@@ -1,0 +1,46 @@
+name: stage2
+description: Downward demand transition from target1 to target2.
+policyRef: ../policies/simulation-default.yaml
+migRulesRef: ../mig-rules/a100-40gb.yaml
+sourceStateRef: target1
+targetStateRef: target2
+workloadOrder:
+  - llama
+  - gpt2
+  - vgg16
+  - resnet50
+  - vit_base
+workloadRefs:
+  llama: ../../manifests/examples/workloadrequests/llama.yaml
+  gpt2: ../../manifests/examples/workloadrequests/gpt2.yaml
+  vgg16: ../../manifests/examples/workloadrequests/vgg16.yaml
+  resnet50: ../../manifests/examples/workloadrequests/resnet50.yaml
+  vit_base: ../../manifests/examples/workloadrequests/vit_base.yaml
+profileCatalogRefs:
+  llama: ../profile-catalogs/llama.yaml
+  gpt2: ../profile-catalogs/gpt2.yaml
+  vgg16: ../profile-catalogs/vgg16.yaml
+  resnet50: ../profile-catalogs/resnet50.yaml
+  vit_base: ../profile-catalogs/vit_base.yaml
+sourceArrival:
+  llama: 3.45
+  gpt2: 22.4
+  vgg16: 324
+  resnet50: 324
+  vit_base: 9000
+targetArrival:
+  llama: 2.484
+  gpt2: 17.472
+  vgg16: 97.2
+  resnet50: 97.2
+  vit_base: 2700
+transition:
+  from: target1
+  to: target2
+  kind: demand-down
+  multipliers:
+    llama: 0.72
+    gpt2: 0.78
+    vgg16: 0.3
+    resnet50: 0.3
+    vit_base: 0.3

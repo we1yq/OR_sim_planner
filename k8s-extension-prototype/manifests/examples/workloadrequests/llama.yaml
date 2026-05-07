@@ -1,0 +1,16 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: WorkloadRequest
+metadata:
+  name: llama
+  namespace: or-sim
+spec:
+  model: llama
+  family: llm
+  arrivalRate: 3
+  allowedBatches:
+    - 1
+  priority: normal
+  slo:
+    ttftMs: 100
+    tpotMs: 25
+

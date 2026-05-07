@@ -1,0 +1,165 @@
+gpuModel: NVIDIA A100 40GB
+sliceCount: 7
+profiles:
+  - name: 1g
+    slices: 1
+    memoryMb: 5120
+  - name: 2g
+    slices: 2
+    memoryMb: 10240
+  - name: 3g
+    slices: 3
+    memoryMb: 20480
+  - name: 4g
+    slices: 4
+    memoryMb: 20480
+  - name: 7g
+    slices: 7
+    memoryMb: 40960
+templates:
+  - name: "7"
+    capacity:
+      7g: 1
+      4g: 0
+      3g: 0
+      2g: 0
+      1g: 0
+    physicalRealizations:
+      - profiles: [7g]
+  - name: "4+3"
+    capacity:
+      7g: 0
+      4g: 1
+      3g: 1
+      2g: 0
+      1g: 0
+    physicalRealizations:
+      - profiles: [4g, 3g]
+  - name: "4+2+1"
+    capacity:
+      7g: 0
+      4g: 1
+      3g: 0
+      2g: 1
+      1g: 1
+    physicalRealizations:
+      - profiles: [4g, 2g, 1g]
+  - name: "4+1+1+1"
+    capacity:
+      7g: 0
+      4g: 1
+      3g: 0
+      2g: 0
+      1g: 3
+    physicalRealizations:
+      - profiles: [4g, 1g, 1g, 1g]
+  - name: "3+3"
+    capacity:
+      7g: 0
+      4g: 0
+      3g: 2
+      2g: 0
+      1g: 0
+    physicalRealizations:
+      - profiles: [3g, 3g]
+    transitionRewriteCandidates:
+      - profiles: [4g, 3g]
+        reason: Legalization/preserve fallback for six-slice 3+3 layout.
+  - name: "3+2+1"
+    capacity:
+      7g: 0
+      4g: 0
+      3g: 1
+      2g: 1
+      1g: 1
+    physicalRealizations:
+      - profiles: [3g, 2g, 1g]
+    transitionRewriteCandidates:
+      - profiles: [4g, 2g, 1g]
+        reason: Upgrade-style preserve fallback.
+      - profiles: [1g, 1g, 2g, 3g]
+        reason: Legal physical ordering fallback.
+      - profiles: [2g, 1g, 1g, 3g]
+        reason: Legal physical ordering fallback.
+  - name: "3+1+1+1"
+    capacity:
+      7g: 0
+      4g: 0
+      3g: 1
+      2g: 0
+      1g: 3
+    physicalRealizations:
+      - profiles: [3g, 1g, 1g, 1g]
+    transitionRewriteCandidates:
+      - profiles: [4g, 1g, 1g, 1g]
+        reason: Upgrade-style preserve fallback.
+      - profiles: [1g, 1g, 1g, 1g, 3g]
+        reason: Legal physical ordering fallback.
+  - name: "2+2+3"
+    capacity:
+      7g: 0
+      4g: 0
+      3g: 1
+      2g: 2
+      1g: 0
+    physicalRealizations:
+      - profiles: [2g, 2g, 3g]
+  - name: "3+2+1+1"
+    capacity:
+      7g: 0
+      4g: 0
+      3g: 1
+      2g: 1
+      1g: 2
+    physicalRealizations:
+      - profiles: [2g, 1g, 1g, 3g]
+      - profiles: [1g, 1g, 2g, 3g]
+  - name: "3+1+1+1+1"
+    capacity:
+      7g: 0
+      4g: 0
+      3g: 1
+      2g: 0
+      1g: 4
+    physicalRealizations:
+      - profiles: [1g, 1g, 1g, 1g, 3g]
+  - name: "2+2+2+1"
+    capacity:
+      7g: 0
+      4g: 0
+      3g: 0
+      2g: 3
+      1g: 1
+    physicalRealizations:
+      - profiles: [2g, 2g, 2g, 1g]
+  - name: "2+2+1+1+1"
+    capacity:
+      7g: 0
+      4g: 0
+      3g: 0
+      2g: 2
+      1g: 3
+    physicalRealizations:
+      - profiles: [2g, 1g, 1g, 2g, 1g]
+      - profiles: [1g, 1g, 2g, 2g, 1g]
+  - name: "2+1+1+1+1+1"
+    capacity:
+      7g: 0
+      4g: 0
+      3g: 0
+      2g: 1
+      1g: 5
+    physicalRealizations:
+      - profiles: [2g, 1g, 1g, 1g, 1g, 1g]
+      - profiles: [1g, 1g, 2g, 1g, 1g, 1g]
+      - profiles: [1g, 1g, 1g, 1g, 2g, 1g]
+      - profiles: [1g, 1g, 1g, 1g, 1g, 2g]
+  - name: "1+1+1+1+1+1+1"
+    capacity:
+      7g: 0
+      4g: 0
+      3g: 0
+      2g: 0
+      1g: 7
+    physicalRealizations:
+      - profiles: [1g, 1g, 1g, 1g, 1g, 1g, 1g]

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mock-gpu-state
+  namespace: or-sim
+data:
+  gpu-state.yaml: |
+    gpus:
+      - gpuId: 0
+        source: mock
+        migEnabled: true
+        instances:
+          - start: 0
+            end: 7
+            profile: void
+            workload: null
+

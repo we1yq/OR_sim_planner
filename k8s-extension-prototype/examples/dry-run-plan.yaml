@@ -1,0 +1,22 @@
+dryRun: true
+planner: v3
+summary:
+  phase: InsufficientMockCapacity
+  message: Selected target demand needs more MIG slices than the current mock state exposes.
+  workload: gpt2
+  arrivalRate: 20.0
+  selectedProfile: 1g
+  selectedBatch: 1
+  instancesNeeded: 18
+  providedMu: 20.35917
+actions:
+  - type: report_insufficient_capacity
+    workload: gpt2
+    selectedProfile: 1g
+    batch: 1
+    instancesNeeded: 18
+    instancesKept: 0
+    missingInstances: 18
+    totalSlicesNeeded: 18
+    totalFreeSlices: 7
+    risk: none

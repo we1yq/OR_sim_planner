@@ -1,0 +1,46 @@
+name: stage1
+description: First upward demand transition from target0 to target1.
+policyRef: ../policies/simulation-default.yaml
+migRulesRef: ../mig-rules/a100-40gb.yaml
+sourceStateRef: target0
+targetStateRef: target1
+workloadOrder:
+  - llama
+  - gpt2
+  - vgg16
+  - resnet50
+  - vit_base
+workloadRefs:
+  llama: ../../manifests/examples/workloadrequests/llama.yaml
+  gpt2: ../../manifests/examples/workloadrequests/gpt2.yaml
+  vgg16: ../../manifests/examples/workloadrequests/vgg16.yaml
+  resnet50: ../../manifests/examples/workloadrequests/resnet50.yaml
+  vit_base: ../../manifests/examples/workloadrequests/vit_base.yaml
+profileCatalogRefs:
+  llama: ../profile-catalogs/llama.yaml
+  gpt2: ../profile-catalogs/gpt2.yaml
+  vgg16: ../profile-catalogs/vgg16.yaml
+  resnet50: ../profile-catalogs/resnet50.yaml
+  vit_base: ../profile-catalogs/vit_base.yaml
+sourceArrival:
+  llama: 3
+  gpt2: 20
+  vgg16: 300
+  resnet50: 300
+  vit_base: 3000
+targetArrival:
+  llama: 3.45
+  gpt2: 22.4
+  vgg16: 324
+  resnet50: 324
+  vit_base: 9000
+transition:
+  from: target0
+  to: target1
+  kind: demand-up
+  multipliers:
+    llama: 1.15
+    gpt2: 1.12
+    vgg16: 1.08
+    resnet50: 1.08
+    vit_base: 3

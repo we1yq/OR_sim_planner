@@ -1,0 +1,65 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: migplans.mig.or-sim.io
+spec:
+  group: mig.or-sim.io
+  scope: Namespaced
+  names:
+    plural: migplans
+    singular: migplan
+    kind: MigPlan
+    shortNames:
+      - mp
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                dryRun:
+                  type: boolean
+                planner:
+                  type: string
+                scenario:
+                  type: string
+                sourceStateRef:
+                  type: string
+                targetStateRef:
+                  type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                reachedTarget:
+                  type: boolean
+                actions:
+                  type: array
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                metrics:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                milp:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                targetState:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                executedState:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                canonicalNextState:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                message:
+                  type: string
+      subresources:
+        status: {}

@@ -1,0 +1,42 @@
+name: stage0
+description: Baseline planning tick from an empty simulation cluster to the first target.
+policyRef: ../policies/simulation-default.yaml
+migRulesRef: ../mig-rules/a100-40gb.yaml
+sourceStateRef: ../gpu-states/simulation-empty-9-a100.yaml
+targetStateRef: target0
+workloadOrder:
+  - llama
+  - gpt2
+  - vgg16
+  - resnet50
+  - vit_base
+workloadRefs:
+  llama: ../../manifests/examples/workloadrequests/llama.yaml
+  gpt2: ../../manifests/examples/workloadrequests/gpt2.yaml
+  vgg16: ../../manifests/examples/workloadrequests/vgg16.yaml
+  resnet50: ../../manifests/examples/workloadrequests/resnet50.yaml
+  vit_base: ../../manifests/examples/workloadrequests/vit_base.yaml
+profileCatalogRefs:
+  llama: ../profile-catalogs/llama.yaml
+  gpt2: ../profile-catalogs/gpt2.yaml
+  vgg16: ../profile-catalogs/vgg16.yaml
+  resnet50: ../profile-catalogs/resnet50.yaml
+  vit_base: ../profile-catalogs/vit_base.yaml
+sourceArrival:
+  llama: 0
+  gpt2: 0
+  vgg16: 0
+  resnet50: 0
+  vit_base: 0
+targetArrival:
+  llama: 3
+  gpt2: 20
+  vgg16: 300
+  resnet50: 300
+  vit_base: 3000
+transition:
+  from: source0
+  to: target0
+  kind: bootstrap
+  notes:
+    - Pure create path from the empty simulation source.

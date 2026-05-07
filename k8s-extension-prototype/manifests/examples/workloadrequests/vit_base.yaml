@@ -1,0 +1,20 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: WorkloadRequest
+metadata:
+  name: vit-base
+  namespace: or-sim
+spec:
+  model: vit_base
+  family: cv
+  arrivalRate: 3000
+  allowedBatches:
+    - 1
+    - 2
+    - 4
+    - 8
+    - 16
+    - 32
+    - 64
+  priority: normal
+  slo:
+    e2eMs: 50

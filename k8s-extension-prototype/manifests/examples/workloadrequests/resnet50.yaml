@@ -1,0 +1,20 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: WorkloadRequest
+metadata:
+  name: resnet50
+  namespace: or-sim
+spec:
+  model: resnet50
+  family: cv
+  arrivalRate: 300
+  allowedBatches:
+    - 4
+    - 8
+    - 16
+    - 32
+    - 64
+    - 128
+  priority: normal
+  slo:
+    e2eMs: 50
+
