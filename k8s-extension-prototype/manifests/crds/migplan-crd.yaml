@@ -15,6 +15,25 @@ spec:
     - name: v1alpha1
       served: true
       storage: true
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Target
+          type: boolean
+          jsonPath: .status.reachedTarget
+        - name: GPUs
+          type: integer
+          jsonPath: .status.metrics.gpuCount
+        - name: Iters
+          type: integer
+          jsonPath: .status.metrics.iterationCount
+        - name: Actions
+          type: integer
+          jsonPath: .status.metrics.actionCount
+        - name: StateCM
+          type: string
+          jsonPath: .status.canonicalNextStateConfigMap
       schema:
         openAPIV3Schema:
           type: object
@@ -31,6 +50,10 @@ spec:
                 sourceStateRef:
                   type: string
                 targetStateRef:
+                  type: string
+                sourceStateConfigMap:
+                  type: string
+                outputStateConfigMap:
                   type: string
             status:
               type: object
@@ -59,6 +82,14 @@ spec:
                 canonicalNextState:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+                canonicalNextStateConfigMap:
+                  type: string
+                observedGeneration:
+                  type: integer
+                migPlanName:
+                  type: string
+                patchError:
+                  type: string
                 message:
                   type: string
       subresources:

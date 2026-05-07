@@ -1,0 +1,11 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: MigPlan
+metadata:
+  name: stage3
+  namespace: or-sim
+spec:
+  dryRun: true
+  planner: v3
+  scenario: stage3
+  sourceStateConfigMap: target2-state
+  outputStateConfigMap: target3-state

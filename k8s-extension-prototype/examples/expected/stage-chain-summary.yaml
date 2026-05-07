@@ -1,0 +1,99 @@
+kind: ExpectedMigPlanStageChainSummary
+apiVersion: mig.or-sim.io/v1alpha1
+planner: v3
+source: mock/scenarios/stage0.yaml..stage3.yaml
+stages:
+  - stage: stage0
+    phase: ReachedTarget
+    gpuCount: 6
+    iterationCount: 1
+    actionCount: 36
+    peakActiveGpu: 9
+    finalActiveGpu: 6
+    chosenTemplates:
+      - 4+3
+      - 4+1+1+1
+      - 4+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 2+1+1+1+1+1
+    canonicalPhysicalIds:
+      0: D
+      1: E
+      2: F
+      3: G
+      4: H
+      5: I
+  - stage: stage1
+    phase: ReachedTarget
+    gpuCount: 9
+    iterationCount: 3
+    actionCount: 14
+    peakActiveGpu: 9
+    finalActiveGpu: 9
+    chosenTemplates:
+      - 4+3
+      - 4+3
+      - 2+2+3
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+    canonicalPhysicalIds:
+      0: D
+      1: E
+      2: F
+      3: G
+      4: H
+      5: I
+      6: A
+      7: B
+      8: C
+  - stage: stage2
+    phase: ReachedTarget
+    gpuCount: 6
+    iterationCount: 5
+    actionCount: 30
+    peakActiveGpu: 10
+    finalActiveGpu: 6
+    chosenTemplates:
+      - 4+3
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 2+2+1+1+1
+    canonicalPhysicalIds:
+      0: D
+      1: E
+      2: G
+      3: H
+      4: I
+      5: J
+  - stage: stage3
+    phase: ReachedTarget
+    gpuCount: 8
+    iterationCount: 3
+    actionCount: 17
+    peakActiveGpu: 8
+    finalActiveGpu: 8
+    chosenTemplates:
+      - 4+3
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+      - 3+1+1+1+1
+    canonicalPhysicalIds:
+      0: D
+      1: E
+      2: G
+      3: H
+      4: I
+      5: J
+      6: A
+      7: B

@@ -6,6 +6,7 @@ from pathlib import Path
 from io_utils import dump_yaml, load_yaml
 from k8s_adapter import plan_scenario_as_migplan_status, plan_scenario_chain_as_migplan_statuses
 from mig_rules import load_mig_rules, mig_rules_summary_dict, validate_gpu_state_against_mig_rules
+from reconciler import reconcile_migplan_once, run_controller_loop, run_watch_controller_loop
 from scenario_loader import load_planning_scenario, scenario_summary_dict
 from state_adapter import gpu_state_from_mock_yaml
 
@@ -52,6 +53,57 @@ def parse_args() -> argparse.Namespace:
         help="Print verbose MILP/target-builder logs.",
     )
     parser.add_argument(
+        "--reconcile-migplan",
+        help="Name of a MigPlan CR to reconcile once by patching status with a dry-run plan.",
+    )
+    parser.add_argument(
+        "--namespace",
+        default="or-sim",
+        help="Kubernetes namespace for --reconcile-migplan.",
+    )
+    parser.add_argument(
+        "--scenario-root",
+        type=Path,
+        help="Directory used to resolve MigPlan spec.scenario values such as stage0.",
+    )
+    parser.add_argument(
+        "--print-reconcile-only",
+        action="store_true",
+        help="For --reconcile-migplan, print the planned status object without patching Kubernetes.",
+    )
+    parser.add_argument(
+        "--run-controller",
+        action="store_true",
+        help="Run a polling MigPlan controller loop that patches dry-run status.",
+    )
+    parser.add_argument(
+        "--run-watch-controller",
+        action="store_true",
+        help="Run a watch-based MigPlan controller loop that patches dry-run status on events.",
+    )
+    parser.add_argument(
+        "--poll-interval-s",
+        type=float,
+        default=10.0,
+        help="Polling interval for --run-controller.",
+    )
+    parser.add_argument(
+        "--controller-max-cycles",
+        type=int,
+        help="Optional cycle limit for --run-controller. Omit to run until interrupted.",
+    )
+    parser.add_argument(
+        "--watch-timeout-s",
+        type=int,
+        default=60,
+        help="Kubernetes watch timeout before reconnecting.",
+    )
+    parser.add_argument(
+        "--watch-max-events",
+        type=int,
+        help="Optional processed-event limit for --run-watch-controller. Omit to run until interrupted.",
+    )
+    parser.add_argument(
         "--validate-mig-rules",
         type=Path,
         help="Path to a MIG rules YAML file. Prints a validation summary.",
@@ -66,6 +118,45 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+
+    if args.run_watch_controller:
+        summary = run_watch_controller_loop(
+            namespace=args.namespace,
+            scenario_root=args.scenario_root,
+            max_iters=args.max_iters,
+            milp_time_limit_s=args.milp_time_limit_s,
+            verbose=args.verbose_planner,
+            watch_timeout_s=args.watch_timeout_s,
+            max_events=args.watch_max_events,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.run_controller:
+        summary = run_controller_loop(
+            namespace=args.namespace,
+            scenario_root=args.scenario_root,
+            max_iters=args.max_iters,
+            milp_time_limit_s=args.milp_time_limit_s,
+            verbose=args.verbose_planner,
+            poll_interval_s=args.poll_interval_s,
+            max_cycles=args.controller_max_cycles,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.reconcile_migplan is not None:
+        plan = reconcile_migplan_once(
+            name=args.reconcile_migplan,
+            namespace=args.namespace,
+            scenario_root=args.scenario_root,
+            max_iters=args.max_iters,
+            milp_time_limit_s=args.milp_time_limit_s,
+            verbose=args.verbose_planner,
+            patch_status=not args.print_reconcile_only,
+        )
+        print(dump_yaml(plan), end="")
+        return 0
 
     if args.plan_scenario is not None:
         scenario = load_planning_scenario(args.plan_scenario)
