@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mig-dry-run-actuator
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: or-sim-mig-planner
+    app.kubernetes.io/component: dry-run-actuator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: or-sim-mig-planner
+      app.kubernetes.io/component: dry-run-actuator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: or-sim-mig-planner
+        app.kubernetes.io/component: dry-run-actuator
+    spec:
+      serviceAccountName: mig-planner-controller
+      containers:
+        - name: actuator
+          image: or-sim-mig-planner:dev
+          imagePullPolicy: IfNotPresent
+          args:
+            - --run-dry-run-actuator
+            - --namespace
+            - or-sim
+            - --poll-interval-s
+            - "5"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi

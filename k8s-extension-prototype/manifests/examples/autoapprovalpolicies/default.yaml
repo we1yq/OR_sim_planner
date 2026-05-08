@@ -1,0 +1,12 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: AutoApprovalPolicy
+metadata:
+  name: default
+  namespace: or-sim
+spec:
+  enabled: true
+  dryRunOnly: true
+  maxActionCount: 40
+  allowedExecutors:
+    - nvidia-gpu-operator
+  requireFullPlanConfigMap: true

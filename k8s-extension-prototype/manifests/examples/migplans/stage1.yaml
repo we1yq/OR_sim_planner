@@ -7,5 +7,6 @@ spec:
   dryRun: true
   planner: v3
   scenario: stage1
+  scenarioConfigMap: scenario-stage1
   sourceStateConfigMap: target0-state
   outputStateConfigMap: target1-state

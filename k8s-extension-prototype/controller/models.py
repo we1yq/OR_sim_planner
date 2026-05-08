@@ -103,7 +103,8 @@ class ScenarioWorkloadDemand:
     source_arrival: float
     target_arrival: float
     workload_ref: str
-    profile_catalog_ref: str
+    profile_catalog_ref: str | None = None
+    profile_catalog_configmap: str | None = None
 
     @property
     def delta(self) -> float:

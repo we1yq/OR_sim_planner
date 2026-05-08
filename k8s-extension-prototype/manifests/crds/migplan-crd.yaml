@@ -47,6 +47,8 @@ spec:
                   type: string
                 scenario:
                   type: string
+                scenarioConfigMap:
+                  type: string
                 sourceStateRef:
                   type: string
                 targetStateRef:
@@ -54,6 +56,8 @@ spec:
                 sourceStateConfigMap:
                   type: string
                 outputStateConfigMap:
+                  type: string
+                actionPlanName:
                   type: string
             status:
               type: object
@@ -70,6 +74,12 @@ spec:
                 metrics:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+                planningTrace:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                planningSummary:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
                 milp:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
@@ -83,6 +93,10 @@ spec:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
                 canonicalNextStateConfigMap:
+                  type: string
+                fullPlanConfigMap:
+                  type: string
+                actionPlanRef:
                   type: string
                 observedGeneration:
                   type: integer

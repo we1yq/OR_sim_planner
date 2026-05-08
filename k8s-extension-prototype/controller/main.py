@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from actuator import run_dry_run_actuator_loop
 from io_utils import dump_yaml, load_yaml
 from k8s_adapter import plan_scenario_as_migplan_status, plan_scenario_chain_as_migplan_statuses
 from mig_rules import load_mig_rules, mig_rules_summary_dict, validate_gpu_state_against_mig_rules
@@ -82,6 +83,11 @@ def parse_args() -> argparse.Namespace:
         help="Run a watch-based MigPlan controller loop that patches dry-run status on events.",
     )
     parser.add_argument(
+        "--run-dry-run-actuator",
+        action="store_true",
+        help="Run a dry-run MigActionPlan actuator loop that validates approved plans without hardware changes.",
+    )
+    parser.add_argument(
         "--poll-interval-s",
         type=float,
         default=10.0,
@@ -128,6 +134,15 @@ def main() -> int:
             verbose=args.verbose_planner,
             watch_timeout_s=args.watch_timeout_s,
             max_events=args.watch_max_events,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.run_dry_run_actuator:
+        summary = run_dry_run_actuator_loop(
+            namespace=args.namespace,
+            poll_interval_s=args.poll_interval_s,
+            max_cycles=args.controller_max_cycles,
         )
         print(dump_yaml(summary), end="")
         return 0

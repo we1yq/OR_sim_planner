@@ -10,10 +10,19 @@ real GPU or MIG operations.
 - `namespace.yaml`: namespace for local experiments.
 - `crds/workloadrequest-crd.yaml`: future CRD for workload demand.
 - `crds/migplan-crd.yaml`: future CRD for dry-run plans.
+- `crds/migactionplan-crd.yaml`: dry-run execution-boundary CRD generated from
+  planner actions.
+- `crds/autoapprovalpolicy-crd.yaml`: policy gate for automatically approving
+  safe dry-run action plans.
 - `controller/*.yaml`: service account, namespaced RBAC, and Deployment for the
   dry-run controller loop.
 - `examples/workloadrequests/*.yaml`: workload requests generated from the
   simulation workload specs.
+- `examples/profile-catalogs/kustomization.yaml`: profile catalog ConfigMaps
+  generated with `data.catalog.yaml` from the catalog YAMLs in that directory.
+- `examples/autoapprovalpolicies/default.yaml`: conservative dry-run-only
+  approval policy.
+- `examples/scenarios/*-configmap.yaml`: PlanningScenario inputs as ConfigMaps.
 - `examples/mock-gpu-states/*.yaml`: sample mock GPU/MIG states as ConfigMaps.
 
 ## Apply Namespace
@@ -38,6 +47,9 @@ Apply the controller resources:
 kubectl apply -f k8s-extension-prototype/manifests/namespace.yaml
 kubectl apply -f k8s-extension-prototype/manifests/crds/
 kubectl apply -f k8s-extension-prototype/manifests/controller/
+kubectl apply -k k8s-extension-prototype/manifests/examples/profile-catalogs/
+kubectl apply -f k8s-extension-prototype/manifests/examples/autoapprovalpolicies/
+kubectl apply -f k8s-extension-prototype/manifests/examples/scenarios/
 kubectl apply -f k8s-extension-prototype/manifests/examples/migplans/
 ```
 
@@ -45,6 +57,9 @@ Watch dry-run status:
 
 ```bash
 kubectl get migplans -n or-sim
+kubectl get migactionplans -n or-sim
+kubectl get autoapprovalpolicies -n or-sim
+kubectl get configmaps -n or-sim -l mig.or-sim.io/input-kind=profile-catalog
 kubectl get configmaps -n or-sim -l mig.or-sim.io/state-kind=canonical-next-state
 ```
 

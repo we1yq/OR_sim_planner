@@ -111,9 +111,20 @@ stage2 spec.sourceStateConfigMap: target1-state -> ConfigMap/target2-state
 stage3 spec.sourceStateConfigMap: target2-state -> ConfigMap/target3-state
 ```
 
+In the current dry-run prototype, `canonicalNextState` is derived from the V3
+transition simulator's executed state. In a real actuator-backed controller, this
+must change: actions must be applied to the cluster first, the controller must
+observe the actual post-action GPU/MIG state, and only that observed executed
+state should be passed through `canonicalize_state_for_next_round`. The
+canonical state is the next planning round's stable input, not proof that a
+planned action succeeded.
+
 Apply all stage examples:
 
 ```bash
+kubectl apply -k k8s-extension-prototype/manifests/examples/profile-catalogs/
+kubectl apply -f k8s-extension-prototype/manifests/examples/autoapprovalpolicies/
+kubectl apply -f k8s-extension-prototype/manifests/examples/scenarios/
 kubectl apply -f k8s-extension-prototype/manifests/examples/migplans/
 
 python3 k8s-extension-prototype/controller/main.py \
@@ -125,6 +136,93 @@ python3 k8s-extension-prototype/controller/main.py \
 kubectl get migplans -n or-sim
 kubectl get configmaps -n or-sim -l mig.or-sim.io/state-kind=canonical-next-state
 ```
+
+Each reconciled `MigPlan.status` is intentionally compact for day-to-day
+inspection. It includes `planningSummary`, which keeps the intermediate planner
+outputs to a short stage-by-stage summary:
+
+```bash
+kubectl get migplan stage0 -n or-sim -o yaml | yq '.status.planningSummary'
+```
+
+The summary includes feasible option count, MILP status/GPU count, target-build
+GPU count, V3 transition iterations/action counts, action counts by type, chosen
+templates, and the canonical physical GPU id mapping.
+
+Verbose debug output is stored separately:
+
+```bash
+kubectl get configmap stage0-full-plan -n or-sim -o yaml
+kubectl get configmap target0-state -n or-sim -o yaml
+```
+
+`*-full-plan` contains the full `planningTrace`, ordered actions, and
+target/executed/canonical state dumps. `target*-state` contains only the
+canonical next state used as the next stage's source.
+
+Each reconcile also writes a `MigActionPlan` object such as
+`stage0-action-plan`. This is the execution boundary for future actuator work:
+it records the action count, action type summary, chosen templates, full-plan
+ConfigMap, canonical next-state ConfigMap, and an executor preview, but it
+remains `dryRun: true` and is only automatically approved when an
+`AutoApprovalPolicy` allows it.
+
+```bash
+kubectl get migactionplans -n or-sim
+kubectl get migactionplan stage0-action-plan -n or-sim -o yaml
+kubectl get autoapprovalpolicy default -n or-sim -o yaml
+```
+
+The default example policy is dry-run-only, allows only the
+`nvidia-gpu-operator` executor, requires a full-plan ConfigMap, and caps action
+plans at 40 actions. Plans that pass become `status.phase: ApprovedDryRun`; plans
+that fail become `ApprovalBlocked`; missing or disabled policy leaves them
+`PendingApproval`.
+
+The dry-run actuator is a separate Deployment. It consumes `ApprovedDryRun`
+action plans, validates that the full-plan and canonical-next-state ConfigMaps
+exist, that the action count matches, and that the executor preview is explicitly
+preview-only, then marks the plan `SucceededDryRun`. It still does not execute
+MIG, Pod, scheduler, or Node changes.
+
+```bash
+kubectl get deployment mig-dry-run-actuator -n or-sim
+kubectl get migactionplans -n or-sim
+```
+
+The intended production executor is `nvidia-gpu-operator`: a future actuator
+should translate approved action plans into NVIDIA GPU Operator/MIG Manager
+inputs, observe the real post-action GPU state, and only then canonicalize the
+observed state for the next planning round. The controller should not jump
+straight to privileged `nvidia-smi` commands unless the operator path is
+insufficient and the safety model is explicit.
+
+`MigActionPlan.spec.executorPreview` is the current interface draft for that
+translation. It maps the canonical target layout into per-physical-GPU target MIG
+geometry and, when a real observer supplies `physicalGpuId -> nodeName/deviceIndex`
+bindings, shows the node labels a GPU Operator/MIG Manager actuator would patch:
+
+```text
+spec.executorPreview.gpuTargets[]
+  logicalGpuId
+  physicalGpuId
+  nodeName
+  deviceIndex
+  targetTemplate
+  targetInstances
+
+spec.executorPreview.migManagerTargetConfigs[]
+spec.executorPreview.wouldPatchNodeLabels:
+  <nodeName>:
+    nvidia.com/mig.config: <generated-config-name>
+```
+
+In kind, `nodeName` and `deviceIndex` are normally unresolved because there is no
+NVIDIA GPU node inventory. That is expected: kind validates the CRD/controller/
+status/ConfigMap/action-plan/preview flow, not real MIG hardware. A real actuator
+must first observe physical GPU bindings and current MIG layouts, then convert
+the approved preview into GPU Operator/MIG Manager config, execute it, observe
+the actual result, and canonicalize that observed state.
 
 ## Run The Polling Controller Loop
 
@@ -153,6 +251,12 @@ requests, scheduler configuration, or MIG state.
 Kubernetes I/O is isolated behind `k8s_api.py` and uses the Kubernetes Python
 client. In-cluster config is used inside the controller Pod; local kubeconfig is
 used when the controller is run from a development shell.
+
+`MigPlan.spec.scenarioConfigMap` is preferred over the older `spec.scenario`
+file lookup. Scenario ConfigMaps can use `profileCatalogConfigMaps` to point at
+profile catalog ConfigMaps whose `data.catalog.yaml` contains the catalog YAML.
+The older `profileCatalogRefs` file lookup remains available as a fallback for
+local mock scenarios.
 
 Smoke-test the reconciler helpers without a cluster:
 

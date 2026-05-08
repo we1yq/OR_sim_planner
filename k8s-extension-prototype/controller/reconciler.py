@@ -7,9 +7,11 @@ from typing import Any
 
 import yaml
 
+from executor_preview import build_gpu_operator_executor_preview
+from feasible_options import profile_catalog_from_yaml
 from k8s_adapter import cluster_state_from_dict, plan_scenario_as_migplan_status
 from k8s_api import KubernetesClient, PythonKubernetesClient
-from scenario_loader import load_planning_scenario
+from scenario_loader import load_planning_scenario, planning_scenario_from_yaml
 
 
 def run_controller_loop(
@@ -182,8 +184,12 @@ def reconcile_migplan_once(
     spec = dict(migplan.get("spec", {}))
     _validate_supported_spec(spec)
 
-    scenario_path = _resolve_scenario_ref(spec.get("scenario"), scenario_root)
-    scenario = load_planning_scenario(scenario_path)
+    scenario = load_scenario_for_migplan_spec(
+        spec=spec,
+        namespace=namespace,
+        scenario_root=scenario_root,
+        client=client,
+    )
     source_state = None
     if spec.get("sourceStateConfigMap"):
         source_state = load_cluster_state_from_configmap(
@@ -191,30 +197,57 @@ def reconcile_migplan_once(
             namespace=namespace,
             client=client,
         )
+    profile_catalogs_by_workload = load_profile_catalogs_for_scenario(
+        scenario=scenario,
+        namespace=namespace,
+        client=client,
+    )
     planned = plan_scenario_as_migplan_status(
         scenario=scenario,
         source_state_override=source_state,
+        profile_catalogs_by_workload=profile_catalogs_by_workload,
         max_iters=max_iters,
         milp_time_limit_s=milp_time_limit_s,
         verbose=verbose,
     )
 
-    status = dict(planned["status"])
-    status["observedGeneration"] = int(migplan.get("metadata", {}).get("generation", 0))
-    status["migPlanName"] = name
+    full_status = dict(planned["status"])
+    full_status["observedGeneration"] = int(migplan.get("metadata", {}).get("generation", 0))
+    full_status["migPlanName"] = name
     output_configmap = _output_state_configmap_name(spec=spec, planned=planned)
     if output_configmap:
-        status["canonicalNextStateConfigMap"] = output_configmap
+        full_status["canonicalNextStateConfigMap"] = output_configmap
+    full_plan_configmap = _full_plan_configmap_name(spec=spec, migplan_name=name)
+    full_status["fullPlanConfigMap"] = full_plan_configmap
+    action_plan_name = _action_plan_name(spec=spec, migplan_name=name)
+    full_status["actionPlanRef"] = action_plan_name
+    status = compact_migplan_status_for_k8s(full_status)
 
     if patch_status:
         if output_configmap:
             upsert_cluster_state_configmap(
                 name=output_configmap,
                 namespace=namespace,
-                state=status["canonicalNextState"],
+                state=full_status["canonicalNextState"],
                 owner_migplan=name,
                 client=client,
             )
+        upsert_full_plan_configmap(
+            name=full_plan_configmap,
+            namespace=namespace,
+            status=full_status,
+            owner_migplan=name,
+            client=client,
+        )
+        upsert_migactionplan(
+            name=action_plan_name,
+            namespace=namespace,
+            owner_migplan=name,
+            migplan_generation=int(migplan.get("metadata", {}).get("generation", 0)),
+            auto_approval_policy_name=str(spec.get("autoApprovalPolicy", "default")),
+            status=full_status,
+            client=client,
+        )
         client.patch_migplan_status(name=name, namespace=namespace, status=status)
 
     return {
@@ -326,6 +359,61 @@ def load_cluster_state_from_configmap(
     return cluster_state_from_dict(obj)
 
 
+def load_scenario_for_migplan_spec(
+    spec: dict[str, Any],
+    namespace: str,
+    scenario_root: str | Path | None = None,
+    client: KubernetesClient | None = None,
+) -> Any:
+    if spec.get("scenarioConfigMap"):
+        client = client or PythonKubernetesClient()
+        name = str(spec["scenarioConfigMap"])
+        configmap = client.get_configmap(name=name, namespace=namespace)
+        data = dict(configmap.get("data", {}))
+        raw = data.get("scenario.yaml")
+        if raw is None:
+            raise ValueError(f"ConfigMap {namespace}/{name} does not contain data.scenario.yaml")
+        obj = yaml.safe_load(raw)
+        if not isinstance(obj, dict):
+            raise ValueError(f"ConfigMap {namespace}/{name} data.scenario.yaml is not a YAML object")
+        return planning_scenario_from_yaml(obj, base_dir=_scenario_base_dir(scenario_root))
+
+    scenario_path = _resolve_scenario_ref(spec.get("scenario"), scenario_root)
+    return load_planning_scenario(scenario_path)
+
+
+def load_profile_catalogs_for_scenario(
+    scenario: Any,
+    namespace: str,
+    client: KubernetesClient | None = None,
+) -> dict[str, Any] | None:
+    configmap_refs = {
+        workload.name: workload.profile_catalog_configmap
+        for workload in scenario.workloads
+        if workload.profile_catalog_configmap
+    }
+    if not configmap_refs:
+        return None
+
+    client = client or PythonKubernetesClient()
+    catalogs = {}
+    for workload_name, configmap_name in configmap_refs.items():
+        configmap = client.get_configmap(name=str(configmap_name), namespace=namespace)
+        data = dict(configmap.get("data", {}))
+        raw = data.get("catalog.yaml")
+        if raw is None:
+            raise ValueError(
+                f"ConfigMap {namespace}/{configmap_name} does not contain data.catalog.yaml"
+            )
+        obj = yaml.safe_load(raw)
+        if not isinstance(obj, dict):
+            raise ValueError(
+                f"ConfigMap {namespace}/{configmap_name} data.catalog.yaml is not a YAML object"
+            )
+        catalogs[workload_name] = profile_catalog_from_yaml(obj)
+    return catalogs
+
+
 def upsert_cluster_state_configmap(
     name: str,
     namespace: str,
@@ -353,6 +441,222 @@ def upsert_cluster_state_configmap(
     client.apply_configmap(manifest)
 
 
+def upsert_full_plan_configmap(
+    name: str,
+    namespace: str,
+    status: dict[str, Any],
+    owner_migplan: str,
+    client: KubernetesClient | None = None,
+) -> None:
+    client = client or PythonKubernetesClient()
+    manifest = {
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "app.kubernetes.io/name": "or-sim-mig-planner",
+                "mig.or-sim.io/state-kind": "full-plan-debug",
+                "mig.or-sim.io/owner-migplan": owner_migplan,
+            },
+        },
+        "data": {
+            "status.yaml": yaml.safe_dump(status, sort_keys=False),
+        },
+    }
+    client.apply_configmap(manifest)
+
+
+def upsert_migactionplan(
+    name: str,
+    namespace: str,
+    owner_migplan: str,
+    migplan_generation: int,
+    auto_approval_policy_name: str,
+    status: dict[str, Any],
+    client: KubernetesClient | None = None,
+) -> None:
+    client = client or PythonKubernetesClient()
+    metrics = dict(status.get("metrics", {}))
+    summary = dict(status.get("planningSummary") or _planning_summary(status.get("planningTrace", {})))
+    executor_preview = build_gpu_operator_executor_preview(status)
+    manifest = {
+        "apiVersion": "mig.or-sim.io/v1alpha1",
+        "kind": "MigActionPlan",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "app.kubernetes.io/name": "or-sim-mig-planner",
+                "mig.or-sim.io/owner-migplan": owner_migplan,
+            },
+        },
+        "spec": {
+            "migPlanRef": owner_migplan,
+            "migPlanGeneration": int(migplan_generation),
+            "dryRun": True,
+            "executor": "nvidia-gpu-operator",
+            "phaseGate": "PendingApproval",
+            "autoApprovalPolicyRef": auto_approval_policy_name,
+            "fullPlanConfigMap": status.get("fullPlanConfigMap"),
+            "canonicalNextStateConfigMap": status.get("canonicalNextStateConfigMap"),
+            "actionCount": int(metrics.get("actionCount", 0)),
+            "actionCountsByType": summary.get("actionCountsByType", {}),
+            "chosenTemplates": summary.get("chosenTemplates", []),
+            "targetGpuCount": int(metrics.get("gpuCount", 0)),
+            "executorPreview": executor_preview,
+            "notes": [
+                "Dry-run action plan only; no MIG, Pod, or scheduler changes are executed.",
+                "Future actuator should translate this plan through NVIDIA GPU Operator MIG Manager before considering direct host commands.",
+            ],
+        },
+    }
+    client.apply_migactionplan(manifest)
+    policy = client.get_autoapprovalpolicy(name=auto_approval_policy_name, namespace=namespace)
+    action_plan_status = evaluate_auto_approval_policy(policy=policy, action_plan=manifest)
+    client.patch_migactionplan_status(name=name, namespace=namespace, status=action_plan_status)
+
+
+def evaluate_auto_approval_policy(
+    policy: dict[str, Any] | None,
+    action_plan: dict[str, Any],
+) -> dict[str, Any]:
+    spec = dict(action_plan.get("spec", {}))
+    if policy is None:
+        return {
+            "phase": "PendingApproval",
+            "approved": False,
+            "executed": False,
+            "message": "No AutoApprovalPolicy found; waiting for approval.",
+        }
+
+    policy_spec = dict(policy.get("spec", {}))
+    if not bool(policy_spec.get("enabled", False)):
+        return {
+            "phase": "PendingApproval",
+            "approved": False,
+            "executed": False,
+            "policyRef": policy.get("metadata", {}).get("name"),
+            "message": "AutoApprovalPolicy is disabled; waiting for approval.",
+        }
+
+    reasons = []
+    if bool(policy_spec.get("dryRunOnly", True)) and not bool(spec.get("dryRun", False)):
+        reasons.append("dryRunOnly policy rejected a non-dry-run action plan")
+
+    max_action_count = policy_spec.get("maxActionCount")
+    if max_action_count is not None and int(spec.get("actionCount", 0)) > int(max_action_count):
+        reasons.append(
+            f"actionCount {spec.get('actionCount', 0)} exceeds maxActionCount {max_action_count}"
+        )
+
+    allowed_executors = list(policy_spec.get("allowedExecutors", []))
+    if allowed_executors and spec.get("executor") not in allowed_executors:
+        reasons.append(f"executor {spec.get('executor')} is not allowed")
+
+    if bool(policy_spec.get("requireFullPlanConfigMap", True)) and not spec.get("fullPlanConfigMap"):
+        reasons.append("fullPlanConfigMap is required")
+
+    if reasons:
+        return {
+            "phase": "ApprovalBlocked",
+            "approved": False,
+            "executed": False,
+            "policyRef": policy.get("metadata", {}).get("name"),
+            "reasons": reasons,
+            "message": "AutoApprovalPolicy rejected the dry-run action plan.",
+        }
+
+    return {
+        "phase": "ApprovedDryRun",
+        "approved": True,
+        "executed": False,
+        "policyRef": policy.get("metadata", {}).get("name"),
+        "message": "AutoApprovalPolicy approved this dry-run action plan. No hardware actions executed.",
+    }
+
+
+def compact_migplan_status_for_k8s(status: dict[str, Any]) -> dict[str, Any]:
+    compact = {
+        "phase": status.get("phase"),
+        "reachedTarget": status.get("reachedTarget"),
+        "message": status.get("message"),
+        "metrics": dict(status.get("metrics", {})),
+        "planningSummary": _planning_summary(status.get("planningTrace", {})),
+        "observedGeneration": status.get("observedGeneration"),
+        "migPlanName": status.get("migPlanName"),
+        "canonicalNextStateConfigMap": status.get("canonicalNextStateConfigMap"),
+        "fullPlanConfigMap": status.get("fullPlanConfigMap"),
+        "actionPlanRef": status.get("actionPlanRef"),
+    }
+    milp = dict(status.get("milp", {}))
+    compact["milp"] = {
+        "status": milp.get("status"),
+        "gpuCount": milp.get("gpuCount"),
+        "chosenTemplates": milp.get("chosenTemplates", []),
+        "KTotal": milp.get("KTotal", {}),
+        "alloc": None,
+    }
+    compact.update(
+        {
+            "actions": None,
+            "planningTrace": None,
+            "targetState": None,
+            "executedState": None,
+            "canonicalNextState": None,
+        }
+    )
+    return compact
+
+
+def _planning_summary(trace: dict[str, Any]) -> dict[str, Any]:
+    feasible = dict(trace.get("feasibleOptions", {}))
+    milp = dict(trace.get("milp", {}))
+    target_build = dict(trace.get("targetBuild", {}))
+    transition = dict(trace.get("transition", {}))
+    canonicalization = dict(trace.get("canonicalization", {}))
+    return {
+        "pipeline": [
+            {
+                "stage": "feasible-options",
+                "elapsedSec": feasible.get("elapsedSec"),
+                "optionCount": feasible.get("optionCount"),
+            },
+            {
+                "stage": "milp",
+                "elapsedSec": milp.get("elapsedSec"),
+                "status": milp.get("status"),
+                "gpuCount": milp.get("gpuCount"),
+                "totalInstances": milp.get("totalInstances"),
+                "totalSlack": milp.get("totalSlack"),
+            },
+            {
+                "stage": "target-build",
+                "elapsedSec": target_build.get("elapsedSec"),
+                "targetGpuCount": target_build.get("targetGpuCount"),
+                "method": target_build.get("method"),
+            },
+            {
+                "stage": "v3-transition",
+                "elapsedSec": transition.get("elapsedSec"),
+                "iterationCount": transition.get("iterationCount"),
+                "actionCount": transition.get("actionCount"),
+                "reachedTarget": transition.get("reachedTarget"),
+            },
+            {
+                "stage": "canonicalization",
+                "canonicalGpuCount": canonicalization.get("canonicalGpuCount"),
+                "canonicalPhysicalIds": canonicalization.get("canonicalPhysicalIds"),
+            },
+        ],
+        "actionCountsByType": transition.get("actionCountsByType", {}),
+        "chosenTemplates": milp.get("chosenTemplates", []),
+        "KTotal": milp.get("KTotal", {}),
+        "fullTrace": "See status.fullPlanConfigMap data.status.yaml",
+    }
+
+
 def should_reconcile_migplan(migplan: dict[str, Any]) -> bool:
     metadata = dict(migplan.get("metadata", {}))
     status = dict(migplan.get("status", {}))
@@ -372,8 +676,8 @@ def _validate_supported_spec(spec: dict[str, Any]) -> None:
         raise ValueError("Only dryRun MigPlan reconciliation is supported")
     if str(spec.get("planner", "v3")) != "v3":
         raise ValueError("Only planner=v3 is supported")
-    if not spec.get("scenario"):
-        raise ValueError("MigPlan spec.scenario is required")
+    if not spec.get("scenario") and not spec.get("scenarioConfigMap"):
+        raise ValueError("MigPlan spec.scenario or spec.scenarioConfigMap is required")
 
 
 def _output_state_configmap_name(spec: dict[str, Any], planned: dict[str, Any]) -> str | None:
@@ -386,13 +690,29 @@ def _output_state_configmap_name(spec: dict[str, Any], planned: dict[str, Any]) 
     return f"{raw}-state"
 
 
+def _full_plan_configmap_name(spec: dict[str, Any], migplan_name: str) -> str:
+    if spec.get("fullPlanConfigMap"):
+        return str(spec["fullPlanConfigMap"])
+    return f"{migplan_name}-full-plan"
+
+
+def _action_plan_name(spec: dict[str, Any], migplan_name: str) -> str:
+    if spec.get("actionPlanName"):
+        return str(spec["actionPlanName"])
+    return f"{migplan_name}-action-plan"
+
+
 def _resolve_scenario_ref(value: Any, scenario_root: str | Path | None) -> Path:
     raw = str(value)
     path = Path(raw)
     if path.is_absolute() or path.exists():
         return path
 
-    root = Path(scenario_root) if scenario_root is not None else Path(__file__).resolve().parents[1] / "mock/scenarios"
+    root = _scenario_base_dir(scenario_root)
     if path.suffix:
         return root / path
     return root / f"{raw}.yaml"
+
+
+def _scenario_base_dir(scenario_root: str | Path | None) -> Path:
+    return Path(scenario_root) if scenario_root is not None else Path(__file__).resolve().parents[1] / "mock/scenarios"

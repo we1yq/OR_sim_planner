@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: or-sim
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    app.kubernetes.io/name: or-sim-mig-planner
+    mig.or-sim.io/input-kind: profile-catalog
+configMapGenerator:
+  - name: profile-catalog-llama
+    files:
+      - catalog.yaml=catalogs/llama.yaml
+  - name: profile-catalog-gpt2
+    files:
+      - catalog.yaml=catalogs/gpt2.yaml
+  - name: profile-catalog-vgg16
+    files:
+      - catalog.yaml=catalogs/vgg16.yaml
+  - name: profile-catalog-resnet50
+    files:
+      - catalog.yaml=catalogs/resnet50.yaml
+  - name: profile-catalog-vit-base
+    files:
+      - catalog.yaml=catalogs/vit_base.yaml

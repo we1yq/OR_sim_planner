@@ -22,7 +22,12 @@ def planning_scenario_from_yaml(obj: dict[str, Any], base_dir: Path | None = Non
     source_arrival = _required_mapping(obj, "sourceArrival")
     target_arrival = _required_mapping(obj, "targetArrival")
     workload_refs = _required_mapping(obj, "workloadRefs")
-    profile_catalog_refs = _required_mapping(obj, "profileCatalogRefs")
+    profile_catalog_refs = _optional_mapping(obj, "profileCatalogRefs")
+    profile_catalog_configmaps = _optional_mapping(obj, "profileCatalogConfigMaps")
+    if profile_catalog_refs is None and profile_catalog_configmaps is None:
+        raise ValueError(
+            "PlanningScenario profileCatalogRefs or profileCatalogConfigMaps is required"
+        )
 
     if not workload_order:
         workload_order = list(target_arrival.keys())
@@ -33,7 +38,12 @@ def planning_scenario_from_yaml(obj: dict[str, Any], base_dir: Path | None = Non
             "sourceArrival": source_arrival,
             "targetArrival": target_arrival,
             "workloadRefs": workload_refs,
-            "profileCatalogRefs": profile_catalog_refs,
+            **({"profileCatalogRefs": profile_catalog_refs} if profile_catalog_refs is not None else {}),
+            **(
+                {"profileCatalogConfigMaps": profile_catalog_configmaps}
+                if profile_catalog_configmaps is not None
+                else {}
+            ),
         },
     )
 
@@ -43,7 +53,16 @@ def planning_scenario_from_yaml(obj: dict[str, Any], base_dir: Path | None = Non
             source_arrival=float(source_arrival[workload]),
             target_arrival=float(target_arrival[workload]),
             workload_ref=_resolve_ref(str(workload_refs[workload]), base_dir),
-            profile_catalog_ref=_resolve_ref(str(profile_catalog_refs[workload]), base_dir),
+            profile_catalog_ref=(
+                _resolve_ref(str(profile_catalog_refs[workload]), base_dir)
+                if profile_catalog_refs is not None and workload in profile_catalog_refs
+                else None
+            ),
+            profile_catalog_configmap=(
+                str(profile_catalog_configmaps[workload])
+                if profile_catalog_configmaps is not None and workload in profile_catalog_configmaps
+                else None
+            ),
         )
         for workload in workload_order
     ]
@@ -78,6 +97,7 @@ def scenario_summary_dict(scenario: PlanningScenario) -> dict[str, Any]:
                 "delta": workload.delta,
                 "workloadRef": workload.workload_ref,
                 "profileCatalogRef": workload.profile_catalog_ref,
+                "profileCatalogConfigMap": workload.profile_catalog_configmap,
             }
             for workload in scenario.workloads
         ],
@@ -93,6 +113,15 @@ def _required_str(obj: dict[str, Any], key: str) -> str:
 
 def _required_mapping(obj: dict[str, Any], key: str) -> dict[str, Any]:
     value = obj.get(key)
+    if not isinstance(value, dict):
+        raise ValueError(f"PlanningScenario {key} must be a mapping")
+    return value
+
+
+def _optional_mapping(obj: dict[str, Any], key: str) -> dict[str, Any] | None:
+    value = obj.get(key)
+    if value is None:
+        return None
     if not isinstance(value, dict):
         raise ValueError(f"PlanningScenario {key} must be a mapping")
     return value
