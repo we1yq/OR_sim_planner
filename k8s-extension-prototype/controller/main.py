@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from actuator import run_dry_run_actuator_loop
+from cluster_observer import observe_cluster_state_once
 from io_utils import dump_yaml, load_yaml
 from k8s_adapter import plan_scenario_as_migplan_status, plan_scenario_chain_as_migplan_statuses
 from mig_rules import load_mig_rules, mig_rules_summary_dict, validate_gpu_state_against_mig_rules
@@ -88,6 +89,21 @@ def parse_args() -> argparse.Namespace:
         help="Run a dry-run MigActionPlan actuator loop that validates approved plans without hardware changes.",
     )
     parser.add_argument(
+        "--observe-cluster-state",
+        action="store_true",
+        help="Read Kubernetes Nodes/Pods and print an ObservedClusterState smoke object.",
+    )
+    parser.add_argument(
+        "--observed-state-name",
+        default="cluster-observed-state",
+        help="ObservedClusterState name for --observe-cluster-state.",
+    )
+    parser.add_argument(
+        "--apply-observed-state",
+        action="store_true",
+        help="For --observe-cluster-state, write the ObservedClusterState and status to Kubernetes.",
+    )
+    parser.add_argument(
         "--poll-interval-s",
         type=float,
         default=10.0,
@@ -145,6 +161,15 @@ def main() -> int:
             max_cycles=args.controller_max_cycles,
         )
         print(dump_yaml(summary), end="")
+        return 0
+
+    if args.observe_cluster_state:
+        observed = observe_cluster_state_once(
+            namespace=args.namespace,
+            name=args.observed_state_name,
+            apply=args.apply_observed_state,
+        )
+        print(dump_yaml(observed), end="")
         return 0
 
     if args.run_controller:

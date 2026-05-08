@@ -8,15 +8,16 @@ import time
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from feasible_options import feasible_options_for_request, profile_catalog_from_yaml
 from io_utils import load_yaml
 from models import PlanningScenario, ProfileOption
 from state_adapter import gpu_state_from_mock_yaml, workload_request_from_k8s_object
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
+from current_state_feasibility import evaluate_current_state_feasibility
 from simulation_core.milp_solver import solve_milp_gurobi_batch_unified
 from simulation_core.physical_ids import (
     bootstrap_physical_ids_for_state,
@@ -49,6 +50,20 @@ def plan_scenario_as_migplan_status(
     ensure_state_metadata(source_state)
     bootstrap_physical_ids_for_state(source_state)
     assert_valid_cluster_state(source_state)
+
+    current_feasibility = evaluate_current_state_feasibility(
+        scenario=scenario,
+        source_state=source_state,
+        safety_factor=float(scenario.transition.get("currentStateSafetyFactor", 1.0)),
+    )
+    if current_feasibility["feasible"] and not bool(scenario.transition.get("forceReplan", False)):
+        canonical_next = canonicalize_state_for_next_round(source_state)
+        return _status_from_current_state_noop(
+            scenario=scenario,
+            source_state=source_state,
+            canonical_next=canonical_next,
+            current_feasibility=current_feasibility,
+        )
 
     feasible_start = time.perf_counter()
     feasible_option_df = build_feasible_option_dataframe(
@@ -99,6 +114,7 @@ def plan_scenario_as_migplan_status(
         target_state=target_state,
         transition_res=transition_res,
         canonical_next=canonical_next,
+        current_feasibility=current_feasibility,
     )
 
 
@@ -259,6 +275,7 @@ def _migplan_status_from_results(
     target_state: ClusterState,
     transition_res: dict[str, Any],
     canonical_next: ClusterState,
+    current_feasibility: dict[str, Any],
 ) -> dict[str, Any]:
     actions = [_to_yamlable(action) for action in transition_res.get("executed_actions", [])]
     metrics = {
@@ -285,6 +302,7 @@ def _migplan_status_from_results(
         transition_res=transition_res,
         canonical_next=canonical_next,
         actions=actions,
+        current_feasibility=current_feasibility,
     )
     reached = bool(transition_res.get("reached_target", False))
     return {
@@ -305,6 +323,7 @@ def _migplan_status_from_results(
             "actions": actions,
             "metrics": metrics,
             "planningTrace": planning_trace,
+            "currentStateFeasibility": current_feasibility,
             "milp": {
                 "status": milp_res.get("status"),
                 "gpuCount": milp_res.get("gpu_count"),
@@ -315,6 +334,100 @@ def _migplan_status_from_results(
             "targetState": cluster_state_to_dict(target_state),
             "executedState": cluster_state_to_dict(transition_res["executed_state"]),
             "canonicalNextState": cluster_state_to_dict(canonical_next),
+        },
+    }
+
+
+def _status_from_current_state_noop(
+    scenario: PlanningScenario,
+    source_state: ClusterState,
+    canonical_next: ClusterState,
+    current_feasibility: dict[str, Any],
+) -> dict[str, Any]:
+    state = cluster_state_to_dict(source_state)
+    canonical = cluster_state_to_dict(canonical_next)
+    return {
+        "apiVersion": "mig.or-sim.io/v1alpha1",
+        "kind": "MigPlan",
+        "metadata": {"name": f"{scenario.name}-dry-run"},
+        "spec": {
+            "dryRun": True,
+            "planner": "v3",
+            "scenario": scenario.name,
+            "sourceStateRef": scenario.source_state_ref,
+            "targetStateRef": scenario.target_state_ref,
+        },
+        "status": {
+            "phase": "SucceededNoOp",
+            "reachedTarget": True,
+            "message": (
+                f"{scenario.name}: current observed A100 state satisfies target arrival; "
+                "no MIG, router, or Pod changes required"
+            ),
+            "actions": [],
+            "metrics": {
+                "gpuCount": len(source_state.real_gpus()),
+                "iterationCount": 0,
+                "actionCount": 0,
+                "peakActiveGpu": len(source_state.real_gpus()),
+                "sourceActiveGpu": len(source_state.real_gpus()),
+                "finalActiveGpu": len(source_state.real_gpus()),
+                "elapsedSec": 0.0,
+                "milpElapsedSec": 0.0,
+                "targetBuildElapsedSec": 0.0,
+                "feasibleOptionBuildElapsedSec": 0.0,
+                "noOp": True,
+            },
+            "planningTrace": {
+                "scenario": scenario.name,
+                "pipeline": "source -> current-state-feasibility -> no-op",
+                "inputs": {
+                    "sourceStateRef": scenario.source_state_ref,
+                    "targetStateRef": scenario.target_state_ref,
+                    "workloadCount": len(scenario.workloads),
+                    "workloads": [
+                        {
+                            "name": workload.name,
+                            "sourceArrival": float(workload.source_arrival),
+                            "targetArrival": float(workload.target_arrival),
+                            "delta": float(workload.delta),
+                            "workloadRef": workload.workload_ref,
+                            "profileCatalogRef": workload.profile_catalog_ref,
+                            "profileCatalogConfigMap": workload.profile_catalog_configmap,
+                        }
+                        for workload in scenario.workloads
+                    ],
+                    "sourceGpuCount": len(source_state.real_gpus()),
+                    "sourcePhysicalIds": _physical_id_map(source_state),
+                },
+                "currentStateFeasibility": current_feasibility,
+                "noOpDecision": {
+                    "recommendedAction": "no-op",
+                    "reason": "current observed A100 state satisfies target arrival",
+                },
+                "canonicalization": {
+                    "canonicalGpuCount": len(canonical_next.real_gpus()),
+                    "canonicalPhysicalIds": _physical_id_map(canonical_next),
+                    "freePhysicalGpuPool": list(
+                        canonical_next.metadata.get("free_physical_gpu_pool", [])
+                    ),
+                    "note": (
+                        "No-op uses the current observed state as the next input. "
+                        "With real hardware this still requires observer-confirmed health."
+                    ),
+                },
+            },
+            "currentStateFeasibility": current_feasibility,
+            "milp": {
+                "status": "SKIPPED_CURRENT_STATE_FEASIBLE",
+                "gpuCount": len(source_state.real_gpus()),
+                "chosenTemplates": [],
+                "KTotal": {},
+                "alloc": None,
+            },
+            "targetState": state,
+            "executedState": state,
+            "canonicalNextState": canonical,
         },
     }
 
@@ -355,6 +468,7 @@ def _planning_trace(
     transition_res: dict[str, Any],
     canonical_next: ClusterState,
     actions: list[dict[str, Any]],
+    current_feasibility: dict[str, Any],
 ) -> dict[str, Any]:
     build_metrics = dict(target_state.metadata.get("build_metrics", {}))
     return {
@@ -383,6 +497,7 @@ def _planning_trace(
             feasible_option_df=feasible_option_df,
             elapsed_sec=feasible_elapsed_sec,
         ),
+        "currentStateFeasibility": current_feasibility,
         "milp": {
             "method": milp_res.get("method"),
             "status": milp_res.get("status"),
@@ -427,6 +542,12 @@ def _planning_trace(
             "finalActiveGpu": int(transition_res.get("final_active_gpu", 0)),
             "iterations": _transition_iteration_summary(transition_res.get("iterations", [])),
             "executedPhysicalIds": _physical_id_map(transition_res["executed_state"]),
+            "finalCoarseActions": _to_yamlable(
+                dict(transition_res.get("final_plan") or {}).get("coarse_actions", [])
+            ),
+            "finalPlanItems": _to_yamlable(
+                dict(transition_res.get("final_plan") or {}).get("plan_items", [])
+            ),
         },
         "canonicalization": {
             "canonicalGpuCount": len(canonical_next.real_gpus()),

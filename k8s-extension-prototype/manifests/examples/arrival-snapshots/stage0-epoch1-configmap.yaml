@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arrival-stage0-epoch1
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: or-sim-mig-planner
+    mig.or-sim.io/input-kind: arrival-snapshot
+data:
+  arrival-snapshot.yaml: |
+    name: arrival-stage0-epoch1
+    epoch: 1
+    source: external-forecast
+    previewOnly: true
+    targetStateRef: target0-epoch1
+    targetArrival:
+      llama: 3
+      gpt2: 20
+      vgg16: 300
+      resnet50: 300
+      vit_base: 3000

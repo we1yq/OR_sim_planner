@@ -89,6 +89,246 @@ def build_gpu_operator_executor_preview(status: dict[str, Any]) -> dict[str, Any
     }
 
 
+def build_mig_geometry_preview(status: dict[str, Any]) -> dict[str, Any]:
+    executor_preview = build_gpu_operator_executor_preview(status)
+    geometry_action_types = {
+        "allocate_gpu",
+        "configure_full_template",
+        "place_target_layout",
+        "clear_gpu",
+        "clear_template",
+    }
+    return {
+        "previewOnly": True,
+        "adapter": "mig-geometry",
+        "executor": "nvidia-gpu-operator",
+        "targetApi": executor_preview["targetApi"],
+        "gpuTargets": executor_preview["gpuTargets"],
+        "migManagerTargetConfigs": executor_preview["migManagerTargetConfigs"],
+        "wouldPatchNodeLabels": executor_preview["wouldPatchNodeLabels"],
+        "unresolvedPhysicalGpuIds": executor_preview["unresolvedPhysicalGpuIds"],
+        "geometryActions": [
+            _action_brief(action)
+            for action in _actions(status)
+            if str(action.get("type")) in geometry_action_types
+        ],
+        "internalStateActionsExcluded": [
+            _action_brief(action)
+            for action in _actions(status)
+            if str(action.get("type")) in {"bind_target_gpu", "mark_reconfig_target_prepared"}
+        ],
+        "notes": [
+            "Only MIG geometry actions become GPU Operator/MIG Manager inputs.",
+            "Logical GPU binding actions are internal planner/controller state and are not sent to MIG Manager.",
+        ],
+    }
+
+
+def build_traffic_and_drain_preview(status: dict[str, Any]) -> dict[str, Any]:
+    traffic_types = {
+        "stop_accepting_new",
+        "reroute_queued_tasks",
+        "mark_draining_instance",
+        "defer_remove_gpu",
+        "defer_remove_instance",
+        "defer_workload_change",
+    }
+    plan_items = _final_plan_items(status)
+    return {
+        "previewOnly": True,
+        "adapter": "router-drain",
+        "rules": [
+            "Stop accepting new work before removing or replacing an active slot.",
+            "Reroute queued work to a takeover slot when one exists.",
+            "Wait for inflight work to drain to zero before deleting pods or clearing MIG geometry.",
+            "Defer the abstract action when takeover capacity or drain completion is missing.",
+        ],
+        "planItems": [
+            {
+                "id": item.get("id"),
+                "type": item.get("type"),
+                "currentPhase": item.get("current_phase"),
+                "status": item.get("status"),
+                "blockedBy": item.get("blocked_by"),
+                "gpuId": item.get("gpu_id"),
+                "physicalGpuId": item.get("physical_gpu_id"),
+                "targetPhysicalGpuId": item.get("target_physical_gpu_id"),
+                "slot": item.get("slot"),
+                "workload": item.get("workload"),
+                "takeover": item.get("takeover"),
+                "queued": item.get("queued"),
+                "inflight": item.get("inflight"),
+                "drainRemaining": item.get("drain_remaining"),
+                "capacitySafe": item.get("capacity_safe"),
+            }
+            for item in plan_items
+        ],
+        "trafficActions": [
+            _action_brief(action)
+            for action in _actions(status)
+            if str(action.get("type")) in traffic_types
+        ],
+    }
+
+
+def build_pod_lifecycle_preview(status: dict[str, Any]) -> dict[str, Any]:
+    actions = _actions(status)
+    return {
+        "previewOnly": True,
+        "adapter": "pod-lifecycle",
+        "policy": {
+            "preferWarmPool": True,
+            "deleteAfterDrainOnly": True,
+            "doNotCreatePodsForMigGeometryOnlyActions": True,
+        },
+        "createOrReuse": [
+            _pod_lifecycle_row(action, reason="target serving capacity required")
+            for action in actions
+            if str(action.get("type")) in {"place_instance", "bridge_place_instance"}
+        ],
+        "drain": [
+            _pod_lifecycle_row(action, reason="old serving instance must stop accepting and drain")
+            for action in actions
+            if str(action.get("type"))
+            in {"stop_accepting_new", "reroute_queued_tasks", "mark_draining_instance"}
+        ],
+        "deleteOrRecycle": [
+            _pod_lifecycle_row(action, reason="safe only after queued work reroutes and inflight reaches zero")
+            for action in actions
+            if str(action.get("type")) in {"remove_instance", "clear_gpu"}
+        ],
+        "reloadInPlace": [
+            _pod_lifecycle_row(action, reason="same workload slot; prefer runtime config reload")
+            for action in actions
+            if str(action.get("type")) == "update_batch"
+        ],
+        "notes": [
+            "Pod lifecycle is a future adapter preview; the current dry-run actuator does not create or delete Pods.",
+            "Router cutover and Pod readiness should be observed before old Pods are deleted or MIG geometry is cleared.",
+        ],
+    }
+
+
+def build_abstract_action_preview(status: dict[str, Any]) -> dict[str, Any]:
+    coarse_actions = _final_coarse_actions(status)
+    plan_items = _final_plan_items(status)
+    return {
+        "previewOnly": True,
+        "source": "v3-final-plan",
+        "actions": [
+            _abstract_action_row(action, plan_items)
+            for action in coarse_actions
+        ],
+        "rules": {
+            "keep_gpu": "Source and target MIG layout plus workload payload are unchanged.",
+            "create_gpu": "Source has no logical GPU and target has one; prepare target-side MIG geometry.",
+            "remove_gpu": "Target no longer needs the GPU; stop/reroute/drain active slots before clearing geometry.",
+            "reconfiguration": "Source and target MIG templates differ; choose target_first unless old workloads have unchanged takeover slots.",
+            "instance_diff": "MIG geometry is unchanged but slot workload or batch payload differs.",
+        },
+        "notes": [
+            "This is a readable report of planner rules, not an execution command stream.",
+            "Detailed fine actions remain in the full-plan ConfigMap.",
+        ],
+    }
+
+
+def build_adapter_dry_run_preview(status: dict[str, Any]) -> dict[str, Any]:
+    mig = build_mig_geometry_preview(status)
+    traffic = build_traffic_and_drain_preview(status)
+    pod = build_pod_lifecycle_preview(status)
+    return {
+        "previewOnly": True,
+        "adapters": {
+            "mig": {
+                "implementation": "nvidia-gpu-operator",
+                "wouldPatchNodeLabels": mig.get("wouldPatchNodeLabels", {}),
+                "wouldApplyMigManagerConfigs": mig.get("migManagerTargetConfigs", []),
+                "blockedUntilObservedBindings": mig.get("unresolvedPhysicalGpuIds", []),
+            },
+            "router": {
+                "implementation": "dry-run-router-adapter",
+                "wouldStopAcceptingNew": [
+                    action for action in traffic.get("trafficActions", [])
+                    if action.get("type") == "stop_accepting_new"
+                ],
+                "wouldRerouteQueuedTasks": [
+                    action for action in traffic.get("trafficActions", [])
+                    if action.get("type") == "reroute_queued_tasks"
+                ],
+                "wouldStartDrains": [
+                    action for action in traffic.get("trafficActions", [])
+                    if action.get("type") == "mark_draining_instance"
+                ],
+            },
+            "pod": {
+                "implementation": "dry-run-pod-lifecycle-adapter",
+                "wouldCreateOrReuse": pod.get("createOrReuse", []),
+                "wouldDrain": pod.get("drain", []),
+                "wouldDeleteOrRecycle": pod.get("deleteOrRecycle", []),
+                "wouldReloadInPlace": pod.get("reloadInPlace", []),
+            },
+        },
+        "notes": [
+            "Adapter skeleton only; no Router, Pod, Node, or MIG changes are executed.",
+            "kind can validate this object shape and actuator gating, but not real GPU hardware effects.",
+        ],
+    }
+
+
+def build_observer_preview(status: dict[str, Any]) -> dict[str, Any]:
+    mig = build_mig_geometry_preview(status)
+    traffic = build_traffic_and_drain_preview(status)
+    pod = build_pod_lifecycle_preview(status)
+    workloads = sorted(
+        {
+            str(row.get("workload"))
+            for section in [pod.get("createOrReuse", []), pod.get("drain", []), pod.get("deleteOrRecycle", [])]
+            for row in section
+            if row.get("workload") is not None
+        }
+    )
+    return {
+        "previewOnly": True,
+        "requiredObservations": {
+            "mig": [
+                "physicalGpuId",
+                "nodeName",
+                "deviceIndex",
+                "observedMigInstances",
+                "gpuOperatorMigConfigState",
+            ],
+            "router": [
+                "acceptingNewByInstance",
+                "queuedByWorkload",
+                "rerouteTargets",
+            ],
+            "pod": [
+                "podReadiness",
+                "podToMigInstanceAssignment",
+                "servingInstanceId",
+                "inflightByInstance",
+            ],
+        },
+        "targetsToObserve": {
+            "physicalGpuIds": sorted(
+                {
+                    str(target.get("physicalGpuId"))
+                    for target in mig.get("gpuTargets", [])
+                    if target.get("physicalGpuId") is not None
+                }
+            ),
+            "workloads": workloads,
+            "planItemIds": [
+                item.get("id")
+                for item in traffic.get("planItems", [])
+                if item.get("id") is not None
+            ],
+        },
+        "canonicalizationRule": "After real execution, canonicalize only observed post-action GPU/MIG/Pod/router state.",
+    }
+
+
 def validate_executor_preview(preview: dict[str, Any] | None) -> list[str]:
     if not isinstance(preview, dict):
         return ["executorPreview is required"]
@@ -104,6 +344,177 @@ def validate_executor_preview(preview: dict[str, Any] | None) -> list[str]:
     if preview.get("wouldPatchNodeLabels") and preview.get("unresolvedPhysicalGpuIds"):
         reasons.append("executorPreview cannot patch node labels while physical GPU bindings are unresolved")
     return reasons
+
+
+def validate_action_previews(spec: dict[str, Any]) -> list[str]:
+    reasons = []
+    for field in [
+        "migGeometryPreview",
+        "trafficAndDrainPreview",
+        "podLifecyclePreview",
+        "abstractActionPreview",
+        "adapterDryRunPreview",
+        "observerPreview",
+    ]:
+        preview = spec.get(field)
+        if not isinstance(preview, dict):
+            reasons.append(f"{field} is required")
+        elif not bool(preview.get("previewOnly", False)):
+            reasons.append(f"{field}.previewOnly must be true for the dry-run actuator")
+    return reasons
+
+
+def _actions(status: dict[str, Any]) -> list[dict[str, Any]]:
+    return [dict(action) for action in list(status.get("actions", [])) if isinstance(action, dict)]
+
+
+def _final_plan_items(status: dict[str, Any]) -> list[dict[str, Any]]:
+    transition = dict(dict(status.get("planningTrace", {})).get("transition", {}))
+    return [dict(item) for item in list(transition.get("finalPlanItems", [])) if isinstance(item, dict)]
+
+
+def _final_coarse_actions(status: dict[str, Any]) -> list[dict[str, Any]]:
+    transition = dict(dict(status.get("planningTrace", {})).get("transition", {}))
+    return [dict(action) for action in list(transition.get("finalCoarseActions", [])) if isinstance(action, dict)]
+
+
+def _abstract_action_row(action: dict[str, Any], plan_items: list[dict[str, Any]]) -> dict[str, Any]:
+    action_type = str(action.get("type"))
+    gpu_id = action.get("gpu_id")
+    related_items = [
+        _plan_item_brief(item)
+        for item in plan_items
+        if gpu_id is None or item.get("gpu_id") == gpu_id
+    ]
+    return {
+        "type": action_type,
+        "gpuId": gpu_id,
+        "physicalGpuId": action.get("physical_gpu_id") or action.get("source_physical_gpu_id"),
+        "targetPhysicalGpuId": action.get("new_physical_gpu_id"),
+        "sourceTemplate": action.get("src_template"),
+        "targetTemplate": action.get("tgt_template") or action.get("template"),
+        "mode": action.get("mode"),
+        "rule": _abstract_rule(action),
+        "gates": _abstract_gates(action_type, action.get("mode")),
+        "podImpact": _abstract_pod_impact(action_type, action.get("mode"), related_items),
+        "migImpact": _abstract_mig_impact(action_type, action.get("mode")),
+        "relatedPlanItems": related_items,
+    }
+
+
+def _plan_item_brief(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": item.get("id"),
+        "type": item.get("type"),
+        "currentPhase": item.get("current_phase"),
+        "status": item.get("status"),
+        "blockedBy": item.get("blocked_by"),
+        "workload": item.get("workload"),
+        "takeover": item.get("takeover"),
+        "queued": item.get("queued"),
+        "inflight": item.get("inflight"),
+        "drainRemaining": item.get("drain_remaining"),
+    }
+
+
+def _abstract_rule(action: dict[str, Any]) -> str:
+    action_type = str(action.get("type"))
+    mode = action.get("mode")
+    if action_type == "reconfiguration" and mode == "target_first":
+        return "No unchanged takeover exists for every old workload slot, so prepare target-side GPU before old-side cutover."
+    if action_type == "reconfiguration" and mode == "in_place_old_first":
+        return "Every old workload slot has unchanged takeover capacity, so drain old side and reconfigure in place."
+    if action_type == "remove_gpu":
+        return "All active slots must pass stop/reroute/drain barriers before old MIG geometry can be cleared."
+    if action_type == "instance_diff":
+        return "MIG geometry is stable; only slot workload or batch payload changes need router/pod handling."
+    if action_type == "create_gpu":
+        return "Allocate a free physical GPU and prepare the target MIG layout before serving traffic."
+    if action_type == "keep_gpu":
+        return "No migration gates are needed because source and target state match."
+    return "Planner classified this GPU using V3 source/target state comparison."
+
+
+def _abstract_gates(action_type: str, mode: Any) -> list[str]:
+    if action_type == "create_gpu":
+        return ["observeFreePhysicalGpu", "prepareMigGeometry", "observeTargetMigReady", "prepareServingCapacity"]
+    if action_type == "remove_gpu":
+        return ["findTakeoverCapacity", "stopAcceptingOldSlots", "rerouteQueuedWork", "waitInflightZero", "deleteOrRecyclePods", "clearOldMigGeometry"]
+    if action_type == "reconfiguration" and mode == "target_first":
+        return ["prepareTargetMigGeometry", "prepareTargetServingCapacity", "shiftRouting", "waitOldInflightZero", "clearOldMigGeometry", "observeAndBindTarget"]
+    if action_type == "reconfiguration":
+        return ["stopAcceptingOldSlots", "rerouteQueuedWork", "waitInflightZero", "clearOldMigGeometry", "prepareMigGeometryInPlace", "observeAndBindTarget"]
+    if action_type == "instance_diff":
+        return ["prepareTargetServingCapacity", "shiftRoutingOrReload", "waitOldInflightZero", "deleteOrRecycleOldPod"]
+    return []
+
+
+def _abstract_pod_impact(action_type: str, mode: Any, related_items: list[dict[str, Any]]) -> dict[str, Any]:
+    blocked = any(item.get("status") == "blocked" for item in related_items)
+    return {
+        "mayCreateOrReuseBeforeCutover": action_type in {"create_gpu", "reconfiguration", "instance_diff"},
+        "mustDrainOldBeforeDelete": action_type in {"remove_gpu", "reconfiguration", "instance_diff"},
+        "preferWarmPool": action_type in {"create_gpu", "reconfiguration", "instance_diff"},
+        "blockedByDrainOrTakeover": blocked,
+    }
+
+
+def _abstract_mig_impact(action_type: str, mode: Any) -> dict[str, Any]:
+    return {
+        "requiresMigManager": action_type in {"create_gpu", "remove_gpu", "reconfiguration"},
+        "requiresNewTargetGpu": action_type == "create_gpu" or (action_type == "reconfiguration" and mode == "target_first"),
+        "clearOldGpuAfterDrain": action_type in {"remove_gpu", "reconfiguration"},
+        "inPlaceGeometryChange": action_type == "reconfiguration" and mode == "in_place_old_first",
+    }
+
+
+def _action_brief(action: dict[str, Any]) -> dict[str, Any]:
+    keys = [
+        "type",
+        "gpu_id",
+        "physical_gpu_id",
+        "target_physical_gpu_id",
+        "new_physical_gpu_id",
+        "source_physical_gpu_id",
+        "slot",
+        "workload",
+        "old_workload",
+        "new_workload",
+        "template",
+        "batch",
+        "old_batch",
+        "new_batch",
+        "phase",
+        "queued",
+        "to",
+        "rounds",
+        "safe_now",
+        "drained",
+        "bridged",
+        "after_drain",
+        "policy",
+    ]
+    return {key: action.get(key) for key in keys if key in action}
+
+
+def _pod_lifecycle_row(action: dict[str, Any], reason: str) -> dict[str, Any]:
+    row = _action_brief(action)
+    row["reason"] = reason
+    row["podAction"] = _pod_action_for_type(str(action.get("type")))
+    row["preferWarmPool"] = str(action.get("type")) in {"place_instance", "bridge_place_instance"}
+    return row
+
+
+def _pod_action_for_type(action_type: str) -> str:
+    if action_type in {"place_instance", "bridge_place_instance"}:
+        return "create-or-reuse"
+    if action_type in {"stop_accepting_new", "reroute_queued_tasks", "mark_draining_instance"}:
+        return "drain"
+    if action_type in {"remove_instance", "clear_gpu"}:
+        return "delete-or-recycle"
+    if action_type == "update_batch":
+        return "reload-in-place"
+    return "none"
 
 
 def _physical_gpu_bindings(metadata: dict[str, Any]) -> dict[str, dict[str, Any]]:

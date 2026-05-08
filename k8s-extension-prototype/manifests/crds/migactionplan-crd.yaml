@@ -68,6 +68,24 @@ spec:
                 executorPreview:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+                migGeometryPreview:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                trafficAndDrainPreview:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                podLifecyclePreview:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                abstractActionPreview:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                adapterDryRunPreview:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                observerPreview:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
                 notes:
                   type: array
                   items:

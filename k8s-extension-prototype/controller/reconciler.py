@@ -7,10 +7,19 @@ from typing import Any
 
 import yaml
 
-from executor_preview import build_gpu_operator_executor_preview
+from executor_preview import (
+    build_abstract_action_preview,
+    build_adapter_dry_run_preview,
+    build_gpu_operator_executor_preview,
+    build_mig_geometry_preview,
+    build_observer_preview,
+    build_pod_lifecycle_preview,
+    build_traffic_and_drain_preview,
+)
 from feasible_options import profile_catalog_from_yaml
 from k8s_adapter import cluster_state_from_dict, plan_scenario_as_migplan_status
 from k8s_api import KubernetesClient, PythonKubernetesClient
+from models import PlanningScenario, ScenarioWorkloadDemand
 from scenario_loader import load_planning_scenario, planning_scenario_from_yaml
 
 
@@ -376,10 +385,83 @@ def load_scenario_for_migplan_spec(
         obj = yaml.safe_load(raw)
         if not isinstance(obj, dict):
             raise ValueError(f"ConfigMap {namespace}/{name} data.scenario.yaml is not a YAML object")
-        return planning_scenario_from_yaml(obj, base_dir=_scenario_base_dir(scenario_root))
+        scenario = planning_scenario_from_yaml(obj, base_dir=_scenario_base_dir(scenario_root))
+    else:
+        scenario_path = _resolve_scenario_ref(spec.get("scenario"), scenario_root)
+        scenario = load_planning_scenario(scenario_path)
 
-    scenario_path = _resolve_scenario_ref(spec.get("scenario"), scenario_root)
-    return load_planning_scenario(scenario_path)
+    if spec.get("arrivalSnapshotConfigMap"):
+        client = client or PythonKubernetesClient()
+        snapshot = load_arrival_snapshot_from_configmap(
+            name=str(spec["arrivalSnapshotConfigMap"]),
+            namespace=namespace,
+            client=client,
+        )
+        scenario = apply_arrival_snapshot_to_scenario(scenario=scenario, snapshot=snapshot)
+    return scenario
+
+
+def load_arrival_snapshot_from_configmap(
+    name: str,
+    namespace: str,
+    client: KubernetesClient | None = None,
+) -> dict[str, Any]:
+    client = client or PythonKubernetesClient()
+    configmap = client.get_configmap(name=name, namespace=namespace)
+    data = dict(configmap.get("data", {}))
+    raw = data.get("arrival-snapshot.yaml")
+    if raw is None:
+        raise ValueError(f"ConfigMap {namespace}/{name} does not contain data.arrival-snapshot.yaml")
+    obj = yaml.safe_load(raw)
+    if not isinstance(obj, dict):
+        raise ValueError(f"ConfigMap {namespace}/{name} data.arrival-snapshot.yaml is not a YAML object")
+    return obj
+
+
+def apply_arrival_snapshot_to_scenario(
+    scenario: PlanningScenario,
+    snapshot: dict[str, Any],
+) -> PlanningScenario:
+    target_arrival = dict(snapshot.get("targetArrival", {}))
+    if not target_arrival:
+        raise ValueError("ArrivalSnapshot targetArrival is required")
+
+    workload_names = [workload.name for workload in scenario.workloads]
+    missing = sorted(set(workload_names) - set(target_arrival))
+    extra = sorted(set(target_arrival) - set(workload_names))
+    if missing or extra:
+        raise ValueError(
+            "ArrivalSnapshot targetArrival keys must match scenario workloads; "
+            f"missing={missing}, extra={extra}"
+        )
+
+    transition = dict(scenario.transition)
+    transition["arrivalSnapshot"] = {
+        "name": str(snapshot.get("name", "arrival-snapshot")),
+        "epoch": snapshot.get("epoch"),
+        "source": snapshot.get("source", "external"),
+        "previewOnly": bool(snapshot.get("previewOnly", True)),
+    }
+    return PlanningScenario(
+        name=scenario.name,
+        description=scenario.description,
+        policy_ref=scenario.policy_ref,
+        mig_rules_ref=scenario.mig_rules_ref,
+        source_state_ref=scenario.source_state_ref,
+        target_state_ref=str(snapshot.get("targetStateRef", scenario.target_state_ref)),
+        workloads=[
+            ScenarioWorkloadDemand(
+                name=workload.name,
+                source_arrival=workload.source_arrival,
+                target_arrival=float(target_arrival[workload.name]),
+                workload_ref=workload.workload_ref,
+                profile_catalog_ref=workload.profile_catalog_ref,
+                profile_catalog_configmap=workload.profile_catalog_configmap,
+            )
+            for workload in scenario.workloads
+        ],
+        transition=transition,
+    )
 
 
 def load_profile_catalogs_for_scenario(
@@ -481,6 +563,12 @@ def upsert_migactionplan(
     metrics = dict(status.get("metrics", {}))
     summary = dict(status.get("planningSummary") or _planning_summary(status.get("planningTrace", {})))
     executor_preview = build_gpu_operator_executor_preview(status)
+    mig_geometry_preview = build_mig_geometry_preview(status)
+    traffic_and_drain_preview = build_traffic_and_drain_preview(status)
+    pod_lifecycle_preview = build_pod_lifecycle_preview(status)
+    abstract_action_preview = build_abstract_action_preview(status)
+    adapter_dry_run_preview = build_adapter_dry_run_preview(status)
+    observer_preview = build_observer_preview(status)
     manifest = {
         "apiVersion": "mig.or-sim.io/v1alpha1",
         "kind": "MigActionPlan",
@@ -506,6 +594,12 @@ def upsert_migactionplan(
             "chosenTemplates": summary.get("chosenTemplates", []),
             "targetGpuCount": int(metrics.get("gpuCount", 0)),
             "executorPreview": executor_preview,
+            "migGeometryPreview": mig_geometry_preview,
+            "trafficAndDrainPreview": traffic_and_drain_preview,
+            "podLifecyclePreview": pod_lifecycle_preview,
+            "abstractActionPreview": abstract_action_preview,
+            "adapterDryRunPreview": adapter_dry_run_preview,
+            "observerPreview": observer_preview,
             "notes": [
                 "Dry-run action plan only; no MIG, Pod, or scheduler changes are executed.",
                 "Future actuator should translate this plan through NVIDIA GPU Operator MIG Manager before considering direct host commands.",
@@ -584,6 +678,7 @@ def compact_migplan_status_for_k8s(status: dict[str, Any]) -> dict[str, Any]:
         "message": status.get("message"),
         "metrics": dict(status.get("metrics", {})),
         "planningSummary": _planning_summary(status.get("planningTrace", {})),
+        "currentStateFeasibility": status.get("currentStateFeasibility"),
         "observedGeneration": status.get("observedGeneration"),
         "migPlanName": status.get("migPlanName"),
         "canonicalNextStateConfigMap": status.get("canonicalNextStateConfigMap"),
@@ -611,6 +706,7 @@ def compact_migplan_status_for_k8s(status: dict[str, Any]) -> dict[str, Any]:
 
 
 def _planning_summary(trace: dict[str, Any]) -> dict[str, Any]:
+    current_state = dict(trace.get("currentStateFeasibility", {}))
     feasible = dict(trace.get("feasibleOptions", {}))
     milp = dict(trace.get("milp", {}))
     target_build = dict(trace.get("targetBuild", {}))
@@ -618,6 +714,12 @@ def _planning_summary(trace: dict[str, Any]) -> dict[str, Any]:
     canonicalization = dict(trace.get("canonicalization", {}))
     return {
         "pipeline": [
+            {
+                "stage": "current-state-feasibility",
+                "phase": current_state.get("phase"),
+                "recommendedAction": current_state.get("recommendedAction"),
+                "feasible": current_state.get("feasible"),
+            },
             {
                 "stage": "feasible-options",
                 "elapsedSec": feasible.get("elapsedSec"),

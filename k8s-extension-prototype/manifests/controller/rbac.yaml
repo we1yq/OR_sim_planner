@@ -10,6 +10,10 @@ rules:
       - migplans
       - migactionplans
       - autoapprovalpolicies
+      - workloadrouteplans
+      - servinginstancedrains
+      - podlifecycleplans
+      - observedclusterstates
     verbs:
       - get
       - list
@@ -22,6 +26,10 @@ rules:
     resources:
       - migplans/status
       - migactionplans/status
+      - workloadrouteplans/status
+      - servinginstancedrains/status
+      - podlifecycleplans/status
+      - observedclusterstates/status
     verbs:
       - get
       - patch

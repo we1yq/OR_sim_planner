@@ -49,6 +49,8 @@ spec:
                   type: string
                 scenarioConfigMap:
                   type: string
+                arrivalSnapshotConfigMap:
+                  type: string
                 sourceStateRef:
                   type: string
                 targetStateRef:
@@ -78,6 +80,9 @@ spec:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
                 planningSummary:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                currentStateFeasibility:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
                 milp:
