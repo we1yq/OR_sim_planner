@@ -280,7 +280,7 @@ def test_build_gpu_operator_executor_preview_with_node_bindings() -> None:
     assert preview["gpuTargets"][0]["deviceIndex"] == 2
     assert preview["gpuTargets"][0]["targetTemplate"] == "3g+3g"
     assert "gpu-node-0" in preview["wouldPatchNodeLabels"]
-    assert preview["wouldPatchNodeLabels"]["gpu-node-0"]["nvidia.com/mig.config"].startswith("or-sim-")
+    assert preview["wouldPatchNodeLabels"]["gpu-node-0"]["nvidia.com/mig.config"] == "all-3g.20gb"
 
 
 def test_build_action_rule_previews() -> None:
@@ -864,8 +864,71 @@ def test_build_observed_cluster_state_from_k8s_lists() -> None:
     assert manifest["spec"]["previewOnly"] is False
     assert manifest["spec"]["observedState"]["nodeInventory"][0]["nodeName"] == "gpu-node-0"
     assert manifest["spec"]["observedState"]["podReadiness"][0]["ready"] is True
-    assert "actual MIG instance inventory" in manifest["spec"]["missingRealClusterInputs"]
+    assert "MIG device UUID and placement inventory" in manifest["spec"]["missingRealClusterInputs"]
     assert status["phase"] == "NodePodInventoryObserved"
+    assert status["readyForCanonicalization"] is False
+
+
+def test_build_observed_cluster_state_with_mig_profile_inventory() -> None:
+    manifest = build_observed_cluster_state_from_k8s_lists(
+        name="cluster-observed-state",
+        namespace="or-sim",
+        nodes=[
+            {
+                "metadata": {
+                    "name": "rtx1",
+                    "labels": {
+                        "nvidia.com/gpu.present": "true",
+                        "nvidia.com/mig.strategy": "mixed",
+                        "nvidia.com/mig.config": "all-2g.10gb",
+                        "nvidia.com/mig.config.state": "success",
+                        "nvidia.com/mig-2g.10gb.count": "3",
+                        "nvidia.com/mig-2g.10gb.product": "NVIDIA-A100-PCIE-40GB-MIG-2g.10gb",
+                        "nvidia.com/mig-2g.10gb.memory": "9856",
+                        "nvidia.com/mig-2g.10gb.multiprocessors": "28",
+                        "nvidia.com/mig-2g.10gb.replicas": "1",
+                        "nvidia.com/mig-2g.10gb.slices.gi": "2",
+                        "nvidia.com/mig-2g.10gb.slices.ci": "2",
+                        "nvidia.com/mig-2g.10gb.engines.copy": "2",
+                        "nvidia.com/mig-2g.10gb.engines.decoder": "1",
+                        "nvidia.com/mig-2g.10gb.engines.encoder": "0",
+                    },
+                },
+                "status": {
+                    "capacity": {
+                        "nvidia.com/gpu": "3",
+                        "nvidia.com/mig-2g.10gb": "3",
+                    },
+                    "allocatable": {
+                        "nvidia.com/gpu": "3",
+                        "nvidia.com/mig-2g.10gb": "3",
+                    },
+                    "conditions": [{"type": "Ready", "status": "True", "reason": "KubeletReady"}],
+                },
+            }
+        ],
+        pods=[],
+    )
+    observed = manifest["spec"]["observedState"]
+    layout = observed["migLayouts"][0]
+    profile = layout["profiles"][0]
+    status = observed_cluster_state_status(manifest)
+
+    assert manifest["metadata"]["labels"]["mig.or-sim.io/observer-kind"] == "kubernetes-mig-node"
+    assert manifest["spec"]["source"] == "kubernetes-mig-node-observer"
+    assert layout["nodeName"] == "rtx1"
+    assert layout["migConfig"] == "all-2g.10gb"
+    assert layout["migConfigState"] == "success"
+    assert profile["profile"] == "2g.10gb"
+    assert profile["labelCount"] == 3
+    assert profile["capacity"] == 3
+    assert profile["allocatable"] == 3
+    assert profile["memoryMiB"] == 9856
+    assert profile["multiprocessors"] == 28
+    assert profile["slices"] == {"gi": 2, "ci": 2}
+    assert profile["engines"]["copy"] == 2
+    assert "MIG device UUID and placement inventory" in manifest["spec"]["missingRealClusterInputs"]
+    assert status["phase"] == "MigNodeInventoryObserved"
     assert status["readyForCanonicalization"] is False
 
 

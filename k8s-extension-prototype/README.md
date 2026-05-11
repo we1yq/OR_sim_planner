@@ -30,6 +30,7 @@ k8s-extension-prototype/
   README.md
   docs/
     phase3-architecture.md
+    add-gpu-server-runbook.md
   manifests/
     README.md
     namespace.yaml

@@ -561,12 +561,46 @@ def _target_instances(raw_gpu: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _mig_config_name(node_name: str, targets: list[dict[str, Any]]) -> str:
+    builtin = _builtin_gpu_operator_config_name(targets)
+    if builtin is not None:
+        return builtin
     fingerprint = "|".join(
         f"{target.get('deviceIndex')}={target.get('targetTemplate')}"
         for target in sorted(targets, key=lambda item: int(item.get("deviceIndex", 0)))
     )
     digest = hashlib.sha1(f"{node_name}|{fingerprint}".encode("utf-8")).hexdigest()[:10]
     return _label_value(f"or-sim-{digest}")
+
+
+def _builtin_gpu_operator_config_name(targets: list[dict[str, Any]]) -> str | None:
+    """Map simple A100-40GB full-GPU layouts to GPU Operator built-in configs."""
+    templates = {
+        str(target.get("targetTemplate", ""))
+        for target in targets
+        if target.get("targetTemplate") is not None
+    }
+    if len(templates) != 1:
+        return None
+    template = next(iter(templates))
+    return {
+        "": "all-disabled",
+        "1g+1g+1g+1g+1g+1g+1g": "all-1g.5gb",
+        "2g+2g+2g": "all-2g.10gb",
+        "3g+3g": "all-3g.20gb",
+        "4g": "all-4g.20gb",
+        "7g": "all-7g.40gb",
+        "4g+3g": "or-sim-4-3",
+        "4g+2g+1g": "or-sim-4-2-1",
+        "4g+1g+1g+1g": "or-sim-4-1-1-1",
+        "3g+2g+1g": "or-sim-3-2-1",
+        "3g+1g+1g+1g": "or-sim-3-1-1-1",
+        "2g+2g+3g": "or-sim-2-2-3",
+        "3g+2g+1g+1g": "or-sim-3-2-1-1",
+        "3g+1g+1g+1g+1g": "or-sim-3-1-1-1-1",
+        "2g+2g+2g+1g": "or-sim-2-2-2-1",
+        "2g+2g+1g+1g+1g": "or-sim-2-2-1-1-1",
+        "2g+1g+1g+1g+1g+1g": "or-sim-2-1-1-1-1-1",
+    }.get(template)
 
 
 def _label_value(value: str) -> str:

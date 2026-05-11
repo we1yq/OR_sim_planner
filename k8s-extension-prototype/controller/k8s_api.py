@@ -12,10 +12,24 @@ class KubernetesClient(Protocol):
     def list_migactionplans(self, namespace: str) -> list[dict[str, Any]]:
         ...
 
+    def get_migactionplan(self, name: str, namespace: str) -> dict[str, Any]:
+        ...
+
     def list_nodes(self) -> list[dict[str, Any]]:
         ...
 
     def list_pods(self, namespace: str) -> list[dict[str, Any]]:
+        ...
+
+    def get_node(self, name: str) -> dict[str, Any]:
+        ...
+
+    def patch_node_labels(
+        self,
+        name: str,
+        labels: dict[str, str],
+        remove_labels: list[str] | None = None,
+    ) -> None:
         ...
 
     def patch_migplan_status(self, name: str, namespace: str, status: dict[str, Any]) -> None:
@@ -116,8 +130,20 @@ class PythonKubernetesClient:
         if not isinstance(obj, dict):
             raise ValueError(
                 f"Kubernetes API returned a non-object MigActionPlanList for namespace {namespace}"
-            )
+        )
         return list(obj.get("items", []))
+
+    def get_migactionplan(self, name: str, namespace: str) -> dict[str, Any]:
+        obj = self.custom.get_namespaced_custom_object(
+            group=self.group,
+            version=self.version,
+            namespace=namespace,
+            plural="migactionplans",
+            name=name,
+        )
+        if not isinstance(obj, dict):
+            raise ValueError(f"Kubernetes API returned a non-object MigActionPlan for {namespace}/{name}")
+        return obj
 
     def list_nodes(self) -> list[dict[str, Any]]:
         obj = self.core.list_node()
@@ -125,6 +151,24 @@ class PythonKubernetesClient:
         if not isinstance(serialized, dict):
             raise ValueError("Kubernetes API returned a non-object NodeList")
         return list(serialized.get("items", []))
+
+    def get_node(self, name: str) -> dict[str, Any]:
+        obj = self.core.read_node(name=name)
+        serialized = self.api_client.sanitize_for_serialization(obj)
+        if not isinstance(serialized, dict):
+            raise ValueError(f"Kubernetes API returned a non-object Node for {name}")
+        return serialized
+
+    def patch_node_labels(
+        self,
+        name: str,
+        labels: dict[str, str],
+        remove_labels: list[str] | None = None,
+    ) -> None:
+        patch_labels: dict[str, Any] = dict(labels)
+        for label in remove_labels or []:
+            patch_labels[label] = None
+        self.core.patch_node(name=name, body={"metadata": {"labels": patch_labels}})
 
     def list_pods(self, namespace: str) -> list[dict[str, Any]]:
         obj = self.core.list_namespaced_pod(namespace=namespace)

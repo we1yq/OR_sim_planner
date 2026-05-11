@@ -37,13 +37,16 @@ def build_observed_cluster_state_from_k8s_lists(
     pods: list[dict[str, Any]],
 ) -> dict[str, Any]:
     node_inventory = [_node_inventory_row(node) for node in nodes]
+    mig_layouts = [layout for node in nodes if (layout := _mig_layout_row(node)) is not None]
     pod_readiness = [_pod_readiness_row(pod) for pod in pods]
     missing_inputs = [
         "physical GPU UUID to node/device binding",
-        "actual MIG instance inventory",
+        "MIG device UUID and placement inventory",
         "pod-to-MIG device assignment",
         "router queue and inflight metrics",
     ]
+    observer_kind = "kubernetes-mig-node" if mig_layouts else "kubernetes-node-pod-smoke"
+    source = f"{observer_kind}-observer"
     return {
         "apiVersion": "mig.or-sim.io/v1alpha1",
         "kind": "ObservedClusterState",
@@ -52,17 +55,17 @@ def build_observed_cluster_state_from_k8s_lists(
             "namespace": namespace,
             "labels": {
                 "app.kubernetes.io/name": "or-sim-mig-planner",
-                "mig.or-sim.io/observer-kind": "kubernetes-node-pod-smoke",
+                "mig.or-sim.io/observer-kind": observer_kind,
                 "mig.or-sim.io/preview-only": "false",
             },
         },
         "spec": {
             "previewOnly": False,
-            "source": "kubernetes-node-pod-smoke-observer",
+            "source": source,
             "observedState": {
                 "nodeInventory": node_inventory,
                 "podReadiness": pod_readiness,
-                "migLayouts": [],
+                "migLayouts": mig_layouts,
                 "podAssignments": [],
                 "routerState": [],
                 "inflightByInstance": [],
@@ -71,8 +74,8 @@ def build_observed_cluster_state_from_k8s_lists(
             "missingRealClusterInputs": missing_inputs,
             "canonicalizationRule": "do not canonicalize until MIG, pod assignment, and router observations are present",
             "notes": [
-                "Read-only hardware smoke observation.",
-                "This proves Kubernetes node/pod visibility before NVIDIA MIG-specific observer integration.",
+                "Read-only Kubernetes hardware observation.",
+                "MIG profile inventory is derived from node labels and capacity/allocatable resources when available.",
             ],
         },
     }
@@ -81,13 +84,21 @@ def build_observed_cluster_state_from_k8s_lists(
 def observed_cluster_state_status(manifest: dict[str, Any]) -> dict[str, Any]:
     spec = dict(manifest.get("spec", {}))
     missing_inputs = list(spec.get("missingRealClusterInputs", []))
+    observed = dict(spec.get("observedState", {}))
+    mig_layouts = list(observed.get("migLayouts", []))
+    validated_by = str(spec.get("source") or "kubernetes-node-pod-smoke-observer")
     return {
-        "phase": "NodePodInventoryObserved",
+        "phase": "MigNodeInventoryObserved" if mig_layouts else "NodePodInventoryObserved",
         "previewOnly": bool(spec.get("previewOnly", False)),
         "readyForCanonicalization": False,
-        "validatedBy": "kubernetes-node-pod-smoke-observer",
+        "validatedBy": validated_by,
         "missingRealClusterInputCount": len(missing_inputs),
-        "message": "Kubernetes nodes and pods observed; MIG/device/router observations are still required.",
+        "message": (
+            "Kubernetes nodes, pods, and MIG profile resources observed; "
+            "MIG device placement, pod assignment, and router observations are still required."
+            if mig_layouts
+            else "Kubernetes nodes and pods observed; MIG/device/router observations are still required."
+        ),
     }
 
 
@@ -110,6 +121,78 @@ def _node_inventory_row(node: dict[str, Any]) -> dict[str, Any]:
             for condition in list(status.get("conditions", []))
         ],
     }
+
+
+def _mig_layout_row(node: dict[str, Any]) -> dict[str, Any] | None:
+    metadata = dict(node.get("metadata", {}))
+    labels = dict(metadata.get("labels", {}))
+    status = dict(node.get("status", {}))
+    capacity = dict(status.get("capacity", {}))
+    allocatable = dict(status.get("allocatable", {}))
+    profiles = []
+    for key, value in sorted(labels.items()):
+        if not key.startswith("nvidia.com/mig-") or not key.endswith(".count"):
+            continue
+        profile = key.removeprefix("nvidia.com/mig-").removesuffix(".count")
+        profile_row = _mig_profile_row(
+            profile=profile,
+            label_count=value,
+            labels=labels,
+            capacity=capacity,
+            allocatable=allocatable,
+        )
+        profiles.append(profile_row)
+    if not profiles:
+        return None
+    return {
+        "nodeName": metadata.get("name"),
+        "migStrategy": labels.get("nvidia.com/mig.strategy"),
+        "migConfig": labels.get("nvidia.com/mig.config"),
+        "migConfigState": labels.get("nvidia.com/mig.config.state"),
+        "profiles": profiles,
+    }
+
+
+def _mig_profile_row(
+    profile: str,
+    label_count: Any,
+    labels: dict[str, Any],
+    capacity: dict[str, Any],
+    allocatable: dict[str, Any],
+) -> dict[str, Any]:
+    prefix = f"nvidia.com/mig-{profile}"
+    row: dict[str, Any] = {
+        "profile": profile,
+        "labelCount": _parse_int(label_count),
+        "capacity": _parse_int(capacity.get(prefix)),
+        "allocatable": _parse_int(allocatable.get(prefix)),
+        "product": labels.get(f"{prefix}.product"),
+        "memoryMiB": _parse_int(labels.get(f"{prefix}.memory")),
+        "multiprocessors": _parse_int(labels.get(f"{prefix}.multiprocessors")),
+        "replicas": _parse_int(labels.get(f"{prefix}.replicas")),
+        "slices": {
+            "gi": _parse_int(labels.get(f"{prefix}.slices.gi")),
+            "ci": _parse_int(labels.get(f"{prefix}.slices.ci")),
+        },
+        "engines": {
+            "copy": _parse_int(labels.get(f"{prefix}.engines.copy")),
+            "decoder": _parse_int(labels.get(f"{prefix}.engines.decoder")),
+            "encoder": _parse_int(labels.get(f"{prefix}.engines.encoder")),
+            "jpeg": _parse_int(labels.get(f"{prefix}.engines.jpeg")),
+            "ofa": _parse_int(labels.get(f"{prefix}.engines.ofa")),
+        },
+        "sharingStrategy": labels.get(f"{prefix}.sharing-strategy"),
+    }
+    return row
+
+
+def _parse_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(str(value))
+    except ValueError:
+        return None
 
 
 def _pod_readiness_row(pod: dict[str, Any]) -> dict[str, Any]:

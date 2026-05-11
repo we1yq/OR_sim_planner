@@ -7,8 +7,10 @@ from actuator import run_dry_run_actuator_loop
 from cluster_observer import observe_cluster_state_once
 from io_utils import dump_yaml, load_yaml
 from k8s_adapter import plan_scenario_as_migplan_status, plan_scenario_chain_as_migplan_statuses
+from mig_label_executor import apply_mig_labels_from_action_plan, summarize_mig_labels_from_action_plan
 from mig_rules import load_mig_rules, mig_rules_summary_dict, validate_gpu_state_against_mig_rules
 from reconciler import reconcile_migplan_once, run_controller_loop, run_watch_controller_loop
+from reconciler import upsert_migactionplan
 from scenario_loader import load_planning_scenario, scenario_summary_dict
 from state_adapter import gpu_state_from_mock_yaml
 
@@ -104,6 +106,51 @@ def parse_args() -> argparse.Namespace:
         help="For --observe-cluster-state, write the ObservedClusterState and status to Kubernetes.",
     )
     parser.add_argument(
+        "--summarize-mig-labels-from-action-plan",
+        help="Read a MigActionPlan and print the NVIDIA GPU Operator node-label patch it would apply.",
+    )
+    parser.add_argument(
+        "--apply-mig-labels-from-action-plan",
+        help="Apply a MigActionPlan executorPreview node-label patch to real Kubernetes Nodes.",
+    )
+    parser.add_argument(
+        "--confirm-real-mig-apply",
+        action="store_true",
+        help="Required with --apply-mig-labels-from-action-plan because it changes real MIG layout.",
+    )
+    parser.add_argument(
+        "--allow-preview-instructions",
+        action="store_true",
+        help="Allow applying instructions from a dryRun MigActionPlan for a controlled hardware smoke test.",
+    )
+    parser.add_argument(
+        "--wait-mig-success",
+        action="store_true",
+        help="Wait for node nvidia.com/mig.config.state=success after applying MIG labels.",
+    )
+    parser.add_argument(
+        "--mig-apply-timeout-s",
+        type=float,
+        default=900.0,
+        help="Timeout for --wait-mig-success.",
+    )
+    parser.add_argument(
+        "--create-mig-label-smoke-action-plan",
+        help="Create a controlled MigActionPlan that targets one node/device MIG layout.",
+    )
+    parser.add_argument("--mig-smoke-node", default="rtx1", help="Node name for MIG label smoke plan.")
+    parser.add_argument("--mig-smoke-device-index", type=int, default=0, help="GPU device index for smoke plan.")
+    parser.add_argument(
+        "--mig-smoke-target-template",
+        default="3g+3g",
+        help="Target template for smoke plan, for example 3g+3g or 2g+2g+2g.",
+    )
+    parser.add_argument(
+        "--mig-smoke-source-template",
+        default="2g+2g+2g",
+        help="Source template recorded in smoke plan metadata.",
+    )
+    parser.add_argument(
         "--poll-interval-s",
         type=float,
         default=10.0,
@@ -172,6 +219,44 @@ def main() -> int:
         print(dump_yaml(observed), end="")
         return 0
 
+    if args.summarize_mig_labels_from_action_plan:
+        summary = summarize_mig_labels_from_action_plan(
+            name=args.summarize_mig_labels_from_action_plan,
+            namespace=args.namespace,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.apply_mig_labels_from_action_plan:
+        summary = apply_mig_labels_from_action_plan(
+            name=args.apply_mig_labels_from_action_plan,
+            namespace=args.namespace,
+            confirm_real_mig_apply=args.confirm_real_mig_apply,
+            allow_preview_instructions=args.allow_preview_instructions,
+            wait=args.wait_mig_success,
+            timeout_s=args.mig_apply_timeout_s,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.create_mig_label_smoke_action_plan:
+        status = _mig_label_smoke_status(
+            node_name=args.mig_smoke_node,
+            device_index=args.mig_smoke_device_index,
+            source_template=args.mig_smoke_source_template,
+            target_template=args.mig_smoke_target_template,
+        )
+        upsert_migactionplan(
+            name=args.create_mig_label_smoke_action_plan,
+            namespace=args.namespace,
+            owner_migplan=f"{args.create_mig_label_smoke_action_plan}-synthetic-owner",
+            migplan_generation=1,
+            auto_approval_policy_name="default",
+            status=status,
+        )
+        print(dump_yaml(status), end="")
+        return 0
+
     if args.run_controller:
         summary = run_controller_loop(
             namespace=args.namespace,
@@ -238,6 +323,106 @@ def main() -> int:
         return 0
 
     raise SystemExit("choose --scenario or --validate-mig-rules")
+
+
+def _mig_label_smoke_status(
+    node_name: str,
+    device_index: int,
+    source_template: str,
+    target_template: str,
+) -> dict:
+    physical_gpu_id = "A"
+    instances = _instances_from_template(target_template)
+    canonical_next_state = {
+        "metadata": {
+            "physical_id_map": {"0": physical_gpu_id},
+            "physicalGpuBindings": {
+                physical_gpu_id: {
+                    "nodeName": node_name,
+                    "deviceIndex": int(device_index),
+                }
+            },
+            "smokeTest": "single-node-mig-label-apply",
+        },
+        "gpus": [
+            {
+                "gpuId": 0,
+                "source": "dry-run",
+                "instances": instances,
+            }
+        ],
+    }
+    return {
+        "metrics": {"actionCount": 3, "gpuCount": 1},
+        "planningSummary": {
+            "actionCountsByType": {
+                "clear_template": 1,
+                "configure_full_template": 1,
+                "place_target_layout": 1,
+            },
+            "chosenTemplates": [target_template],
+        },
+        "actions": [
+            {"type": "clear_template", "gpu_id": 0, "physical_gpu_id": physical_gpu_id},
+            {
+                "type": "configure_full_template",
+                "physical_gpu_id": physical_gpu_id,
+                "template": target_template,
+            },
+            {"type": "place_target_layout", "gpu_id": 0, "physical_gpu_id": physical_gpu_id},
+        ],
+        "planningTrace": {
+            "scenario": "single-node-mig-label-smoke",
+            "transition": {
+                "finalCoarseActions": [
+                    {
+                        "type": "reconfiguration",
+                        "gpu_id": 0,
+                        "source_physical_gpu_id": physical_gpu_id,
+                        "new_physical_gpu_id": physical_gpu_id,
+                        "src_template": source_template,
+                        "tgt_template": target_template,
+                        "mode": "in_place_old_first",
+                    }
+                ],
+                "finalPlanItems": [],
+            },
+        },
+        "canonicalNextState": canonical_next_state,
+    }
+
+
+def _instances_from_template(template: str) -> list[dict]:
+    cursor = 0
+    instances = []
+    for raw_profile in [part for part in template.split("+") if part]:
+        profile = raw_profile if raw_profile.endswith("g") else f"{raw_profile}g"
+        size = int(profile.removesuffix("g"))
+        instances.append(
+            {
+                "start": cursor,
+                "end": cursor + size,
+                "profile": profile,
+                "workload": None,
+                "batch": None,
+                "mu": 0.0,
+                "preserved": False,
+            }
+        )
+        cursor += size
+    if cursor < 7:
+        instances.append(
+            {
+                "start": cursor,
+                "end": 7,
+                "profile": "void",
+                "workload": None,
+                "batch": None,
+                "mu": 0.0,
+                "preserved": False,
+            }
+        )
+    return instances
 
 
 if __name__ == "__main__":
