@@ -17,6 +17,7 @@ from executor_preview import (
     build_traffic_and_drain_preview,
 )
 from k8s_adapter import plan_scenario_as_migplan_status
+from mig_label_executor import MigLabelApplyError, apply_mig_labels_from_action_plan
 from models import PlanningScenario, ScenarioWorkloadDemand
 from reconciler import (
     compact_migplan_status_for_k8s,
@@ -39,6 +40,8 @@ class FakeKubernetesClient:
         self.servinginstancedrains: dict[tuple[str, str], dict[str, Any]] = {}
         self.podlifecycleplans: dict[tuple[str, str], dict[str, Any]] = {}
         self.observedclusterstates: dict[tuple[str, str], dict[str, Any]] = {}
+        self.migactionplans: dict[tuple[str, str], dict[str, Any]] = {}
+        self.clusterpolicies: dict[str, dict[str, Any]] = {}
         self.statuses: dict[tuple[str, str], dict[str, Any]] = {}
         self.workloadrouteplan_statuses: dict[tuple[str, str], dict[str, Any]] = {}
         self.servinginstancedrain_statuses: dict[tuple[str, str], dict[str, Any]] = {}
@@ -61,6 +64,34 @@ class FakeKubernetesClient:
 
     def list_pods(self, namespace: str) -> list[dict[str, Any]]:
         return [pod for pod in self.pods if pod.get("metadata", {}).get("namespace") == namespace]
+
+    def get_node(self, name: str) -> dict[str, Any]:
+        for node in self.nodes:
+            if node.get("metadata", {}).get("name") == name:
+                return node
+        raise KeyError(name)
+
+    def patch_node_labels(
+        self,
+        name: str,
+        labels: dict[str, str],
+        remove_labels: list[str] | None = None,
+    ) -> None:
+        node = self.get_node(name)
+        node_labels = node.setdefault("metadata", {}).setdefault("labels", {})
+        for label in remove_labels or []:
+            node_labels.pop(label, None)
+        node_labels.update(labels)
+
+    def list_migactionplans(self, namespace: str) -> list[dict[str, Any]]:
+        return [
+            manifest
+            for (manifest_namespace, _), manifest in self.migactionplans.items()
+            if manifest_namespace == namespace
+        ]
+
+    def get_migactionplan(self, name: str, namespace: str) -> dict[str, Any]:
+        return self.migactionplans[(namespace, name)]
 
     def patch_migplan_status(self, name: str, namespace: str, status: dict[str, Any]) -> None:
         raise NotImplementedError
@@ -86,6 +117,9 @@ class FakeKubernetesClient:
     def get_configmap(self, name: str, namespace: str) -> dict[str, Any]:
         return self.configmaps[(namespace, name)]
 
+    def get_clusterpolicy(self, name: str) -> dict[str, Any]:
+        return self.clusterpolicies[name]
+
     def apply_configmap(self, manifest: dict[str, Any]) -> None:
         metadata = manifest["metadata"]
         self.configmaps[(metadata["namespace"], metadata["name"])] = manifest
@@ -93,6 +127,7 @@ class FakeKubernetesClient:
     def apply_migactionplan(self, manifest: dict[str, Any]) -> None:
         metadata = manifest["metadata"]
         self.configmaps[(metadata["namespace"], metadata["name"])] = manifest
+        self.migactionplans[(metadata["namespace"], metadata["name"])] = manifest
 
     def apply_workloadrouteplan(self, manifest: dict[str, Any]) -> None:
         metadata = manifest["metadata"]
@@ -932,6 +967,43 @@ def test_build_observed_cluster_state_with_mig_profile_inventory() -> None:
     assert status["readyForCanonicalization"] is False
 
 
+def test_mig_label_executor_preflights_or_sim_configmap() -> None:
+    client = _fake_mig_label_client(target_configs=["or-sim-4-3"])
+
+    summary = apply_mig_labels_from_action_plan(
+        name="apply-4-3",
+        namespace="or-sim",
+        confirm_real_mig_apply=True,
+        allow_preview_instructions=True,
+        wait=False,
+        client=client,
+    )
+
+    assert summary["gpuOperatorPreflight"]["configMap"] == "or-sim-mig-parted-config"
+    assert summary["gpuOperatorPreflight"]["missingTargetConfigs"] == []
+    assert client.get_node("rtx1")["metadata"]["labels"]["nvidia.com/mig.config"] == "or-sim-4-3"
+    assert "nvidia.com/mig.config.state" not in client.get_node("rtx1")["metadata"]["labels"]
+
+
+def test_mig_label_executor_blocks_missing_gpu_operator_config() -> None:
+    client = _fake_mig_label_client(target_configs=["all-2g.10gb"])
+
+    try:
+        apply_mig_labels_from_action_plan(
+            name="apply-4-3",
+            namespace="or-sim",
+            confirm_real_mig_apply=True,
+            allow_preview_instructions=True,
+            wait=False,
+            client=client,
+        )
+    except MigLabelApplyError as exc:
+        assert "Target MIG configs missing" in str(exc)
+        assert "or-sim-4-3" in str(exc)
+    else:
+        raise AssertionError("expected missing MIG config preflight failure")
+
+
 def _valid_executor_preview() -> dict[str, Any]:
     return {
         "previewOnly": True,
@@ -941,6 +1013,68 @@ def _valid_executor_preview() -> dict[str, Any]:
         "wouldPatchNodeLabels": {},
         "unresolvedPhysicalGpuIds": ["A"],
     }
+
+
+def _fake_mig_label_client(target_configs: list[str]) -> FakeKubernetesClient:
+    client = FakeKubernetesClient()
+    client.nodes = [
+        {
+            "metadata": {
+                "name": "rtx1",
+                "labels": {
+                    "nvidia.com/mig.config": "all-enabled",
+                    "nvidia.com/mig.config.state": "success",
+                },
+            },
+            "status": {"capacity": {}, "allocatable": {}},
+        }
+    ]
+    client.clusterpolicies["cluster-policy"] = {
+        "spec": {
+            "migManager": {
+                "config": {
+                    "name": "or-sim-mig-parted-config",
+                }
+            }
+        }
+    }
+    client.configmaps[("gpu-operator", "or-sim-mig-parted-config")] = {
+        "metadata": {"name": "or-sim-mig-parted-config", "namespace": "gpu-operator"},
+        "data": {
+            "config.yaml": yaml.safe_dump(
+                {
+                    "mig-configs": {
+                        config_name: [
+                            {
+                                "devices": "all",
+                                "mig-enabled": True,
+                                "mig-devices": {},
+                            }
+                        ]
+                        for config_name in target_configs
+                    }
+                },
+                sort_keys=False,
+            )
+        },
+    }
+    client.migactionplans[("or-sim", "apply-4-3")] = {
+        "metadata": {"name": "apply-4-3", "namespace": "or-sim"},
+        "spec": {
+            "dryRun": True,
+            "executorPreview": {
+                "executor": "nvidia-gpu-operator",
+                "gpuOperatorLabel": "nvidia.com/mig.config",
+                "unresolvedPhysicalGpuIds": [],
+                "wouldPatchNodeLabels": {
+                    "rtx1": {
+                        "nvidia.com/mig.config": "or-sim-4-3",
+                    }
+                },
+            },
+        },
+    }
+    return client
 
 
 def _valid_action_previews() -> dict[str, Any]:
@@ -1023,6 +1157,8 @@ def main() -> int:
     test_load_scenario_with_arrival_snapshot_configmap()
     test_current_state_feasible_arrival_snapshot_noop()
     test_build_observed_cluster_state_from_k8s_lists()
+    test_mig_label_executor_preflights_or_sim_configmap()
+    test_mig_label_executor_blocks_missing_gpu_operator_config()
     print("ok")
     return 0
 

@@ -3,11 +3,16 @@ from __future__ import annotations
 import time
 from typing import Any
 
+import yaml
+
 from k8s_api import KubernetesClient, PythonKubernetesClient
 
 
 MIG_CONFIG_LABEL = "nvidia.com/mig.config"
 MIG_CONFIG_STATE_LABEL = "nvidia.com/mig.config.state"
+GPU_OPERATOR_NAMESPACE = "gpu-operator"
+GPU_OPERATOR_CLUSTERPOLICY = "cluster-policy"
+OR_SIM_MIG_CONFIGMAP = "or-sim-mig-parted-config"
 
 
 class MigLabelApplyError(RuntimeError):
@@ -51,6 +56,10 @@ def apply_mig_labels_from_action_plan(
         raise MigLabelApplyError("executorPreview.wouldPatchNodeLabels is empty.")
 
     patches = []
+    preflight = _validate_gpu_operator_mig_configs(
+        client=client,
+        target_configs=_target_configs_from_would_patch(would_patch),
+    )
     for node_name, labels in sorted(would_patch.items()):
         label_map = dict(labels)
         if set(label_map) != {MIG_CONFIG_LABEL}:
@@ -94,6 +103,7 @@ def apply_mig_labels_from_action_plan(
         "confirmedRealMigApply": True,
         "allowedPreviewInstructions": bool(allow_preview_instructions),
         "waitedForSuccess": bool(wait),
+        "gpuOperatorPreflight": preflight,
         "patches": patches,
     }
 
@@ -112,6 +122,10 @@ def summarize_mig_labels_from_action_plan(
         str(node_name): _node_mig_summary(client.get_node(str(node_name)))
         for node_name in sorted(would_patch)
     }
+    preflight = _summarize_gpu_operator_mig_configs(
+        client=client,
+        target_configs=_target_configs_from_would_patch(would_patch, strict=False),
+    )
     return {
         "kind": "MigLabelApplyPlan",
         "apiVersion": "mig.or-sim.io/v1alpha1",
@@ -120,6 +134,7 @@ def summarize_mig_labels_from_action_plan(
         "dryRunActionPlan": bool(spec.get("dryRun", True)),
         "executor": executor_preview.get("executor"),
         "wouldPatchNodeLabels": would_patch,
+        "gpuOperatorPreflight": preflight,
         "unresolvedPhysicalGpuIds": list(executor_preview.get("unresolvedPhysicalGpuIds", [])),
         "currentNodeMig": node_summaries,
         "notes": [
@@ -127,6 +142,86 @@ def summarize_mig_labels_from_action_plan(
             "Real execution patches nvidia.com/mig.config and removes nvidia.com/mig.config.state.",
         ],
     }
+
+
+def _target_configs_from_would_patch(
+    would_patch: dict[str, Any],
+    strict: bool = True,
+) -> list[str]:
+    target_configs = []
+    for node_name, labels in sorted(would_patch.items()):
+        if not isinstance(labels, dict) or MIG_CONFIG_LABEL not in labels:
+            if strict:
+                raise MigLabelApplyError(
+                    f"Missing {MIG_CONFIG_LABEL} patch for node {node_name}: {labels}"
+                )
+            continue
+        target_configs.append(str(labels[MIG_CONFIG_LABEL]))
+    return target_configs
+
+
+def _validate_gpu_operator_mig_configs(
+    client: KubernetesClient,
+    target_configs: list[str],
+) -> dict[str, Any]:
+    summary = _summarize_gpu_operator_mig_configs(
+        client=client,
+        target_configs=target_configs,
+    )
+    errors = list(summary.get("errors", []))
+    if errors:
+        raise MigLabelApplyError("GPU Operator MIG config preflight failed: " + "; ".join(errors))
+    return summary
+
+
+def _summarize_gpu_operator_mig_configs(
+    client: KubernetesClient,
+    target_configs: list[str],
+) -> dict[str, Any]:
+    clusterpolicy = client.get_clusterpolicy(GPU_OPERATOR_CLUSTERPOLICY)
+    spec = dict(clusterpolicy.get("spec", {}))
+    mig_manager = dict(spec.get("migManager", {}))
+    config_ref = dict(mig_manager.get("config", {}))
+    configured_name = str(config_ref.get("name", ""))
+    configmap_name = configured_name or "default-mig-parted-config"
+    configmap = client.get_configmap(configmap_name, GPU_OPERATOR_NAMESPACE)
+    data = dict(configmap.get("data", {}))
+    raw_config = data.get("config.yaml", "")
+    mig_configs = _mig_configs_from_raw_config(raw_config)
+    available = sorted(mig_configs)
+    targets = sorted(set(target_configs))
+    missing = [target for target in targets if target not in mig_configs]
+    errors = []
+    if configured_name != OR_SIM_MIG_CONFIGMAP:
+        errors.append(
+            f"ClusterPolicy {GPU_OPERATOR_CLUSTERPOLICY} points to "
+            f"{configured_name or '<default>'}, expected {OR_SIM_MIG_CONFIGMAP}"
+        )
+    if missing:
+        errors.append(
+            "Target MIG configs missing from "
+            f"{GPU_OPERATOR_NAMESPACE}/{configmap_name}: {missing}"
+        )
+    return {
+        "clusterPolicy": GPU_OPERATOR_CLUSTERPOLICY,
+        "namespace": GPU_OPERATOR_NAMESPACE,
+        "configMap": configmap_name,
+        "expectedConfigMap": OR_SIM_MIG_CONFIGMAP,
+        "targetConfigs": targets,
+        "missingTargetConfigs": missing,
+        "availableConfigCount": len(available),
+        "errors": errors,
+    }
+
+
+def _mig_configs_from_raw_config(raw_config: str) -> dict[str, Any]:
+    if not raw_config:
+        return {}
+    parsed = yaml.safe_load(raw_config)
+    if not isinstance(parsed, dict):
+        return {}
+    mig_configs = parsed.get("mig-configs", {})
+    return mig_configs if isinstance(mig_configs, dict) else {}
 
 
 def _wait_for_mig_success(

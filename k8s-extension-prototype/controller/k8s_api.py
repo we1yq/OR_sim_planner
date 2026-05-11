@@ -56,6 +56,9 @@ class KubernetesClient(Protocol):
     def get_configmap(self, name: str, namespace: str) -> dict[str, Any]:
         ...
 
+    def get_clusterpolicy(self, name: str) -> dict[str, Any]:
+        ...
+
     def apply_configmap(self, manifest: dict[str, Any]) -> None:
         ...
 
@@ -262,6 +265,17 @@ class PythonKubernetesClient:
     def get_configmap(self, name: str, namespace: str) -> dict[str, Any]:
         obj = self.core.read_namespaced_config_map(name=name, namespace=namespace)
         return self.api_client.sanitize_for_serialization(obj)
+
+    def get_clusterpolicy(self, name: str) -> dict[str, Any]:
+        obj = self.custom.get_cluster_custom_object(
+            group="nvidia.com",
+            version="v1",
+            plural="clusterpolicies",
+            name=name,
+        )
+        if not isinstance(obj, dict):
+            raise ValueError(f"Kubernetes API returned a non-object ClusterPolicy for {name}")
+        return obj
 
     def apply_configmap(self, manifest: dict[str, Any]) -> None:
         metadata = dict(manifest.get("metadata", {}))
