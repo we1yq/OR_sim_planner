@@ -1,0 +1,905 @@
+apiVersion: v1
+items:
+- apiVersion: mig.or-sim.io/v1alpha1
+  kind: PhysicalGpuRegistry
+  metadata:
+    creationTimestamp: "2026-05-11T08:19:27Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: or-sim-mig-planner
+    name: default
+    namespace: or-sim
+    resourceVersion: "73840954"
+    uid: 7039303e-1e39-4e18-9ed1-b7d562e9a425
+  spec:
+    policy:
+      allocationOrder: first-observed
+      gpuProductAllowlist:
+      - NVIDIA A100
+      requireEmptyBeforeAvailable: true
+  status:
+    activeQueue: []
+    availableQueue:
+    - rtx1-gpu0
+    bindings:
+      rtx1-gpu0:
+        availabilityReason: empty_config_success
+        availableEligible: true
+        bindingSource: gpu-operator-mig-manager-nvidia-smi
+        cleanliness: empty
+        confidence: gpu-operator-nvidia-smi
+        currentMigConfig: or-sim-empty
+        currentMigConfigState: success
+        deviceIndex: 0
+        gpuUuid: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f
+        migCapable: true
+        migDevices: []
+        migDevicesFresh: true
+        nodeName: rtx1
+        physicalGpuId: rtx1-gpu0
+        product: NVIDIA A100-PCIE-40GB
+        state: available
+    discoveredA100:
+    - rtx1-gpu0
+    ignoredGpuDevices:
+    - bindingSource: gpu-operator-device-plugin-nvidia-smi
+      confidence: gpu-operator-nvidia-smi
+      deviceIndex: 1
+      gpuUuid: GPU-21058121-c040-c847-712d-da7a5cf48e4b
+      migCapable: false
+      migDevices: []
+      nodeName: rtx1
+      physicalGpuId: rtx1-gpu1
+      product: NVIDIA TITAN RTX
+      reason: non-A100 GPU ignored by OR-SIM MIG planner
+    - bindingSource: gpu-operator-device-plugin-nvidia-smi
+      confidence: gpu-operator-nvidia-smi
+      deviceIndex: 2
+      gpuUuid: GPU-edc7db6f-0fec-bc09-9cbe-5a8d2598a62e
+      migCapable: false
+      migDevices: []
+      nodeName: rtx1
+      physicalGpuId: rtx1-gpu2
+      product: NVIDIA TITAN RTX
+      reason: non-A100 GPU ignored by OR-SIM MIG planner
+    - bindingSource: gpu-operator-device-plugin-nvidia-smi
+      confidence: gpu-operator-nvidia-smi
+      deviceIndex: 3
+      gpuUuid: GPU-1e09b62e-bae8-23dd-a55d-03b34ee00182
+      migCapable: false
+      migDevices: []
+      nodeName: rtx1
+      physicalGpuId: rtx1-gpu3
+      product: NVIDIA GeForce RTX 3090
+      reason: non-A100 GPU ignored by OR-SIM MIG planner
+    missingActivePhysicalGpuIds: []
+    notes:
+    - activeQueue is planner-owned and preserved from the previous registry status.
+    - availableQueue contains only observed A100 GPUs with no MIG devices, or-sim-empty=success,
+      and not active.
+    - transitioningQueue contains observed A100 GPUs that must be cleaned or reconfigured
+      before availability.
+    - During nvidia.com/mig.config.state=pending, GPU Operator exec inventory is skipped
+      and stable GPU UUID bindings are reused from the previous registry.
+    observedAt: "2026-05-11T09:55:21.392974+00:00"
+    observedClusterState: cluster-observed-state
+    phase: Synced
+    policy:
+      allocationOrder: first-observed
+      gpuProductAllowlist:
+      - NVIDIA A100
+      requireEmptyBeforeAvailable: true
+    queueCounts:
+      active: 0
+      available: 1
+      discovered: 1
+      ignored: 3
+      missingActive: 0
+      transitioning: 0
+    transitioningQueue: []
+- apiVersion: mig.or-sim.io/v1alpha1
+  kind: ObservedClusterState
+  metadata:
+    creationTimestamp: "2026-05-10T12:37:21Z"
+    generation: 17
+    labels:
+      app.kubernetes.io/name: or-sim-mig-planner
+      mig.or-sim.io/observer-kind: kubernetes-node-pod-smoke
+      mig.or-sim.io/preview-only: "false"
+    name: cluster-observed-state
+    namespace: or-sim
+    resourceVersion: "73840953"
+    uid: bfd84be2-59e6-44c8-a62b-50ba5c66cf80
+  spec:
+    canonicalizationRule: do not canonicalize until MIG, pod assignment, and router
+      observations are present
+    missingRealClusterInputs:
+    - MIG device UUID and placement inventory
+    - pod-to-MIG device assignment
+    - router queue and inflight metrics
+    notes:
+    - Read-only Kubernetes hardware observation.
+    - MIG profile inventory is derived from node labels and capacity/allocatable resources
+      when available.
+    - GPU Operator exec inventory was collected for GPU and MIG UUIDs.
+    observedState:
+      gpuOperatorInventory:
+      - namespace: gpu-operator
+        nodeName: rtx1
+        nvidiaSmiL: |
+          GPU 0: NVIDIA A100-PCIE-40GB (UUID: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f)
+          GPU 1: NVIDIA TITAN RTX (UUID: GPU-21058121-c040-c847-712d-da7a5cf48e4b)
+          GPU 2: NVIDIA TITAN RTX (UUID: GPU-edc7db6f-0fec-bc09-9cbe-5a8d2598a62e)
+          GPU 3: NVIDIA GeForce RTX 3090 (UUID: GPU-1e09b62e-bae8-23dd-a55d-03b34ee00182)
+        podName: nvidia-device-plugin-daemonset-jmtpt
+        source: gpu-operator-device-plugin-nvidia-smi
+      - namespace: gpu-operator
+        nodeName: rtx1
+        nvidiaSmiL: |
+          GPU 0: NVIDIA A100-PCIE-40GB (UUID: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f)
+          GPU 1: NVIDIA TITAN RTX (UUID: GPU-21058121-c040-c847-712d-da7a5cf48e4b)
+          GPU 2: NVIDIA TITAN RTX (UUID: GPU-edc7db6f-0fec-bc09-9cbe-5a8d2598a62e)
+          GPU 3: NVIDIA GeForce RTX 3090 (UUID: GPU-1e09b62e-bae8-23dd-a55d-03b34ee00182)
+        podName: nvidia-mig-manager-shqf6
+        source: gpu-operator-mig-manager-nvidia-smi
+      gpuOperatorInventoryFresh: true
+      gpuOperatorInventorySkippedReason: null
+      ignoredGpuDevices:
+      - bindingSource: gpu-operator-device-plugin-nvidia-smi
+        confidence: gpu-operator-nvidia-smi
+        deviceIndex: 1
+        gpuUuid: GPU-21058121-c040-c847-712d-da7a5cf48e4b
+        migCapable: false
+        migDevices: []
+        nodeName: rtx1
+        physicalGpuId: rtx1-gpu1
+        product: NVIDIA TITAN RTX
+        reason: non-A100 GPU ignored by OR-SIM MIG planner
+      - bindingSource: gpu-operator-device-plugin-nvidia-smi
+        confidence: gpu-operator-nvidia-smi
+        deviceIndex: 2
+        gpuUuid: GPU-edc7db6f-0fec-bc09-9cbe-5a8d2598a62e
+        migCapable: false
+        migDevices: []
+        nodeName: rtx1
+        physicalGpuId: rtx1-gpu2
+        product: NVIDIA TITAN RTX
+        reason: non-A100 GPU ignored by OR-SIM MIG planner
+      - bindingSource: gpu-operator-device-plugin-nvidia-smi
+        confidence: gpu-operator-nvidia-smi
+        deviceIndex: 3
+        gpuUuid: GPU-1e09b62e-bae8-23dd-a55d-03b34ee00182
+        migCapable: false
+        migDevices: []
+        nodeName: rtx1
+        physicalGpuId: rtx1-gpu3
+        product: NVIDIA GeForce RTX 3090
+        reason: non-A100 GPU ignored by OR-SIM MIG planner
+      inflightByInstance: []
+      migLayouts: []
+      nodeInventory:
+      - conditions:
+        - reason: FlannelIsUp
+          status: "False"
+          type: NetworkUnavailable
+        - reason: MemberNotLearner
+          status: "True"
+          type: EtcdIsVoter
+        - reason: KubeletHasSufficientMemory
+          status: "False"
+          type: MemoryPressure
+        - reason: KubeletHasNoDiskPressure
+          status: "False"
+          type: DiskPressure
+        - reason: KubeletHasSufficientPID
+          status: "False"
+          type: PIDPressure
+        - reason: KubeletReady
+          status: "True"
+          type: Ready
+        gpuAllocatable: "3"
+        gpuCapacity: "3"
+        labels:
+          beta.kubernetes.io/arch: amd64
+          beta.kubernetes.io/instance-type: rke2
+          beta.kubernetes.io/os: linux
+          feature.node.kubernetes.io/cpu-cpuid.ADX: "true"
+          feature.node.kubernetes.io/cpu-cpuid.AESNI: "true"
+          feature.node.kubernetes.io/cpu-cpuid.AMXFP8: "true"
+          feature.node.kubernetes.io/cpu-cpuid.AVX: "true"
+          feature.node.kubernetes.io/cpu-cpuid.AVX2: "true"
+          feature.node.kubernetes.io/cpu-cpuid.AVX512BW: "true"
+          feature.node.kubernetes.io/cpu-cpuid.AVX512CD: "true"
+          feature.node.kubernetes.io/cpu-cpuid.AVX512DQ: "true"
+          feature.node.kubernetes.io/cpu-cpuid.AVX512F: "true"
+          feature.node.kubernetes.io/cpu-cpuid.AVX512VL: "true"
+          feature.node.kubernetes.io/cpu-cpuid.AVX512VNNI: "true"
+          feature.node.kubernetes.io/cpu-cpuid.CMPXCHG8: "true"
+          feature.node.kubernetes.io/cpu-cpuid.FLUSH_L1D: "true"
+          feature.node.kubernetes.io/cpu-cpuid.FMA3: "true"
+          feature.node.kubernetes.io/cpu-cpuid.FXSR: "true"
+          feature.node.kubernetes.io/cpu-cpuid.FXSROPT: "true"
+          feature.node.kubernetes.io/cpu-cpuid.IA32_ARCH_CAP: "true"
+          feature.node.kubernetes.io/cpu-cpuid.IBPB: "true"
+          feature.node.kubernetes.io/cpu-cpuid.LAHF: "true"
+          feature.node.kubernetes.io/cpu-cpuid.MD_CLEAR: "true"
+          feature.node.kubernetes.io/cpu-cpuid.MOVBE: "true"
+          feature.node.kubernetes.io/cpu-cpuid.MPX: "true"
+          feature.node.kubernetes.io/cpu-cpuid.OSXSAVE: "true"
+          feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_CYCLES: "true"
+          feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_INSTRUCTIONS: "true"
+          feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_REFCYCLES: "true"
+          feature.node.kubernetes.io/cpu-cpuid.SPEC_CTRL_SSBD: "true"
+          feature.node.kubernetes.io/cpu-cpuid.STIBP: "true"
+          feature.node.kubernetes.io/cpu-cpuid.SYSCALL: "true"
+          feature.node.kubernetes.io/cpu-cpuid.SYSEE: "true"
+          feature.node.kubernetes.io/cpu-cpuid.VMX: "true"
+          feature.node.kubernetes.io/cpu-cpuid.X87: "true"
+          feature.node.kubernetes.io/cpu-cpuid.XGETBV1: "true"
+          feature.node.kubernetes.io/cpu-cpuid.XSAVE: "true"
+          feature.node.kubernetes.io/cpu-cpuid.XSAVEC: "true"
+          feature.node.kubernetes.io/cpu-cpuid.XSAVEOPT: "true"
+          feature.node.kubernetes.io/cpu-cpuid.XSAVES: "true"
+          feature.node.kubernetes.io/cpu-cstate.enabled: "true"
+          feature.node.kubernetes.io/cpu-hardware_multithreading: "false"
+          feature.node.kubernetes.io/cpu-model.family: "6"
+          feature.node.kubernetes.io/cpu-model.id: "85"
+          feature.node.kubernetes.io/cpu-model.vendor_id: Intel
+          feature.node.kubernetes.io/kernel-config.NO_HZ: "true"
+          feature.node.kubernetes.io/kernel-config.NO_HZ_IDLE: "true"
+          feature.node.kubernetes.io/kernel-version.full: 5.15.0-60-generic
+          feature.node.kubernetes.io/kernel-version.major: "5"
+          feature.node.kubernetes.io/kernel-version.minor: "15"
+          feature.node.kubernetes.io/kernel-version.revision: "0"
+          feature.node.kubernetes.io/memory-numa: "true"
+          feature.node.kubernetes.io/pci-10de.present: "true"
+          feature.node.kubernetes.io/pci-10de.sriov.capable: "true"
+          feature.node.kubernetes.io/pci-14e4.present: "true"
+          feature.node.kubernetes.io/pci-15b3.present: "true"
+          feature.node.kubernetes.io/pci-102b.present: "true"
+          feature.node.kubernetes.io/rdma.capable: "true"
+          feature.node.kubernetes.io/storage-nonrotationaldisk: "true"
+          feature.node.kubernetes.io/system-os_release.ID: ubuntu
+          feature.node.kubernetes.io/system-os_release.VERSION_ID: "22.04"
+          feature.node.kubernetes.io/system-os_release.VERSION_ID.major: "22"
+          feature.node.kubernetes.io/system-os_release.VERSION_ID.minor: "04"
+          kubernetes.io/arch: amd64
+          kubernetes.io/hostname: rtx1
+          kubernetes.io/os: linux
+          node-role.kubernetes.io/control-plane: "true"
+          node-role.kubernetes.io/etcd: "true"
+          node-role.kubernetes.io/master: "true"
+          node.kubernetes.io/instance-type: rke2
+          nvidia.com/cuda.driver-version.full: 550.163.01
+          nvidia.com/cuda.driver-version.major: "550"
+          nvidia.com/cuda.driver-version.minor: "163"
+          nvidia.com/cuda.driver-version.revision: "01"
+          nvidia.com/cuda.driver.major: "550"
+          nvidia.com/cuda.driver.minor: "163"
+          nvidia.com/cuda.driver.rev: "01"
+          nvidia.com/cuda.runtime-version.full: "12.4"
+          nvidia.com/cuda.runtime-version.major: "12"
+          nvidia.com/cuda.runtime-version.minor: "4"
+          nvidia.com/cuda.runtime.major: "12"
+          nvidia.com/cuda.runtime.minor: "4"
+          nvidia.com/gfd.timestamp: "1778489036"
+          nvidia.com/gpu.compute.major: "8"
+          nvidia.com/gpu.compute.minor: "6"
+          nvidia.com/gpu.count: "1"
+          nvidia.com/gpu.deploy.container-toolkit: "true"
+          nvidia.com/gpu.deploy.dcgm: "true"
+          nvidia.com/gpu.deploy.dcgm-exporter: "true"
+          nvidia.com/gpu.deploy.device-plugin: "true"
+          nvidia.com/gpu.deploy.driver: "true"
+          nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
+          nvidia.com/gpu.deploy.mig-manager: "true"
+          nvidia.com/gpu.deploy.node-status-exporter: "true"
+          nvidia.com/gpu.deploy.nvsm: "true"
+          nvidia.com/gpu.deploy.operator-validator: "true"
+          nvidia.com/gpu.family: ampere
+          nvidia.com/gpu.machine: PowerEdge-T640
+          nvidia.com/gpu.memory: "24576"
+          nvidia.com/gpu.mode: unknown
+          nvidia.com/gpu.present: "true"
+          nvidia.com/gpu.product: NVIDIA-GeForce-RTX-3090
+          nvidia.com/gpu.replicas: "1"
+          nvidia.com/gpu.sharing-strategy: none
+          nvidia.com/mig.capable: "true"
+          nvidia.com/mig.config: or-sim-empty
+          nvidia.com/mig.config.state: success
+          nvidia.com/mig.strategy: mixed
+          nvidia.com/mps.capable: "false"
+          nvidia.com/vgpu.present: "false"
+        nodeName: rtx1
+      physicalGpuBindingList:
+      - bindingSource: gpu-operator-mig-manager-nvidia-smi
+        confidence: gpu-operator-nvidia-smi
+        deviceIndex: 0
+        gpuUuid: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f
+        migCapable: true
+        migDevices: []
+        nodeName: rtx1
+        physicalGpuId: rtx1-gpu0
+        product: NVIDIA A100-PCIE-40GB
+      physicalGpuBindings:
+        rtx1-gpu0:
+          bindingSource: gpu-operator-mig-manager-nvidia-smi
+          confidence: gpu-operator-nvidia-smi
+          deviceIndex: 0
+          gpuUuid: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f
+          migCapable: true
+          migDevices: []
+          nodeName: rtx1
+          physicalGpuId: rtx1-gpu0
+          product: NVIDIA A100-PCIE-40GB
+      podAssignments: []
+      podReadiness: []
+      queuedByWorkload: []
+      routerState: []
+      unresolvedPhysicalGpuDevices: []
+    previewOnly: false
+    source: kubernetes-node-pod-smoke-observer
+  status:
+    message: Kubernetes nodes and pods observed; MIG/device/router observations are
+      still required.
+    missingRealClusterInputCount: 3
+    phase: NodePodInventoryObserved
+    previewOnly: false
+    readyForCanonicalization: false
+    validatedBy: kubernetes-node-pod-smoke-observer
+- apiVersion: mig.or-sim.io/v1alpha1
+  kind: MigActionPlan
+  metadata:
+    creationTimestamp: "2026-05-10T14:08:11Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: or-sim-mig-planner
+      mig.or-sim.io/owner-migplan: rtx1-2g-to-3g-smoke-synthetic-owner
+    name: rtx1-2g-to-3g-smoke
+    namespace: or-sim
+    resourceVersion: "73539135"
+    uid: dc913b62-5567-4c9f-abb1-7fc5e3e51c7b
+  spec:
+    abstractActionPreview:
+      actions:
+      - gates:
+        - stopAcceptingOldSlots
+        - rerouteQueuedWork
+        - waitInflightZero
+        - clearOldMigGeometry
+        - prepareMigGeometryInPlace
+        - observeAndBindTarget
+        gpuId: 0
+        migImpact:
+          clearOldGpuAfterDrain: true
+          inPlaceGeometryChange: true
+          requiresMigManager: true
+          requiresNewTargetGpu: false
+        mode: in_place_old_first
+        physicalGpuId: A
+        podImpact:
+          blockedByDrainOrTakeover: false
+          mayCreateOrReuseBeforeCutover: true
+          mustDrainOldBeforeDelete: true
+          preferWarmPool: true
+        relatedPlanItems: []
+        rule: Every old workload slot has unchanged takeover capacity, so drain old
+          side and reconfigure in place.
+        sourceTemplate: 2g+2g+2g
+        targetPhysicalGpuId: A
+        targetTemplate: 3g+3g
+        type: reconfiguration
+      notes:
+      - This is a readable report of planner rules, not an execution command stream.
+      - Detailed fine actions remain in the full-plan ConfigMap.
+      previewOnly: true
+      rules:
+        create_gpu: Source has no logical GPU and target has one; prepare target-side
+          MIG geometry.
+        instance_diff: MIG geometry is unchanged but slot workload or batch payload
+          differs.
+        keep_gpu: Source and target MIG layout plus workload payload are unchanged.
+        reconfiguration: Source and target MIG templates differ; choose target_first
+          unless old workloads have unchanged takeover slots.
+        remove_gpu: Target no longer needs the GPU; stop/reroute/drain active slots
+          before clearing geometry.
+      source: v3-final-plan
+    actionCount: 3
+    actionCountsByType:
+      clear_template: 1
+      configure_full_template: 1
+      place_target_layout: 1
+    adapterDryRunPreview:
+      adapters:
+        mig:
+          blockedUntilObservedBindings: []
+          implementation: nvidia-gpu-operator
+          wouldApplyMigManagerConfigs:
+          - configName: all-3g.20gb
+            gpus:
+            - deviceIndex: 0
+              physicalGpuId: A
+              targetInstances:
+              - end: 3
+                profile: 3g
+                start: 0
+              - end: 6
+                profile: 3g
+                start: 3
+              targetTemplate: 3g+3g
+            nodeName: rtx1
+          wouldPatchNodeLabels:
+            rtx1:
+              nvidia.com/mig.config: all-3g.20gb
+        pod:
+          implementation: dry-run-pod-lifecycle-adapter
+          wouldCreateOrReuse: []
+          wouldDeleteOrRecycle: []
+          wouldDrain: []
+          wouldReloadInPlace: []
+        router:
+          implementation: dry-run-router-adapter
+          wouldRerouteQueuedTasks: []
+          wouldStartDrains: []
+          wouldStopAcceptingNew: []
+      notes:
+      - Adapter skeleton only; no Router, Pod, Node, or MIG changes are executed.
+      - kind can validate this object shape and actuator gating, but not real GPU
+        hardware effects.
+      previewOnly: true
+    autoApprovalPolicyRef: default
+    chosenTemplates:
+    - 3g+3g
+    dryRun: true
+    executor: nvidia-gpu-operator
+    executorPreview:
+      executor: nvidia-gpu-operator
+      gpuOperatorLabel: nvidia.com/mig.config
+      gpuTargets:
+      - deviceIndex: 0
+        logicalGpuId: 0
+        nodeName: rtx1
+        physicalGpuId: A
+        targetInstances:
+        - end: 3
+          profile: 3g
+          start: 0
+        - end: 6
+          profile: 3g
+          start: 3
+        targetTemplate: 3g+3g
+      migManagerTargetConfigs:
+      - configName: all-3g.20gb
+        gpus:
+        - deviceIndex: 0
+          physicalGpuId: A
+          targetInstances:
+          - end: 3
+            profile: 3g
+            start: 0
+          - end: 6
+            profile: 3g
+            start: 3
+          targetTemplate: 3g+3g
+        nodeName: rtx1
+      notes:
+      - Preview only; the actuator must not patch Nodes or run hardware commands in
+        dry-run mode.
+      - A real actuator must observe node/device bindings before converting this preview
+        into MIG Manager input.
+      - After real execution, canonicalize the observed post-action MIG state, not
+        the planned state.
+      previewOnly: true
+      requiredObserverFields:
+      - physicalGpuId
+      - nodeName
+      - deviceIndex
+      - observedMigInstances
+      targetApi: NVIDIA GPU Operator MIG Manager
+      unresolvedPhysicalGpuIds: []
+      wouldPatchNodeLabels:
+        rtx1:
+          nvidia.com/mig.config: all-3g.20gb
+    migGeometryPreview:
+      adapter: mig-geometry
+      executor: nvidia-gpu-operator
+      geometryActions:
+      - gpu_id: 0
+        physical_gpu_id: A
+        type: clear_template
+      - physical_gpu_id: A
+        template: 3g+3g
+        type: configure_full_template
+      - gpu_id: 0
+        physical_gpu_id: A
+        type: place_target_layout
+      gpuTargets:
+      - deviceIndex: 0
+        logicalGpuId: 0
+        nodeName: rtx1
+        physicalGpuId: A
+        targetInstances:
+        - end: 3
+          profile: 3g
+          start: 0
+        - end: 6
+          profile: 3g
+          start: 3
+        targetTemplate: 3g+3g
+      internalStateActionsExcluded: []
+      migManagerTargetConfigs:
+      - configName: all-3g.20gb
+        gpus:
+        - deviceIndex: 0
+          physicalGpuId: A
+          targetInstances:
+          - end: 3
+            profile: 3g
+            start: 0
+          - end: 6
+            profile: 3g
+            start: 3
+          targetTemplate: 3g+3g
+        nodeName: rtx1
+      notes:
+      - Only MIG geometry actions become GPU Operator/MIG Manager inputs.
+      - Logical GPU binding actions are internal planner/controller state and are
+        not sent to MIG Manager.
+      previewOnly: true
+      targetApi: NVIDIA GPU Operator MIG Manager
+      unresolvedPhysicalGpuIds: []
+      wouldPatchNodeLabels:
+        rtx1:
+          nvidia.com/mig.config: all-3g.20gb
+    migPlanGeneration: 1
+    migPlanRef: rtx1-2g-to-3g-smoke-synthetic-owner
+    notes:
+    - Dry-run action plan only; no MIG, Pod, or scheduler changes are executed.
+    - Future actuator should translate this plan through NVIDIA GPU Operator MIG Manager
+      before considering direct host commands.
+    observerPreview:
+      canonicalizationRule: After real execution, canonicalize only observed post-action
+        GPU/MIG/Pod/router state.
+      previewOnly: true
+      requiredObservations:
+        mig:
+        - physicalGpuId
+        - nodeName
+        - deviceIndex
+        - observedMigInstances
+        - gpuOperatorMigConfigState
+        pod:
+        - podReadiness
+        - podToMigInstanceAssignment
+        - servingInstanceId
+        - inflightByInstance
+        router:
+        - acceptingNewByInstance
+        - queuedByWorkload
+        - rerouteTargets
+      targetsToObserve:
+        physicalGpuIds:
+        - A
+        planItemIds: []
+        workloads: []
+    phaseGate: PendingApproval
+    podLifecyclePreview:
+      adapter: pod-lifecycle
+      createOrReuse: []
+      deleteOrRecycle: []
+      drain: []
+      notes:
+      - Pod lifecycle is a future adapter preview; the current dry-run actuator does
+        not create or delete Pods.
+      - Router cutover and Pod readiness should be observed before old Pods are deleted
+        or MIG geometry is cleared.
+      policy:
+        deleteAfterDrainOnly: true
+        doNotCreatePodsForMigGeometryOnlyActions: true
+        preferWarmPool: true
+      previewOnly: true
+      reloadInPlace: []
+    targetGpuCount: 1
+    trafficAndDrainPreview:
+      adapter: router-drain
+      planItems: []
+      previewOnly: true
+      rules:
+      - Stop accepting new work before removing or replacing an active slot.
+      - Reroute queued work to a takeover slot when one exists.
+      - Wait for inflight work to drain to zero before deleting pods or clearing MIG
+        geometry.
+      - Defer the abstract action when takeover capacity or drain completion is missing.
+      trafficActions: []
+  status:
+    approved: false
+    executed: false
+    message: No AutoApprovalPolicy found; waiting for approval.
+    phase: PendingApproval
+- apiVersion: mig.or-sim.io/v1alpha1
+  kind: MigActionPlan
+  metadata:
+    creationTimestamp: "2026-05-10T14:11:51Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: or-sim-mig-planner
+      mig.or-sim.io/owner-migplan: rtx1-3g-to-2g-rollback-synthetic-owner
+    name: rtx1-3g-to-2g-rollback
+    namespace: or-sim
+    resourceVersion: "73540213"
+    uid: aaba1e8b-f88b-46cb-b0e8-ff9637b6f6ec
+  spec:
+    abstractActionPreview:
+      actions:
+      - gates:
+        - stopAcceptingOldSlots
+        - rerouteQueuedWork
+        - waitInflightZero
+        - clearOldMigGeometry
+        - prepareMigGeometryInPlace
+        - observeAndBindTarget
+        gpuId: 0
+        migImpact:
+          clearOldGpuAfterDrain: true
+          inPlaceGeometryChange: true
+          requiresMigManager: true
+          requiresNewTargetGpu: false
+        mode: in_place_old_first
+        physicalGpuId: A
+        podImpact:
+          blockedByDrainOrTakeover: false
+          mayCreateOrReuseBeforeCutover: true
+          mustDrainOldBeforeDelete: true
+          preferWarmPool: true
+        relatedPlanItems: []
+        rule: Every old workload slot has unchanged takeover capacity, so drain old
+          side and reconfigure in place.
+        sourceTemplate: 3g+3g
+        targetPhysicalGpuId: A
+        targetTemplate: 2g+2g+2g
+        type: reconfiguration
+      notes:
+      - This is a readable report of planner rules, not an execution command stream.
+      - Detailed fine actions remain in the full-plan ConfigMap.
+      previewOnly: true
+      rules:
+        create_gpu: Source has no logical GPU and target has one; prepare target-side
+          MIG geometry.
+        instance_diff: MIG geometry is unchanged but slot workload or batch payload
+          differs.
+        keep_gpu: Source and target MIG layout plus workload payload are unchanged.
+        reconfiguration: Source and target MIG templates differ; choose target_first
+          unless old workloads have unchanged takeover slots.
+        remove_gpu: Target no longer needs the GPU; stop/reroute/drain active slots
+          before clearing geometry.
+      source: v3-final-plan
+    actionCount: 3
+    actionCountsByType:
+      clear_template: 1
+      configure_full_template: 1
+      place_target_layout: 1
+    adapterDryRunPreview:
+      adapters:
+        mig:
+          blockedUntilObservedBindings: []
+          implementation: nvidia-gpu-operator
+          wouldApplyMigManagerConfigs:
+          - configName: all-2g.10gb
+            gpus:
+            - deviceIndex: 0
+              physicalGpuId: A
+              targetInstances:
+              - end: 2
+                profile: 2g
+                start: 0
+              - end: 4
+                profile: 2g
+                start: 2
+              - end: 6
+                profile: 2g
+                start: 4
+              targetTemplate: 2g+2g+2g
+            nodeName: rtx1
+          wouldPatchNodeLabels:
+            rtx1:
+              nvidia.com/mig.config: all-2g.10gb
+        pod:
+          implementation: dry-run-pod-lifecycle-adapter
+          wouldCreateOrReuse: []
+          wouldDeleteOrRecycle: []
+          wouldDrain: []
+          wouldReloadInPlace: []
+        router:
+          implementation: dry-run-router-adapter
+          wouldRerouteQueuedTasks: []
+          wouldStartDrains: []
+          wouldStopAcceptingNew: []
+      notes:
+      - Adapter skeleton only; no Router, Pod, Node, or MIG changes are executed.
+      - kind can validate this object shape and actuator gating, but not real GPU
+        hardware effects.
+      previewOnly: true
+    autoApprovalPolicyRef: default
+    chosenTemplates:
+    - 2g+2g+2g
+    dryRun: true
+    executor: nvidia-gpu-operator
+    executorPreview:
+      executor: nvidia-gpu-operator
+      gpuOperatorLabel: nvidia.com/mig.config
+      gpuTargets:
+      - deviceIndex: 0
+        logicalGpuId: 0
+        nodeName: rtx1
+        physicalGpuId: A
+        targetInstances:
+        - end: 2
+          profile: 2g
+          start: 0
+        - end: 4
+          profile: 2g
+          start: 2
+        - end: 6
+          profile: 2g
+          start: 4
+        targetTemplate: 2g+2g+2g
+      migManagerTargetConfigs:
+      - configName: all-2g.10gb
+        gpus:
+        - deviceIndex: 0
+          physicalGpuId: A
+          targetInstances:
+          - end: 2
+            profile: 2g
+            start: 0
+          - end: 4
+            profile: 2g
+            start: 2
+          - end: 6
+            profile: 2g
+            start: 4
+          targetTemplate: 2g+2g+2g
+        nodeName: rtx1
+      notes:
+      - Preview only; the actuator must not patch Nodes or run hardware commands in
+        dry-run mode.
+      - A real actuator must observe node/device bindings before converting this preview
+        into MIG Manager input.
+      - After real execution, canonicalize the observed post-action MIG state, not
+        the planned state.
+      previewOnly: true
+      requiredObserverFields:
+      - physicalGpuId
+      - nodeName
+      - deviceIndex
+      - observedMigInstances
+      targetApi: NVIDIA GPU Operator MIG Manager
+      unresolvedPhysicalGpuIds: []
+      wouldPatchNodeLabels:
+        rtx1:
+          nvidia.com/mig.config: all-2g.10gb
+    migGeometryPreview:
+      adapter: mig-geometry
+      executor: nvidia-gpu-operator
+      geometryActions:
+      - gpu_id: 0
+        physical_gpu_id: A
+        type: clear_template
+      - physical_gpu_id: A
+        template: 2g+2g+2g
+        type: configure_full_template
+      - gpu_id: 0
+        physical_gpu_id: A
+        type: place_target_layout
+      gpuTargets:
+      - deviceIndex: 0
+        logicalGpuId: 0
+        nodeName: rtx1
+        physicalGpuId: A
+        targetInstances:
+        - end: 2
+          profile: 2g
+          start: 0
+        - end: 4
+          profile: 2g
+          start: 2
+        - end: 6
+          profile: 2g
+          start: 4
+        targetTemplate: 2g+2g+2g
+      internalStateActionsExcluded: []
+      migManagerTargetConfigs:
+      - configName: all-2g.10gb
+        gpus:
+        - deviceIndex: 0
+          physicalGpuId: A
+          targetInstances:
+          - end: 2
+            profile: 2g
+            start: 0
+          - end: 4
+            profile: 2g
+            start: 2
+          - end: 6
+            profile: 2g
+            start: 4
+          targetTemplate: 2g+2g+2g
+        nodeName: rtx1
+      notes:
+      - Only MIG geometry actions become GPU Operator/MIG Manager inputs.
+      - Logical GPU binding actions are internal planner/controller state and are
+        not sent to MIG Manager.
+      previewOnly: true
+      targetApi: NVIDIA GPU Operator MIG Manager
+      unresolvedPhysicalGpuIds: []
+      wouldPatchNodeLabels:
+        rtx1:
+          nvidia.com/mig.config: all-2g.10gb
+    migPlanGeneration: 1
+    migPlanRef: rtx1-3g-to-2g-rollback-synthetic-owner
+    notes:
+    - Dry-run action plan only; no MIG, Pod, or scheduler changes are executed.
+    - Future actuator should translate this plan through NVIDIA GPU Operator MIG Manager
+      before considering direct host commands.
+    observerPreview:
+      canonicalizationRule: After real execution, canonicalize only observed post-action
+        GPU/MIG/Pod/router state.
+      previewOnly: true
+      requiredObservations:
+        mig:
+        - physicalGpuId
+        - nodeName
+        - deviceIndex
+        - observedMigInstances
+        - gpuOperatorMigConfigState
+        pod:
+        - podReadiness
+        - podToMigInstanceAssignment
+        - servingInstanceId
+        - inflightByInstance
+        router:
+        - acceptingNewByInstance
+        - queuedByWorkload
+        - rerouteTargets
+      targetsToObserve:
+        physicalGpuIds:
+        - A
+        planItemIds: []
+        workloads: []
+    phaseGate: PendingApproval
+    podLifecyclePreview:
+      adapter: pod-lifecycle
+      createOrReuse: []
+      deleteOrRecycle: []
+      drain: []
+      notes:
+      - Pod lifecycle is a future adapter preview; the current dry-run actuator does
+        not create or delete Pods.
+      - Router cutover and Pod readiness should be observed before old Pods are deleted
+        or MIG geometry is cleared.
+      policy:
+        deleteAfterDrainOnly: true
+        doNotCreatePodsForMigGeometryOnlyActions: true
+        preferWarmPool: true
+      previewOnly: true
+      reloadInPlace: []
+    targetGpuCount: 1
+    trafficAndDrainPreview:
+      adapter: router-drain
+      planItems: []
+      previewOnly: true
+      rules:
+      - Stop accepting new work before removing or replacing an active slot.
+      - Reroute queued work to a takeover slot when one exists.
+      - Wait for inflight work to drain to zero before deleting pods or clearing MIG
+        geometry.
+      - Defer the abstract action when takeover capacity or drain completion is missing.
+      trafficActions: []
+  status:
+    approved: false
+    executed: false
+    message: No AutoApprovalPolicy found; waiting for approval.
+    phase: PendingApproval
+kind: List
+metadata:
+  resourceVersion: ""

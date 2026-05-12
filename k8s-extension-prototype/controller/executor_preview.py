@@ -545,7 +545,7 @@ def _template_from_gpu(raw_gpu: dict[str, Any]) -> str:
         for inst in sorted(raw_gpu.get("instances", []), key=lambda item: int(item.get("start", 0)))
         if str(inst.get("profile")) != "void"
     ]
-    return "+".join(profiles) if profiles else "empty"
+    return "+".join(profiles)
 
 
 def _target_instances(raw_gpu: dict[str, Any]) -> list[dict[str, Any]]:
@@ -583,7 +583,7 @@ def _builtin_gpu_operator_config_name(targets: list[dict[str, Any]]) -> str | No
         return None
     template = next(iter(templates))
     return {
-        "": "all-disabled",
+        "": "or-sim-empty",
         "1g+1g+1g+1g+1g+1g+1g": "all-1g.5gb",
         "2g+2g+2g": "all-2g.10gb",
         "3g+3g": "all-3g.20gb",

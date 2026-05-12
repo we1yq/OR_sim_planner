@@ -1,0 +1,329 @@
+apiVersion: v1
+kind: Node
+metadata:
+  annotations:
+    alpha.kubernetes.io/provided-node-ip: 115.145.179.130
+    etcd.rke2.cattle.io/local-snapshots-timestamp: "2026-05-11T19:40:52+09:00"
+    etcd.rke2.cattle.io/node-address: 115.145.179.130
+    etcd.rke2.cattle.io/node-name: rtx1-157146d3
+    flannel.alpha.coreos.com/backend-data: '{"VNI":1,"VtepMAC":"f6:78:a3:20:22:b8"}'
+    flannel.alpha.coreos.com/backend-type: vxlan
+    flannel.alpha.coreos.com/kube-subnet-manager: "true"
+    flannel.alpha.coreos.com/public-ip: 115.145.179.130
+    nfd.node.kubernetes.io/feature-labels: cpu-cpuid.ADX,cpu-cpuid.AESNI,cpu-cpuid.AMXFP8,cpu-cpuid.AVX,cpu-cpuid.AVX2,cpu-cpuid.AVX512BW,cpu-cpuid.AVX512CD,cpu-cpuid.AVX512DQ,cpu-cpuid.AVX512F,cpu-cpuid.AVX512VL,cpu-cpuid.AVX512VNNI,cpu-cpuid.CMPXCHG8,cpu-cpuid.FLUSH_L1D,cpu-cpuid.FMA3,cpu-cpuid.FXSR,cpu-cpuid.FXSROPT,cpu-cpuid.IA32_ARCH_CAP,cpu-cpuid.IBPB,cpu-cpuid.LAHF,cpu-cpuid.MD_CLEAR,cpu-cpuid.MOVBE,cpu-cpuid.MPX,cpu-cpuid.OSXSAVE,cpu-cpuid.PMU_FIXEDCOUNTER_CYCLES,cpu-cpuid.PMU_FIXEDCOUNTER_INSTRUCTIONS,cpu-cpuid.PMU_FIXEDCOUNTER_REFCYCLES,cpu-cpuid.SPEC_CTRL_SSBD,cpu-cpuid.STIBP,cpu-cpuid.SYSCALL,cpu-cpuid.SYSEE,cpu-cpuid.VMX,cpu-cpuid.X87,cpu-cpuid.XGETBV1,cpu-cpuid.XSAVE,cpu-cpuid.XSAVEC,cpu-cpuid.XSAVEOPT,cpu-cpuid.XSAVES,cpu-cstate.enabled,cpu-hardware_multithreading,cpu-model.family,cpu-model.id,cpu-model.vendor_id,kernel-config.NO_HZ,kernel-config.NO_HZ_IDLE,kernel-version.full,kernel-version.major,kernel-version.minor,kernel-version.revision,memory-numa,nvidia.com/cuda.driver-version.full,nvidia.com/cuda.driver-version.major,nvidia.com/cuda.driver-version.minor,nvidia.com/cuda.driver-version.revision,nvidia.com/cuda.driver.major,nvidia.com/cuda.driver.minor,nvidia.com/cuda.driver.rev,nvidia.com/cuda.runtime-version.full,nvidia.com/cuda.runtime-version.major,nvidia.com/cuda.runtime-version.minor,nvidia.com/cuda.runtime.major,nvidia.com/cuda.runtime.minor,nvidia.com/gfd.timestamp,nvidia.com/gpu.compute.major,nvidia.com/gpu.compute.minor,nvidia.com/gpu.count,nvidia.com/gpu.family,nvidia.com/gpu.machine,nvidia.com/gpu.memory,nvidia.com/gpu.mode,nvidia.com/gpu.product,nvidia.com/gpu.replicas,nvidia.com/gpu.sharing-strategy,nvidia.com/mig.capable,nvidia.com/mig.strategy,nvidia.com/mps.capable,nvidia.com/vgpu.present,pci-102b.present,pci-10de.present,pci-10de.sriov.capable,pci-14e4.present,pci-15b3.present,rdma.capable,storage-nonrotationaldisk,system-os_release.ID,system-os_release.VERSION_ID,system-os_release.VERSION_ID.major,system-os_release.VERSION_ID.minor
+    node.alpha.kubernetes.io/ttl: "0"
+    rke2.io/encryption-config-hash: start-c1565cd5c4d6c5c60fb91cd0358fd348bc1a295af1661a9200981fda8609cc52
+    rke2.io/hostname: rtx1
+    rke2.io/internal-ip: 115.145.179.130
+    rke2.io/node-args: '["server"]'
+    rke2.io/node-config-hash: MLFMUCBMRVINLJJKSG32TOUFWB4CN55GMSNY25AZPESQXZCYRN2A====
+    rke2.io/node-env: '{}'
+    volumes.kubernetes.io/controller-managed-attach-detach: "true"
+  creationTimestamp: "2025-08-19T10:16:38Z"
+  finalizers:
+  - wrangler.cattle.io/managed-etcd-controller
+  - wrangler.cattle.io/node
+  labels:
+    beta.kubernetes.io/arch: amd64
+    beta.kubernetes.io/instance-type: rke2
+    beta.kubernetes.io/os: linux
+    feature.node.kubernetes.io/cpu-cpuid.ADX: "true"
+    feature.node.kubernetes.io/cpu-cpuid.AESNI: "true"
+    feature.node.kubernetes.io/cpu-cpuid.AMXFP8: "true"
+    feature.node.kubernetes.io/cpu-cpuid.AVX: "true"
+    feature.node.kubernetes.io/cpu-cpuid.AVX2: "true"
+    feature.node.kubernetes.io/cpu-cpuid.AVX512BW: "true"
+    feature.node.kubernetes.io/cpu-cpuid.AVX512CD: "true"
+    feature.node.kubernetes.io/cpu-cpuid.AVX512DQ: "true"
+    feature.node.kubernetes.io/cpu-cpuid.AVX512F: "true"
+    feature.node.kubernetes.io/cpu-cpuid.AVX512VL: "true"
+    feature.node.kubernetes.io/cpu-cpuid.AVX512VNNI: "true"
+    feature.node.kubernetes.io/cpu-cpuid.CMPXCHG8: "true"
+    feature.node.kubernetes.io/cpu-cpuid.FLUSH_L1D: "true"
+    feature.node.kubernetes.io/cpu-cpuid.FMA3: "true"
+    feature.node.kubernetes.io/cpu-cpuid.FXSR: "true"
+    feature.node.kubernetes.io/cpu-cpuid.FXSROPT: "true"
+    feature.node.kubernetes.io/cpu-cpuid.IA32_ARCH_CAP: "true"
+    feature.node.kubernetes.io/cpu-cpuid.IBPB: "true"
+    feature.node.kubernetes.io/cpu-cpuid.LAHF: "true"
+    feature.node.kubernetes.io/cpu-cpuid.MD_CLEAR: "true"
+    feature.node.kubernetes.io/cpu-cpuid.MOVBE: "true"
+    feature.node.kubernetes.io/cpu-cpuid.MPX: "true"
+    feature.node.kubernetes.io/cpu-cpuid.OSXSAVE: "true"
+    feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_CYCLES: "true"
+    feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_INSTRUCTIONS: "true"
+    feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_REFCYCLES: "true"
+    feature.node.kubernetes.io/cpu-cpuid.SPEC_CTRL_SSBD: "true"
+    feature.node.kubernetes.io/cpu-cpuid.STIBP: "true"
+    feature.node.kubernetes.io/cpu-cpuid.SYSCALL: "true"
+    feature.node.kubernetes.io/cpu-cpuid.SYSEE: "true"
+    feature.node.kubernetes.io/cpu-cpuid.VMX: "true"
+    feature.node.kubernetes.io/cpu-cpuid.X87: "true"
+    feature.node.kubernetes.io/cpu-cpuid.XGETBV1: "true"
+    feature.node.kubernetes.io/cpu-cpuid.XSAVE: "true"
+    feature.node.kubernetes.io/cpu-cpuid.XSAVEC: "true"
+    feature.node.kubernetes.io/cpu-cpuid.XSAVEOPT: "true"
+    feature.node.kubernetes.io/cpu-cpuid.XSAVES: "true"
+    feature.node.kubernetes.io/cpu-cstate.enabled: "true"
+    feature.node.kubernetes.io/cpu-hardware_multithreading: "false"
+    feature.node.kubernetes.io/cpu-model.family: "6"
+    feature.node.kubernetes.io/cpu-model.id: "85"
+    feature.node.kubernetes.io/cpu-model.vendor_id: Intel
+    feature.node.kubernetes.io/kernel-config.NO_HZ: "true"
+    feature.node.kubernetes.io/kernel-config.NO_HZ_IDLE: "true"
+    feature.node.kubernetes.io/kernel-version.full: 5.15.0-60-generic
+    feature.node.kubernetes.io/kernel-version.major: "5"
+    feature.node.kubernetes.io/kernel-version.minor: "15"
+    feature.node.kubernetes.io/kernel-version.revision: "0"
+    feature.node.kubernetes.io/memory-numa: "true"
+    feature.node.kubernetes.io/pci-102b.present: "true"
+    feature.node.kubernetes.io/pci-10de.present: "true"
+    feature.node.kubernetes.io/pci-10de.sriov.capable: "true"
+    feature.node.kubernetes.io/pci-14e4.present: "true"
+    feature.node.kubernetes.io/pci-15b3.present: "true"
+    feature.node.kubernetes.io/rdma.capable: "true"
+    feature.node.kubernetes.io/storage-nonrotationaldisk: "true"
+    feature.node.kubernetes.io/system-os_release.ID: ubuntu
+    feature.node.kubernetes.io/system-os_release.VERSION_ID: "22.04"
+    feature.node.kubernetes.io/system-os_release.VERSION_ID.major: "22"
+    feature.node.kubernetes.io/system-os_release.VERSION_ID.minor: "04"
+    kubernetes.io/arch: amd64
+    kubernetes.io/hostname: rtx1
+    kubernetes.io/os: linux
+    node-role.kubernetes.io/control-plane: "true"
+    node-role.kubernetes.io/etcd: "true"
+    node-role.kubernetes.io/master: "true"
+    node.kubernetes.io/instance-type: rke2
+    nvidia.com/cuda.driver-version.full: 550.163.01
+    nvidia.com/cuda.driver-version.major: "550"
+    nvidia.com/cuda.driver-version.minor: "163"
+    nvidia.com/cuda.driver-version.revision: "01"
+    nvidia.com/cuda.driver.major: "550"
+    nvidia.com/cuda.driver.minor: "163"
+    nvidia.com/cuda.driver.rev: "01"
+    nvidia.com/cuda.runtime-version.full: "12.4"
+    nvidia.com/cuda.runtime-version.major: "12"
+    nvidia.com/cuda.runtime-version.minor: "4"
+    nvidia.com/cuda.runtime.major: "12"
+    nvidia.com/cuda.runtime.minor: "4"
+    nvidia.com/gfd.timestamp: "1778489036"
+    nvidia.com/gpu.compute.major: "8"
+    nvidia.com/gpu.compute.minor: "6"
+    nvidia.com/gpu.count: "1"
+    nvidia.com/gpu.deploy.container-toolkit: "true"
+    nvidia.com/gpu.deploy.dcgm: "true"
+    nvidia.com/gpu.deploy.dcgm-exporter: "true"
+    nvidia.com/gpu.deploy.device-plugin: "true"
+    nvidia.com/gpu.deploy.driver: "true"
+    nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
+    nvidia.com/gpu.deploy.mig-manager: "true"
+    nvidia.com/gpu.deploy.node-status-exporter: "true"
+    nvidia.com/gpu.deploy.nvsm: "true"
+    nvidia.com/gpu.deploy.operator-validator: "true"
+    nvidia.com/gpu.family: ampere
+    nvidia.com/gpu.machine: PowerEdge-T640
+    nvidia.com/gpu.memory: "24576"
+    nvidia.com/gpu.mode: unknown
+    nvidia.com/gpu.present: "true"
+    nvidia.com/gpu.product: NVIDIA-GeForce-RTX-3090
+    nvidia.com/gpu.replicas: "1"
+    nvidia.com/gpu.sharing-strategy: none
+    nvidia.com/mig.capable: "true"
+    nvidia.com/mig.config: or-sim-empty
+    nvidia.com/mig.config.state: success
+    nvidia.com/mig.strategy: mixed
+    nvidia.com/mps.capable: "false"
+    nvidia.com/vgpu.present: "false"
+  name: rtx1
+  resourceVersion: "73852518"
+  uid: bcfcc3d5-48c1-46aa-bf40-6b4a2420333d
+spec:
+  podCIDR: 10.42.0.0/24
+  podCIDRs:
+  - 10.42.0.0/24
+  providerID: rke2://rtx1
+status:
+  addresses:
+  - address: 115.145.179.130
+    type: InternalIP
+  - address: rtx1
+    type: Hostname
+  allocatable:
+    cpu: "32"
+    ephemeral-storage: "894774505180"
+    hugepages-1Gi: "0"
+    hugepages-2Mi: "0"
+    memory: 131630336Ki
+    nvidia.com/gpu: "3"
+    nvidia.com/mig-1g.5gb: "0"
+    nvidia.com/mig-2g.10gb: "0"
+    nvidia.com/mig-3g.20gb: "0"
+    nvidia.com/mig-4g.20gb: "0"
+    nvidia.com/mig-7g.40gb: "0"
+    pods: "110"
+  capacity:
+    cpu: "32"
+    ephemeral-storage: 919792872Ki
+    hugepages-1Gi: "0"
+    hugepages-2Mi: "0"
+    memory: 131630336Ki
+    nvidia.com/gpu: "3"
+    nvidia.com/mig-1g.5gb: "0"
+    nvidia.com/mig-2g.10gb: "0"
+    nvidia.com/mig-3g.20gb: "0"
+    nvidia.com/mig-4g.20gb: "0"
+    nvidia.com/mig-7g.40gb: "0"
+    pods: "110"
+  conditions:
+  - lastHeartbeatTime: "2026-04-08T08:00:31Z"
+    lastTransitionTime: "2026-04-08T08:00:31Z"
+    message: Flannel is running on this node
+    reason: FlannelIsUp
+    status: "False"
+    type: NetworkUnavailable
+  - lastHeartbeatTime: "2026-05-11T10:41:51Z"
+    lastTransitionTime: "2025-08-19T10:16:49Z"
+    message: Node is a voting member of the etcd cluster
+    reason: MemberNotLearner
+    status: "True"
+    type: EtcdIsVoter
+  - lastHeartbeatTime: "2026-05-11T10:39:55Z"
+    lastTransitionTime: "2025-09-08T04:11:41Z"
+    message: kubelet has sufficient memory available
+    reason: KubeletHasSufficientMemory
+    status: "False"
+    type: MemoryPressure
+  - lastHeartbeatTime: "2026-05-11T10:39:55Z"
+    lastTransitionTime: "2025-09-08T04:11:41Z"
+    message: kubelet has no disk pressure
+    reason: KubeletHasNoDiskPressure
+    status: "False"
+    type: DiskPressure
+  - lastHeartbeatTime: "2026-05-11T10:39:55Z"
+    lastTransitionTime: "2025-09-08T04:11:41Z"
+    message: kubelet has sufficient PID available
+    reason: KubeletHasSufficientPID
+    status: "False"
+    type: PIDPressure
+  - lastHeartbeatTime: "2026-05-11T10:39:55Z"
+    lastTransitionTime: "2025-12-01T03:56:33Z"
+    message: kubelet is posting ready status
+    reason: KubeletReady
+    status: "True"
+    type: Ready
+  daemonEndpoints:
+    kubeletEndpoint:
+      Port: 10250
+  images:
+  - names:
+    - docker.io/rancher/nginx-ingress-controller@sha256:9c9f9167b373e3cc6a7794f19842185018a1c0fb6007fb1e26aff83ecc8b5a87
+    - docker.io/rancher/nginx-ingress-controller:v1.12.4-hardened2
+    sizeBytes: 303446350
+  - names:
+    - docker.io/rancher/hardened-calico@sha256:fbcb417b8720c7d10f1785a0f23258f8d84d07fbdd8bb2569d90521ed27d63db
+    - docker.io/rancher/hardened-calico:v3.30.2-build20250711
+    sizeBytes: 227032125
+  - names:
+    - docker.io/rancher/hardened-kubernetes@sha256:483f0bd52b0b8f92bef201195b97c2775b2763a8ff7ef3e15e06562a3272062f
+    - docker.io/rancher/hardened-kubernetes:v1.32.7-rke2r1-build20250716
+    sizeBytes: 224086744
+  - names:
+    - nvcr.io/nvidia/gpu-operator@sha256:327518e7157e9634eab9aeb51abfba816845fad47177ca985e1b34d202a1f51e
+    - nvcr.io/nvidia/gpu-operator:v26.3.1
+    sizeBytes: 138219156
+  - names:
+    - docker.io/rancher/rke2-runtime@sha256:d5ab9a8189df977c132d2fd14864231a536bf0ab572d6310221e8a9374b7a3f5
+    - docker.io/rancher/rke2-runtime:v1.32.7-rke2r1
+    sizeBytes: 96905305
+  - names:
+    - docker.io/nvidia/cuda@sha256:0f6bfcbf267e65123bcc2287e2153dedfc0f24772fb5ce84afe16ac4b2fada95
+    - docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04
+    sizeBytes: 91769375
+  - names:
+    - registry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862
+    - registry.k8s.io/nfd/node-feature-discovery:v0.18.3
+    sizeBytes: 83817218
+  - names:
+    - docker.io/rancher/hardened-flannel@sha256:48916326b3142f2315cc7ae1f5fde073420b9d73285db6da4a067b4ece0de43b
+    - docker.io/rancher/hardened-flannel:v0.27.1-build20250710
+    sizeBytes: 80861208
+  - names:
+    - docker.io/rancher/klipper-helm@sha256:5e2e5ab00d5f2652bfea2bc5554d07b57a015fe574434b275a2cb11c2d135c04
+    - docker.io/rancher/klipper-helm:v0.9.8-build20250709
+    sizeBytes: 76820308
+  - names:
+    - nvcr.io/nvidia/k8s/dcgm-exporter@sha256:b5d8813707469c5717ce27a5fefb933a29e8ba6cd2fd7d93ad3dcd6ae18579ef
+    - nvcr.io/nvidia/k8s/dcgm-exporter:4.5.1-4.8.0-distroless
+    sizeBytes: 59967374
+  - names:
+    - nvcr.io/nvidia/k8s/container-toolkit@sha256:62204e9fc0f817e6e3fd8edc18d0322feda3728cdf89270d20a8d01d7ef0edb5
+    - nvcr.io/nvidia/k8s/container-toolkit:v1.19.0
+    sizeBytes: 57183469
+  - names:
+    - nvcr.io/nvidia/k8s-device-plugin@sha256:75eff5962176618e486da18d73eae57870369b69f186fc8d193973166d1cfad9
+    - nvcr.io/nvidia/k8s-device-plugin:v0.19.0
+    sizeBytes: 55900878
+  - names:
+    - nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:2efec3ae4208909d18166811254538b6f6996d6bb1d0b524139429fb79c03c70
+    - nvcr.io/nvidia/cloud-native/k8s-mig-manager:v0.14.0
+    sizeBytes: 35865056
+  - names:
+    - docker.io/rancher/hardened-coredns@sha256:a00c188e15553ca7b6185d8950d7eadebe26e9e28e138234a5aab64361d75686
+    - docker.io/rancher/hardened-coredns:v1.12.2-build20250611
+    sizeBytes: 29169203
+  - names:
+    - docker.io/rancher/mirrored-sig-storage-snapshot-controller@sha256:1cda6e2aeae92ad55aa33459b3903850010afce8e12c43842d5a98a0d620c159
+    - docker.io/rancher/mirrored-sig-storage-snapshot-controller:v8.2.0
+    sizeBytes: 29129582
+  - names:
+    - docker.io/rancher/rke2-cloud-provider@sha256:921e8a5dc9f4a4acd35c08e6c60dae81ebdb595cc3105b2541ab2e7523d84bf8
+    - docker.io/rancher/rke2-cloud-provider:v1.32.5-rc1.0.20250516182639-8e8f2a4726fd-build20250612
+    sizeBytes: 23394197
+  - names:
+    - docker.io/rancher/hardened-k8s-metrics-server@sha256:35ee3a036283853043e32ed885dba0a03e8c133add9db0e3e4b7afbcf25075e0
+    - docker.io/rancher/hardened-k8s-metrics-server:v0.8.0-build20250704
+    sizeBytes: 21357861
+  - names:
+    - docker.io/rancher/hardened-etcd@sha256:a7b27de3631122aa0086238a71dc7e9bf6fcfa7fd48b8ccf55139231b018680b
+    - docker.io/rancher/hardened-etcd:v3.5.21-k3s1-build20250612
+    sizeBytes: 17700820
+  - names:
+    - docker.io/rancher/hardened-cluster-autoscaler@sha256:0da59496f804fefe96af3af01b194fe33748630525a4eedd09dc55f620de3fc1
+    - docker.io/rancher/hardened-cluster-autoscaler:v1.10.2-build20250611
+    sizeBytes: 14086887
+  - names:
+    - docker.io/rancher/mirrored-pause@sha256:74c4244427b7312c5b901fe0f67cbc53683d06f4f24c6faee65d4182bf0fa893
+    - docker.io/rancher/mirrored-pause:3.6
+    sizeBytes: 301463
+  nodeInfo:
+    architecture: amd64
+    bootID: 52b8c178-66d4-45f3-862f-db50351ae104
+    containerRuntimeVersion: containerd://2.0.5-k3s2
+    kernelVersion: 5.15.0-60-generic
+    kubeProxyVersion: v1.32.7+rke2r1
+    kubeletVersion: v1.32.7+rke2r1
+    machineID: e67442ae7bc049df8f71d01c96c25f75
+    operatingSystem: linux
+    osImage: Ubuntu 22.04.2 LTS
+    systemUUID: 4c4c4544-0048-5610-804d-c8c04f393333
+  runtimeHandlers:
+  - features:
+      recursiveReadOnlyMounts: false
+      userNamespaces: false
+    name: runhcs-wcow-process
+  - features:
+      recursiveReadOnlyMounts: true
+      userNamespaces: true
+    name: runc
+  - features:
+      recursiveReadOnlyMounts: true
+      userNamespaces: true
+    name: ""
+  - features:
+      recursiveReadOnlyMounts: true
+      userNamespaces: true
+    name: nvidia
+  - features:
+      recursiveReadOnlyMounts: true
+      userNamespaces: true
+    name: nvidia-cdi

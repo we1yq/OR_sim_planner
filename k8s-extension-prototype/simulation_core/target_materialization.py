@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from typing import Any
 
 from .preserve import (
@@ -472,6 +473,238 @@ def _exact_preserve_preassign(
 
     residual_demands = [demand for demand in demands if demand["demand_id"] not in preserved_ids]
     return assigned, residual_demands
+
+
+def _exact_preserve_preassign_exact_only(
+    demands: list[dict[str, Any]],
+    slots: list[dict[str, Any]],
+    prev_state: ClusterState | None,
+) -> tuple[dict[int, dict[str, Any] | None], list[dict[str, Any]]]:
+    old_map = old_exact_slot_map(prev_state)
+    demand_buckets = defaultdict(list)
+    for demand in demands:
+        demand_buckets[(demand["workload"], demand["profile"])].append(demand)
+    for key in demand_buckets:
+        demand_buckets[key].sort(key=lambda demand: (int(demand["batch"]), int(demand["demand_id"])))
+
+    assigned = {slot["slot_id"]: None for slot in slots}
+    preserved_ids = set()
+    for slot in slots:
+        old = old_map.get((slot["gpu_id"], slot["start"], slot["end"], slot["profile"]))
+        if old is None or old.workload is None:
+            continue
+        key = (old.workload, old.profile)
+        if len(demand_buckets[key]) == 0:
+            continue
+        demand = demand_buckets[key].pop(0)
+        assigned[slot["slot_id"]] = {
+            "slot": slot,
+            "demand": demand,
+            "placement_mode": "exact_preserve",
+        }
+        preserved_ids.add(demand["demand_id"])
+
+    residual_demands = [demand for demand in demands if demand["demand_id"] not in preserved_ids]
+    return assigned, residual_demands
+
+
+@dataclass
+class _BeamNode:
+    assigned: dict[int, dict[str, Any] | None]
+    used_slots: set[int]
+    workload_gpus: dict[str, set[int]]
+    per_gpu_workload_count: dict[int, Counter]
+
+    def clone(self) -> "_BeamNode":
+        return _BeamNode(
+            assigned=dict(self.assigned),
+            used_slots=set(self.used_slots),
+            workload_gpus=defaultdict(set, {key: set(value) for key, value in self.workload_gpus.items()}),
+            per_gpu_workload_count=defaultdict(Counter, {key: Counter(value) for key, value in self.per_gpu_workload_count.items()}),
+        )
+
+
+def _beam_seed_from_preassign(assigned: dict[int, dict[str, Any] | None]) -> _BeamNode:
+    workload_gpus = defaultdict(set)
+    per_gpu_workload_count = defaultdict(Counter)
+    used = set()
+    for slot_id, info in assigned.items():
+        if info is None:
+            continue
+        slot = info["slot"]
+        demand = info["demand"]
+        used.add(slot_id)
+        workload_gpus[demand["workload"]].add(slot["gpu_id"])
+        per_gpu_workload_count[slot["gpu_id"]][demand["workload"]] += 1
+    return _BeamNode(
+        assigned=dict(assigned),
+        used_slots=used,
+        workload_gpus=workload_gpus,
+        per_gpu_workload_count=per_gpu_workload_count,
+    )
+
+
+def _order_residual_demands_for_beam(
+    demands: list[dict[str, Any]],
+    slots: list[dict[str, Any]],
+    prev_state: ClusterState | None,
+) -> list[dict[str, Any]]:
+    slots_by_profile = defaultdict(list)
+    old_map = old_exact_slot_map(prev_state)
+    for slot in slots:
+        slots_by_profile[slot["profile"]].append(slot)
+
+    def preserve_candidates(demand: dict[str, Any]) -> int:
+        count = 0
+        for slot in slots_by_profile[demand["profile"]]:
+            old = old_map.get((slot["gpu_id"], slot["start"], slot["end"], slot["profile"]))
+            if old is not None and old.workload == demand["workload"] and old.profile == demand["profile"]:
+                count += 1
+        return count
+
+    ordered = list(demands)
+    if has_prev(prev_state):
+        ordered.sort(
+            key=lambda demand: (
+                -preserve_candidates(demand),
+                -PROFILE_SIZE[demand["profile"]],
+                demand["workload"],
+                int(demand["batch"]),
+                int(demand["demand_id"]),
+            )
+        )
+    else:
+        ordered.sort(
+            key=lambda demand: (
+                demand["workload"],
+                -PROFILE_SIZE[demand["profile"]],
+                int(demand["batch"]),
+                int(demand["demand_id"]),
+            )
+        )
+    return ordered
+
+
+def _beam_slot_local_rank(
+    demand: dict[str, Any],
+    slot: dict[str, Any],
+    node: _BeamNode,
+    prev_state: ClusterState | None,
+) -> tuple[int, ...]:
+    gpu_id = slot["gpu_id"]
+    workload = demand["workload"]
+    same_workload = node.per_gpu_workload_count[gpu_id][workload]
+    new_touch = 1 if gpu_id not in node.workload_gpus[workload] else 0
+    distinct_before = len(node.per_gpu_workload_count[gpu_id])
+    mixed_penalty = 1 if distinct_before >= 1 and same_workload == 0 else 0
+    preserve_bonus = 1 if slot_preserve_match(slot, demand, prev_state) else 0
+    return (
+        preserve_bonus,
+        same_workload,
+        -new_touch,
+        -mixed_penalty,
+        -slot["slot_idx"],
+    )
+
+
+def _beam_node_score(
+    node: _BeamNode,
+    slots: list[dict[str, Any]],
+    ordered_abstract_templates: list[str],
+    ordered_physical_templates: list[str],
+    layout_preserve_score: tuple[int, int, int, int],
+    prev_state: ClusterState | None,
+) -> tuple[int, ...]:
+    _, metrics = _assignments_to_target(
+        slots=slots,
+        assigned=node.assigned,
+        ordered_abstract_templates=ordered_abstract_templates,
+        ordered_physical_templates=ordered_physical_templates,
+        layout_preserve_score=layout_preserve_score,
+        prev_state=prev_state,
+    )
+    return _score_tuple(metrics, has_prev(prev_state))
+
+
+def _solve_target_with_preserve_first_beam(
+    demands: list[dict[str, Any]],
+    ordered_abstract_templates: list[str],
+    ordered_physical_templates: list[str],
+    intervals_list: list[list[tuple[int, int, str]]],
+    prev_state: ClusterState | None,
+    beam_width: int = 32,
+    slot_choice_width: int = 8,
+    layout_preserve_score: tuple[int, int, int, int] = (0, 0, 0, 0),
+) -> tuple[ClusterState, dict[str, Any]]:
+    slots = _make_slot_list_from_intervals_list(intervals_list)
+    assigned0, residual = _exact_preserve_preassign_exact_only(demands, slots, prev_state)
+    residual = _order_residual_demands_for_beam(residual, slots, prev_state)
+    beam = [_beam_seed_from_preassign(assigned0)]
+
+    slots_by_profile = defaultdict(list)
+    for slot in slots:
+        slots_by_profile[slot["profile"]].append(slot)
+
+    for demand in residual:
+        next_beam = []
+        candidate_slots = slots_by_profile[demand["profile"]]
+        for node in beam:
+            free_slots = [slot for slot in candidate_slots if slot["slot_id"] not in node.used_slots]
+            if not free_slots:
+                continue
+            ranked = sorted(
+                free_slots,
+                key=lambda slot: _beam_slot_local_rank(demand, slot, node, prev_state),
+                reverse=True,
+            )[:slot_choice_width]
+            for slot in ranked:
+                child = node.clone()
+                slot_id = slot["slot_id"]
+                child.assigned[slot_id] = {
+                    "slot": slot,
+                    "demand": demand,
+                    "placement_mode": "beam",
+                }
+                child.used_slots.add(slot_id)
+                child.workload_gpus[demand["workload"]].add(slot["gpu_id"])
+                child.per_gpu_workload_count[slot["gpu_id"]][demand["workload"]] += 1
+                next_beam.append(child)
+
+        if not next_beam:
+            raise RuntimeError("Preserve-first beam failed: no feasible extension found.")
+
+        next_beam.sort(
+            key=lambda node: _beam_node_score(
+                node=node,
+                slots=slots,
+                ordered_abstract_templates=ordered_abstract_templates,
+                ordered_physical_templates=ordered_physical_templates,
+                layout_preserve_score=layout_preserve_score,
+                prev_state=prev_state,
+            ),
+            reverse=True,
+        )
+        beam = next_beam[:beam_width]
+
+    best = max(
+        beam,
+        key=lambda node: _beam_node_score(
+            node=node,
+            slots=slots,
+            ordered_abstract_templates=ordered_abstract_templates,
+            ordered_physical_templates=ordered_physical_templates,
+            layout_preserve_score=layout_preserve_score,
+            prev_state=prev_state,
+        ),
+    )
+    return _assignments_to_target(
+        slots=slots,
+        assigned=best.assigned,
+        ordered_abstract_templates=ordered_abstract_templates,
+        ordered_physical_templates=ordered_physical_templates,
+        layout_preserve_score=layout_preserve_score,
+        prev_state=prev_state,
+    )
 
 
 def _order_residual_demands_for_greedy(

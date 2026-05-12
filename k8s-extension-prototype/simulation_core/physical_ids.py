@@ -3,7 +3,7 @@ from __future__ import annotations
 from .state import ClusterState, deepcopy_state
 
 
-PHYSICAL_ID_POOL = [chr(ord("A") + i) for i in range(11)]
+PHYSICAL_ID_POOL = [chr(ord("A") + i) for i in range(26)]
 
 
 def ensure_state_metadata(state: ClusterState) -> None:
@@ -32,7 +32,7 @@ def alloc_new_physical_id(state: ClusterState) -> str:
     ensure_state_metadata(state)
     idx = int(state.metadata.get("next_physical_idx", 0))
     if idx >= len(PHYSICAL_ID_POOL):
-        raise RuntimeError("Out of physical GPU ids (A-K)")
+        raise RuntimeError("Out of physical GPU ids (A-Z)")
     physical_id = PHYSICAL_ID_POOL[idx]
     state.metadata["next_physical_idx"] = idx + 1
     return physical_id

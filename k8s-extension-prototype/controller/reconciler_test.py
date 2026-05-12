@@ -898,7 +898,13 @@ def test_build_observed_cluster_state_from_k8s_lists() -> None:
     assert manifest["kind"] == "ObservedClusterState"
     assert manifest["spec"]["previewOnly"] is False
     assert manifest["spec"]["observedState"]["nodeInventory"][0]["nodeName"] == "gpu-node-0"
+    assert manifest["spec"]["observedState"]["physicalGpuBindings"] == {}
+    assert manifest["spec"]["observedState"]["unresolvedPhysicalGpuDevices"] == []
+    assert manifest["spec"]["observedState"]["ignoredGpuDevices"][0]["nodeName"] == "gpu-node-0"
+    assert manifest["spec"]["observedState"]["ignoredGpuDevices"][0]["deviceIndex"] == 0
+    assert manifest["spec"]["observedState"]["ignoredGpuDevices"][0]["physicalGpuId"] == "gpu-node-0-gpu0"
     assert manifest["spec"]["observedState"]["podReadiness"][0]["ready"] is True
+    assert "physical GPU UUID" not in manifest["spec"]["missingRealClusterInputs"]
     assert "MIG device UUID and placement inventory" in manifest["spec"]["missingRealClusterInputs"]
     assert status["phase"] == "NodePodInventoryObserved"
     assert status["readyForCanonicalization"] is False
@@ -947,10 +953,21 @@ def test_build_observed_cluster_state_with_mig_profile_inventory() -> None:
     observed = manifest["spec"]["observedState"]
     layout = observed["migLayouts"][0]
     profile = layout["profiles"][0]
+    bindings = observed["physicalGpuBindings"]
     status = observed_cluster_state_status(manifest)
 
     assert manifest["metadata"]["labels"]["mig.or-sim.io/observer-kind"] == "kubernetes-mig-node"
     assert manifest["spec"]["source"] == "kubernetes-mig-node-observer"
+    assert bindings == {}
+    assert observed["unresolvedPhysicalGpuDevices"][0]["nodeName"] == "rtx1"
+    assert observed["unresolvedPhysicalGpuDevices"][0]["deviceIndex"] == 0
+    assert observed["unresolvedPhysicalGpuDevices"][0]["migCapable"] is True
+    assert observed["unresolvedPhysicalGpuDevices"][0]["migConfig"] == "all-2g.10gb"
+    assert observed["unresolvedPhysicalGpuDevices"][0]["bindingSource"] == "kubernetes-node-labels-inferred"
+    assert observed["unresolvedPhysicalGpuDevices"][0]["physicalGpuId"] == "rtx1-gpu0"
+    assert observed["ignoredGpuDevices"][0]["nodeName"] == "rtx1"
+    assert observed["ignoredGpuDevices"][0]["deviceIndex"] == 1
+    assert observed["ignoredGpuDevices"][0]["migCapable"] is False
     assert layout["nodeName"] == "rtx1"
     assert layout["migConfig"] == "all-2g.10gb"
     assert layout["migConfigState"] == "success"
@@ -965,6 +982,86 @@ def test_build_observed_cluster_state_with_mig_profile_inventory() -> None:
     assert "MIG device UUID and placement inventory" in manifest["spec"]["missingRealClusterInputs"]
     assert status["phase"] == "MigNodeInventoryObserved"
     assert status["readyForCanonicalization"] is False
+
+
+def test_build_observed_cluster_state_uses_real_gpu_uuid_binding() -> None:
+    manifest = build_observed_cluster_state_from_k8s_lists(
+        name="cluster-observed-state",
+        namespace="or-sim",
+        nodes=[
+            {
+                "metadata": {
+                    "name": "rtx1",
+                    "annotations": {
+                        "mig.or-sim.io/physical-gpu.count": "1",
+                        "mig.or-sim.io/physical-gpu.0.uuid": "GPU-real-a100",
+                        "mig.or-sim.io/physical-gpu.0.product": "NVIDIA-A100-PCIE-40GB",
+                        "mig.or-sim.io/physical-gpu.0.mig-capable": "true",
+                    },
+                    "labels": {
+                        "nvidia.com/mig.config": "all-2g.10gb",
+                        "nvidia.com/mig.config.state": "success",
+                    },
+                },
+                "status": {
+                    "capacity": {"nvidia.com/gpu": "3", "nvidia.com/mig-2g.10gb": "3"},
+                    "allocatable": {"nvidia.com/gpu": "3", "nvidia.com/mig-2g.10gb": "3"},
+                },
+            }
+        ],
+        pods=[],
+    )
+    observed = manifest["spec"]["observedState"]
+    binding = observed["physicalGpuBindings"]["rtx1-gpu0"]
+
+    assert binding["physicalGpuId"] == "rtx1-gpu0"
+    assert binding["gpuUuid"] == "GPU-real-a100"
+    assert binding["nodeName"] == "rtx1"
+    assert binding["deviceIndex"] == 0
+    assert binding["confidence"] == "explicit"
+    assert observed["unresolvedPhysicalGpuDevices"] == []
+
+
+def test_build_observed_cluster_state_from_gpu_operator_inventory_keeps_only_a100() -> None:
+    manifest = build_observed_cluster_state_from_k8s_lists(
+        name="cluster-observed-state",
+        namespace="or-sim",
+        nodes=[
+            {
+                "metadata": {
+                    "name": "rtx1",
+                    "labels": {
+                        "nvidia.com/mig.config": "all-2g.10gb",
+                        "nvidia.com/mig.config.state": "success",
+                        "nvidia.com/mig-2g.10gb.count": "3",
+                    },
+                },
+                "status": {"capacity": {"nvidia.com/gpu": "3"}},
+            }
+        ],
+        pods=[],
+        gpu_inventory=[
+            {
+                "nodeName": "rtx1",
+                "source": "gpu-operator-device-plugin-nvidia-smi",
+                "nvidiaSmiL": "\n".join(
+                    [
+                        "GPU 0: NVIDIA A100-PCIE-40GB (UUID: GPU-real-a100)",
+                        "  MIG 2g.10gb     Device  0: (UUID: MIG-real-0)",
+                        "GPU 1: NVIDIA TITAN RTX (UUID: GPU-real-titan)",
+                    ]
+                ),
+            }
+        ],
+    )
+    observed = manifest["spec"]["observedState"]
+    binding = observed["physicalGpuBindings"]["rtx1-gpu0"]
+
+    assert list(observed["physicalGpuBindings"].keys()) == ["rtx1-gpu0"]
+    assert binding["gpuUuid"] == "GPU-real-a100"
+    assert binding["migDevices"][0]["migDeviceUuid"] == "MIG-real-0"
+    assert observed["ignoredGpuDevices"][0]["gpuUuid"] == "GPU-real-titan"
+    assert observed["ignoredGpuDevices"][0]["reason"] == "non-A100 GPU ignored by OR-SIM MIG planner"
 
 
 def test_mig_label_executor_preflights_or_sim_configmap() -> None:

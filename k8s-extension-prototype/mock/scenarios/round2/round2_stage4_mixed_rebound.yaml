@@ -1,0 +1,42 @@
+name: round2_stage4_mixed_rebound
+description: Round 2 mixed rebound with renewed LLM/text demand and a large ViT increase.
+policyRef: ../../policies/simulation-default.yaml
+migRulesRef: ../../mig-rules/a100-40gb.yaml
+sourceStateRef: target3
+targetStateRef: target4
+workloadOrder:
+  - llama
+  - gpt2
+  - vgg16
+  - resnet50
+  - vit_base
+workloadRefs:
+  llama: ../../../manifests/examples/workloadrequests/llama.yaml
+  gpt2: ../../../manifests/examples/workloadrequests/gpt2.yaml
+  vgg16: ../../../manifests/examples/workloadrequests/vgg16.yaml
+  resnet50: ../../../manifests/examples/workloadrequests/resnet50.yaml
+  vit_base: ../../../manifests/examples/workloadrequests/vit_base.yaml
+profileCatalogRefs:
+  llama: ../../profile-catalogs/llama.yaml
+  gpt2: ../../profile-catalogs/gpt2.yaml
+  vgg16: ../../profile-catalogs/vgg16.yaml
+  resnet50: ../../profile-catalogs/resnet50.yaml
+  vit_base: ../../profile-catalogs/vit_base.yaml
+sourceArrival:
+  llama: 1.5
+  gpt2: 12
+  vgg16: 150
+  resnet50: 160
+  vit_base: 900
+targetArrival:
+  llama: 4
+  gpt2: 28
+  vgg16: 260
+  resnet50: 260
+  vit_base: 6000
+transition:
+  from: target3
+  to: target4
+  kind: mixed-rebound
+  notes:
+    - Tests a rebound after scale-down where prior preservation can either help or constrain reconfiguration.

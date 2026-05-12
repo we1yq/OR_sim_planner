@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: physical-gpu-registry-monitor
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: or-sim-mig-planner
+    app.kubernetes.io/component: physical-gpu-registry-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: or-sim-mig-planner
+      app.kubernetes.io/component: physical-gpu-registry-monitor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: or-sim-mig-planner
+        app.kubernetes.io/component: physical-gpu-registry-monitor
+    spec:
+      serviceAccountName: mig-planner-controller
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      containers:
+        - name: monitor
+          image: or-sim-mig-planner:dev
+          imagePullPolicy: IfNotPresent
+          args:
+            - --run-physical-gpu-registry-monitor
+            - --namespace
+            - or-sim
+            - --registry-name
+            - default
+            - --observed-state-name
+            - cluster-observed-state
+            - --poll-interval-s
+            - "30"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi

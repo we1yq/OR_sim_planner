@@ -1,0 +1,412 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/component":"dry-run-actuator","app.kubernetes.io/name":"or-sim-mig-planner"},"name":"mig-dry-run-actuator","namespace":"or-sim"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/component":"dry-run-actuator","app.kubernetes.io/name":"or-sim-mig-planner"}},"template":{"metadata":{"labels":{"app.kubernetes.io/component":"dry-run-actuator","app.kubernetes.io/name":"or-sim-mig-planner"}},"spec":{"containers":[{"args":["--run-dry-run-actuator","--namespace","or-sim","--poll-interval-s","5"],"image":"or-sim-mig-planner:dev","imagePullPolicy":"IfNotPresent","name":"actuator","resources":{"limits":{"cpu":"1","memory":"512Mi"},"requests":{"cpu":"50m","memory":"128Mi"}}}],"serviceAccountName":"mig-planner-controller"}}}}
+    creationTimestamp: "2026-05-10T12:37:04Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/component: dry-run-actuator
+      app.kubernetes.io/name: or-sim-mig-planner
+    name: mig-dry-run-actuator
+    namespace: or-sim
+    resourceVersion: "73523081"
+    uid: fb182ab5-ddf2-4067-9fce-42d463897982
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 0
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: dry-run-actuator
+        app.kubernetes.io/name: or-sim-mig-planner
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: dry-run-actuator
+          app.kubernetes.io/name: or-sim-mig-planner
+      spec:
+        containers:
+        - args:
+          - --run-dry-run-actuator
+          - --namespace
+          - or-sim
+          - --poll-interval-s
+          - "5"
+          image: or-sim-mig-planner:dev
+          imagePullPolicy: IfNotPresent
+          name: actuator
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: mig-planner-controller
+        serviceAccountName: mig-planner-controller
+        terminationGracePeriodSeconds: 30
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-10T13:03:41Z"
+      lastUpdateTime: "2026-05-10T13:03:41Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-10T13:03:41Z"
+      lastUpdateTime: "2026-05-10T13:03:41Z"
+      message: ReplicaSet "mig-dry-run-actuator-58f5864468" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 2
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/component":"controller","app.kubernetes.io/name":"or-sim-mig-planner"},"name":"mig-planner-controller","namespace":"or-sim"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/component":"controller","app.kubernetes.io/name":"or-sim-mig-planner"}},"template":{"metadata":{"labels":{"app.kubernetes.io/component":"controller","app.kubernetes.io/name":"or-sim-mig-planner"}},"spec":{"containers":[{"args":["--run-watch-controller","--namespace","or-sim","--watch-timeout-s","60"],"image":"or-sim-mig-planner:dev","imagePullPolicy":"IfNotPresent","name":"controller","resources":{"limits":{"cpu":"2","memory":"2Gi"},"requests":{"cpu":"100m","memory":"256Mi"}}}],"serviceAccountName":"mig-planner-controller"}}}}
+    creationTimestamp: "2026-05-10T12:37:04Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/name: or-sim-mig-planner
+    name: mig-planner-controller
+    namespace: or-sim
+    resourceVersion: "73523070"
+    uid: 63ee1875-8f0d-48e4-8416-7688a60c72f0
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 0
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/name: or-sim-mig-planner
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/name: or-sim-mig-planner
+      spec:
+        containers:
+        - args:
+          - --run-watch-controller
+          - --namespace
+          - or-sim
+          - --watch-timeout-s
+          - "60"
+          image: or-sim-mig-planner:dev
+          imagePullPolicy: IfNotPresent
+          name: controller
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: mig-planner-controller
+        serviceAccountName: mig-planner-controller
+        terminationGracePeriodSeconds: 30
+  status:
+    conditions:
+    - lastTransitionTime: "2026-05-10T13:03:41Z"
+      lastUpdateTime: "2026-05-10T13:03:41Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-10T13:03:41Z"
+      lastUpdateTime: "2026-05-10T13:03:41Z"
+      message: ReplicaSet "mig-planner-controller-6dd7cd95b4" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 2
+- apiVersion: apps/v1
+  kind: ReplicaSet
+  metadata:
+    annotations:
+      deployment.kubernetes.io/desired-replicas: "0"
+      deployment.kubernetes.io/max-replicas: "0"
+      deployment.kubernetes.io/revision: "1"
+    creationTimestamp: "2026-05-10T12:37:04Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/component: dry-run-actuator
+      app.kubernetes.io/name: or-sim-mig-planner
+      pod-template-hash: 58f5864468
+    name: mig-dry-run-actuator-58f5864468
+    namespace: or-sim
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Deployment
+      name: mig-dry-run-actuator
+      uid: fb182ab5-ddf2-4067-9fce-42d463897982
+    resourceVersion: "73523079"
+    uid: 59a904a1-c370-432b-9c0a-2f44fc33b657
+  spec:
+    replicas: 0
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: dry-run-actuator
+        app.kubernetes.io/name: or-sim-mig-planner
+        pod-template-hash: 58f5864468
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: dry-run-actuator
+          app.kubernetes.io/name: or-sim-mig-planner
+          pod-template-hash: 58f5864468
+      spec:
+        containers:
+        - args:
+          - --run-dry-run-actuator
+          - --namespace
+          - or-sim
+          - --poll-interval-s
+          - "5"
+          image: or-sim-mig-planner:dev
+          imagePullPolicy: IfNotPresent
+          name: actuator
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: mig-planner-controller
+        serviceAccountName: mig-planner-controller
+        terminationGracePeriodSeconds: 30
+  status:
+    observedGeneration: 2
+    replicas: 0
+- apiVersion: apps/v1
+  kind: ReplicaSet
+  metadata:
+    annotations:
+      deployment.kubernetes.io/desired-replicas: "0"
+      deployment.kubernetes.io/max-replicas: "0"
+      deployment.kubernetes.io/revision: "1"
+    creationTimestamp: "2026-05-10T12:37:04Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/name: or-sim-mig-planner
+      pod-template-hash: 6dd7cd95b4
+    name: mig-planner-controller-6dd7cd95b4
+    namespace: or-sim
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Deployment
+      name: mig-planner-controller
+      uid: 63ee1875-8f0d-48e4-8416-7688a60c72f0
+    resourceVersion: "73523068"
+    uid: eaafadcf-31c2-42e9-9989-7bd34db78492
+  spec:
+    replicas: 0
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/name: or-sim-mig-planner
+        pod-template-hash: 6dd7cd95b4
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/name: or-sim-mig-planner
+          pod-template-hash: 6dd7cd95b4
+      spec:
+        containers:
+        - args:
+          - --run-watch-controller
+          - --namespace
+          - or-sim
+          - --watch-timeout-s
+          - "60"
+          image: or-sim-mig-planner:dev
+          imagePullPolicy: IfNotPresent
+          name: controller
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: mig-planner-controller
+        serviceAccountName: mig-planner-controller
+        terminationGracePeriodSeconds: 30
+  status:
+    observedGeneration: 2
+    replicas: 0
+- apiVersion: v1
+  data:
+    ca.crt: |
+      -----BEGIN CERTIFICATE-----
+      MIIBeTCCAR+gAwIBAgIBADAKBggqhkjOPQQDAjAkMSIwIAYDVQQDDBlya2UyLXNl
+      cnZlci1jYUAxNzU1NTk4NTcwMB4XDTI1MDgxOTEwMTYxMFoXDTM1MDgxNzEwMTYx
+      MFowJDEiMCAGA1UEAwwZcmtlMi1zZXJ2ZXItY2FAMTc1NTU5ODU3MDBZMBMGByqG
+      SM49AgEGCCqGSM49AwEHA0IABPF7SLsj8bKi8oCjDdNvKPaylwxBcWLH84l9MH46
+      cIwH5k2C+HhYvkuAW/0bcmybpC3sV1roZvqFKddQ/gdTWlGjQjBAMA4GA1UdDwEB
+      /wQEAwICpDAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBQvrSaOedqlhAmAuWwO
+      yDxgVRWdgTAKBggqhkjOPQQDAgNIADBFAiEA9JDlK3LZxnB0zEtvqsfdK2QC2kat
+      jRZmY+Rbkluc8QgCICkqWcrirzjePgtULhY5fv2/HCs1wXRSlz0mYld7AqQx
+      -----END CERTIFICATE-----
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2026-05-10T12:35:08Z"
+    name: kube-root-ca.crt
+    namespace: or-sim
+    resourceVersion: "73515722"
+    uid: 7a7507f7-e18c-4d76-9bb0-5ffe700c3e5d
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    creationTimestamp: "2026-05-10T12:35:08Z"
+    name: default
+    namespace: or-sim
+    resourceVersion: "73515721"
+    uid: 8dac0a3b-0957-4f02-ac66-1f20e2c47851
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"ServiceAccount","metadata":{"annotations":{},"name":"mig-planner-controller","namespace":"or-sim"}}
+    creationTimestamp: "2026-05-10T12:37:04Z"
+    name: mig-planner-controller
+    namespace: or-sim
+    resourceVersion: "73516258"
+    uid: d8d890a7-6fbe-44a7-84b1-674714d2d86a
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"rbac.authorization.k8s.io/v1","kind":"Role","metadata":{"annotations":{},"name":"mig-planner-controller","namespace":"or-sim"},"rules":[{"apiGroups":["mig.or-sim.io"],"resources":["migplans","migactionplans","autoapprovalpolicies","workloadrouteplans","servinginstancedrains","podlifecycleplans","observedclusterstates","physicalgpuregistries"],"verbs":["get","list","watch","create","patch","update"]},{"apiGroups":["mig.or-sim.io"],"resources":["migplans/status","migactionplans/status","workloadrouteplans/status","servinginstancedrains/status","podlifecycleplans/status","observedclusterstates/status","physicalgpuregistries/status"],"verbs":["get","patch","update"]},{"apiGroups":[""],"resources":["configmaps"],"verbs":["get","list","create","patch","update"]}]}
+    creationTimestamp: "2026-05-10T12:37:04Z"
+    name: mig-planner-controller
+    namespace: or-sim
+    resourceVersion: "73816212"
+    uid: 152d5990-c94e-4aa1-8d4f-5589a029ada8
+  rules:
+  - apiGroups:
+    - mig.or-sim.io
+    resources:
+    - migplans
+    - migactionplans
+    - autoapprovalpolicies
+    - workloadrouteplans
+    - servinginstancedrains
+    - podlifecycleplans
+    - observedclusterstates
+    - physicalgpuregistries
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - patch
+    - update
+  - apiGroups:
+    - mig.or-sim.io
+    resources:
+    - migplans/status
+    - migactionplans/status
+    - workloadrouteplans/status
+    - servinginstancedrains/status
+    - podlifecycleplans/status
+    - observedclusterstates/status
+    - physicalgpuregistries/status
+    verbs:
+    - get
+    - patch
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - get
+    - list
+    - create
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"rbac.authorization.k8s.io/v1","kind":"RoleBinding","metadata":{"annotations":{},"name":"mig-planner-controller","namespace":"or-sim"},"roleRef":{"apiGroup":"rbac.authorization.k8s.io","kind":"Role","name":"mig-planner-controller"},"subjects":[{"kind":"ServiceAccount","name":"mig-planner-controller","namespace":"or-sim"}]}
+    creationTimestamp: "2026-05-10T12:37:04Z"
+    name: mig-planner-controller
+    namespace: or-sim
+    resourceVersion: "73516255"
+    uid: 2f3d7acd-beea-4a84-8723-6af0c4451267
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: mig-planner-controller
+  subjects:
+  - kind: ServiceAccount
+    name: mig-planner-controller
+    namespace: or-sim
+kind: List
+metadata:
+  resourceVersion: ""

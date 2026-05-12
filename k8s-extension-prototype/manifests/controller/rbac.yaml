@@ -14,6 +14,7 @@ rules:
       - servinginstancedrains
       - podlifecycleplans
       - observedclusterstates
+      - physicalgpuregistries
     verbs:
       - get
       - list
@@ -30,6 +31,7 @@ rules:
       - servinginstancedrains/status
       - podlifecycleplans/status
       - observedclusterstates/status
+      - physicalgpuregistries/status
     verbs:
       - get
       - patch
@@ -38,12 +40,21 @@ rules:
       - ""
     resources:
       - configmaps
+      - pods
     verbs:
       - get
       - list
       - create
       - patch
       - update
+      - delete
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods/log
+    verbs:
+      - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

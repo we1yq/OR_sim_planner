@@ -105,6 +105,26 @@ MIG Planner Controller
 Dry-run MigPlan
 ```
 
+## Long-Running Hardware Monitor
+
+Real A100 discovery is maintained by `PhysicalGpuRegistry/default`. The current
+inventory provider is `GpuOperatorExecProvider`: it runs `nvidia-smi -L` inside
+a GPU Operator pod to collect real GPU UUIDs and MIG device UUIDs. This is kept
+behind the observer interface so a future node-agent/exporter can replace it
+without changing planner logic.
+
+For long-running target clusters:
+
+```bash
+kubectl apply -f k8s-extension-prototype/manifests/controller/registry-monitor-gpu-operator-rbac.yaml
+kubectl apply -f k8s-extension-prototype/manifests/controller/registry-monitor-deployment.yaml
+```
+
+The RBAC is scoped to the `gpu-operator` namespace. The monitor avoids running
+`nvidia-smi -L` while any node has `nvidia.com/mig.config.state=pending`; it
+reuses cached GPU UUID bindings and refreshes MIG device UUIDs after
+success/failed.
+
 ## Regenerate Profile Catalogs
 
 ```bash

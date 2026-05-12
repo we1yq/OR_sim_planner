@@ -1,0 +1,40 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: or-sim-physical-gpu-registry-monitor
+  namespace: gpu-operator
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - pods/exec
+    verbs:
+      - get
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: or-sim-physical-gpu-registry-monitor
+  namespace: gpu-operator
+subjects:
+  - kind: ServiceAccount
+    name: mig-planner-controller
+    namespace: or-sim
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: or-sim-physical-gpu-registry-monitor

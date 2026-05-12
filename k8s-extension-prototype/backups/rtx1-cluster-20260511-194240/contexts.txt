@@ -1,0 +1,2 @@
+CURRENT   NAME        CLUSTER   AUTHINFO   NAMESPACE
+*         rtx1-rke2   default   default    

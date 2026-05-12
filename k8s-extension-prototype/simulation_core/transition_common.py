@@ -207,7 +207,7 @@ def build_initial_free_pool(state: ClusterState) -> list[str]:
 
 def alloc_from_free_pool(free_pool: list[str]) -> str:
     if not free_pool:
-        raise RuntimeError("Out of free physical GPUs in A-K")
+        raise RuntimeError("Out of free physical GPUs in A-Z")
     return free_pool.pop()
 
 

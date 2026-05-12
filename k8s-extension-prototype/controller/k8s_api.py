@@ -21,6 +21,17 @@ class KubernetesClient(Protocol):
     def list_pods(self, namespace: str) -> list[dict[str, Any]]:
         ...
 
+    def get_pod(self, name: str, namespace: str) -> dict[str, Any]:
+        ...
+
+    def patch_pod_annotations(
+        self,
+        name: str,
+        namespace: str,
+        annotations: dict[str, str],
+    ) -> None:
+        ...
+
     def get_node(self, name: str) -> dict[str, Any]:
         ...
 
@@ -48,6 +59,18 @@ class KubernetesClient(Protocol):
         ...
 
     def patch_observedclusterstate_status(self, name: str, namespace: str, status: dict[str, Any]) -> None:
+        ...
+
+    def get_observedclusterstate(self, name: str, namespace: str) -> dict[str, Any]:
+        ...
+
+    def get_physicalgpuregistry(self, name: str, namespace: str) -> dict[str, Any] | None:
+        ...
+
+    def apply_physicalgpuregistry(self, manifest: dict[str, Any]) -> None:
+        ...
+
+    def patch_physicalgpuregistry_status(self, name: str, namespace: str, status: dict[str, Any]) -> None:
         ...
 
     def get_autoapprovalpolicy(self, name: str, namespace: str) -> dict[str, Any] | None:
@@ -78,6 +101,9 @@ class KubernetesClient(Protocol):
         ...
 
     def watch_migplans(self, namespace: str, timeout_seconds: int) -> Any:
+        ...
+
+    def list_gpu_operator_inventory(self, namespace: str = "gpu-operator") -> list[dict[str, Any]]:
         ...
 
 
@@ -180,6 +206,82 @@ class PythonKubernetesClient:
             raise ValueError(f"Kubernetes API returned a non-object PodList for namespace {namespace}")
         return list(serialized.get("items", []))
 
+    def get_pod(self, name: str, namespace: str) -> dict[str, Any]:
+        obj = self.core.read_namespaced_pod(name=name, namespace=namespace)
+        serialized = self.api_client.sanitize_for_serialization(obj)
+        if not isinstance(serialized, dict):
+            raise ValueError(f"Kubernetes API returned a non-object Pod for {namespace}/{name}")
+        return serialized
+
+    def patch_pod_annotations(
+        self,
+        name: str,
+        namespace: str,
+        annotations: dict[str, str],
+    ) -> None:
+        self.core.patch_namespaced_pod(
+            name=name,
+            namespace=namespace,
+            body={"metadata": {"annotations": annotations}},
+        )
+
+    def list_gpu_operator_inventory(self, namespace: str = "gpu-operator") -> list[dict[str, Any]]:
+        from kubernetes.stream import stream
+
+        pods = self.list_pods(namespace=namespace)
+        inventory = []
+        candidates: list[tuple[str, str, str]] = [
+            (
+                "nvidia-device-plugin-daemonset-",
+                "nvidia-device-plugin",
+                "gpu-operator-device-plugin-nvidia-smi",
+            ),
+            (
+                "nvidia-mig-manager-",
+                "nvidia-mig-manager",
+                "gpu-operator-mig-manager-nvidia-smi",
+            ),
+        ]
+        for pod in pods:
+            metadata = dict(pod.get("metadata", {}))
+            spec = dict(pod.get("spec", {}))
+            status = dict(pod.get("status", {}))
+            pod_name = str(metadata.get("name") or "")
+            candidate = next(
+                (
+                    item
+                    for item in candidates
+                    if pod_name.startswith(item[0])
+                ),
+                None,
+            )
+            if candidate is None:
+                continue
+            if status.get("phase") not in {None, "Running"}:
+                continue
+            _, container_name, source = candidate
+            output = stream(
+                self.core.connect_get_namespaced_pod_exec,
+                pod_name,
+                namespace,
+                container=container_name,
+                command=["nvidia-smi", "-L"],
+                stderr=True,
+                stdin=False,
+                stdout=True,
+                tty=False,
+            )
+            inventory.append(
+                {
+                    "nodeName": spec.get("nodeName"),
+                    "podName": pod_name,
+                    "namespace": namespace,
+                    "source": source,
+                    "nvidiaSmiL": str(output),
+                }
+            )
+        return inventory
+
     def watch_migplans(self, namespace: str, timeout_seconds: int = 60) -> Any:
         from kubernetes import watch
 
@@ -243,6 +345,50 @@ class PythonKubernetesClient:
             status=status,
         )
 
+    def get_observedclusterstate(self, name: str, namespace: str) -> dict[str, Any]:
+        obj = self.custom.get_namespaced_custom_object(
+            group=self.group,
+            version=self.version,
+            namespace=namespace,
+            plural="observedclusterstates",
+            name=name,
+        )
+        if not isinstance(obj, dict):
+            raise ValueError(
+                f"Kubernetes API returned a non-object ObservedClusterState for {namespace}/{name}"
+            )
+        return obj
+
+    def get_physicalgpuregistry(self, name: str, namespace: str) -> dict[str, Any] | None:
+        try:
+            obj = self.custom.get_namespaced_custom_object(
+                group=self.group,
+                version=self.version,
+                namespace=namespace,
+                plural="physicalgpuregistries",
+                name=name,
+            )
+        except self.api_exception as exc:
+            if int(getattr(exc, "status", 0)) == 404:
+                return None
+            raise
+        if not isinstance(obj, dict):
+            raise ValueError(
+                f"Kubernetes API returned a non-object PhysicalGpuRegistry for {namespace}/{name}"
+            )
+        return obj
+
+    def apply_physicalgpuregistry(self, manifest: dict[str, Any]) -> None:
+        self._replace_custom_object(manifest=manifest, plural="physicalgpuregistries")
+
+    def patch_physicalgpuregistry_status(self, name: str, namespace: str, status: dict[str, Any]) -> None:
+        self._patch_custom_object_status(
+            plural="physicalgpuregistries",
+            name=name,
+            namespace=namespace,
+            status=status,
+        )
+
     def get_autoapprovalpolicy(self, name: str, namespace: str) -> dict[str, Any] | None:
         try:
             obj = self.custom.get_namespaced_custom_object(
@@ -301,7 +447,7 @@ class PythonKubernetesClient:
         self._apply_custom_object(manifest=manifest, plural="podlifecycleplans")
 
     def apply_observedclusterstate(self, manifest: dict[str, Any]) -> None:
-        self._apply_custom_object(manifest=manifest, plural="observedclusterstates")
+        self._replace_custom_object(manifest=manifest, plural="observedclusterstates")
 
     def _apply_custom_object(self, manifest: dict[str, Any], plural: str) -> None:
         metadata = dict(manifest.get("metadata", {}))
@@ -325,6 +471,42 @@ class PythonKubernetesClient:
                 plural=plural,
                 name=name,
                 body=manifest,
+            )
+
+    def _replace_custom_object(self, manifest: dict[str, Any], plural: str) -> None:
+        metadata = dict(manifest.get("metadata", {}))
+        name = str(metadata["name"])
+        namespace = str(metadata["namespace"])
+        try:
+            self.custom.create_namespaced_custom_object(
+                group=self.group,
+                version=self.version,
+                namespace=namespace,
+                plural=plural,
+                body=manifest,
+            )
+        except self.api_exception as exc:
+            if int(getattr(exc, "status", 0)) != 409:
+                raise
+            current = self.custom.get_namespaced_custom_object(
+                group=self.group,
+                version=self.version,
+                namespace=namespace,
+                plural=plural,
+                name=name,
+            )
+            body = dict(manifest)
+            body_metadata = dict(body.get("metadata", {}))
+            current_metadata = dict(current.get("metadata", {})) if isinstance(current, dict) else {}
+            body_metadata["resourceVersion"] = current_metadata.get("resourceVersion")
+            body["metadata"] = body_metadata
+            self.custom.replace_namespaced_custom_object(
+                group=self.group,
+                version=self.version,
+                namespace=namespace,
+                plural=plural,
+                name=name,
+                body=body,
             )
 
     def _patch_custom_object_status(

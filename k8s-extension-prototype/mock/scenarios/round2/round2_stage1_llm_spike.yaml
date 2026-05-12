@@ -1,0 +1,42 @@
+name: round2_stage1_llm_spike
+description: Round 2 demand transition with a large LLM/text spike and stable vision load.
+policyRef: ../../policies/simulation-default.yaml
+migRulesRef: ../../mig-rules/a100-40gb.yaml
+sourceStateRef: target0
+targetStateRef: target1
+workloadOrder:
+  - llama
+  - gpt2
+  - vgg16
+  - resnet50
+  - vit_base
+workloadRefs:
+  llama: ../../../manifests/examples/workloadrequests/llama.yaml
+  gpt2: ../../../manifests/examples/workloadrequests/gpt2.yaml
+  vgg16: ../../../manifests/examples/workloadrequests/vgg16.yaml
+  resnet50: ../../../manifests/examples/workloadrequests/resnet50.yaml
+  vit_base: ../../../manifests/examples/workloadrequests/vit_base.yaml
+profileCatalogRefs:
+  llama: ../../profile-catalogs/llama.yaml
+  gpt2: ../../profile-catalogs/gpt2.yaml
+  vgg16: ../../profile-catalogs/vgg16.yaml
+  resnet50: ../../profile-catalogs/resnet50.yaml
+  vit_base: ../../profile-catalogs/vit_base.yaml
+sourceArrival:
+  llama: 1.5
+  gpt2: 10
+  vgg16: 120
+  resnet50: 180
+  vit_base: 1500
+targetArrival:
+  llama: 8
+  gpt2: 45
+  vgg16: 120
+  resnet50: 180
+  vit_base: 1500
+transition:
+  from: target0
+  to: target1
+  kind: llm-spike
+  notes:
+    - Stresses placement choice under increased large-profile demand.

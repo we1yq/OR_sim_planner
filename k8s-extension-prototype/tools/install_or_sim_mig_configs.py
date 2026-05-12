@@ -15,6 +15,7 @@ PROFILE_TO_GPU_OPERATOR = {
 }
 
 OR_SIM_TEMPLATE_CONFIGS = {
+    "or-sim-empty": [],
     "or-sim-4-3": ["4g", "3g"],
     "or-sim-4-2-1": ["4g", "2g", "1g"],
     "or-sim-4-1-1-1": ["4g", "1g", "1g", "1g"],

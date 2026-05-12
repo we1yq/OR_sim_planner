@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="430" viewBox="0 0 1000 430">
+<rect width="100%" height="100%" fill="white"/>
+<text x="80" y="24" font-family="sans-serif" font-size="18" fill="#222">Transition Planner 变体 - Fine-grained executed actions</text>
+<line x1="80" y1="40" x2="80" y2="310" stroke="#333"/>
+<line x1="80" y1="310" x2="960" y2="310" stroke="#333"/>
+<rect x="98" y="40" width="197" height="270" fill="#4C78A8"/>
+<text x="196.5" y="54" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#222">97.0</text>
+<text transform="translate(196.5,328) rotate(35)" text-anchor="start" font-family="sans-serif" font-size="12" fill="#222">current_full</text>
+<rect x="313" y="40" width="197" height="270" fill="#4C78A8"/>
+<text x="411.5" y="54" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#222">97.0</text>
+<text transform="translate(411.5,328) rotate(35)" text-anchor="start" font-family="sans-serif" font-size="12" fill="#222">transition_serial_v0</text>
+<rect x="528" y="40" width="197" height="270" fill="#4C78A8"/>
+<text x="626.5" y="54" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#222">97.0</text>
+<text transform="translate(626.5,328) rotate(35)" text-anchor="start" font-family="sans-serif" font-size="12" fill="#222">transition_drain_v2</text>
+<rect x="743" y="40" width="197" height="270" fill="#4C78A8"/>
+<text x="841.5" y="54" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#222">97.0</text>
+<text transform="translate(841.5,328) rotate(35)" text-anchor="start" font-family="sans-serif" font-size="12" fill="#222">transition_full_plan_v2</text>
+</svg>

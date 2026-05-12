@@ -9,10 +9,21 @@ from io_utils import dump_yaml, load_yaml
 from k8s_adapter import plan_scenario_as_migplan_status, plan_scenario_chain_as_migplan_statuses
 from mig_label_executor import apply_mig_labels_from_action_plan, summarize_mig_labels_from_action_plan
 from mig_rules import load_mig_rules, mig_rules_summary_dict, validate_gpu_state_against_mig_rules
+from physical_gpu_registry import (
+    mark_physical_gpu_active,
+    mark_physical_gpu_released,
+    registry_queue_summary,
+    run_physical_gpu_registry_monitor_loop,
+    sync_physical_gpu_registry,
+)
 from reconciler import reconcile_migplan_once, run_controller_loop, run_watch_controller_loop
 from reconciler import upsert_migactionplan
 from scenario_loader import load_planning_scenario, scenario_summary_dict
 from state_adapter import gpu_state_from_mock_yaml
+from executors.pod_lifecycle_executor import apply_pod_lifecycle_from_action_plan
+from executors.router_drain_executor import apply_router_drain_from_action_plan
+from test_harness.router_drain_smoke import create_router_drain_smoke_action_plan
+from test_harness.workload_lifecycle_smoke import create_workload_lifecycle_smoke_action_plan
 
 
 def parse_args() -> argparse.Namespace:
@@ -106,6 +117,34 @@ def parse_args() -> argparse.Namespace:
         help="For --observe-cluster-state, write the ObservedClusterState and status to Kubernetes.",
     )
     parser.add_argument(
+        "--sync-physical-gpu-registry",
+        action="store_true",
+        help="Observe hardware and sync the PhysicalGpuRegistry status.",
+    )
+    parser.add_argument(
+        "--run-physical-gpu-registry-monitor",
+        action="store_true",
+        help="Run a polling monitor that continuously syncs PhysicalGpuRegistry.",
+    )
+    parser.add_argument(
+        "--registry-name",
+        default="default",
+        help="PhysicalGpuRegistry name for registry operations.",
+    )
+    parser.add_argument(
+        "--apply-physical-gpu-registry",
+        action="store_true",
+        help="For --sync-physical-gpu-registry, write registry spec/status to Kubernetes.",
+    )
+    parser.add_argument(
+        "--activate-physical-gpu",
+        help="Move a physicalGpuId from available/transitioning to activeQueue for a planner ownership smoke test.",
+    )
+    parser.add_argument(
+        "--release-physical-gpu",
+        help="Move a physicalGpuId out of activeQueue; it returns to available only if observed clean.",
+    )
+    parser.add_argument(
         "--summarize-mig-labels-from-action-plan",
         help="Read a MigActionPlan and print the NVIDIA GPU Operator node-label patch it would apply.",
     )
@@ -137,6 +176,80 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--create-mig-label-smoke-action-plan",
         help="Create a controlled MigActionPlan that targets one node/device MIG layout.",
+    )
+    parser.add_argument(
+        "--create-workload-lifecycle-smoke-action-plan",
+        help="Create a controlled MigActionPlan that targets one workload Pod and one live batch update.",
+    )
+    parser.add_argument(
+        "--apply-pod-lifecycle-from-action-plan",
+        dest="apply_pod_lifecycle_from_action_plan",
+        help="Apply a MigActionPlan podLifecyclePreview to real Kubernetes Pods.",
+    )
+    parser.add_argument(
+        "--create-router-drain-smoke-action-plan",
+        help="Create a controlled MigActionPlan that reroutes one workload from source to target.",
+    )
+    parser.add_argument(
+        "--apply-router-drain-from-action-plan",
+        help="Apply a MigActionPlan trafficAndDrainPreview through the Router/Drain executor.",
+    )
+    parser.add_argument(
+        "--confirm-real-router-apply",
+        action="store_true",
+        help="Required with --apply-router-drain-from-action-plan because it changes real router/drain state.",
+    )
+    parser.add_argument("--router-endpoint", help="Base URL for the router service.")
+    parser.add_argument(
+        "--router-drain-mode",
+        default="http",
+        choices=["http", "annotation", "no-traffic"],
+        help="Router/Drain executor mode.",
+    )
+    parser.add_argument("--router-smoke-workload", default="resnet50")
+    parser.add_argument("--router-smoke-source-pod", default="router-workload-a")
+    parser.add_argument("--router-smoke-source-endpoint", default="http://router-workload-a:8080")
+    parser.add_argument("--router-smoke-target-pod", default="router-workload-b")
+    parser.add_argument("--router-smoke-target-endpoint", default="http://router-workload-b:8080")
+    parser.add_argument(
+        "--confirm-real-pod-apply",
+        action="store_true",
+        help="Required with --apply-pod-lifecycle-from-action-plan because it creates, patches, or deletes Pods.",
+    )
+    parser.add_argument(
+        "--workload-smoke-node",
+        default="rtx1-worker",
+        help="Node name for workload lifecycle smoke plans.",
+    )
+    parser.add_argument(
+        "--workload-smoke-mig-resource",
+        default="nvidia.com/mig-3g.20gb",
+        help="MIG resource name requested by workload lifecycle smoke Pods.",
+    )
+    parser.add_argument(
+        "--workload-smoke-name",
+        default="smoke",
+        help="Workload name recorded in workload lifecycle smoke plans.",
+    )
+    parser.add_argument(
+        "--workload-smoke-initial-batch-size",
+        default="4",
+        help="Initial batch size for workload lifecycle smoke plans.",
+    )
+    parser.add_argument(
+        "--workload-smoke-updated-batch-size",
+        default="8",
+        help="Updated batch size for workload lifecycle smoke plans.",
+    )
+    parser.add_argument(
+        "--workload-smoke-image",
+        default="nvidia/cuda:12.4.1-base-ubuntu22.04",
+        help="Container image for workload lifecycle smoke Pods.",
+    )
+    parser.add_argument(
+        "--cleanup-workload-smoke",
+        action="store_true",
+        help="Delete workload lifecycle smoke Pods and ConfigMaps after applying the action plan.",
     )
     parser.add_argument("--mig-smoke-node", default="rtx1", help="Node name for MIG label smoke plan.")
     parser.add_argument("--mig-smoke-device-index", type=int, default=0, help="GPU device index for smoke plan.")
@@ -219,6 +332,47 @@ def main() -> int:
         print(dump_yaml(observed), end="")
         return 0
 
+    if args.sync_physical_gpu_registry:
+        registry = sync_physical_gpu_registry(
+            namespace=args.namespace,
+            registry_name=args.registry_name,
+            observed_state_name=args.observed_state_name,
+            apply=args.apply_physical_gpu_registry,
+        )
+        print(dump_yaml(registry_queue_summary(registry)), end="")
+        return 0
+
+    if args.run_physical_gpu_registry_monitor:
+        summary = run_physical_gpu_registry_monitor_loop(
+            namespace=args.namespace,
+            registry_name=args.registry_name,
+            observed_state_name=args.observed_state_name,
+            poll_interval_s=args.poll_interval_s,
+            max_cycles=args.controller_max_cycles,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.activate_physical_gpu:
+        registry = mark_physical_gpu_active(
+            physical_gpu_id=args.activate_physical_gpu,
+            namespace=args.namespace,
+            registry_name=args.registry_name,
+            apply=args.apply_physical_gpu_registry,
+        )
+        print(dump_yaml(registry_queue_summary(registry)), end="")
+        return 0
+
+    if args.release_physical_gpu:
+        registry = mark_physical_gpu_released(
+            physical_gpu_id=args.release_physical_gpu,
+            namespace=args.namespace,
+            registry_name=args.registry_name,
+            apply=args.apply_physical_gpu_registry,
+        )
+        print(dump_yaml(registry_queue_summary(registry)), end="")
+        return 0
+
     if args.summarize_mig_labels_from_action_plan:
         summary = summarize_mig_labels_from_action_plan(
             name=args.summarize_mig_labels_from_action_plan,
@@ -255,6 +409,61 @@ def main() -> int:
             status=status,
         )
         print(dump_yaml(status), end="")
+        return 0
+
+    if args.create_workload_lifecycle_smoke_action_plan:
+        summary = create_workload_lifecycle_smoke_action_plan(
+            name=args.create_workload_lifecycle_smoke_action_plan,
+            namespace=args.namespace,
+            node_name=args.workload_smoke_node,
+            mig_resource=args.workload_smoke_mig_resource,
+            workload=args.workload_smoke_name,
+            initial_batch_size=args.workload_smoke_initial_batch_size,
+            updated_batch_size=args.workload_smoke_updated_batch_size,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.apply_pod_lifecycle_from_action_plan:
+        summary = apply_pod_lifecycle_from_action_plan(
+            name=args.apply_pod_lifecycle_from_action_plan,
+            namespace=args.namespace,
+            confirm_real_pod_apply=args.confirm_real_pod_apply,
+            allow_preview_instructions=args.allow_preview_instructions,
+            node_name=args.workload_smoke_node,
+            mig_resource=args.workload_smoke_mig_resource,
+            image=args.workload_smoke_image,
+            timeout_s=args.mig_apply_timeout_s,
+            cleanup=args.cleanup_workload_smoke,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.create_router_drain_smoke_action_plan:
+        summary = create_router_drain_smoke_action_plan(
+            name=args.create_router_drain_smoke_action_plan,
+            namespace=args.namespace,
+            workload=args.router_smoke_workload,
+            source_pod=args.router_smoke_source_pod,
+            source_endpoint=args.router_smoke_source_endpoint,
+            target_pod=args.router_smoke_target_pod,
+            target_endpoint=args.router_smoke_target_endpoint,
+            router_endpoint=args.router_endpoint or "http://or-sim-smoke-router:8080",
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.apply_router_drain_from_action_plan:
+        summary = apply_router_drain_from_action_plan(
+            name=args.apply_router_drain_from_action_plan,
+            namespace=args.namespace,
+            confirm_real_router_apply=args.confirm_real_router_apply,
+            allow_preview_instructions=args.allow_preview_instructions,
+            router_endpoint=args.router_endpoint,
+            mode=args.router_drain_mode,
+            timeout_s=args.mig_apply_timeout_s,
+        )
+        print(dump_yaml(summary), end="")
         return 0
 
     if args.run_controller:

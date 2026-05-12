@@ -1,0 +1,107 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2025-08-19T10:16:35Z"
+    labels:
+      kubernetes.io/metadata.name: default
+    name: default
+    resourceVersion: "25"
+    uid: c8909e49-f0f2-4d97-8436-669f86c0bfcf
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2025-08-19T10:20:23Z"
+    labels:
+      kubernetes.io/metadata.name: gpu-operator
+      name: gpu-operator
+    name: gpu-operator
+    resourceVersion: "1790"
+    uid: 142a724b-8559-42c9-a2ad-52771bb1fe5d
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2025-08-19T10:16:35Z"
+    labels:
+      kubernetes.io/metadata.name: kube-node-lease
+    name: kube-node-lease
+    resourceVersion: "31"
+    uid: c8585908-9d5e-4c20-80eb-7c3b6cd7a2cd
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2025-08-19T10:16:35Z"
+    labels:
+      kubernetes.io/metadata.name: kube-public
+    name: kube-public
+    resourceVersion: "16"
+    uid: 1efc7cc3-1d61-4c30-97c7-287de0325342
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2025-08-19T10:16:35Z"
+    labels:
+      kubernetes.io/metadata.name: kube-system
+    name: kube-system
+    resourceVersion: "11"
+    uid: c6b4fc0b-ac43-46b7-b46e-0cff056c56c7
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"Namespace","metadata":{"annotations":{},"creationTimestamp":null,"name":"or-sim"},"spec":{},"status":{}}
+    creationTimestamp: "2026-05-10T12:35:08Z"
+    labels:
+      kubernetes.io/metadata.name: or-sim
+    name: or-sim
+    resourceVersion: "73515720"
+    uid: 19d217ee-3946-478f-9942-29b6916bdeba
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2025-08-19T10:49:55Z"
+    labels:
+      kubernetes.io/metadata.name: task-jobs
+    name: task-jobs
+    resourceVersion: "6893"
+    uid: b1909a34-ca91-4a38-a73e-bdcd4bda26c8
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+kind: List
+metadata:
+  resourceVersion: ""

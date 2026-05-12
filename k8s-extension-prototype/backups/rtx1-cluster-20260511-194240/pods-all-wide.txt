@@ -1,0 +1,31 @@
+NAMESPACE      NAME                                                         READY   STATUS      RESTARTS       AGE    IP                NODE   NOMINATED NODE   READINESS GATES
+gpu-operator   gpu-feature-discovery-nzvw7                                  1/1     Running     0              119m   10.42.0.155       rtx1   <none>           <none>
+gpu-operator   gpu-operator-556b77bc7c-gn472                                1/1     Running     0              3d1h   10.42.0.180       rtx1   <none>           <none>
+gpu-operator   gpu-operator-node-feature-discovery-gc-775976dc9d-v89pp      1/1     Running     0              3d1h   10.42.0.179       rtx1   <none>           <none>
+gpu-operator   gpu-operator-node-feature-discovery-master-c784d775d-s5pdq   1/1     Running     0              3d1h   10.42.0.177       rtx1   <none>           <none>
+gpu-operator   gpu-operator-node-feature-discovery-worker-5jmpf             1/1     Running     0              3d1h   10.42.0.178       rtx1   <none>           <none>
+gpu-operator   nvidia-container-toolkit-daemonset-g4b87                     1/1     Running     0              22h    10.42.0.157       rtx1   <none>           <none>
+gpu-operator   nvidia-cuda-validator-wwtgv                                  0/1     Completed   0              118m   10.42.0.158       rtx1   <none>           <none>
+gpu-operator   nvidia-dcgm-exporter-j8dr5                                   1/1     Running     0              119m   10.42.0.153       rtx1   <none>           <none>
+gpu-operator   nvidia-device-plugin-daemonset-jmtpt                         1/1     Running     0              119m   10.42.0.154       rtx1   <none>           <none>
+gpu-operator   nvidia-mig-manager-shqf6                                     1/1     Running     0              123m   10.42.0.141       rtx1   <none>           <none>
+gpu-operator   nvidia-operator-validator-pbdmv                              1/1     Running     0              118m   10.42.0.156       rtx1   <none>           <none>
+kube-system    cloud-controller-manager-rtx1                                1/1     Running     27 (33d ago)   245d   115.145.179.130   rtx1   <none>           <none>
+kube-system    etcd-rtx1                                                    1/1     Running     11             264d   115.145.179.130   rtx1   <none>           <none>
+kube-system    helm-install-rke2-canal-42qqz                                0/1     Completed   0              265d   115.145.179.130   rtx1   <none>           <none>
+kube-system    helm-install-rke2-coredns-8trxj                              0/1     Completed   0              265d   115.145.179.130   rtx1   <none>           <none>
+kube-system    helm-install-rke2-ingress-nginx-jv6zz                        0/1     Completed   0              265d   <none>            rtx1   <none>           <none>
+kube-system    helm-install-rke2-metrics-server-ql48x                       0/1     Completed   0              265d   <none>            rtx1   <none>           <none>
+kube-system    helm-install-rke2-runtimeclasses-dqvkx                       0/1     Completed   0              265d   <none>            rtx1   <none>           <none>
+kube-system    helm-install-rke2-snapshot-controller-7zs2x                  0/1     Completed   2              265d   <none>            rtx1   <none>           <none>
+kube-system    helm-install-rke2-snapshot-controller-crd-x9wdw              0/1     Completed   0              265d   <none>            rtx1   <none>           <none>
+kube-system    kube-apiserver-rtx1                                          1/1     Running     15             265d   115.145.179.130   rtx1   <none>           <none>
+kube-system    kube-controller-manager-rtx1                                 1/1     Running     26 (33d ago)   245d   115.145.179.130   rtx1   <none>           <none>
+kube-system    kube-proxy-rtx1                                              1/1     Running     0              33d    115.145.179.130   rtx1   <none>           <none>
+kube-system    kube-scheduler-rtx1                                          1/1     Running     15 (33d ago)   245d   115.145.179.130   rtx1   <none>           <none>
+kube-system    rke2-canal-cq9ld                                             2/2     Running     22 (33d ago)   265d   115.145.179.130   rtx1   <none>           <none>
+kube-system    rke2-coredns-rke2-coredns-65dc69968-p7cnn                    1/1     Running     11 (33d ago)   265d   10.42.0.173       rtx1   <none>           <none>
+kube-system    rke2-coredns-rke2-coredns-autoscaler-68d5f76f7-v7k2p         1/1     Running     11 (33d ago)   265d   10.42.0.175       rtx1   <none>           <none>
+kube-system    rke2-ingress-nginx-controller-54lgg                          1/1     Running     11 (33d ago)   265d   10.42.0.176       rtx1   <none>           <none>
+kube-system    rke2-metrics-server-69bdccfdd9-kkp7j                         1/1     Running     11 (33d ago)   265d   10.42.0.174       rtx1   <none>           <none>
+kube-system    rke2-snapshot-controller-696989ffdd-997fg                    1/1     Running     16 (33d ago)   265d   10.42.0.172       rtx1   <none>           <none>

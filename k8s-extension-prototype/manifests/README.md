@@ -23,7 +23,8 @@ real GPU or MIG operations.
 - `crds/autoapprovalpolicy-crd.yaml`: policy gate for automatically approving
   safe dry-run action plans.
 - `controller/*.yaml`: service account, namespaced RBAC, optional observer
-  read-only ClusterRole, and Deployments for the dry-run controller loops.
+  read-only ClusterRole, optional GPU Operator exec RBAC, and Deployments for
+  the dry-run controller loops and physical GPU registry monitor.
 - `examples/workloadrequests/*.yaml`: workload requests generated from the
   simulation workload specs.
 - `examples/profile-catalogs/kustomization.yaml`: profile catalog ConfigMaps
@@ -81,3 +82,25 @@ The controller image uses the Kubernetes Python client directly and watches
 `MigPlan` API events; it does not carry `kubectl` inside the container. The Deployment still only patches
 `MigPlan.status` and writes canonical state ConfigMaps. It does not modify pods,
 scheduler configuration, or real MIG state.
+
+## Deploy The Physical GPU Registry Monitor
+
+The long-running monitor keeps `PhysicalGpuRegistry/default` up to date. It
+uses GPU Operator pod exec to run `nvidia-smi -L` for real GPU UUID and MIG UUID
+inventory, so apply the narrowly-scoped `gpu-operator` namespace RBAC first:
+
+```bash
+kubectl apply -f k8s-extension-prototype/manifests/controller/registry-monitor-gpu-operator-rbac.yaml
+kubectl apply -f k8s-extension-prototype/manifests/controller/registry-monitor-deployment.yaml
+```
+
+Check it:
+
+```bash
+kubectl logs -n or-sim deployment/physical-gpu-registry-monitor
+kubectl get physicalgpuregistry -n or-sim default -o yaml
+```
+
+The monitor skips GPU Operator exec while any node has
+`nvidia.com/mig.config.state=pending`; it reuses cached GPU UUID bindings and
+waits for a success/failed state before refreshing MIG device UUIDs.

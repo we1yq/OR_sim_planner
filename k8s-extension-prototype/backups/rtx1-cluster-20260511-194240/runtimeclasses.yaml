@@ -1,0 +1,82 @@
+apiVersion: v1
+items:
+- apiVersion: node.k8s.io/v1
+  handler: crun
+  kind: RuntimeClass
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: rke2-runtimeclasses
+      meta.helm.sh/release-namespace: kube-system
+    creationTimestamp: "2025-08-19T10:17:19Z"
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: crun
+    resourceVersion: "1005"
+    uid: a477c342-e577-43bb-ad43-11dde04e209f
+- apiVersion: node.k8s.io/v1
+  handler: nvidia
+  kind: RuntimeClass
+  metadata:
+    creationTimestamp: "2026-05-08T09:15:59Z"
+    labels:
+      app.kubernetes.io/component: gpu-operator
+    name: nvidia
+    ownerReferences:
+    - apiVersion: nvidia.com/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ClusterPolicy
+      name: cluster-policy
+      uid: ae870c7f-d47f-4626-ba54-47db2e0e5593
+    resourceVersion: "72717117"
+    uid: ce108f13-43aa-4551-ba0f-ec27818a7f9a
+- apiVersion: node.k8s.io/v1
+  handler: nvidia-cdi
+  kind: RuntimeClass
+  metadata:
+    creationTimestamp: "2026-05-08T09:15:59Z"
+    labels:
+      app.kubernetes.io/component: gpu-operator
+    name: nvidia-cdi
+    ownerReferences:
+    - apiVersion: nvidia.com/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ClusterPolicy
+      name: cluster-policy
+      uid: ae870c7f-d47f-4626-ba54-47db2e0e5593
+    resourceVersion: "72717119"
+    uid: 5574f273-9395-428b-8e5b-06b18b3482fe
+- apiVersion: node.k8s.io/v1
+  handler: nvidia-experimental
+  kind: RuntimeClass
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: rke2-runtimeclasses
+      meta.helm.sh/release-namespace: kube-system
+    creationTimestamp: "2025-08-19T10:17:19Z"
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: nvidia-experimental
+    resourceVersion: "1004"
+    uid: e31550a9-3f1f-4f63-bb6e-ed45087d76ea
+- apiVersion: node.k8s.io/v1
+  handler: nvidia-legacy
+  kind: RuntimeClass
+  metadata:
+    creationTimestamp: "2026-05-08T09:15:59Z"
+    labels:
+      app.kubernetes.io/component: gpu-operator
+    name: nvidia-legacy
+    ownerReferences:
+    - apiVersion: nvidia.com/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ClusterPolicy
+      name: cluster-policy
+      uid: ae870c7f-d47f-4626-ba54-47db2e0e5593
+    resourceVersion: "72717118"
+    uid: c9fbdc8d-4559-43c3-9af3-2a7b398a46ff
+kind: List
+metadata:
+  resourceVersion: ""

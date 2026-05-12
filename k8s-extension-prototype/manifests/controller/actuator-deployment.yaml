@@ -19,6 +19,8 @@ spec:
         app.kubernetes.io/component: dry-run-actuator
     spec:
       serviceAccountName: mig-planner-controller
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
       containers:
         - name: actuator
           image: or-sim-mig-planner:dev

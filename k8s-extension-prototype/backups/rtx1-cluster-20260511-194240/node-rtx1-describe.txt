@@ -1,0 +1,234 @@
+Name:               rtx1
+Roles:              control-plane,etcd,master
+Labels:             beta.kubernetes.io/arch=amd64
+                    beta.kubernetes.io/instance-type=rke2
+                    beta.kubernetes.io/os=linux
+                    feature.node.kubernetes.io/cpu-cpuid.ADX=true
+                    feature.node.kubernetes.io/cpu-cpuid.AESNI=true
+                    feature.node.kubernetes.io/cpu-cpuid.AMXFP8=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX2=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512BW=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512CD=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512DQ=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512F=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512VL=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512VNNI=true
+                    feature.node.kubernetes.io/cpu-cpuid.CMPXCHG8=true
+                    feature.node.kubernetes.io/cpu-cpuid.FLUSH_L1D=true
+                    feature.node.kubernetes.io/cpu-cpuid.FMA3=true
+                    feature.node.kubernetes.io/cpu-cpuid.FXSR=true
+                    feature.node.kubernetes.io/cpu-cpuid.FXSROPT=true
+                    feature.node.kubernetes.io/cpu-cpuid.IA32_ARCH_CAP=true
+                    feature.node.kubernetes.io/cpu-cpuid.IBPB=true
+                    feature.node.kubernetes.io/cpu-cpuid.LAHF=true
+                    feature.node.kubernetes.io/cpu-cpuid.MD_CLEAR=true
+                    feature.node.kubernetes.io/cpu-cpuid.MOVBE=true
+                    feature.node.kubernetes.io/cpu-cpuid.MPX=true
+                    feature.node.kubernetes.io/cpu-cpuid.OSXSAVE=true
+                    feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_CYCLES=true
+                    feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_INSTRUCTIONS=true
+                    feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_REFCYCLES=true
+                    feature.node.kubernetes.io/cpu-cpuid.SPEC_CTRL_SSBD=true
+                    feature.node.kubernetes.io/cpu-cpuid.STIBP=true
+                    feature.node.kubernetes.io/cpu-cpuid.SYSCALL=true
+                    feature.node.kubernetes.io/cpu-cpuid.SYSEE=true
+                    feature.node.kubernetes.io/cpu-cpuid.VMX=true
+                    feature.node.kubernetes.io/cpu-cpuid.X87=true
+                    feature.node.kubernetes.io/cpu-cpuid.XGETBV1=true
+                    feature.node.kubernetes.io/cpu-cpuid.XSAVE=true
+                    feature.node.kubernetes.io/cpu-cpuid.XSAVEC=true
+                    feature.node.kubernetes.io/cpu-cpuid.XSAVEOPT=true
+                    feature.node.kubernetes.io/cpu-cpuid.XSAVES=true
+                    feature.node.kubernetes.io/cpu-cstate.enabled=true
+                    feature.node.kubernetes.io/cpu-hardware_multithreading=false
+                    feature.node.kubernetes.io/cpu-model.family=6
+                    feature.node.kubernetes.io/cpu-model.id=85
+                    feature.node.kubernetes.io/cpu-model.vendor_id=Intel
+                    feature.node.kubernetes.io/kernel-config.NO_HZ=true
+                    feature.node.kubernetes.io/kernel-config.NO_HZ_IDLE=true
+                    feature.node.kubernetes.io/kernel-version.full=5.15.0-60-generic
+                    feature.node.kubernetes.io/kernel-version.major=5
+                    feature.node.kubernetes.io/kernel-version.minor=15
+                    feature.node.kubernetes.io/kernel-version.revision=0
+                    feature.node.kubernetes.io/memory-numa=true
+                    feature.node.kubernetes.io/pci-102b.present=true
+                    feature.node.kubernetes.io/pci-10de.present=true
+                    feature.node.kubernetes.io/pci-10de.sriov.capable=true
+                    feature.node.kubernetes.io/pci-14e4.present=true
+                    feature.node.kubernetes.io/pci-15b3.present=true
+                    feature.node.kubernetes.io/rdma.capable=true
+                    feature.node.kubernetes.io/storage-nonrotationaldisk=true
+                    feature.node.kubernetes.io/system-os_release.ID=ubuntu
+                    feature.node.kubernetes.io/system-os_release.VERSION_ID=22.04
+                    feature.node.kubernetes.io/system-os_release.VERSION_ID.major=22
+                    feature.node.kubernetes.io/system-os_release.VERSION_ID.minor=04
+                    kubernetes.io/arch=amd64
+                    kubernetes.io/hostname=rtx1
+                    kubernetes.io/os=linux
+                    node-role.kubernetes.io/control-plane=true
+                    node-role.kubernetes.io/etcd=true
+                    node-role.kubernetes.io/master=true
+                    node.kubernetes.io/instance-type=rke2
+                    nvidia.com/cuda.driver-version.full=550.163.01
+                    nvidia.com/cuda.driver-version.major=550
+                    nvidia.com/cuda.driver-version.minor=163
+                    nvidia.com/cuda.driver-version.revision=01
+                    nvidia.com/cuda.driver.major=550
+                    nvidia.com/cuda.driver.minor=163
+                    nvidia.com/cuda.driver.rev=01
+                    nvidia.com/cuda.runtime-version.full=12.4
+                    nvidia.com/cuda.runtime-version.major=12
+                    nvidia.com/cuda.runtime-version.minor=4
+                    nvidia.com/cuda.runtime.major=12
+                    nvidia.com/cuda.runtime.minor=4
+                    nvidia.com/gfd.timestamp=1778489036
+                    nvidia.com/gpu.compute.major=8
+                    nvidia.com/gpu.compute.minor=6
+                    nvidia.com/gpu.count=1
+                    nvidia.com/gpu.deploy.container-toolkit=true
+                    nvidia.com/gpu.deploy.dcgm=true
+                    nvidia.com/gpu.deploy.dcgm-exporter=true
+                    nvidia.com/gpu.deploy.device-plugin=true
+                    nvidia.com/gpu.deploy.driver=true
+                    nvidia.com/gpu.deploy.gpu-feature-discovery=true
+                    nvidia.com/gpu.deploy.mig-manager=true
+                    nvidia.com/gpu.deploy.node-status-exporter=true
+                    nvidia.com/gpu.deploy.nvsm=true
+                    nvidia.com/gpu.deploy.operator-validator=true
+                    nvidia.com/gpu.family=ampere
+                    nvidia.com/gpu.machine=PowerEdge-T640
+                    nvidia.com/gpu.memory=24576
+                    nvidia.com/gpu.mode=unknown
+                    nvidia.com/gpu.present=true
+                    nvidia.com/gpu.product=NVIDIA-GeForce-RTX-3090
+                    nvidia.com/gpu.replicas=1
+                    nvidia.com/gpu.sharing-strategy=none
+                    nvidia.com/mig.capable=true
+                    nvidia.com/mig.config=or-sim-empty
+                    nvidia.com/mig.config.state=success
+                    nvidia.com/mig.strategy=mixed
+                    nvidia.com/mps.capable=false
+                    nvidia.com/vgpu.present=false
+Annotations:        alpha.kubernetes.io/provided-node-ip: 115.145.179.130
+                    etcd.rke2.cattle.io/local-snapshots-timestamp: 2026-05-11T19:40:52+09:00
+                    etcd.rke2.cattle.io/node-address: 115.145.179.130
+                    etcd.rke2.cattle.io/node-name: rtx1-157146d3
+                    flannel.alpha.coreos.com/backend-data: {"VNI":1,"VtepMAC":"f6:78:a3:20:22:b8"}
+                    flannel.alpha.coreos.com/backend-type: vxlan
+                    flannel.alpha.coreos.com/kube-subnet-manager: true
+                    flannel.alpha.coreos.com/public-ip: 115.145.179.130
+                    nfd.node.kubernetes.io/feature-labels:
+                      cpu-cpuid.ADX,cpu-cpuid.AESNI,cpu-cpuid.AMXFP8,cpu-cpuid.AVX,cpu-cpuid.AVX2,cpu-cpuid.AVX512BW,cpu-cpuid.AVX512CD,cpu-cpuid.AVX512DQ,cpu-c...
+                    node.alpha.kubernetes.io/ttl: 0
+                    rke2.io/encryption-config-hash: start-c1565cd5c4d6c5c60fb91cd0358fd348bc1a295af1661a9200981fda8609cc52
+                    rke2.io/hostname: rtx1
+                    rke2.io/internal-ip: 115.145.179.130
+                    rke2.io/node-args: ["server"]
+                    rke2.io/node-config-hash: MLFMUCBMRVINLJJKSG32TOUFWB4CN55GMSNY25AZPESQXZCYRN2A====
+                    rke2.io/node-env: {}
+                    volumes.kubernetes.io/controller-managed-attach-detach: true
+CreationTimestamp:  Tue, 19 Aug 2025 19:16:38 +0900
+Taints:             <none>
+Unschedulable:      false
+Lease:
+  HolderIdentity:  rtx1
+  AcquireTime:     <unset>
+  RenewTime:       Mon, 11 May 2026 19:42:35 +0900
+Conditions:
+  Type                 Status  LastHeartbeatTime                 LastTransitionTime                Reason                       Message
+  ----                 ------  -----------------                 ------------------                ------                       -------
+  NetworkUnavailable   False   Wed, 08 Apr 2026 17:00:31 +0900   Wed, 08 Apr 2026 17:00:31 +0900   FlannelIsUp                  Flannel is running on this node
+  EtcdIsVoter          True    Mon, 11 May 2026 19:41:51 +0900   Tue, 19 Aug 2025 19:16:49 +0900   MemberNotLearner             Node is a voting member of the etcd cluster
+  MemoryPressure       False   Mon, 11 May 2026 19:39:55 +0900   Mon, 08 Sep 2025 13:11:41 +0900   KubeletHasSufficientMemory   kubelet has sufficient memory available
+  DiskPressure         False   Mon, 11 May 2026 19:39:55 +0900   Mon, 08 Sep 2025 13:11:41 +0900   KubeletHasNoDiskPressure     kubelet has no disk pressure
+  PIDPressure          False   Mon, 11 May 2026 19:39:55 +0900   Mon, 08 Sep 2025 13:11:41 +0900   KubeletHasSufficientPID      kubelet has sufficient PID available
+  Ready                True    Mon, 11 May 2026 19:39:55 +0900   Mon, 01 Dec 2025 12:56:33 +0900   KubeletReady                 kubelet is posting ready status
+Addresses:
+  InternalIP:  115.145.179.130
+  Hostname:    rtx1
+Capacity:
+  cpu:                     32
+  ephemeral-storage:       919792872Ki
+  hugepages-1Gi:           0
+  hugepages-2Mi:           0
+  memory:                  131630336Ki
+  nvidia.com/gpu:          3
+  nvidia.com/mig-1g.5gb:   0
+  nvidia.com/mig-2g.10gb:  0
+  nvidia.com/mig-3g.20gb:  0
+  nvidia.com/mig-4g.20gb:  0
+  nvidia.com/mig-7g.40gb:  0
+  pods:                    110
+Allocatable:
+  cpu:                     32
+  ephemeral-storage:       894774505180
+  hugepages-1Gi:           0
+  hugepages-2Mi:           0
+  memory:                  131630336Ki
+  nvidia.com/gpu:          3
+  nvidia.com/mig-1g.5gb:   0
+  nvidia.com/mig-2g.10gb:  0
+  nvidia.com/mig-3g.20gb:  0
+  nvidia.com/mig-4g.20gb:  0
+  nvidia.com/mig-7g.40gb:  0
+  pods:                    110
+System Info:
+  Machine ID:                 e67442ae7bc049df8f71d01c96c25f75
+  System UUID:                4c4c4544-0048-5610-804d-c8c04f393333
+  Boot ID:                    52b8c178-66d4-45f3-862f-db50351ae104
+  Kernel Version:             5.15.0-60-generic
+  OS Image:                   Ubuntu 22.04.2 LTS
+  Operating System:           linux
+  Architecture:               amd64
+  Container Runtime Version:  containerd://2.0.5-k3s2
+  Kubelet Version:            v1.32.7+rke2r1
+  Kube-Proxy Version:         v1.32.7+rke2r1
+PodCIDR:                      10.42.0.0/24
+PodCIDRs:                     10.42.0.0/24
+ProviderID:                   rke2://rtx1
+Non-terminated Pods:          (22 in total)
+  Namespace                   Name                                                          CPU Requests  CPU Limits  Memory Requests  Memory Limits  Age
+  ---------                   ----                                                          ------------  ----------  ---------------  -------------  ---
+  gpu-operator                gpu-feature-discovery-nzvw7                                   0 (0%)        0 (0%)      0 (0%)           0 (0%)         119m
+  gpu-operator                gpu-operator-556b77bc7c-gn472                                 200m (0%)     500m (1%)   100Mi (0%)       350Mi (0%)     3d1h
+  gpu-operator                gpu-operator-node-feature-discovery-gc-775976dc9d-v89pp       10m (0%)      0 (0%)      128Mi (0%)       1Gi (0%)       3d1h
+  gpu-operator                gpu-operator-node-feature-discovery-master-c784d775d-s5pdq    100m (0%)     0 (0%)      128Mi (0%)       4Gi (3%)       3d1h
+  gpu-operator                gpu-operator-node-feature-discovery-worker-5jmpf              5m (0%)       0 (0%)      64Mi (0%)        512Mi (0%)     3d1h
+  gpu-operator                nvidia-container-toolkit-daemonset-g4b87                      0 (0%)        0 (0%)      0 (0%)           0 (0%)         22h
+  gpu-operator                nvidia-dcgm-exporter-j8dr5                                    0 (0%)        0 (0%)      0 (0%)           0 (0%)         119m
+  gpu-operator                nvidia-device-plugin-daemonset-jmtpt                          0 (0%)        0 (0%)      0 (0%)           0 (0%)         119m
+  gpu-operator                nvidia-mig-manager-shqf6                                      0 (0%)        0 (0%)      0 (0%)           0 (0%)         123m
+  gpu-operator                nvidia-operator-validator-pbdmv                               0 (0%)        0 (0%)      0 (0%)           0 (0%)         118m
+  kube-system                 cloud-controller-manager-rtx1                                 100m (0%)     0 (0%)      128Mi (0%)       0 (0%)         245d
+  kube-system                 etcd-rtx1                                                     200m (0%)     0 (0%)      512Mi (0%)       0 (0%)         264d
+  kube-system                 kube-apiserver-rtx1                                           250m (0%)     0 (0%)      1Gi (0%)         0 (0%)         265d
+  kube-system                 kube-controller-manager-rtx1                                  200m (0%)     0 (0%)      256Mi (0%)       0 (0%)         245d
+  kube-system                 kube-proxy-rtx1                                               250m (0%)     0 (0%)      128Mi (0%)       0 (0%)         33d
+  kube-system                 kube-scheduler-rtx1                                           100m (0%)     0 (0%)      128Mi (0%)       0 (0%)         245d
+  kube-system                 rke2-canal-cq9ld                                              250m (0%)     0 (0%)      0 (0%)           0 (0%)         265d
+  kube-system                 rke2-coredns-rke2-coredns-65dc69968-p7cnn                     100m (0%)     100m (0%)   128Mi (0%)       128Mi (0%)     265d
+  kube-system                 rke2-coredns-rke2-coredns-autoscaler-68d5f76f7-v7k2p          25m (0%)      100m (0%)   16Mi (0%)        64Mi (0%)      265d
+  kube-system                 rke2-ingress-nginx-controller-54lgg                           100m (0%)     0 (0%)      90Mi (0%)        0 (0%)         265d
+  kube-system                 rke2-metrics-server-69bdccfdd9-kkp7j                          100m (0%)     0 (0%)      200Mi (0%)       0 (0%)         265d
+  kube-system                 rke2-snapshot-controller-696989ffdd-997fg                     0 (0%)        0 (0%)      0 (0%)           0 (0%)         265d
+Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource                Requests     Limits
+  --------                --------     ------
+  cpu                     1990m (6%)   700m (2%)
+  memory                  3030Mi (2%)  6174Mi (4%)
+  ephemeral-storage       0 (0%)       0 (0%)
+  hugepages-1Gi           0 (0%)       0 (0%)
+  hugepages-2Mi           0 (0%)       0 (0%)
+  nvidia.com/gpu          0            0
+  nvidia.com/mig-1g.5gb   0            0
+  nvidia.com/mig-2g.10gb  0            0
+  nvidia.com/mig-3g.20gb  0            0
+  nvidia.com/mig-4g.20gb  0            0
+  nvidia.com/mig-7g.40gb  0            0
+Events:
+  Type     Reason                        Age                  From               Message
+  ----     ------                        ----                 ----               -------
+  Warning  CertificateExpirationWarning  42m (x72 over 19d)   rke2-cert-monitor  Node certificates require attention - restart rke2 on this node to trigger automatic rotation: etcd/client.crt: certificate CN=etcd-client will expire within 120 days at 2026-08-19T10:16:10Z, etcd/server-client.crt: certificate CN=etcd-server will expire within 120 days at 2026-08-19T10:16:10Z, etcd/peer-server-client.crt: certificate CN=etcd-peer will expire within 120 days at 2026-08-19T10:16:10Z, scheduler/client-scheduler.crt: certificate CN=system:kube-scheduler will expire within 120 days at 2026-08-19T10:16:10Z, scheduler/kube-scheduler.crt: certificate CN=kube-scheduler will expire within 120 days at 2026-08-19T10:16:10Z, admin/client-admin.crt: certificate CN=system:admin,O=system:masters will expire within 120 days at 2026-08-19T10:16:10Z, auth-proxy/client-auth-proxy.crt: certificate CN=system:auth-proxy will expire within 120 days at 2026-08-19T10:16:10Z, controller-manager/client-controller.crt: certificate CN=system:kube-controller-manager will expire within 120 days at 2026-08-19T10:16:10Z, controller-manager/kube-controller-manager.crt: certificate CN=kube-controller-manager will expire within 120 days at 2026-08-19T10:16:10Z, api-server/client-kube-apiserver.crt: certificate CN=system:apiserver,O=system:masters will expire within 120 days at 2026-08-19T10:16:10Z, api-server/serving-kube-apiserver.crt: certificate CN=kube-apiserver will expire within 120 days at 2026-08-19T10:16:10Z, cloud-controller/client-rke2-cloud-controller.crt: certificate CN=rke2-cloud-controller-manager will expire within 120 days at 2026-08-19T10:16:10Z, supervisor/client-supervisor.crt: certificate CN=system:rke2-supervisor,O=system:masters will expire within 120 days at 2026-08-19T10:16:10Z
+  Warning  CertificateExpirationWarning  12m (x244 over 19d)  rke2-cert-monitor  Node certificates require attention - restart rke2 on this node to trigger automatic rotation: admin/client-admin.crt: certificate CN=system:admin,O=system:masters will expire within 120 days at 2026-08-19T10:16:10Z, auth-proxy/client-auth-proxy.crt: certificate CN=system:auth-proxy will expire within 120 days at 2026-08-19T10:16:10Z, controller-manager/client-controller.crt: certificate CN=system:kube-controller-manager will expire within 120 days at 2026-08-19T10:16:10Z, controller-manager/kube-controller-manager.crt: certificate CN=kube-controller-manager will expire within 120 days at 2026-08-19T10:16:10Z, etcd/client.crt: certificate CN=etcd-client will expire within 120 days at 2026-08-19T10:16:10Z, etcd/server-client.crt: certificate CN=etcd-server will expire within 120 days at 2026-08-19T10:16:10Z, etcd/peer-server-client.crt: certificate CN=etcd-peer will expire within 120 days at 2026-08-19T10:16:10Z, scheduler/client-scheduler.crt: certificate CN=system:kube-scheduler will expire within 120 days at 2026-08-19T10:16:10Z, scheduler/kube-scheduler.crt: certificate CN=kube-scheduler will expire within 120 days at 2026-08-19T10:16:10Z, api-server/client-kube-apiserver.crt: certificate CN=system:apiserver,O=system:masters will expire within 120 days at 2026-08-19T10:16:10Z, api-server/serving-kube-apiserver.crt: certificate CN=kube-apiserver will expire within 120 days at 2026-08-19T10:16:10Z, cloud-controller/client-rke2-cloud-controller.crt: certificate CN=rke2-cloud-controller-manager will expire within 120 days at 2026-08-19T10:16:10Z, supervisor/client-supervisor.crt: certificate CN=system:rke2-supervisor,O=system:masters will expire within 120 days at 2026-08-19T10:16:10Z

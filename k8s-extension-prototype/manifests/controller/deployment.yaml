@@ -19,6 +19,8 @@ spec:
         app.kubernetes.io/component: controller
     spec:
       serviceAccountName: mig-planner-controller
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
       containers:
         - name: controller
           image: or-sim-mig-planner:dev

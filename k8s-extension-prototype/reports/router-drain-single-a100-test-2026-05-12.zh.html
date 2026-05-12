@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Router/Drain Adapter 单 A100 测试报告</title>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #17202a; }
+    h1, h2, h3 { line-height: 1.25; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    pre { background: #f5f7f9; border: 1px solid #d9e0e7; border-radius: 6px; padding: 12px; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    th, td { border: 1px solid #d9e0e7; padding: 8px; text-align: left; }
+    th { background: #eef3f7; }
+    .ok { color: #0b6b3a; font-weight: 600; }
+    .note { background: #fff8e6; border-left: 4px solid #d99a00; padding: 10px 12px; }
+  </style>
+</head>
+<body>
+  <h1>Router/Drain Adapter 单 A100 测试报告</h1>
+  <p>日期：2026-05-12</p>
+  <p>集群：<code>or-sim-edge</code>，kubeconfig：<code>~/.kube/or-sim-edge.yaml</code></p>
+  <p>控制平面：desktap 上的 <code>or-sim-control-plane</code></p>
+  <p>GPU Worker：<code>rtx1-worker</code></p>
+  <p>测试 GPU：单张 NVIDIA A100，MIG 配置为 <code>all-3g.20gb</code></p>
+
+  <h2>本次实现内容</h2>
+  <ul>
+    <li>实现真实 Router/Drain 执行路径：<code>controller/executors/router_drain_executor.py</code>。</li>
+    <li>增加 Router/Drain smoke ActionPlan 生成器：<code>controller/test_harness/router_drain_smoke.py</code>。</li>
+    <li>增加轻量 HTTP router/workload 测试程序：<code>tools/test_workloads/simple_router_workload.c</code>。</li>
+    <li>更新 adapter 结构文档，把真实运行组件和测试 harness 分开。</li>
+  </ul>
+  <p>当前 adapter 可以停止源实例接收新请求、把新请求和排队请求切到目标 endpoint、等待源实例 <code>inflight=0</code> 且 <code>queued=0</code>，并把执行结果写入 <code>MigActionPlan</code>、<code>WorkloadRoutePlan</code> 和 <code>ServingInstanceDrain</code>。</p>
+
+  <h2>测试拓扑</h2>
+  <p>测试使用单张 A100 上的两个 <code>3g.20gb</code> MIG 分区。</p>
+  <table>
+    <thead>
+      <tr><th>Pod</th><th>节点</th><th>GPU 请求</th><th>角色</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>router-workload-a</code></td><td><code>rtx1-worker</code></td><td><code>nvidia.com/mig-3g.20gb: 1</code></td><td>源 serving 实例</td></tr>
+      <tr><td><code>router-workload-b</code></td><td><code>rtx1-worker</code></td><td><code>nvidia.com/mig-3g.20gb: 1</code></td><td>目标 serving 实例</td></tr>
+      <tr><td><code>or-sim-smoke-router</code></td><td><code>rtx1-worker</code></td><td>无</td><td>HTTP router</td></tr>
+    </tbody>
+  </table>
+  <pre>nvidia.com/mig.config       all-3g.20gb
+nvidia.com/mig.config.state success
+capacity mig-3g.20gb        2
+allocatable mig-3g.20gb     2</pre>
+
+  <h2>测试步骤与结果</h2>
+  <h3>1. 切换前路由检查</h3>
+  <pre>GET http://127.0.0.1:18080/route?workload=resnet50&amp;ms=50</pre>
+  <pre>{
+  "ok": true,
+  "workload": "resnet50",
+  "target": "http://router-workload-a:8080",
+  "upstream": {
+    "ok": true,
+    "workload": "resnet50",
+    "instance": "a",
+    "ms": 50
+  }
+}</pre>
+  <p>耗时：<code>79.5 ms</code>。状态：<span class="ok">成功</span>。</p>
+
+  <h3>2. 创建 Router/Drain ActionPlan</h3>
+  <p>ActionPlan：<code>router-drain-smoke</code>。</p>
+  <p>包含三个动作：<code>stop_accepting_new</code>、<code>reroute_queued_tasks</code>、<code>mark_draining_instance</code>。</p>
+  <pre>phase: ApprovedDryRun
+approved: true
+executed: false</pre>
+  <p>状态：<span class="ok">成功</span>。</p>
+
+  <h3>3. 执行真实 Router/Drain Adapter</h3>
+  <pre>python3 k8s-extension-prototype/controller/main.py \
+  --namespace or-sim \
+  --apply-router-drain-from-action-plan router-drain-smoke \
+  --confirm-real-router-apply \
+  --allow-preview-instructions \
+  --router-endpoint http://127.0.0.1:18080 \
+  --router-drain-mode http \
+  --mig-apply-timeout-s 120</pre>
+  <pre>stopAcceptingNew success: true
+reroute success: true
+drain success: true
+verification success: true
+adapter timing total: 0.149 s
+outer command elapsed: 0.50 s</pre>
+  <p>源实例 drain metrics：</p>
+  <pre>{
+  "ok": true,
+  "instance": "a",
+  "inflight": 0,
+  "queued": 0,
+  "accepting": false
+}</pre>
+  <p>adapter 自带验证请求已经进入目标实例 B：</p>
+  <pre>{
+  "ok": true,
+  "workload": "resnet50",
+  "target": "http://router-workload-b:8080",
+  "upstream": {
+    "ok": true,
+    "workload": "resnet50",
+    "instance": "b",
+    "ms": 50
+  }
+}</pre>
+  <p>状态：<span class="ok">成功</span>。</p>
+
+  <h3>4. 切换后路由检查</h3>
+  <pre>GET http://127.0.0.1:18080/route?workload=resnet50&amp;ms=50</pre>
+  <pre>{
+  "ok": true,
+  "workload": "resnet50",
+  "target": "http://router-workload-b:8080",
+  "upstream": {
+    "ok": true,
+    "workload": "resnet50",
+    "instance": "b",
+    "ms": 50
+  }
+}</pre>
+  <p>耗时：<code>76.6 ms</code>。状态：<span class="ok">成功</span>。</p>
+
+  <h3>5. Kubernetes CR 证据</h3>
+  <p><code>WorkloadRoutePlan</code> 已为 <code>StopAcceptingNew</code> 和 <code>RerouteQueuedTasks</code> 创建并进入：</p>
+  <pre>phase: SucceededRealRouterDrain
+previewOnly: false
+validatedBy: router-drain-executor</pre>
+  <p><code>ServingInstanceDrain</code> 进入：</p>
+  <pre>phase: SucceededRealRouterDrain
+message: Drain completed in 0.014s.
+previewOnly: false
+validatedBy: router-drain-executor</pre>
+  <p>源 Pod drain annotation：</p>
+  <pre>mig.or-sim.io/accepting-new=false
+mig.or-sim.io/draining=true
+mig.or-sim.io/drain-state=drained
+mig.or-sim.io/inflight=0
+mig.or-sim.io/queued=0</pre>
+
+  <h2>本次测试证明了什么</h2>
+  <ul>
+    <li>单张 A100 的两个 MIG 分区可以分别运行相同 workload 的两个 serving 实例。</li>
+    <li>切换前流量进入源实例 A。</li>
+    <li>Router/Drain Adapter 可以让源实例停止接收新请求。</li>
+    <li>Router/Drain Adapter 可以把 router 目标改到目标实例 B。</li>
+    <li>Adapter 会等待源实例 inflight 和 queued 清零。</li>
+    <li>切换后流量进入目标实例 B。</li>
+    <li>执行结果会写回 Kubernetes CR。</li>
+  </ul>
+
+  <h2>仍需后续验证的内容</h2>
+  <div class="note">
+    <p>这次测试完成的是单 A100、分区到分区的真实 adapter 路径。下面内容需要多 GPU 或生产 serving runtime 接入后继续测试。</p>
+  </div>
+  <ul>
+    <li>跨物理 GPU routing。</li>
+    <li>跨服务器 routing。</li>
+    <li>生产模型 serving router 或负载均衡器集成。</li>
+    <li>真实 queue/runtime 中排队请求的迁移语义。</li>
+    <li>从生产 serving framework 获取 inflight metrics。</li>
+    <li>source、target 或 router endpoint 不可达时的故障处理。</li>
+  </ul>
+  <p>当前 adapter 是 endpoint-based 设计，因此未来只要目标实例 endpoint 可达，同一套接口可以用于单卡分区、单机多 GPU 和多机 GPU 的 routing。</p>
+</body>
+</html>

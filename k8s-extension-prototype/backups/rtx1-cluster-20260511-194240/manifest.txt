@@ -1,0 +1,3 @@
+createdAt: 2026-05-11T19:42:40+09:00
+kubeconfig: /home/we1yq/.kube/rtx1-rke2.yaml
+backupDir: k8s-extension-prototype/backups/rtx1-cluster-20260511-194240

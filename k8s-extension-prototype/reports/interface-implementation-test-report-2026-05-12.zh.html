@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>OR-SIM 接口实现与单 A100 测试报告</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.55; margin: 32px; color: #1f2937; }
+    h1, h2, h3 { color: #111827; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    pre { background: #f3f4f6; padding: 12px; border-radius: 6px; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 24px; }
+    th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #f9fafb; }
+    .pass { color: #047857; font-weight: 600; }
+    .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 10px 12px; }
+  </style>
+</head>
+<body>
+  <h1>OR-SIM 接口实现与单 A100 测试报告</h1>
+
+  <p>日期：2026-05-12</p>
+  <p>集群：<code>desktap</code> RKE2 control-plane + <code>rtx1-worker</code> RKE2 GPU worker</p>
+  <p>Kubeconfig：<code>~/.kube/or-sim-edge.yaml</code></p>
+  <p>测试 GPU：<code>rtx1-worker</code> 上的一张 NVIDIA A100-PCIE-40GB</p>
+
+  <h2>总览</h2>
+  <p class="pass">结果：单 A100 可验证的接口全部通过。</p>
+
+  <p>本轮实现内容：</p>
+  <ul>
+    <li>为 <code>MigActionPlan.spec.podLifecyclePreview</code> 增加真实 Pod lifecycle 执行入口。</li>
+    <li>实现 <code>createOrReuse</code>：创建或复用请求 MIG 资源的 workload Pod。</li>
+    <li>实现 <code>reloadInPlace</code>：通过 ConfigMap 投影卷更新 batch size，不删除 Pod。</li>
+    <li>执行结果写回 <code>MigActionPlan.status.validated.realPodLifecycle</code>。</li>
+    <li>补充 controller 对 Pod 和 Pod 日志的 RBAC。</li>
+    <li>增加短时 CUDA profile workload runner，用于单 A100 profile-backed 测试。</li>
+  </ul>
+
+  <p>本轮在 edge 集群中完成的测试：</p>
+  <ul>
+    <li>A100 <code>or-sim-empty -&gt; all-3g.20gb -&gt; or-sim-empty</code>。</li>
+    <li>workload 调度到 <code>nvidia.com/mig-3g.20gb</code>。</li>
+    <li>batch size 从 <code>4</code> 热更新到 <code>8</code>，Pod UID 不变。</li>
+    <li>使用 profile catalog 中的 <code>resnet50 / profile=3g / batch=4</code> 运行真实 CUDA 计算。</li>
+    <li>清理临时资源，并确认 registry 回到 <code>availableQueue</code>。</li>
+  </ul>
+
+  <div class="note">
+    重要边界：这次 <code>resnet50</code> 测试使用了 profile catalog 中的 workload/profile/batch，并在对应 MIG 分区中运行真实 CUDA 计算。
+    但它还不是完整的 ResNet50 模型服务，因为当前 repo 还没有真实模型服务镜像或模型仓库。
+  </div>
+
+  <h2>代码变更</h2>
+
+  <h3>真实 Pod Lifecycle Executor</h3>
+  <p>新增文件：</p>
+  <pre>k8s-extension-prototype/controller/executors/pod_lifecycle_executor.py</pre>
+
+  <p>新增接口：</p>
+  <pre>apply_pod_lifecycle_from_action_plan(...)</pre>
+
+  <table>
+    <thead>
+      <tr><th>Preview 区域</th><th>真实行为</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>createOrReuse</code></td><td>创建或复用 Kubernetes Pod，并请求 <code>nvidia.com/mig-3g.20gb</code> 这类 MIG 资源。</td></tr>
+      <tr><td><code>reloadInPlace</code></td><td>patch ConfigMap，等待运行中的 Pod 观察到新的 batch size，并确认 Pod UID 没变。</td></tr>
+      <tr><td><code>deleteOrRecycle</code></td><td>删除 executor 创建的 smoke Pod 和 ConfigMap。</td></tr>
+      <tr><td><code>drain</code></td><td>目前是 no-traffic stub；真实 router 还没有接入。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>CLI 入口</h3>
+  <p>修改文件：</p>
+  <pre>k8s-extension-prototype/controller/main.py</pre>
+
+  <p>新增参数：</p>
+  <pre>--create-workload-lifecycle-smoke-action-plan
+--apply-pod-lifecycle-from-action-plan
+--confirm-real-pod-apply
+--workload-smoke-node
+--workload-smoke-mig-resource
+--workload-smoke-name
+--workload-smoke-initial-batch-size
+--workload-smoke-updated-batch-size
+--workload-smoke-image
+--cleanup-workload-smoke</pre>
+
+  <h3>RBAC</h3>
+  <p>修改文件：</p>
+  <pre>k8s-extension-prototype/manifests/controller/rbac.yaml</pre>
+
+  <p>新增权限：</p>
+  <pre>pods: get, list, create, patch, update, delete, watch
+pods/log: get</pre>
+
+  <h3>Profile Workload Runner</h3>
+  <p>新增文件：</p>
+  <pre>k8s-extension-prototype/tools/test_workloads/cuda_profile_workload.cu</pre>
+
+  <p>用途：在指定 MIG 分区中运行短时 CUDA 计算，并记录 workload/profile/batch。</p>
+
+  <h2>测试 1：编译检查</h2>
+  <p class="pass">结果：通过。</p>
+
+  <pre>python3 -m compileall \
+  k8s-extension-prototype/controller/executors/pod_lifecycle_executor.py \
+  k8s-extension-prototype/controller/main.py</pre>
+
+  <p>CUDA runner 编译信息：</p>
+  <pre>nvcc release: 12.8, V12.8.93
+target: sm_80
+binary size: 703K</pre>
+
+  <p>第一次默认 nvcc 编译生成的 PTX 在 rtx1 驱动上不兼容；改为 <code>sm_80</code> 后通过。</p>
+
+  <h2>测试 2：Workload Lifecycle Executor Smoke</h2>
+  <p class="pass">结果：通过。</p>
+
+  <p>ActionPlan：</p>
+  <pre>iface-test-workload</pre>
+
+  <p>测试内容：</p>
+  <pre>createOrReuse: smoke workload on nvidia.com/mig-3g.20gb
+reloadInPlace: batch 4 -> 8</pre>
+
+  <p>关键输出：</p>
+  <pre>podName: or-sim-iface-test-workload-smoke-0-3-3g
+nodeName: rtx1-worker
+requestedMigResource: nvidia.com/mig-3g.20gb
+batchSize: 4
+podUid: 7d451759-3629-4387-a667-649e0cb3dc8c
+readySeconds: 1.666
+initialBatchObservedSeconds: 0.017
+podUidBeforeUpdate: 7d451759-3629-4387-a667-649e0cb3dc8c
+podUidAfterUpdate: 7d451759-3629-4387-a667-649e0cb3dc8c
+podRecreatedDuringBatchUpdate: false
+observedSecondsAfterPatch: 2.015
+total: 3.717s</pre>
+
+  <p>Pod 日志证明它看到了 MIG 分区和 batch 更新：</p>
+  <pre>GPU 0: NVIDIA A100-PCIE-40GB
+  MIG 3g.20gb Device 0
+tick=0 batch_size=4
+tick=2 batch_size=8</pre>
+
+  <h2>测试 3：Profile-Backed Workload On MIG</h2>
+  <p class="pass">结果：通过。</p>
+
+  <p>选择的 profile catalog 选项：</p>
+  <pre>catalog: manifests/examples/profile-catalogs/catalogs/resnet50.yaml
+workload: resnet50
+family: cv
+profile: 3g
+batch: 4
+mu: 788.767944
+e2eMs: 5.0712
+peakMemMb: 166.0
+fit: true</pre>
+
+  <p>MIG 设置耗时：</p>
+  <pre>targetMigConfig: all-3g.20gb
+before: or-sim-empty/success
+observed: all-3g.20gb/success
+elapsed_s=40.47</pre>
+
+  <p>device-plugin Ready 耗时：</p>
+  <pre>pod/nvidia-device-plugin-daemonset-94dd6 condition met
+elapsed_s=28.76</pre>
+
+  <p>节点资源：</p>
+  <pre>nvidia.com/mig-3g.20gb capacity: 2
+nvidia.com/mig-3g.20gb allocatable: 2</pre>
+
+  <p>测试 Pod：</p>
+  <pre>name: profile-resnet50-3g-b4
+namespace: or-sim
+node: rtx1-worker
+image: nvidia/cuda:12.4.1-base-ubuntu22.04
+limit: nvidia.com/mig-3g.20gb=1</pre>
+
+  <p>Pod 结果：</p>
+  <pre>phase: Succeeded
+pod startTime: 2026-05-12T04:40:06Z
+container startedAt: 2026-05-12T04:40:07Z
+container finishedAt: 2026-05-12T04:40:28Z
+exitCode: 0</pre>
+
+  <p>workload 输出：</p>
+  <pre>profile_workload_start workload=resnet50 profile=3g batch=4 seconds=20
+cuda_device name=NVIDIA A100-PCIE-40GB MIG 3g.20gb multiprocessors=42 global_mem_mib=19968
+profile_workload_done workload=resnet50 profile=3g batch=4 iterations=6960 elapsed_s=20.006</pre>
+
+  <p>运行期间从 rtx1 的 <code>nvidia-smi</code> 抓到的进程：</p>
+  <pre>MIG devices:
+GPU 0 GI 1 CI 0 MIG 0: 38MiB / 19968MiB
+GPU 0 GI 2 CI 0 MIG 1: 317MiB / 19968MiB
+
+Processes:
+GPU 0 GI 2 CI 0 PID 2281505 C /opt/or-sim/cuda_profile_workload 270MiB</pre>
+
+  <p>结论：workload 使用 profile catalog 中的 workload/profile/batch，在真实 MIG 分区中运行，并且在 rtx1 的 <code>nvidia-smi</code> 中可见。</p>
+
+  <h2>清理与恢复</h2>
+
+  <p>删除临时 workload 资源：</p>
+  <pre>pod "profile-resnet50-3g-b4" deleted
+configmap "profile-workload-runner" deleted</pre>
+
+  <p>A100 恢复到 empty MIG 模式：</p>
+  <pre>targetMigConfig: or-sim-empty
+before: all-3g.20gb/success
+observed: or-sim-empty/success
+elapsed_s=45.48</pre>
+
+  <p>恢复后 device-plugin Ready：</p>
+  <pre>pod/nvidia-device-plugin-daemonset-qwhxr condition met
+elapsed_s=20.83</pre>
+
+  <p>最终 GPU inventory：</p>
+  <pre>GPU 0: NVIDIA A100-PCIE-40GB
+GPU 1: NVIDIA TITAN RTX
+GPU 2: NVIDIA TITAN RTX
+GPU 3: NVIDIA GeForce RTX 3090</pre>
+
+  <p>恢复后没有 MIG child devices。</p>
+
+  <p>最终 registry 状态：</p>
+  <pre>queueCounts:
+  active: 0
+  available: 1
+  discovered: 1
+  ignored: 3
+  missingActive: 0
+  transitioning: 0
+availableQueue:
+- rtx1-worker-gpu0
+transitioningQueue: []
+currentMigConfig: or-sim-empty
+currentMigConfigState: success</pre>
+
+  <p>本轮临时 action plans 已删除：</p>
+  <pre>profile-test-a100-3g3g
+profile-test-a100-empty
+iface-test-a100-3g3g
+iface-test-a100-empty
+iface-test-workload</pre>
+
+  <p>本地清理：</p>
+  <pre>已删除：k8s-extension-prototype/backups/kind-or-sim-dev-20260512-133033/
+已删除：Python __pycache__ directories
+已删除：/tmp/or-sim-profile-workload/
+保留：k8s-extension-prototype/backups/kind-or-sim-dev-20260512-133033.tar.gz</pre>
+
+  <h2>仍未实现或未完全实现的接口</h2>
+
+  <h3>单 A100 还能继续测的部分</h3>
+  <table>
+    <thead>
+      <tr><th>接口</th><th>当前状态</th><th>下一步单 A100 测试</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>完整模型服务 workload 镜像</td><td>未实现。本轮是 profile-backed CUDA runner。</td><td>加入真实 ResNet50/GPT2 serving image，在 <code>nvidia.com/mig-3g.20gb</code> 上跑 inference loop。</td></tr>
+      <tr><td>runtime batch API</td><td>现在用 ConfigMap volume reload。</td><td>给 workload 进程加 HTTP/gRPC 接口，让 <code>reloadInPlace</code> 调用真实 runtime API。</td></tr>
+      <tr><td>无流量 drain 后删除 Pod</td><td>delete path 已有，但本轮没有真实 drain 流量。</td><td>创建含 <code>deleteOrRecycle</code> 的 plan，验证 no-traffic stub 后删除。</td></tr>
+      <tr><td>Pod 到 MIG assignment 观测</td><td>通过资源请求和容器内 <code>nvidia-smi</code> 间接确认。</td><td>把 MIG UUID 写入 <code>ObservedClusterState</code> 或 <code>MigActionPlan.status</code>。</td></tr>
+      <tr><td>真实执行状态细化</td><td>summary 写在 <code>status.validated.realPodLifecycle</code>。</td><td>增加每步 condition 和 timestamp。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>需要多张 A100 才能真实验证的部分</h3>
+  <table>
+    <thead>
+      <tr><th>接口</th><th>为什么需要多 A100</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>target_first</code> reconfiguration</td><td>需要旧 physical GPU 和新的 target physical GPU 同时存在。</td></tr>
+      <tr><td>多 GPU <code>activeQueue</code> 分配顺序</td><td>单 A100 无法验证多 GPU 排序和竞争。</td></tr>
+      <tr><td>跨 GPU workload takeover</td><td>需要旧实例和另一张 GPU 上的 takeover capacity。</td></tr>
+      <tr><td>多 GPU router cutover</td><td>需要至少两个 serving target 才能验证流量切换。</td></tr>
+      <tr><td>takeover 后 drain 和 cleanup</td><td>需要旧位置和新位置同时存在。</td></tr>
+      <tr><td>真实执行后的多 GPU canonicalization</td><td>单 A100 无法验证 physical ID 复用、free-pool 策略和跨 GPU binding 保留。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>需要外部 runtime 组件的部分</h3>
+  <table>
+    <thead>
+      <tr><th>接口</th><th>缺少的组件</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>真实 router/drain adapter</td><td>还没有 router、queue 或 inflight request 来源；目前 drain 是 no-traffic stub。</td></tr>
+      <tr><td>精确 MIG UUID placement</td><td>Kubernetes device-plugin 默认按资源类型调度，不按指定 MIG UUID 调度；需要 scheduler/admission/CDI 或 assignment observer。</td></tr>
+      <tr><td>生产模型服务生命周期</td><td>repo 里还没有模型服务镜像和 model repository。</td></tr>
+      <tr><td>镜像分发</td><td>controller 仍使用 dev image；长期应使用内网 registry。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>最终状态</h2>
+  <pre>OR-SIM controllers: Running on or-sim-control-plane
+A100 MIG config: or-sim-empty/success
+PhysicalGpuRegistry/default: availableQueue=[rtx1-worker-gpu0], transitioningQueue=[]
+Temporary workload Pods: none
+Temporary workload ConfigMaps: none
+Temporary MigActionPlans from this test: none</pre>
+</body>
+</html>

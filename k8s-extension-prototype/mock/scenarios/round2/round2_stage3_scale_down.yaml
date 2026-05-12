@@ -1,0 +1,42 @@
+name: round2_stage3_scale_down
+description: Round 2 broad demand contraction after a vision-heavy phase.
+policyRef: ../../policies/simulation-default.yaml
+migRulesRef: ../../mig-rules/a100-40gb.yaml
+sourceStateRef: target2
+targetStateRef: target3
+workloadOrder:
+  - llama
+  - gpt2
+  - vgg16
+  - resnet50
+  - vit_base
+workloadRefs:
+  llama: ../../../manifests/examples/workloadrequests/llama.yaml
+  gpt2: ../../../manifests/examples/workloadrequests/gpt2.yaml
+  vgg16: ../../../manifests/examples/workloadrequests/vgg16.yaml
+  resnet50: ../../../manifests/examples/workloadrequests/resnet50.yaml
+  vit_base: ../../../manifests/examples/workloadrequests/vit_base.yaml
+profileCatalogRefs:
+  llama: ../../profile-catalogs/llama.yaml
+  gpt2: ../../profile-catalogs/gpt2.yaml
+  vgg16: ../../profile-catalogs/vgg16.yaml
+  resnet50: ../../profile-catalogs/resnet50.yaml
+  vit_base: ../../profile-catalogs/vit_base.yaml
+sourceArrival:
+  llama: 3
+  gpt2: 20
+  vgg16: 600
+  resnet50: 700
+  vit_base: 2500
+targetArrival:
+  llama: 1.5
+  gpt2: 12
+  vgg16: 150
+  resnet50: 160
+  vit_base: 900
+transition:
+  from: target2
+  to: target3
+  kind: scale-down
+  notes:
+    - Tests cleanup and preservation behavior during contraction.

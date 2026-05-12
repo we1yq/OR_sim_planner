@@ -11,6 +11,13 @@ rules:
       - get
       - list
       - watch
+      - patch
+  - apiGroups:
+      - nvidia.com
+    resources:
+      - clusterpolicies
+    verbs:
+      - get
   - apiGroups:
       - ""
     resources:

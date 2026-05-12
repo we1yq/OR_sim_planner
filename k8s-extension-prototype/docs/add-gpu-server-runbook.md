@@ -37,6 +37,15 @@ The controller does not have to run inside every GPU cluster. Keeping it on the
 management host makes multi-server experiments easier and avoids rebuilding and
 pushing controller images during early development.
 
+For the intended architecture where the management host runs the Kubernetes
+control-plane and `rtx1`, `rtx2`, ... join as GPU workers, see
+[Migrate To A Management Control Plane](migrate-to-management-control-plane.md).
+
+Before adding multiple GPU servers, keep the planner/action boundary in
+[MIG Planner Interface Contract](mig-action-interface.md) stable. In
+particular, planner-local GPU ids must not be treated as Kubernetes node/device
+identity; real execution should go through observed physical GPU bindings.
+
 ## 1. Confirm the Server
 
 SSH to the server using the real lab endpoint:
@@ -371,7 +380,71 @@ nvidia-operator-validator
 
 to be Running.
 
-## 8. Run the Real Cluster Observer
+## 8. Run the Physical GPU Registry Monitor
+
+The long-running hardware monitor maintains `PhysicalGpuRegistry/default`.
+It uses the current provider:
+
+```text
+GpuInventoryProvider = GPU Operator exec provider
+```
+
+That provider runs `nvidia-smi -L` inside a GPU Operator pod to collect real GPU
+UUIDs and MIG device UUIDs. This is intentionally isolated behind the observer
+interface so a future production deployment can replace it with a node
+agent/exporter without changing planner logic.
+
+Install the narrowly-scoped RBAC that allows `or-sim/mig-planner-controller` to
+exec only in the `gpu-operator` namespace:
+
+```bash
+KUBECONFIG=$HOME/.kube/rtx1-rke2.yaml \
+  kubectl apply -f k8s-extension-prototype/manifests/controller/registry-monitor-gpu-operator-rbac.yaml
+```
+
+Deploy the monitor:
+
+```bash
+KUBECONFIG=$HOME/.kube/rtx1-rke2.yaml \
+  kubectl apply -f k8s-extension-prototype/manifests/controller/registry-monitor-deployment.yaml
+```
+
+Verify:
+
+```bash
+KUBECONFIG=$HOME/.kube/rtx1-rke2.yaml kubectl get pods -n or-sim
+KUBECONFIG=$HOME/.kube/rtx1-rke2.yaml kubectl logs -n or-sim deployment/physical-gpu-registry-monitor
+KUBECONFIG=$HOME/.kube/rtx1-rke2.yaml kubectl get physicalgpuregistry -n or-sim default -o yaml
+```
+
+Expected queue behavior:
+
+```text
+new A100 with existing MIG template -> transitioningQueue
+A100 with nvidia.com/mig.config=or-sim-empty and state=success -> availableQueue
+planner-claimed A100 -> activeQueue
+non-A100 devices -> ignoredGpuDevices
+```
+
+Safety behavior:
+
+```text
+If any node has nvidia.com/mig.config.state=pending, the monitor does not exec
+nvidia-smi -L in that cycle. It preserves stable GPU UUID bindings from the
+previous PhysicalGpuRegistry and keeps affected GPUs in transitioningQueue.
+After success/failed, it can exec again to refresh MIG device UUIDs.
+```
+
+For local debugging without a Deployment:
+
+```bash
+KUBECONFIG=$HOME/.kube/rtx1-rke2.yaml python3 k8s-extension-prototype/controller/main.py \
+  --namespace or-sim \
+  --run-physical-gpu-registry-monitor \
+  --controller-max-cycles 1
+```
+
+## 9. Run the Real Cluster Observer
 
 From the management host:
 
@@ -409,10 +482,10 @@ missingRealClusterInputs includes MIG instance inventory, pod-to-MIG assignment,
 and router metrics.
 ```
 
-The next integration step is to upgrade the observer to derive MIG layouts from
-real node labels and resource capacity/allocatable.
+The registry monitor is now the preferred long-running observer path. Use this
+one-shot command mainly for debugging the raw `ObservedClusterState`.
 
-## 9. What to Record for a New Server
+## 10. What to Record for a New Server
 
 For each target server, record:
 
@@ -432,6 +505,7 @@ MIG resource capacity:
 MIG resource allocatable:
 test pod result:
 observer result:
+physical registry result:
 known caveats:
 ```
 
@@ -451,9 +525,10 @@ MIG resource: nvidia.com/mig-2g.10gb
 capacity: 3
 allocatable: 3
 test pod: nvidia/cuda:12.4.1-base-ubuntu22.04, Completed
+physical registry: rtx1-gpu0 available, non-A100 GPUs ignored
 ```
 
-## 10. When to Deploy In-Cluster Controllers
+## 11. When to Deploy In-Cluster Controllers
 
 Use the external controller while the research system is changing quickly:
 
@@ -468,7 +543,7 @@ Deploy in-cluster controllers only after the image and interfaces are stable:
 or-sim namespace
   mig-planner-controller Deployment
   mig-dry-run-actuator Deployment
-  observer CronJob or controller loop
+  physical-gpu-registry-monitor Deployment
 ```
 
 In-cluster deployment is useful for long-running autonomous experiments, but it

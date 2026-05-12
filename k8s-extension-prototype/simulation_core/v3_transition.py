@@ -268,13 +268,24 @@ def _takeover_candidates(
         for inst in _nonfree_instances(gpu):
             slot = (inst.start, inst.end, inst.profile)
             if gpu.gpu_id == exclude_gpu_id and slot == exclude_slot:
-                continue
+                record = _reconfig_map(source_state).get(str(gpu.gpu_id))
+                source_physical_id = get_physical_id(source_state, gpu.gpu_id)
+                if record is None or record.get("physical_gpu_id") == source_physical_id:
+                    continue
             if inst.workload != workload:
                 continue
             key = (gpu.gpu_id, slot)
             if key in seen:
                 continue
-            out.append({"kind": "target-backed", "gpu_id": gpu.gpu_id, "slot": slot, "physical_gpu_id": None})
+            record = _reconfig_map(source_state).get(str(gpu.gpu_id))
+            out.append(
+                {
+                    "kind": "target-backed",
+                    "gpu_id": gpu.gpu_id,
+                    "slot": slot,
+                    "physical_gpu_id": record.get("physical_gpu_id") if record is not None else None,
+                }
+            )
     return out
 
 
@@ -840,6 +851,18 @@ def plan_v3_full_action_plan(
                             "workload": inst_action["src"].workload,
                         }
                     )
+                    plan_items.append(
+                        _plan_item(
+                            item_id=f"BATCH_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}",
+                            item_type="batch_change",
+                            current_phase="update_batch",
+                            status="ready",
+                            gpu_id=gpu_id,
+                            physical_gpu_id=physical_id,
+                            slot=slot,
+                            workload=inst_action["src"].workload,
+                        )
+                    )
                     continue
                 if inst_action["type"] == "place_instance":
                     capacity_actions.append(
@@ -1170,7 +1193,7 @@ def _root_id_from_item(item: dict[str, Any]) -> str:
         return "_".join(parts[:2]) if len(parts) >= 2 else item_id
     if item_id.startswith("CREATE_gpu"):
         return item_id
-    if item_id.startswith(("WC_gpu", "RM_gpu", "PLACE_gpu")):
+    if item_id.startswith(("WC_gpu", "RM_gpu", "PLACE_gpu", "BATCH_gpu")):
         parts = item_id.split("_")
         return "_".join(parts[:5]) if len(parts) >= 5 else item_id
     return item_id
@@ -1197,7 +1220,7 @@ def _action_matches_root(action: dict[str, Any], root_id: str) -> bool:
     if root_id.startswith(("CREATE_gpu", "RECONF_gpu", "REMOVE_gpu")):
         gpu_id = int(root_id.split("gpu", 1)[1])
         return action.get("gpu_id") == gpu_id
-    if root_id.startswith(("WC_gpu", "RM_gpu", "PLACE_gpu")):
+    if root_id.startswith(("WC_gpu", "RM_gpu", "PLACE_gpu", "BATCH_gpu")):
         parts = root_id.split("_")
         gpu_id = int(parts[1].replace("gpu", ""))
         slot = (int(parts[2]), int(parts[3]), parts[4])
