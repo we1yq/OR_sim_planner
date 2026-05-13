@@ -5,7 +5,7 @@ metadata:
   namespace: or-sim
 spec:
   dryRun: true
-  planner: v3
+  planner: phase_greedy
   scenario: stage2
   scenarioConfigMap: scenario-stage2
   sourceStateConfigMap: target1-state

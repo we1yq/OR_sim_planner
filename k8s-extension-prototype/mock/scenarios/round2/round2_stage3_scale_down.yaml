@@ -1,6 +1,6 @@
 name: round2_stage3_scale_down
 description: Round 2 broad demand contraction after a vision-heavy phase.
-policyRef: ../../policies/simulation-default.yaml
+policyRef: ../../policies/migrant-default.yaml
 migRulesRef: ../../mig-rules/a100-40gb.yaml
 sourceStateRef: target2
 targetStateRef: target3

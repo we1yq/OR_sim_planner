@@ -1,0 +1,13 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: MigPlan
+metadata:
+  name: stage0-arrival-ref
+  namespace: or-sim
+spec:
+  dryRun: true
+  planner: phase_greedy
+  scenario: stage0
+  scenarioConfigMap: scenario-stage0
+  observedStateRef: cluster-observed-state
+  arrivalSnapshotRef: arrival-stage0-epoch1
+  outputStateConfigMap: target0-arrival-ref-state

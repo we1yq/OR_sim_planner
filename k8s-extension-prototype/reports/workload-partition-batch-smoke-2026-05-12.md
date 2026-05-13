@@ -1,4 +1,4 @@
-# OR-SIM Workload Partition And Batch-Size Smoke Test Report
+# MIGRANT Workload Partition And Batch-Size Smoke Test Report
 
 Date: 2026-05-12  
 Cluster: `desktap` control-plane + `rtx1-worker` GPU worker  
@@ -11,7 +11,7 @@ Result: PASS
 
 This test validated two workload-facing behaviors on the migrated edge cluster:
 
-- A workload Pod can be scheduled onto the A100 after OR-SIM changes the A100 from empty MIG mode to two `3g.20gb` instances.
+- A workload Pod can be scheduled onto the A100 after MIGRANT changes the A100 from empty MIG mode to two `3g.20gb` instances.
 - A running Pod can observe a batch-size change without Pod deletion or recreation by reading a projected ConfigMap volume.
 
 Important scope note: Kubernetes GPU scheduling selected a `nvidia.com/mig-3g.20gb` resource instance, not a specific MIG UUID. Exact per-partition UUID pinning is not implemented yet.
@@ -32,7 +32,7 @@ bindings.rtx1-worker-gpu0.currentMigConfigState: success
 
 ### Create Test MIG Geometry
 
-OR-SIM created a temporary `MigActionPlan` targeting `3g+3g` on the single A100:
+MIGRANT created a temporary `MigActionPlan` targeting `3g+3g` on the single A100:
 
 ```text
 plan: workload-test-a100-3g3g

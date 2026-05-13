@@ -50,7 +50,7 @@ spec:
       - nodeName: gpu-node-0
         deviceIndex: 1
         product: NVIDIA TITAN RTX
-        reason: non-A100 GPU ignored by OR-SIM MIG planner
+        reason: non-A100 GPU ignored by MIGRANT MIG planner
     migLayouts:
       - physicalGpuId: gpu-node-0-gpu0
         nodeName: gpu-node-0
@@ -96,7 +96,7 @@ hardware identity from logical GPU numbering.
 Stable identity rules:
 
 - `gpuUuid` is the real NVIDIA UUID from `nvidia-smi -L`.
-- `physicalGpuId` is a stable OR-SIM alias permanently bound to that UUID, such
+- `physicalGpuId` is a stable MIGRANT alias permanently bound to that UUID, such
   as `rtx1-gpu0`.
 - planner `gpu_id` is not hardware identity. It is a logical position in the
   global canonical GPU queue and may change after canonicalization.
@@ -125,7 +125,7 @@ status:
   ignoredGpuDevices:
     - physicalGpuId: rtx1-gpu1
       product: NVIDIA TITAN RTX
-      reason: non-A100 GPU ignored by OR-SIM MIG planner
+      reason: non-A100 GPU ignored by MIGRANT MIG planner
 ```
 
 - `discoveredA100` is the observed inventory of relevant A100 hardware.

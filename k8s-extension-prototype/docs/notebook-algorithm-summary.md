@@ -7,7 +7,7 @@ the planner with a greedy or approximate implementation.
 
 ## Scope
 
-Only V3 is carried forward as the planner path. V1 and V2 are useful notebook
+Only phase-greedy is carried forward as the planner path. legacy and full-plan candidate are useful notebook
 history, but they are not part of the Kubernetes prototype target behavior.
 
 The extension should reproduce the notebook experiment:
@@ -178,30 +178,30 @@ freePhysicalGpuPool:
   ids: [...]
 ```
 
-## V3 Planner
+## phase-greedy planner
 
 The retained planner is:
 
 ```text
-run_v3_stage_iterative(...)
+run_phase_greedy_stage(...)
 ```
 
-V3 uses the V2 full-plan/action item generation as candidate generation, then
+phase-greedy uses the full-plan candidate full-plan/action item generation as candidate generation, then
 adds scoring, grouping, conflict checks, and iterative execution.
 
-Main V3 flow:
+Main phase-greedy flow:
 
 ```text
 current_state
-  -> plan_naive_action_v2(...) produces full_plan and plan_items
-  -> _v3_group_scores(...)
-  -> _v3_choose_nonconflicting_groups(...)
-  -> _v3_select_actions_for_root(...)
+  -> plan_full_action_plan(...) produces full_plan and plan_items
+  -> _group_scores(...)
+  -> _choose_nonconflicting_groups(...)
+  -> _select_actions_for_root(...)
   -> apply selected actions
   -> repeat until converged or max_iters
 ```
 
-V3 scoring includes:
+phase-greedy scoring includes:
 
 - takeover readiness,
 - capacity headroom,
@@ -234,7 +234,7 @@ PlanningScenario / CR inputs
   -> notebook-compatible planning inputs
   -> solve_milp_gurobi_batch_unified
   -> build_target_state_from_milp
-  -> run_v3_stage_iterative
+  -> run_phase_greedy_stage
   -> dry-run MigPlan/status output
 ```
 

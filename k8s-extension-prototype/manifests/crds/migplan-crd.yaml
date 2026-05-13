@@ -51,11 +51,15 @@ spec:
                   type: string
                 arrivalSnapshotConfigMap:
                   type: string
+                arrivalSnapshotRef:
+                  type: string
                 sourceStateRef:
                   type: string
                 targetStateRef:
                   type: string
                 sourceStateConfigMap:
+                  type: string
+                observedStateRef:
                   type: string
                 outputStateConfigMap:
                   type: string

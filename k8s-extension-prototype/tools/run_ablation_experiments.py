@@ -24,37 +24,32 @@ CONTROLLER = ROOT / "controller"
 if str(CONTROLLER) not in sys.path:
     sys.path.insert(0, str(CONTROLLER))
 
-from k8s_adapter import (  # noqa: E402
+from planning.k8s_adapter import (  # noqa: E402
     build_feasible_option_dataframe,
     cluster_state_from_mock_yaml,
 )
 from io_utils import load_yaml  # noqa: E402
 from scenario_loader import load_planning_scenario  # noqa: E402
-from simulation_core.physical_ids import (  # noqa: E402
+from migrant_core.physical_ids import (  # noqa: E402
     bootstrap_physical_ids_for_state,
     canonicalize_state_for_next_round,
     ensure_state_metadata,
 )
-from simulation_core.state import assert_valid_cluster_state  # noqa: E402
+from migrant_core.state import assert_valid_cluster_state  # noqa: E402
 
-from simulation_core.placement_planners import (  # noqa: E402
+from migrant_core.placement_planners import (  # noqa: E402
     greedy_two_phase,
     milp_enhanced,
     milp_original,
     simulated_annealing,
 )
-from simulation_core.target_builders import (  # noqa: E402
+from migrant_core.target_builders import (  # noqa: E402
     beam_preserve,
     exact_milp_templates,
     no_preserve_greedy,
     preserve_greedy,
 )
-from simulation_core.transition_planners import (  # noqa: E402
-    drain_v2,
-    full_plan_v2,
-    serial_v0,
-    v3_phase_greedy,
-)
+from migrant_core.transition_planners import PLANNER_CATALOG  # noqa: E402
 
 
 REPORT_DIR = ROOT / "reports"
@@ -67,15 +62,24 @@ HARDWARE_SECONDS = {
     "place_target_layout": 0.0,
     "bind_target_gpu": 0.0,
     "clear_gpu": 10.4,
+    "delete_gpu_pods": 1.0,
+    "clear_gpu_binding": 0.0,
     "clear_template": 0.0,
+    "return_gpu": 0.0,
     "allocate_gpu": 0.0,
     "mark_reconfig_target_prepared": 0.0,
+    "stop_gpu_traffic": 1.0,
     "stop_accepting_new": 1.0,
+    "accept_queued_requests": 1.0,
     "reroute_queued_tasks": 1.0,
     "mark_draining_instance": 30.0,
     "remove_instance": 1.0,
+    "delete_bridge_pod": 1.0,
     "place_instance": 1.0,
     "update_batch": 1.0,
+    "patch_batch_config": 0.2,
+    "apply_batch": 1.0,
+    "verify_batch": 0.5,
     "workload_change": 1.0,
     "bridge_place_instance": 1.0,
 }
@@ -85,62 +89,68 @@ VARIANTS = {
     "current_full": {
         "placement": milp_enhanced.solve,
         "target": preserve_greedy.build,
-        "transition": v3_phase_greedy.run,
-        "description": "Current stack: enhanced MILP + preserve-greedy target builder + V3 phase greedy transition.",
+        "transition": PLANNER_CATALOG["phase_greedy"].runner,
+        "description": "Current stack: enhanced MILP + preserve-greedy target builder + phase-greedy transition.",
     },
     "placement_milp_original": {
         "placement": milp_original.solve,
         "target": preserve_greedy.build,
-        "transition": v3_phase_greedy.run,
+        "transition": PLANNER_CATALOG["phase_greedy"].runner,
         "description": "Ablate placement: notebook original MILP without option pruning, elastic objective, warm-start hooks, or previous-state input.",
     },
     "placement_greedy_two_phase": {
         "placement": greedy_two_phase.solve,
         "target": preserve_greedy.build,
-        "transition": v3_phase_greedy.run,
+        "transition": PLANNER_CATALOG["phase_greedy"].runner,
         "description": "Ablate placement: notebook-style two-phase greedy placement, current target and transition.",
     },
     "placement_simulated_annealing": {
         "placement": simulated_annealing.solve,
         "target": preserve_greedy.build,
-        "transition": v3_phase_greedy.run,
+        "transition": PLANNER_CATALOG["phase_greedy"].runner,
         "description": "Ablate placement: notebook-style simulated annealing over two-phase template choices.",
     },
     "target_no_preserve": {
         "placement": milp_enhanced.solve,
         "target": no_preserve_greedy.build,
-        "transition": v3_phase_greedy.run,
+        "transition": PLANNER_CATALOG["phase_greedy"].runner,
         "description": "Ablate target preservation: ignore previous layout when materializing target state.",
     },
     "target_beam_preserve": {
         "placement": milp_enhanced.solve,
         "target": beam_preserve.build,
-        "transition": v3_phase_greedy.run,
+        "transition": PLANNER_CATALOG["phase_greedy"].runner,
         "description": "Ablate target search: notebook preserve-first beam solver.",
     },
     "target_exact_milp_templates": {
         "placement": milp_enhanced.solve,
         "target": exact_milp_templates.build,
-        "transition": v3_phase_greedy.run,
+        "transition": PLANNER_CATALOG["phase_greedy"].runner,
         "description": "Ablate target rewrite/search: use exact MILP template list and first physical realization.",
     },
-    "transition_serial_v0": {
+    "transition_serial_root_baseline": {
         "placement": milp_enhanced.solve,
         "target": preserve_greedy.build,
-        "transition": serial_v0.run,
+        "transition": PLANNER_CATALOG["serial_root_baseline"].runner,
         "description": "Ablate transition: execute one root transition per iteration.",
     },
-    "transition_drain_v2": {
+    "transition_drain_aware_baseline": {
         "placement": milp_enhanced.solve,
         "target": preserve_greedy.build,
-        "transition": drain_v2.run,
-        "description": "Ablate transition scoring: drain-aware non-conflicting groups without future Parallel-DAG.",
+        "transition": PLANNER_CATALOG["drain_aware_baseline"].runner,
+        "description": "Ablate transition scoring: drain-aware non-conflicting groups without phased/DAG action-plan representation.",
     },
-    "transition_full_plan_v2": {
+    "transition_full_plan_baseline": {
         "placement": milp_enhanced.solve,
         "target": preserve_greedy.build,
-        "transition": full_plan_v2.run,
+        "transition": PLANNER_CATALOG["full_plan_baseline"].runner,
         "description": "Ablate transition granularity: execute the whole full plan each iteration.",
+    },
+    "transition_phase_greedy_dag": {
+        "placement": milp_enhanced.solve,
+        "target": preserve_greedy.build,
+        "transition": PLANNER_CATALOG["phase_greedy_with_dag_output"].runner,
+        "description": "Ablate transition representation: phase-greedy execution plus explicit phased/DAG action-plan output.",
     },
 }
 
@@ -160,9 +170,10 @@ VARIANT_GROUPS = {
     ],
     "transition": [
         "current_full",
-        "transition_serial_v0",
-        "transition_drain_v2",
-        "transition_full_plan_v2",
+        "transition_serial_root_baseline",
+        "transition_drain_aware_baseline",
+        "transition_full_plan_baseline",
+        "transition_phase_greedy_dag",
     ],
 }
 
@@ -252,7 +263,9 @@ def _metrics_from_stage(
         "fine_action_count": len(actions),
         "action_count": len(actions),
         "configure_count": int(action_counts.get("configure_full_template", 0)),
-        "clear_count": int(action_counts.get("clear_gpu", 0)),
+        "clear_count": int(action_counts.get("clear_gpu", 0))
+        + int(action_counts.get("clear_gpu_binding", 0))
+        + int(action_counts.get("clear_template", 0)),
         "peak_active_gpu": int(transition_res.get("peak_active_gpu", 0) or 0),
         "source_active_gpu": int(transition_res.get("source_active_gpu", 0) or 0),
         "final_active_gpu": int(transition_res.get("final_active_gpu", 0) or 0),
@@ -560,7 +573,7 @@ def _write_report(
         "",
         "## Scope",
         "",
-        "This round uses the existing stage0-stage3 simulation chain and excludes the future Parallel-DAG planner. "
+        "This round uses the existing stage0-stage3 chain and includes the phased/DAG action-plan representation as a transition ablation. "
         "The goal is to make the current stack modular and compare placement, target materialization, and transition-plan ablations with the same scenario inputs.",
         "",
         "## Variants",
@@ -648,9 +661,9 @@ def _write_report(
             "",
             "## Notes",
             "",
-            "- `current_full` is the current V3 baseline before any future Parallel-DAG planner.",
+            "- `current_full` is the current phase-greedy baseline; `transition_phase_greedy_dag` keeps the same execution semantics but exposes phased/DAG action-plan structure.",
             "- `target_no_preserve` and `target_exact_milp_templates` isolate target-state materialization choices.",
-            "- `transition_serial_v0` and `transition_drain_v2` isolate transition ordering choices while keeping placement and target building fixed.",
+            "- `transition_serial_root_baseline` and `transition_drain_aware_baseline` isolate transition ordering choices while keeping placement and target building fixed.",
             "- `estimated_hardware_sec` is a coarse estimate derived from the real single-server MIG benchmark constants, not a real hardware rerun.",
             "- The `simulated_annealing` placement module is present as an optional compatibility module but is not part of this first deterministic ablation matrix.",
             "",
@@ -785,7 +798,7 @@ def _analysis_section(group_name: str, group_rows: list[dict[str, Any]]) -> str:
             "因此如果 fine actions 和 estimated hardware seconds 接近，说明它们最终执行了相似的重构集合，差异主要体现在迭代轮数和并行批处理粒度。"
         )
         bullets.append(
-            "当前结果里 `transition_full_plan_v2` 迭代数最少，`transition_serial_v0` 迭代数最多；"
+            "当前结果里 `transition_full_plan_baseline` 迭代数最少，`transition_serial_root_baseline` 迭代数最多；"
             "但硬件估算时间几乎相同，说明现有估算模型还没有把跨 GPU 并行执行收益纳入 makespan，只是在累加动作成本。"
         )
 

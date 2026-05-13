@@ -4,20 +4,21 @@ import argparse
 from pathlib import Path
 
 from actuator import run_dry_run_actuator_loop
-from cluster_observer import observe_cluster_state_once
+from observe.cluster_observer import observe_cluster_state_once
 from io_utils import dump_yaml, load_yaml
-from k8s_adapter import plan_scenario_as_migplan_status, plan_scenario_chain_as_migplan_statuses
-from mig_label_executor import apply_mig_labels_from_action_plan, summarize_mig_labels_from_action_plan
+from planning.k8s_adapter import plan_scenario_as_migplan_status, plan_scenario_chain_as_migplan_statuses
+from executors.mig_label_executor import apply_mig_labels_from_action_plan, summarize_mig_labels_from_action_plan
 from mig_rules import load_mig_rules, mig_rules_summary_dict, validate_gpu_state_against_mig_rules
-from physical_gpu_registry import (
+from observe.physical_gpu_registry import (
     mark_physical_gpu_active,
+    mark_physical_gpu_pending,
     mark_physical_gpu_released,
     registry_queue_summary,
     run_physical_gpu_registry_monitor_loop,
     sync_physical_gpu_registry,
 )
-from reconciler import reconcile_migplan_once, run_controller_loop, run_watch_controller_loop
-from reconciler import upsert_migactionplan
+from planning.reconciler import reconcile_migplan_once, run_controller_loop, run_watch_controller_loop
+from planning.reconciler import upsert_migactionplan
 from scenario_loader import load_planning_scenario, scenario_summary_dict
 from state_adapter import gpu_state_from_mock_yaml
 from executors.pod_lifecycle_executor import apply_pod_lifecycle_from_action_plan
@@ -28,7 +29,7 @@ from test_harness.workload_lifecycle_smoke import create_workload_lifecycle_smok
 
 def parse_args() -> argparse.Namespace:
     root = Path(__file__).resolve().parents[1]
-    parser = argparse.ArgumentParser(description="Mock MIG planner controller")
+    parser = argparse.ArgumentParser(description="MIGRANT MIG planner controller")
     parser.add_argument(
         "--gpu-state",
         default=root / "mock/gpu-states/one-a100-empty.yaml",
@@ -43,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--plan-scenario",
         type=Path,
-        help="Path to a PlanningScenario YAML file. Runs MILP target build plus V3 dry-run planning.",
+        help="Path to a PlanningScenario YAML file. Runs MILP target build plus phase-greedy dry-run planning.",
     )
     parser.add_argument(
         "--plan-scenario-chain",
@@ -55,7 +56,7 @@ def parse_args() -> argparse.Namespace:
         "--max-iters",
         type=int,
         default=20,
-        help="Maximum V3 transition iterations per stage.",
+        help="Maximum phase-greedy transition iterations per stage.",
     )
     parser.add_argument(
         "--milp-time-limit-s",
@@ -139,6 +140,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--activate-physical-gpu",
         help="Move a physicalGpuId from available/transitioning to activeQueue for a planner ownership smoke test.",
+    )
+    parser.add_argument(
+        "--pend-physical-gpu",
+        help="Move a physicalGpuId to transitioningQueue and assign/keep pendingLogicalGpuId.",
+    )
+    parser.add_argument(
+        "--logical-gpu-id",
+        help="Logical GPU id used by --pend-physical-gpu or --activate-physical-gpu.",
     )
     parser.add_argument(
         "--release-physical-gpu",
@@ -356,6 +365,18 @@ def main() -> int:
     if args.activate_physical_gpu:
         registry = mark_physical_gpu_active(
             physical_gpu_id=args.activate_physical_gpu,
+            logical_gpu_id=args.logical_gpu_id,
+            namespace=args.namespace,
+            registry_name=args.registry_name,
+            apply=args.apply_physical_gpu_registry,
+        )
+        print(dump_yaml(registry_queue_summary(registry)), end="")
+        return 0
+
+    if args.pend_physical_gpu:
+        registry = mark_physical_gpu_pending(
+            physical_gpu_id=args.pend_physical_gpu,
+            logical_gpu_id=args.logical_gpu_id,
             namespace=args.namespace,
             registry_name=args.registry_name,
             apply=args.apply_physical_gpu_registry,

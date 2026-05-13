@@ -7,8 +7,8 @@ from typing import Any
 from kubernetes import client, config, watch
 from kubernetes.config.config_exception import ConfigException
 
-from k8s_api import KubernetesClient, PythonKubernetesClient
-from observed_layout import (
+from api.k8s_api import KubernetesClient, PythonKubernetesClient
+from observe.observed_layout import (
     expected_placement_from_row,
     find_logical_slot,
     logical_mig_slots_from_bindings,

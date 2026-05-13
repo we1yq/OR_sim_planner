@@ -1,6 +1,6 @@
 name: stage3
 description: Second upward demand transition from target2 to target3.
-policyRef: ../policies/simulation-default.yaml
+policyRef: ../policies/migrant-default.yaml
 migRulesRef: ../mig-rules/a100-40gb.yaml
 sourceStateRef: target2
 targetStateRef: target3

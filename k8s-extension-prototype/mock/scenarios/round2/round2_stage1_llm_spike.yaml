@@ -1,6 +1,6 @@
 name: round2_stage1_llm_spike
 description: Round 2 demand transition with a large LLM/text spike and stable vision load.
-policyRef: ../../policies/simulation-default.yaml
+policyRef: ../../policies/migrant-default.yaml
 migRulesRef: ../../mig-rules/a100-40gb.yaml
 sourceStateRef: target0
 targetStateRef: target1

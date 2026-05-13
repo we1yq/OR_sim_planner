@@ -371,7 +371,7 @@ spec:
       - nodeName: rtx1
         deviceIndex: 1
         product: NVIDIA TITAN RTX
-        reason: non-A100 GPU ignored by OR-SIM MIG planner
+        reason: non-A100 GPU ignored by MIGRANT MIG planner
 ```
 
 Planner state may carry the same binding under metadata for executor preview:

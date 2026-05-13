@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
-from k8s_api import KubernetesClient, PythonKubernetesClient
+from api.k8s_api import KubernetesClient, PythonKubernetesClient
 
 
 class RouterDrainApplyError(RuntimeError):
@@ -77,6 +77,8 @@ def apply_router_drain_from_action_plan(
             stop_results.append(result)
         elif action_type == "reroute_queued_tasks":
             result = _reroute_queued_tasks(
+                client=client,
+                namespace=namespace,
                 action=action,
                 mode=mode,
                 router_endpoint=str(router_endpoint or ""),
@@ -183,12 +185,18 @@ def _stop_accepting_new(
 
 
 def _reroute_queued_tasks(
+    client: KubernetesClient,
+    namespace: str,
     action: dict[str, Any],
     mode: str,
     router_endpoint: str,
 ) -> dict[str, Any]:
     workload = str(action.get("workload") or "")
     target_endpoint = str(action.get("targetEndpoint") or action.get("toEndpoint") or "")
+    source_pod = str(action.get("sourcePod") or action.get("podName") or "")
+    target_pod = str(action.get("targetPod") or action.get("toPod") or "")
+    queued_requested = int(action.get("queued", 0) or 0)
+    queued_moved = queued_requested
     response = {}
     if mode == "http":
         if not workload or not target_endpoint:
@@ -197,14 +205,49 @@ def _reroute_queued_tasks(
             )
         response = _http_json(
             f"{router_endpoint.rstrip('/')}/reroute?"
-            + urlencode({"workload": workload, "target": target_endpoint})
+            + urlencode({"workload": workload, "target": target_endpoint, "queued": str(queued_requested)})
         )
+        queued_moved = int(response.get("queuedMoved", response.get("moved", queued_requested)) or 0)
+    elif mode == "annotation":
+        if source_pod:
+            _patch_pod_annotations(
+                client=client,
+                namespace=namespace,
+                pod_name=source_pod,
+                annotations={
+                    "mig.or-sim.io/queued": "0",
+                    "mig.or-sim.io/reroute-target": target_pod or target_endpoint or str(action.get("to") or ""),
+                    "mig.or-sim.io/last-rerouted-queued": str(queued_moved),
+                },
+            )
+        if target_pod:
+            _patch_pod_annotations(
+                client=client,
+                namespace=namespace,
+                pod_name=target_pod,
+                annotations={
+                    "mig.or-sim.io/accepted-queued": str(queued_moved),
+                    "mig.or-sim.io/reroute-source": source_pod,
+                },
+            )
+    elif mode == "no-traffic":
+        queued_moved = 0
     return {
         "workload": workload,
+        "sourcePod": source_pod or None,
+        "targetPod": target_pod or None,
         "targetEndpoint": target_endpoint or None,
+        "queuedRequested": queued_requested,
+        "queuedMoved": queued_moved,
+        "queueRuntime": {
+            "mode": mode,
+            "supportsQueuedReroute": mode in {"http", "annotation"},
+            "sourceQueueAfter": 0 if mode in {"http", "annotation"} else queued_requested,
+            "targetAcceptedQueued": queued_moved if mode in {"http", "annotation"} else 0,
+        },
         "mode": mode,
         "response": response,
-        "success": True,
+        "success": mode != "no-traffic" or queued_requested == 0,
     }
 
 
@@ -320,6 +363,9 @@ def _record_workload_route_plan(
             "sourceInstanceRef": _instance_ref(action),
             "queued": int(action.get("queued", 0) or 0),
             "target": action.get("targetEndpoint") or action.get("toEndpoint") or action.get("to"),
+            "targetInstanceRef": _target_instance_ref(action),
+            "queueRuntime": result.get("queueRuntime"),
+            "queuedMoved": int(result.get("queuedMoved", 0) or 0),
         },
     }
     client.apply_workloadrouteplan(manifest)
@@ -365,8 +411,11 @@ def _record_serving_instance_drain(
             "workload": action.get("workload"),
             "sourceInstanceRef": _instance_ref(action),
             "targetInflight": 0,
+            "targetQueued": 0,
             "currentInflightApprox": int(metrics.get("inflight", 0) or 0),
+            "currentQueuedApprox": int(metrics.get("queued", 0) or 0),
             "waitForInflightZero": True,
+            "waitForQueuedZero": True,
         },
     }
     client.apply_servinginstancedrain(manifest)
@@ -392,6 +441,15 @@ def _instance_ref(action: dict[str, Any]) -> dict[str, Any]:
         "slot": action.get("slot"),
         "podName": action.get("sourcePod") or action.get("podName"),
         "endpoint": action.get("sourceEndpoint"),
+    }
+
+
+def _target_instance_ref(action: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "podName": action.get("targetPod") or action.get("toPod"),
+        "endpoint": action.get("targetEndpoint") or action.get("toEndpoint") or action.get("to"),
+        "slot": action.get("targetSlot") or action.get("toSlot"),
+        "physicalGpuId": action.get("target_physical_gpu_id") or action.get("targetPhysicalGpuId"),
     }
 
 

@@ -12,7 +12,7 @@ read-only references. The prototype starts from mock data and dry-run plans.
 - Build a minimal Kubernetes-native prototype around the simulation ideas.
 - Keep the first version safe: no real MIG reconfiguration, no scheduler
   modification, no workload deletion.
-- Preserve only the V3 planning direction for action ordering.
+- Preserve only the phase-greedy planning direction for action ordering.
 - Separate external inputs from system-owned planning work.
 - Make the architecture ready to later read real A100 MIG state.
 
@@ -59,7 +59,7 @@ read-only references. The prototype starts from mock data and dry-run plans.
                    Target State Planner
                              |
                              v
-                     V3 Action Planner
+                     phase-greedy action planner
                              |
                              v
                    Dry-Run ActionPlan
@@ -78,7 +78,7 @@ read-only references. The prototype starts from mock data and dry-run plans.
 5. Controller normalizes all inputs into internal data models.
 6. Feasible Option Builder computes valid workload/batch/profile options.
 7. Target State Planner computes the desired MIG/workload placement.
-8. V3 Action Planner compares current state and target state.
+8. phase-greedy action planner compares current state and target state.
 9. Controller writes a dry-run action plan to status/logs.
 ```
 
@@ -189,7 +189,7 @@ Example fields:
 dryRun: true
 allowMigReconfiguration: false
 maxGpuCount: 1
-planner: v3
+planner: phase_greedy
 ```
 
 In the first prototype, `dryRun` must stay true.
@@ -260,33 +260,33 @@ Prototype simplification:
 - The interface should allow replacing it with MILP later.
 - Do not require Gurobi in the first controller image.
 
-### V3 Action Planner
+### phase-greedy action planner
 
 Responsibilities:
 
 - Compare current state and target state.
 - Generate candidate transition actions.
-- Score and choose action groups using V3 ordering logic.
+- Score and choose action groups using phase-greedy ordering logic.
 - Produce a dry-run action plan.
 
 Important design decision:
 
 ```text
-The prototype exposes only V3 planner behavior.
-V1/V2 planner variants are not part of the system surface.
+The prototype exposes only phase-greedy planner behavior.
+legacy/full-plan candidate planner variants are not part of the system surface.
 ```
 
-Notebook V3 currently reuses V2 candidate-generation code internally. The
+Notebook phase-greedy currently reuses full-plan candidate candidate-generation code internally. The
 prototype should rename and isolate this as:
 
 ```text
 CandidateActionGenerator
-V3Scorer
-V3Selector
-V3Planner
+phase-greedyScorer
+phase-greedySelector
+phase-greedyPlanner
 ```
 
-So the public planner remains V3-only.
+So the public planner remains phase-greedy-only.
 
 ### Dry-Run ActionPlan Writer
 
@@ -301,7 +301,7 @@ Example:
 
 ```yaml
 dryRun: true
-planner: v3
+planner: phase_greedy
 actions:
   - type: drain_old
     gpuId: 0
@@ -413,7 +413,7 @@ These must remain disabled until explicit future phases.
 | Workload requests | YAML/CRD | YAML/CRD | Real CRD/API |
 | Profile data | Static mock/profile CSV-derived data | Static profile catalog | Profile database |
 | Target planner | Greedy/simple first | MILP-capable interface | Production planner |
-| Action planner | V3 dry-run | V3 dry-run | V3 gated execution |
+| Action planner | phase-greedy dry-run | phase-greedy dry-run | phase-greedy gated execution |
 | MIG changes | None | None | Via MIG Manager or controlled executor |
 | Scheduler | Default scheduler | Default scheduler | Possible scheduler integration later |
 
@@ -430,13 +430,13 @@ Migrate as data structures or algorithms:
 - workload/profile/batch feasible option logic
 - target state representation
 - action plan representation
-- V3 action group scoring and selection
+- phase-greedy action group scoring and selection
 
 Do not migrate directly:
 
 - notebook cells
 - print/report/demo functions
-- V1/V2 comparison code
+- legacy/full-plan candidate comparison code
 - hard-coded stage experiments
 - global-variable-heavy execution flow
 - Colab/Jupyter outputs
@@ -477,6 +477,6 @@ This structure will be created and filled incrementally in later phases.
 - Use mock GPU state locally.
 - Keep real A100 integration read-only at first.
 - Keep all actions dry-run.
-- Expose only V3 planner behavior.
+- Expose only phase-greedy planner behavior.
 - Treat NVIDIA GPU Operator/device plugin/DCGM as future data sources or
   execution helpers, not as things to rewrite.

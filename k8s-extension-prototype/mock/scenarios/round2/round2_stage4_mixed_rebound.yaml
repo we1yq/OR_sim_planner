@@ -1,6 +1,6 @@
 name: round2_stage4_mixed_rebound
 description: Round 2 mixed rebound with renewed LLM/text demand and a large ViT increase.
-policyRef: ../../policies/simulation-default.yaml
+policyRef: ../../policies/migrant-default.yaml
 migRulesRef: ../../mig-rules/a100-40gb.yaml
 sourceStateRef: target3
 targetStateRef: target4

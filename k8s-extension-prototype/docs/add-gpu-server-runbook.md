@@ -1,7 +1,7 @@
 # Add a GPU Server Runbook
 
 This runbook describes how to add a new GPU server or GPU Kubernetes cluster to
-the OR-SIM MIG planning experiments. It assumes the controller and experiment
+the MIGRANT MIG planning experiments. It assumes the controller and experiment
 driver can run from a management host, while the GPU server runs Kubernetes,
 NVIDIA GPU Operator, and the actual GPUs.
 
@@ -224,7 +224,7 @@ clusters:
 
 ## 5. Create the Experiment Namespace
 
-Create a dedicated namespace for OR-SIM experiment objects in the target
+Create a dedicated namespace for MIGRANT experiment objects in the target
 cluster:
 
 ```bash
@@ -261,7 +261,7 @@ kubectl delete pod -n gpu-operator ...
 kubectl delete ns gpu-operator
 ```
 
-## 6. Install OR-SIM CRDs and RBAC
+## 6. Install MIGRANT CRDs and RBAC
 
 From the repository on the management host:
 

@@ -1,12 +1,12 @@
 # Migrate To A Management Control Plane
 
-This runbook moves the OR-SIM hardware experiment from the temporary
+This runbook moves the MIGRANT hardware experiment from the temporary
 `rtx1` single-node RKE2 cluster to the intended edge-cluster architecture:
 
 ```text
 management host
   RKE2 server / Kubernetes control-plane
-  OR-SIM CRDs, controller, registry monitor
+  MIGRANT CRDs, controller, registry monitor
   NVIDIA GPU Operator cluster-level controller
 
 rtx1, rtx2, ...
@@ -26,7 +26,7 @@ The current validation setup is:
 rtx1
   RKE2 server/control-plane/etcd/master
   GPU Operator
-  OR-SIM CRDs and registry monitor
+  MIGRANT CRDs and registry monitor
   one A100 admitted by PhysicalGpuRegistry
 ```
 
@@ -180,12 +180,12 @@ KUBECONFIG=$HOME/.kube/or-sim-edge.yaml kubectl get pods -n gpu-operator -o wide
 KUBECONFIG=$HOME/.kube/or-sim-edge.yaml kubectl describe node rtx1 | grep -i "nvidia.com" -A 80
 ```
 
-Install the OR-SIM MIG parted config and reset the A100 to the strict empty
+Install the MIGRANT MIG parted config and reset the A100 to the strict empty
 state:
 
 ```bash
 KUBECONFIG=$HOME/.kube/or-sim-edge.yaml \
-  python3 k8s-extension-prototype/tools/install_or_sim_mig_configs.py
+  python3 k8s-extension-prototype/tools/install_migrant_mig_configs.py
 
 KUBECONFIG=$HOME/.kube/or-sim-edge.yaml \
   kubectl label node rtx1 nvidia.com/mig.config=or-sim-empty --overwrite
@@ -201,7 +201,7 @@ nvidia.com/mig.config.state=success
 no MIG devices in nvidia-smi
 ```
 
-## 5. Deploy OR-SIM To The New Cluster
+## 5. Deploy MIGRANT To The New Cluster
 
 ```bash
 KUBECONFIG=$HOME/.kube/or-sim-edge.yaml kubectl apply -f k8s-extension-prototype/manifests/namespace.yaml

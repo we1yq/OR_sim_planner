@@ -9,6 +9,7 @@ rules:
     resources:
       - migplans
       - migactionplans
+      - arrivalsnapshots
       - autoapprovalpolicies
       - workloadrouteplans
       - servinginstancedrains

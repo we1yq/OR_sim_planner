@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1532" height="488" viewBox="0 0 1532 488">
+<defs>
+<marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+<path d="M0,0 L0,6 L7,3 z" fill="#6b7280"/>
+</marker>
+</defs>
+<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
+<text x="24.0" y="32.0" text-anchor="start" font-family="Arial, sans-serif" font-size="22" fill="#111827">Bridge-Assisted Workload Replacement</text>
+<text x="24.0" y="55.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#4b5563">Notebook bridge case: temporarily place the old workload, replace the original slot, then remove the bridge pod in a later cleanup step.</text>
+<line x1="254.0" y1="141.0" x2="532.0" y2="141.0" stroke="#6b7280" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="254.0" y1="301.0" x2="294.0" y2="301.0" stroke="#6b7280" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="492.0" y1="301.0" x2="532.0" y2="141.0" stroke="#6b7280" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="492.0" y1="301.0" x2="532.0" y2="301.0" stroke="#6b7280" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="730.0" y1="141.0" x2="770.0" y2="141.0" stroke="#6b7280" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="968.0" y1="141.0" x2="1008.0" y2="141.0" stroke="#6b7280" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="730.0" y1="301.0" x2="770.0" y2="301.0" stroke="#6b7280" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="968.0" y1="301.0" x2="1008.0" y2="301.0" stroke="#6b7280" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="1206.0" y1="301.0" x2="1246.0" y2="301.0" stroke="#6b7280" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="52.0" y="92.0" width="206" height="98" rx="5" fill="#dcfce7" stroke="#111827" stroke-width="1"/>
+<title>Deploy Bridge Pod: deploy temporary old-workload pod on compatible free slot</title>
+<text x="155.0" y="134.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Deploy Bridge Pod</text>
+<text x="155.0" y="145.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">deploy temporary old-workload</text>
+<text x="155.0" y="156.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">pod on compatible free slot</text>
+<rect x="528.0" y="92.0" width="206" height="98" rx="5" fill="#fef3c7" stroke="#111827" stroke-width="1"/>
+<title>Accept Queued Requests: bridge pod accepts rerouted queued requests</title>
+<text x="631.0" y="134.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Accept Queued Requests</text>
+<text x="631.0" y="145.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">bridge pod accepts rerouted</text>
+<text x="631.0" y="156.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">queued requests</text>
+<rect x="766.0" y="92.0" width="206" height="98" rx="5" fill="#fef3c7" stroke="#111827" stroke-width="1"/>
+<title>Drain Bridge: wait until bridge queued requests and running work are zero</title>
+<text x="869.0" y="129.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Drain Bridge</text>
+<text x="869.0" y="140.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">wait until bridge queued</text>
+<text x="869.0" y="151.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">requests and running work are</text>
+<text x="869.0" y="162.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">zero</text>
+<rect x="1004.0" y="92.0" width="206" height="98" rx="5" fill="#fee2e2" stroke="#111827" stroke-width="1"/>
+<title>Delete Bridge Pod: delete temporary bridge pod</title>
+<text x="1107.0" y="139.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Delete Bridge Pod</text>
+<text x="1107.0" y="150.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete temporary bridge pod</text>
+<rect x="52.0" y="252.0" width="206" height="98" rx="5" fill="#fef3c7" stroke="#111827" stroke-width="1"/>
+<title>Stop Slot Traffic: stop new requests entering this slot/pod</title>
+<text x="155.0" y="294.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Stop Slot Traffic</text>
+<text x="155.0" y="305.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">stop new requests entering this</text>
+<text x="155.0" y="316.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot/pod</text>
+<rect x="290.0" y="252.0" width="206" height="98" rx="5" fill="#fef3c7" stroke="#111827" stroke-width="1"/>
+<title>Reroute Queued Requests: move queued requests to bridge pod</title>
+<text x="393.0" y="294.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Reroute Queued Requests</text>
+<text x="393.0" y="305.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">move queued requests to bridge</text>
+<text x="393.0" y="316.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">pod</text>
+<rect x="528.0" y="252.0" width="206" height="98" rx="5" fill="#fef3c7" stroke="#111827" stroke-width="1"/>
+<title>Wait Drain: wait until original pod running work is zero</title>
+<text x="631.0" y="294.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Wait Drain</text>
+<text x="631.0" y="305.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">wait until original pod running</text>
+<text x="631.0" y="316.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">work is zero</text>
+<rect x="766.0" y="252.0" width="206" height="98" rx="5" fill="#fee2e2" stroke="#111827" stroke-width="1"/>
+<title>Delete Pod: delete old workload pod</title>
+<text x="869.0" y="299.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Delete Pod</text>
+<text x="869.0" y="310.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete old workload pod</text>
+<rect x="1004.0" y="252.0" width="206" height="98" rx="5" fill="#dcfce7" stroke="#111827" stroke-width="1"/>
+<title>Deploy Pod: deploy replacement workload pod on same slot</title>
+<text x="1107.0" y="294.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Deploy Pod</text>
+<text x="1107.0" y="305.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">deploy replacement workload pod</text>
+<text x="1107.0" y="316.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">on same slot</text>
+<rect x="1242.0" y="252.0" width="206" height="98" rx="5" fill="#fef3c7" stroke="#111827" stroke-width="1"/>
+<title>Activate Route: route new requests to replacement pod</title>
+<text x="1345.0" y="294.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Activate Route</text>
+<text x="1345.0" y="305.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">route new requests to</text>
+<text x="1345.0" y="316.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">replacement pod</text>
+<rect x="1102" y="451" width="14" height="14" fill="#dbeafe" stroke="#111827" stroke-width="0.8"/>
+<text x="1120.0" y="463.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">MIG/state</text>
+<rect x="1186" y="451" width="14" height="14" fill="#ede9fe" stroke="#111827" stroke-width="0.8"/>
+<text x="1204.0" y="463.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">binding/state</text>
+<rect x="1270" y="451" width="14" height="14" fill="#dcfce7" stroke="#111827" stroke-width="0.8"/>
+<text x="1288.0" y="463.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">workload/pod</text>
+<rect x="1354" y="451" width="14" height="14" fill="#fef3c7" stroke="#111827" stroke-width="0.8"/>
+<text x="1372.0" y="463.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">router/drain</text>
+<rect x="1438" y="451" width="14" height="14" fill="#fee2e2" stroke="#111827" stroke-width="0.8"/>
+<text x="1456.0" y="463.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">cleanup</text>
+<rect x="1522" y="451" width="14" height="14" fill="#ffffff" stroke="#111827" stroke-width="0.8" stroke-dasharray="3 2"/>
+<text x="1540.0" y="463.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">optional</text>
+</svg>

@@ -1,4 +1,4 @@
-# OR-SIM Adapter Structure
+# MIGRANT Adapter Structure
 
 This document separates production execution components from dry-run previews and
 smoke-test helpers.
@@ -10,12 +10,17 @@ path.
 
 | Component | Path | Purpose |
 | --- | --- | --- |
-| MIG label executor | `controller/mig_label_executor.py` | Applies `MigActionPlan.spec.executorPreview` by patching GPU Operator node labels such as `nvidia.com/mig.config`. |
+| MIG label executor | `controller/executors/mig_label_executor.py` | Applies `MigActionPlan.spec.executorPreview` by patching GPU Operator node labels such as `nvidia.com/mig.config`. |
 | Pod lifecycle executor | `controller/executors/pod_lifecycle_executor.py` | Applies `MigActionPlan.spec.podLifecyclePreview` by creating/reusing workload Pods, patching live batch configuration, and deleting owned Pods when requested. |
 | Router/drain executor | `controller/executors/router_drain_executor.py` | Applies `MigActionPlan.spec.trafficAndDrainPreview` by stopping new traffic on the source instance, rerouting queued/new traffic to a target endpoint, waiting for source inflight/queued work to drain, and recording `WorkloadRoutePlan` / `ServingInstanceDrain` status. |
-| Physical GPU registry monitor | `controller/physical_gpu_registry.py` | Maintains `PhysicalGpuRegistry/default`, including `availableQueue`, `activeQueue`, `transitioningQueue`, and stable `physicalGpuId -> gpuUuid` bindings. |
-| Cluster observer | `controller/cluster_observer.py` | Observes nodes, pods, GPU Operator inventory, physical GPU UUIDs, and MIG device UUIDs. |
-| Observed logical layout mapper | `controller/observed_layout.py` | Converts observed GPU/MIG UUID inventory into the stable OR-SIM layout contract: `physicalGpuId + slot/range + profile -> currentMigDeviceUuid`. |
+| Physical GPU registry monitor | `controller/observe/physical_gpu_registry.py` | Maintains `PhysicalGpuRegistry/default`, including `availableQueue`, `activeQueue`, `transitioningQueue`, and stable `physicalGpuId -> gpuUuid` bindings. |
+| Cluster observer | `controller/observe/cluster_observer.py` | Observes nodes, pods, GPU Operator inventory, physical GPU UUIDs, and MIG device UUIDs. |
+| Observed logical layout mapper | `controller/observe/observed_layout.py` | Converts observed GPU/MIG UUID inventory into the stable MIGRANT layout contract: `physicalGpuId + slot/range + profile -> currentMigDeviceUuid`. |
+| Pod assignment observer | `controller/observe/pod_assignment_observer.py` | Joins Pod labels/annotations, batch ConfigMaps, and logical MIG slots into `ObservedClusterState.spec.observedState.podAssignments`. |
+| Observed state adapter | `controller/observe/observed_state_adapter.py` | Converts `ObservedClusterState` into `migrant_core.ClusterState` so real planning epochs can diff from actual cluster state. |
+| Transition planner catalog | `migrant_core/transition_planners/catalog.py` | Lists canonical transition planners, compatibility aliases, roles, and runner functions so algorithm count is explicit even when variants share implementation modules. |
+| Phased action DAG format | `migrant_core/transition_planners/action_plan_formats/phased_action_dag.py` | Compiles a linear action list into `migrant.phased-action-dag/v1` nodes, dependencies, phases, and resource-conflict summaries. This is a format/compiler helper, not a planner. |
+| Phase-greedy transition planner | `migrant_core/transition_planners/phase_greedy.py` | Provides plain phase-greedy action planning and a `run_with_dag_output()` compatibility entry that attaches the phased action DAG representation for actuators and ablation. |
 
 ## Dry-Run Adapter Components
 
@@ -66,6 +71,8 @@ Real execution adapters:
 Supporting runtime mappers:
 
 1. `observed_layout.py`
+2. `pod_assignment_observer.py`
+3. `observed_state_adapter.py`
 
 Dry-run adapters:
 
@@ -102,7 +109,7 @@ The current implementation completes the Kubernetes-native adapter contract:
 - record real execution status in `MigActionPlan`, `WorkloadRoutePlan`, and
   `ServingInstanceDrain`.
 
-What remains outside OR-SIM until a production serving layer is integrated:
+What remains outside MIGRANT until a production serving layer is integrated:
 
 - a production queue/runtime API that owns real queued requests;
 - production load-balancer or model-serving router configuration;
@@ -111,7 +118,7 @@ What remains outside OR-SIM until a production serving layer is integrated:
 
 ## Exact Layout Contract
 
-OR-SIM's long-lived placement contract is logical, not UUID-first:
+MIGRANT's long-lived placement contract is logical, not UUID-first:
 
 ```text
 physicalGpuId + slot/range + profile
@@ -124,7 +131,7 @@ rtx1-worker-gpu0 slot 0-3 profile 3g
 rtx1-worker-gpu0 slot 3-6 profile 3g
 ```
 
-`controller/observed_layout.py` resolves that logical placement to the current
+`controller/observe/observed_layout.py` resolves that logical placement to the current
 runtime MIG UUID observed from GPU Operator `nvidia-smi -L` inventory. The UUID
 is then used as execution evidence and verification material, not as the
 planner's stable identity.
@@ -152,6 +159,61 @@ passes UUID verification, those reservation Pods are deleted and the workload
 keeps its assigned MIG device.
 
 This reservation mechanism is an experiment-friendly bridge, not the preferred
-production primitive. The production path should be an OR-SIM
+production primitive. The production path should be an MIGRANT
 scheduler/device-plugin/admission layer that reserves the exact logical slot
 before the Pod is admitted.
+
+## Actual Current State
+
+Real planning epochs must start from `ObservedClusterState`, not from the
+previous simulated stage. The observed state is assembled from:
+
+- node and GPU Operator inventory;
+- physical GPU identity from the registry/observer path;
+- logical MIG slots resolved from the current template and `nvidia-smi -L`;
+- Pod assignment rows joined by actual MIG UUID;
+- batch size from Pod annotations or MIGRANT batch ConfigMaps;
+- routing/drain annotations such as accepting-new, inflight, and queued.
+
+The Pod assignment shape is:
+
+```text
+physicalGpuId
+slot
+profile
+migDeviceUuid
+workload
+batch
+podName
+endpoint
+ready
+acceptingNew
+inflight
+queued
+```
+
+This is the state that the action planner should diff against the next MILP
+target. Preserve decisions should compare stable logical identity and workload
+payload:
+
+```text
+physicalGpuId + slot + profile + workload + batch
+```
+
+`migDeviceUuid` remains part of the actual state because it is needed to join
+Pods back to logical slots and to verify execution, but it is not the long-lived
+planner key.
+
+## Queue Ownership
+
+There are two different queue concepts:
+
+- `PhysicalGpuRegistry.availableQueue`, `activeQueue`, and `transitioningQueue`
+  are MIGRANT planner ownership queues. They are maintained by the registry
+  monitor/controller from observed hardware state plus planner ownership
+  actions.
+- request queues and inflight serving requests belong to the serving
+  router/runtime. MIGRANT observes or commands them through Router/Drain adapter
+  APIs and records snapshots in `ObservedClusterState`, but MIGRANT should not be
+  the production request queue itself unless a dedicated serving runtime is
+  added.

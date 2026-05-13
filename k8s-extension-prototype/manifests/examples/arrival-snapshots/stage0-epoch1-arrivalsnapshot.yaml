@@ -1,0 +1,27 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: arrival-stage0-epoch1
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: or-sim-mig-planner
+    mig.or-sim.io/input-kind: arrival-snapshot
+spec:
+  source: example-static
+  mode: static
+  epoch: "1"
+  windowSeconds: 30
+  unit: requests_per_second
+  observedAt: "2026-05-12T00:00:30Z"
+  targetArrival:
+    gpt2: 3.5
+    llama: 2.0
+    resnet50: 4.0
+    vgg16: 2.5
+    vit_base: 1.5
+  requestCount:
+    gpt2: 105
+    llama: 60
+    resnet50: 120
+    vgg16: 75
+    vit_base: 45

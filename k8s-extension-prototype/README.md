@@ -1,4 +1,4 @@
-# Kubernetes Extension Prototype
+# MIGRANT Kubernetes Prototype
 
 This directory contains the new Kubernetes controller/operator prototype for the
 MIG planning system.
@@ -11,7 +11,7 @@ prototype code and Kubernetes manifests should live here.
 Phase 5: mock-based controller with file inputs.
 
 The controller reads workload request YAML, mock GPU state, and normalized
-profile catalogs. It prints a dry-run V3 action plan. No real GPU or MIG
+profile catalogs. It prints a dry-run phase-greedy action plan. No real GPU or MIG
 operations are performed.
 
 ## Safety Rules
@@ -55,7 +55,7 @@ k8s-extension-prototype/
     feasible_options.py
     mig_rules.py
     scenario_loader.py
-  simulation_core/
+  migrant_core/
     README.md
     state.py
     physical_ids.py
@@ -68,7 +68,7 @@ k8s-extension-prototype/
     mig-rules/
       a100-40gb.yaml
     policies/
-      simulation-default.yaml
+      migrant-default.yaml
     profile-catalogs/
       gpt2.yaml
       llama.yaml
@@ -78,7 +78,7 @@ k8s-extension-prototype/
     gpu-states/
       empty-cluster.yaml
       one-a100-empty.yaml
-      simulation-empty-9-a100.yaml
+      migrant-empty-9-a100.yaml
     scenarios/
       stage0.yaml
       stage1.yaml
@@ -104,6 +104,65 @@ MIG Planner Controller
         v
 Dry-run MigPlan
 ```
+
+## Traffic Experiments And Arrival Input
+
+MIGRANT's control-plane input is a per-window arrival-rate snapshot. Synthetic
+traffic generators and trace replayers should write the same Kubernetes object:
+
+```yaml
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: arrival-t00030
+  namespace: or-sim
+spec:
+  source: poisson-generator
+  mode: poisson
+  windowSeconds: 30
+  unit: requests_per_second
+  targetArrival:
+    resnet50: 120.0
+    bert: 60.0
+```
+
+A `MigPlan` should reference the snapshot and the actual observed source state:
+
+```yaml
+spec:
+  observedStateRef: cluster-observed-state
+  arrivalSnapshotRef: arrival-t00030
+```
+
+Recommended experiment modes:
+
+1. `static`: fixed request rates for sanity and ablation.
+2. `poisson`: time-varying synthetic arrivals for one-week SLO experiments.
+3. `traceReplay`: public or internal trace windows converted to arrival rates.
+4. `stress`: burst, overload, and workload-mix shift robustness.
+
+All modes should emit:
+
+```text
+ArrivalSnapshot per control window
+request event log when request-level simulation is enabled
+latency/SLO report
+```
+
+Generate an example `ArrivalSnapshot`:
+
+```bash
+python3 k8s-extension-prototype/tools/traffic_experiment.py \
+  --mode poisson \
+  --name arrival-t00030 \
+  --epoch 1 \
+  --window-seconds 30 \
+  --workload-rate resnet50=120 \
+  --workload-rate bert=60
+```
+
+`arrivalSnapshotConfigMap` remains as a backward-compatible/test-only input.
+The CRD path, `arrivalSnapshotRef`, is the preferred runtime API.
 
 ## Long-Running Hardware Monitor
 

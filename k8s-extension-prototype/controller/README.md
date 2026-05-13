@@ -7,7 +7,7 @@ Phase 5 starts with a local CLI controller that:
 - reads scenario YAML and workload request references,
 - reads mock GPU/MIG state,
 - validates mock MIG rules,
-- adapts inputs into the notebook-derived real MILP target builder and V3
+- adapts inputs into the notebook-derived real MILP target builder and phase-greedy
   transition planner.
 
 The controller must not execute real Kubernetes scheduling changes or MIG
@@ -57,7 +57,7 @@ python3 k8s-extension-prototype/controller/main.py \
   --scenario k8s-extension-prototype/mock/scenarios/stage0.yaml
 ```
 
-## Run Real MILP + V3 Dry-Run Planning
+## Run Real MILP + phase-greedy Dry-Run Planning
 
 Single stage:
 
@@ -82,17 +82,17 @@ This path intentionally calls:
 ```text
 solve_milp_gurobi_batch_unified
   -> build_target_state_from_milp
-  -> run_v3_stage_iterative
+  -> run_phase_greedy_stage
   -> canonicalize_state_for_next_round
 ```
 
-It does not include an approximate planner or the old V2 planner.
+It does not include an approximate planner or the old full-plan planner.
 
 ## Reconcile One MigPlan CR
 
 The first Kubernetes adapter path is a one-shot dry-run reconciler. It reads a
 `MigPlan`, resolves `spec.scenario` under `mock/scenarios`, runs the same real
-MILP plus V3 flow, and patches only `MigPlan.status`.
+MILP plus phase-greedy flow, and patches only `MigPlan.status`.
 
 ```bash
 kubectl apply -f k8s-extension-prototype/manifests/crds/migplan-crd.yaml
@@ -115,7 +115,7 @@ stage2 spec.sourceStateConfigMap: target1-state -> ConfigMap/target2-state
 stage3 spec.sourceStateConfigMap: target2-state -> ConfigMap/target3-state
 ```
 
-In the current dry-run prototype, `canonicalNextState` is derived from the V3
+In the current dry-run prototype, `canonicalNextState` is derived from the phase-greedy
 transition simulator's executed state. In a real actuator-backed controller, this
 must change: actions must be applied to the cluster first, the controller must
 observe the actual post-action GPU/MIG state, and only that observed executed
@@ -150,7 +150,7 @@ kubectl get migplan stage0 -n or-sim -o yaml | yq '.status.planningSummary'
 ```
 
 The summary includes feasible option count, MILP status/GPU count, target-build
-GPU count, V3 transition iterations/action counts, action counts by type, chosen
+GPU count, phase-greedy transition iterations/action counts, action counts by type, chosen
 templates, and the canonical physical GPU id mapping.
 
 Verbose debug output is stored separately:
@@ -286,7 +286,7 @@ spec.migGeometryPreview.wouldPatchNodeLabels:
     nvidia.com/mig.config: <generated-config-name>
 ```
 
-`trafficAndDrainPreview` exposes the V3 abstract-action rules that are not MIG
+`trafficAndDrainPreview` exposes the phase-greedy abstract-action rules that are not MIG
 geometry: stop accepting new requests, reroute queued work, wait for inflight
 work to drain, and defer actions when takeover capacity or drain completion is
 missing. It is intended for a future router/drain adapter.
@@ -297,7 +297,7 @@ traffic. It identifies which actions would need target serving capacity
 deleted or recycled only after drain, and which changes should prefer in-place
 runtime reload.
 
-`abstractActionPreview` is a human-readable report over V3 coarse actions. It
+`abstractActionPreview` is a human-readable report over phase-greedy coarse actions. It
 shows why an action is `create_gpu`, `remove_gpu`, `reconfiguration`, or
 `instance_diff`, which gates must pass, and the expected MIG/Pod impact. This is
 the object to inspect when reviewing planner rules rather than individual fine
@@ -331,10 +331,11 @@ the actual result, and canonicalize that observed state.
 
 The `stage0`, `stage1`, ... files are offline planning epochs. In production the
 same role is played by an external arrival-rate snapshot or forecast. A
-`MigPlan` can optionally set `spec.arrivalSnapshotConfigMap`; when present, the
-controller loads `data.arrival-snapshot.yaml` and uses its `targetArrival` as
-the next planning epoch's target arrival while keeping the scenario's workload
-refs, profile catalogs, and source state.
+`MigPlan` should set `spec.arrivalSnapshotRef`; when present, the controller
+loads the named `ArrivalSnapshot` CR and uses its `spec.targetArrival` as the
+next planning epoch's target arrival while keeping the scenario's workload refs
+and profile catalogs. `spec.arrivalSnapshotConfigMap` is still supported for
+older tests, but the CRD path is preferred.
 
 An arrival snapshot is a demand update, not an execution command. Before running
 MILP, the planner evaluates whether the current observed A100 state already
@@ -348,19 +349,30 @@ state.
 Example snapshot shape:
 
 ```yaml
-name: arrival-stage0-epoch1
-epoch: 1
-source: external-forecast
-previewOnly: true
-targetStateRef: target0-epoch1
-targetArrival:
-  llama: 3
-  gpt2: 20
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: arrival-stage0-epoch1
+  namespace: or-sim
+spec:
+  epoch: "1"
+  source: external-forecast
+  mode: traceReplay
+  windowSeconds: 30
+  unit: requests_per_second
+  targetArrival:
+    llama: 3
+    gpt2: 20
 ```
 
 This keeps the current stage-chain examples working while making the production
 interpretation explicit: each new external arrival snapshot can drive a new
 planning round.
+
+For paper experiments, the traffic harness can generate `ArrivalSnapshot`
+objects from static rates, Poisson arrivals, stress bursts, or trace replay
+windows. The control plane consumes rates; request-level generators/replayers
+measure latency and SLO violation.
 
 kind validation is therefore limited but still useful. It can validate CRD schema,
 RBAC, controller reconciliation, ConfigMap writes, preview generation, actuator
@@ -420,6 +432,6 @@ To validate a mock GPU state against those rules:
 ```bash
 python3 k8s-extension-prototype/controller/main.py \
   --validate-mig-rules k8s-extension-prototype/mock/mig-rules/a100-40gb.yaml \
-  --gpu-state k8s-extension-prototype/mock/gpu-states/simulation-empty-9-a100.yaml \
+  --gpu-state k8s-extension-prototype/mock/gpu-states/migrant-empty-9-a100.yaml \
   --validate-gpu-state
 ```

@@ -19,9 +19,10 @@ SHORT_LABELS = {
     "target_no_preserve": "No-preserve",
     "target_beam_preserve": "Beam",
     "target_exact_milp_templates": "Exact-template",
-    "transition_serial_v0": "Serial",
-    "transition_drain_v2": "Drain-aware",
-    "transition_full_plan_v2": "Full-plan",
+    "transition_serial_root_baseline": "Serial",
+    "transition_drain_aware_baseline": "Drain-aware",
+    "transition_full_plan_baseline": "Full-plan",
+    "transition_phase_greedy_dag": "Phase-DAG",
 }
 
 GROUPS = {
@@ -39,9 +40,10 @@ GROUPS = {
     ],
     "transition": [
         "current_full",
-        "transition_serial_v0",
-        "transition_drain_v2",
-        "transition_full_plan_v2",
+        "transition_serial_root_baseline",
+        "transition_drain_aware_baseline",
+        "transition_full_plan_baseline",
+        "transition_phase_greedy_dag",
     ],
 }
 
@@ -53,9 +55,10 @@ PALETTE = {
     "target_no_preserve": "#9ca3af",
     "target_beam_preserve": "#6b7280",
     "target_exact_milp_templates": "#4b5563",
-    "transition_serial_v0": "#9ca3af",
-    "transition_drain_v2": "#6b7280",
-    "transition_full_plan_v2": "#4b5563",
+    "transition_serial_root_baseline": "#9ca3af",
+    "transition_drain_aware_baseline": "#6b7280",
+    "transition_full_plan_baseline": "#4b5563",
+    "transition_phase_greedy_dag": "#111827",
 }
 
 

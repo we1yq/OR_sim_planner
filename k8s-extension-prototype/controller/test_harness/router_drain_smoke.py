@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from k8s_api import KubernetesClient, PythonKubernetesClient
+from api.k8s_api import KubernetesClient, PythonKubernetesClient
 
 
 def create_router_drain_smoke_action_plan(

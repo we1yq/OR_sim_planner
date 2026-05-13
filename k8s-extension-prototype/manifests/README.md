@@ -9,6 +9,8 @@ real GPU or MIG operations.
 
 - `namespace.yaml`: namespace for local experiments.
 - `crds/workloadrequest-crd.yaml`: future CRD for workload demand.
+- `crds/arrivalsnapshot-crd.yaml`: per-window external arrival-rate input used
+  by real planning epochs.
 - `crds/migplan-crd.yaml`: future CRD for dry-run plans.
 - `crds/migactionplan-crd.yaml`: dry-run execution-boundary CRD generated from
   planner actions.
@@ -32,8 +34,10 @@ real GPU or MIG operations.
 - `examples/autoapprovalpolicies/default.yaml`: conservative dry-run-only
   approval policy.
 - `examples/scenarios/*-configmap.yaml`: PlanningScenario inputs as ConfigMaps.
-- `examples/arrival-snapshots/*-configmap.yaml`: optional external arrival
-  snapshots that can override a scenario's target arrival for a planning epoch.
+- `examples/arrival-snapshots/*-arrivalsnapshot.yaml`: preferred
+  `ArrivalSnapshot` CR inputs for planning epochs.
+- `examples/arrival-snapshots/*-configmap.yaml`: deprecated/test-compatible
+  arrival snapshot inputs for `spec.arrivalSnapshotConfigMap`.
 - `examples/mock-gpu-states/*.yaml`: sample mock GPU/MIG states as ConfigMaps.
 
 ## Apply Namespace
@@ -61,7 +65,7 @@ kubectl apply -f k8s-extension-prototype/manifests/controller/
 kubectl apply -k k8s-extension-prototype/manifests/examples/profile-catalogs/
 kubectl apply -f k8s-extension-prototype/manifests/examples/autoapprovalpolicies/
 kubectl apply -f k8s-extension-prototype/manifests/examples/scenarios/
-# Optional: use when a MigPlan references spec.arrivalSnapshotConfigMap.
+# Preferred: use when a MigPlan references spec.arrivalSnapshotRef.
 kubectl apply -f k8s-extension-prototype/manifests/examples/arrival-snapshots/
 kubectl apply -f k8s-extension-prototype/manifests/examples/migplans/
 ```
@@ -73,6 +77,7 @@ kubectl get migplans -n or-sim
 kubectl get migactionplans -n or-sim
 kubectl get workloadrouteplans,servinginstancedrains,podlifecycleplans -n or-sim
 kubectl get observedclusterstates -n or-sim
+kubectl get arrivalsnapshots -n or-sim
 kubectl get autoapprovalpolicies -n or-sim
 kubectl get configmaps -n or-sim -l mig.or-sim.io/input-kind=profile-catalog
 kubectl get configmaps -n or-sim -l mig.or-sim.io/state-kind=canonical-next-state

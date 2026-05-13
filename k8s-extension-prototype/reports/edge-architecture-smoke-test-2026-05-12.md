@@ -1,4 +1,4 @@
-# OR-SIM Edge Architecture Smoke Test Report
+# MIGRANT Edge Architecture Smoke Test Report
 
 Date: 2026-05-12  
 Cluster: `desktap` control-plane + `rtx1-worker` GPU worker  
@@ -10,11 +10,11 @@ Result: PASS
 
 The migrated edge architecture is functional for the currently available hardware:
 
-- OR-SIM control components run on `or-sim-control-plane`.
+- MIGRANT control components run on `or-sim-control-plane`.
 - GPU Operator node components run on `rtx1-worker`.
 - `PhysicalGpuRegistry/default` discovers the single A100 as `rtx1-worker-gpu0`.
 - Non-A100 GPUs are ignored.
-- Real MIG reconfiguration through the OR-SIM action adapter and GPU Operator works in both directions:
+- Real MIG reconfiguration through the MIGRANT action adapter and GPU Operator works in both directions:
   - `or-sim-empty -> all-3g.20gb`
   - `all-3g.20gb -> or-sim-empty`
 - After restore, the A100 returns automatically from `transitioningQueue` to `availableQueue`.
@@ -45,7 +45,7 @@ The real hardware path was separately tested with confirmed MIG label apply oper
 
 | Test | Time | Result | Key output |
 | --- | ---: | --- | --- |
-| Python compile check | 0.03s | PASS | `compileall` completed for `controller`, `simulation_core`, and `tools` |
+| Python compile check | 0.03s | PASS | `compileall` completed for `controller`, `migrant_core`, and `tools` |
 | Controller test suite | 0.09s | PASS | `ok` |
 | A100 MIG rules validation | 0.06s | PASS | `14 abstract templates, 19 physical realizations` |
 | Scenario YAML parse | 0.05s | PASS | `scenario_yaml_ok 9` |
@@ -57,14 +57,14 @@ The real hardware path was separately tested with confirmed MIG label apply oper
 | Test | Time | Result | Key output |
 | --- | ---: | --- | --- |
 | Controller manifests server dry-run | 0.31s | PASS | Deployments, RBAC, ServiceAccount accepted by API server |
-| MIG config installer dry-run | 0.40s | PASS | Would ensure 12 OR-SIM configs in `or-sim-mig-parted-config`; no cluster mutation |
+| MIG config installer dry-run | 0.40s | PASS | Would ensure 12 MIGRANT configs in `or-sim-mig-parted-config`; no cluster mutation |
 | GPU Operator exec RBAC | 0.04s | PASS | `can-i get pods --subresource=exec`: `yes` |
 | Node patch RBAC | 0.05s | PASS | `can-i patch nodes`: `yes` |
 | Running pod code check | 0.15s | PASS | empty template maps to `or-sim-empty` |
 
 ## Runtime Health
 
-### OR-SIM Pods
+### MIGRANT Pods
 
 Time: 0.05s  
 Result: PASS
@@ -129,7 +129,7 @@ rtx1-worker-gpu3  NVIDIA GeForce RTX 3090
 
 ### GPU Inventory
 
-OR-SIM registry monitor inventory call:
+MIGRANT registry monitor inventory call:
 
 Time: 1.17s  
 Result: PASS
@@ -338,13 +338,13 @@ binding:
 
 1. `PhysicalGpuRegistry` correctly uses GPU Operator exec / `nvidia-smi -L` inventory, so it handles the mixed GPU node correctly.
 2. Kubernetes node aggregate label `nvidia.com/gpu.product` is not reliable for mixed-GPU nodes. Registry discovery must continue using per-GPU inventory.
-3. After restore-to-empty, the node still showed stale `capacity.nvidia.com/mig-3g.20gb: 2` for a while, while `allocatable.nvidia.com/mig-3g.20gb` was `0`. This did not affect OR-SIM registry availability because registry uses per-GPU MIG device inventory and `or-sim-empty/success`.
+3. After restore-to-empty, the node still showed stale `capacity.nvidia.com/mig-3g.20gb: 2` for a while, while `allocatable.nvidia.com/mig-3g.20gb` was `0`. This did not affect MIGRANT registry availability because registry uses per-GPU MIG device inventory and `or-sim-empty/success`.
 4. The final registry state is clean and usable for the next planner allocation.
 
 ## Final Cluster State
 
 ```text
-OR-SIM:
+MIGRANT:
   mig-dry-run-actuator            Running on or-sim-control-plane
   mig-planner-controller          Running on or-sim-control-plane
   physical-gpu-registry-monitor   Running on or-sim-control-plane

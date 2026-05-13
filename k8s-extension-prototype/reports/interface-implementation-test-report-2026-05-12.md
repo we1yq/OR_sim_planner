@@ -1,4 +1,4 @@
-# OR-SIM Interface Implementation And Single-A100 Test Report
+# MIGRANT Interface Implementation And Single-A100 Test Report
 
 Date: 2026-05-12  
 Cluster: `desktap` RKE2 control-plane + `rtx1-worker` RKE2 GPU worker  
@@ -377,7 +377,7 @@ kept: k8s-extension-prototype/backups/kind-or-sim-dev-20260512-133033.tar.gz
 The edge cluster was left in the clean baseline state:
 
 ```text
-OR-SIM controllers: Running on or-sim-control-plane
+MIGRANT controllers: Running on or-sim-control-plane
 A100 MIG config: or-sim-empty/success
 PhysicalGpuRegistry/default: availableQueue=[rtx1-worker-gpu0], transitioningQueue=[]
 Temporary workload Pods: none

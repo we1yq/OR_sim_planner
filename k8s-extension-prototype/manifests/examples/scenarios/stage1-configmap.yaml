@@ -10,7 +10,7 @@ data:
   scenario.yaml: |
     name: stage1
     description: First upward demand transition from target0 to target1.
-    policyRef: ../policies/simulation-default.yaml
+    policyRef: ../policies/migrant-default.yaml
     migRulesRef: ../mig-rules/a100-40gb.yaml
     sourceStateRef: target0
     targetStateRef: target1

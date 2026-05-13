@@ -177,7 +177,7 @@ Workload requests
   -> feasible options
   -> abstract capacity target
   -> physical target layout
-  -> V3 dry-run action plan
+  -> phase-greedy dry-run action plan
 ```
 
 Later:
@@ -185,5 +185,5 @@ Later:
 - Reimplement the target builder interface from the notebook without copying
   notebook code directly.
 - Keep MILP optional behind an interface.
-- Keep V3 as the only public action planner.
+- Keep phase-greedy as the only public action planner.
 

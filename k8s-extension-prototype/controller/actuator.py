@@ -15,8 +15,8 @@ from adapters.contracts import (
 from adapters.observer_adapter import DryRunObservedStateBuilder
 from adapters.pod_lifecycle_adapter import DryRunPodLifecyclePlanBuilder
 from adapters.router_adapter import DryRunRouterPlanBuilder
-from executor_preview import validate_action_previews, validate_executor_preview
-from k8s_api import KubernetesClient, PythonKubernetesClient
+from planning.executor_preview import validate_action_previews, validate_executor_preview
+from api.k8s_api import KubernetesClient, PythonKubernetesClient
 
 
 def run_dry_run_actuator_loop(

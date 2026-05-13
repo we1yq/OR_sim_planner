@@ -1,5 +1,5 @@
 dryRun: true
-planner: v3
+planner: phase_greedy
 summary:
   phase: InsufficientMockCapacity
   message: Selected target demand needs more MIG slices than the current mock state exposes.

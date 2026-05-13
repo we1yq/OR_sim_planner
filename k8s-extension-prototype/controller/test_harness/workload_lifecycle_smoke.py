@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from k8s_api import KubernetesClient, PythonKubernetesClient
+from api.k8s_api import KubernetesClient, PythonKubernetesClient
 from executors.pod_lifecycle_executor import DEFAULT_MIG_RESOURCE
 
 

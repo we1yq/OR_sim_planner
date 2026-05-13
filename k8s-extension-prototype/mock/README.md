@@ -30,8 +30,8 @@ kind can natively enforce.
 For a simulation-like local capacity ceiling, use:
 
 ```text
-policies/simulation-default.yaml
-gpu-states/simulation-empty-9-a100.yaml
+policies/migrant-default.yaml
+gpu-states/migrant-empty-9-a100.yaml
 scenarios/stage0.yaml
 scenarios/stage1.yaml
 scenarios/stage2.yaml

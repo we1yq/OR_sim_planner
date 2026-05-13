@@ -6,8 +6,8 @@ import yaml
 
 from actuator import should_actuate_dry_run, validate_and_succeed_dry_run_action_plan
 from adapters.observer_adapter import DryRunObservedStateBuilder
-from cluster_observer import build_observed_cluster_state_from_k8s_lists, observed_cluster_state_status
-from executor_preview import (
+from observe.cluster_observer import build_observed_cluster_state_from_k8s_lists, observed_cluster_state_status
+from planning.executor_preview import (
     build_abstract_action_preview,
     build_adapter_dry_run_preview,
     build_gpu_operator_executor_preview,
@@ -16,12 +16,14 @@ from executor_preview import (
     build_pod_lifecycle_preview,
     build_traffic_and_drain_preview,
 )
-from k8s_adapter import plan_scenario_as_migplan_status
-from mig_label_executor import MigLabelApplyError, apply_mig_labels_from_action_plan
+from planning.k8s_adapter import plan_scenario_as_migplan_status
+from executors.mig_label_executor import MigLabelApplyError, apply_mig_labels_from_action_plan
+from executors.router_drain_executor import apply_router_drain_from_action_plan
 from models import PlanningScenario, ScenarioWorkloadDemand
-from reconciler import (
+from planning.reconciler import (
     compact_migplan_status_for_k8s,
     evaluate_auto_approval_policy,
+    load_arrival_snapshot_from_crd,
     load_profile_catalogs_for_scenario,
     load_scenario_for_migplan_spec,
     run_watch_controller_loop,
@@ -30,7 +32,13 @@ from reconciler import (
     upsert_full_plan_configmap,
     upsert_migactionplan,
 )
-from simulation_core.state import ClusterState, GPUState, MigInstance
+from migrant_core.state import ClusterState, GPUState, MigInstance
+from observe.physical_gpu_registry import (
+    build_physical_gpu_registry,
+    mark_physical_gpu_active,
+    mark_physical_gpu_pending,
+    mark_physical_gpu_released,
+)
 
 
 class FakeKubernetesClient:
@@ -40,6 +48,7 @@ class FakeKubernetesClient:
         self.servinginstancedrains: dict[tuple[str, str], dict[str, Any]] = {}
         self.podlifecycleplans: dict[tuple[str, str], dict[str, Any]] = {}
         self.observedclusterstates: dict[tuple[str, str], dict[str, Any]] = {}
+        self.physicalgpuregistries: dict[tuple[str, str], dict[str, Any]] = {}
         self.migactionplans: dict[tuple[str, str], dict[str, Any]] = {}
         self.clusterpolicies: dict[str, dict[str, Any]] = {}
         self.statuses: dict[tuple[str, str], dict[str, Any]] = {}
@@ -48,6 +57,7 @@ class FakeKubernetesClient:
         self.podlifecycleplan_statuses: dict[tuple[str, str], dict[str, Any]] = {}
         self.observedclusterstate_statuses: dict[tuple[str, str], dict[str, Any]] = {}
         self.autoapprovalpolicies: dict[tuple[str, str], dict[str, Any]] = {}
+        self.arrivalsnapshots: dict[tuple[str, str], dict[str, Any]] = {}
         self.migplans: list[dict[str, Any]] = []
         self.nodes: list[dict[str, Any]] = []
         self.pods: list[dict[str, Any]] = []
@@ -64,6 +74,18 @@ class FakeKubernetesClient:
 
     def list_pods(self, namespace: str) -> list[dict[str, Any]]:
         return [pod for pod in self.pods if pod.get("metadata", {}).get("namespace") == namespace]
+
+    def get_pod(self, name: str, namespace: str) -> dict[str, Any]:
+        for pod in self.pods:
+            metadata = pod.get("metadata", {})
+            if metadata.get("namespace") == namespace and metadata.get("name") == name:
+                return pod
+        raise KeyError(f"{namespace}/{name}")
+
+    def patch_pod_annotations(self, name: str, namespace: str, annotations: dict[str, str]) -> None:
+        pod = self.get_pod(name=name, namespace=namespace)
+        pod_annotations = pod.setdefault("metadata", {}).setdefault("annotations", {})
+        pod_annotations.update(annotations)
 
     def get_node(self, name: str) -> dict[str, Any]:
         for node in self.nodes:
@@ -92,6 +114,9 @@ class FakeKubernetesClient:
 
     def get_migactionplan(self, name: str, namespace: str) -> dict[str, Any]:
         return self.migactionplans[(namespace, name)]
+
+    def get_arrivalsnapshot(self, name: str, namespace: str) -> dict[str, Any]:
+        return self.arrivalsnapshots[(namespace, name)]
 
     def patch_migplan_status(self, name: str, namespace: str, status: dict[str, Any]) -> None:
         raise NotImplementedError
@@ -145,6 +170,24 @@ class FakeKubernetesClient:
         metadata = manifest["metadata"]
         self.observedclusterstates[(metadata["namespace"], metadata["name"])] = manifest
 
+    def get_physicalgpuregistry(self, name: str, namespace: str) -> dict[str, Any] | None:
+        return self.physicalgpuregistries.get((namespace, name))
+
+    def apply_physicalgpuregistry(self, manifest: dict[str, Any]) -> None:
+        metadata = manifest["metadata"]
+        self.physicalgpuregistries[(metadata["namespace"], metadata["name"])] = manifest
+
+    def patch_physicalgpuregistry_status(self, name: str, namespace: str, status: dict[str, Any]) -> None:
+        manifest = self.physicalgpuregistries.setdefault(
+            (namespace, name),
+            {
+                "apiVersion": "mig.or-sim.io/v1alpha1",
+                "kind": "PhysicalGpuRegistry",
+                "metadata": {"name": name, "namespace": namespace},
+            },
+        )
+        manifest["status"] = status
+
     def watch_migplans(self, namespace: str, timeout_seconds: int) -> Any:
         yield from self.events
 
@@ -191,6 +234,188 @@ def test_upsert_full_plan_configmap() -> None:
     assert configmap["metadata"]["labels"]["mig.or-sim.io/state-kind"] == "full-plan-debug"
     assert configmap["metadata"]["labels"]["mig.or-sim.io/owner-migplan"] == "stage0"
     assert "clear_gpu" in configmap["data"]["status.yaml"]
+
+
+def test_physical_gpu_registry_pending_active_logical_ids() -> None:
+    client = FakeKubernetesClient()
+    client.physicalgpuregistries[("or-sim", "default")] = {
+        "apiVersion": "mig.or-sim.io/v1alpha1",
+        "kind": "PhysicalGpuRegistry",
+        "metadata": {"name": "default", "namespace": "or-sim"},
+        "status": {
+            "discoveredA100": ["rtx1-gpu0"],
+            "availableQueue": ["rtx1-gpu0"],
+            "transitioningQueue": [],
+            "activeQueue": [],
+            "bindings": {
+                "rtx1-gpu0": {
+                    "physicalGpuId": "rtx1-gpu0",
+                    "availableEligible": True,
+                    "state": "available",
+                }
+            },
+            "ignoredGpuDevices": [],
+            "missingActivePhysicalGpuIds": [],
+        },
+    }
+
+    pending = mark_physical_gpu_pending(
+        "rtx1-gpu0",
+        logical_gpu_id=7,
+        apply=True,
+        client=client,
+    )
+    pending_status = pending["status"]
+    assert pending_status["transitioningQueue"] == ["rtx1-gpu0"]
+    assert pending_status["bindings"]["rtx1-gpu0"]["pendingLogicalGpuId"] == 7
+    assert "activeLogicalGpuId" not in pending_status["bindings"]["rtx1-gpu0"]
+
+    active = mark_physical_gpu_active("rtx1-gpu0", apply=True, client=client)
+    active_status = active["status"]
+    assert active_status["activeQueue"] == ["rtx1-gpu0"]
+    assert active_status["bindings"]["rtx1-gpu0"]["activeLogicalGpuId"] == 7
+    assert "pendingLogicalGpuId" not in active_status["bindings"]["rtx1-gpu0"]
+
+    released = mark_physical_gpu_released("rtx1-gpu0", apply=True, client=client)
+    released_binding = released["status"]["bindings"]["rtx1-gpu0"]
+    assert released["status"]["availableQueue"] == ["rtx1-gpu0"]
+    assert "activeLogicalGpuId" not in released_binding
+    assert "pendingLogicalGpuId" not in released_binding
+
+
+def test_physical_gpu_registry_preserves_logical_ids_from_previous_status() -> None:
+    observed = {
+        "metadata": {"name": "cluster-observed-state"},
+        "spec": {
+            "observedState": {
+                "physicalGpuBindings": {
+                    "A": {
+                        "physicalGpuId": "A",
+                        "gpuUuid": "GPU-A",
+                        "nodeName": "rtx1-worker",
+                        "deviceIndex": 0,
+                        "product": "NVIDIA A100-SXM4-40GB",
+                        "migCapable": True,
+                        "migDevices": [],
+                        "migConfig": "or-sim-empty",
+                        "migConfigState": "success",
+                    },
+                    "B": {
+                        "physicalGpuId": "B",
+                        "gpuUuid": "GPU-B",
+                        "nodeName": "rtx2-worker",
+                        "deviceIndex": 0,
+                        "product": "NVIDIA A100-SXM4-40GB",
+                        "migCapable": True,
+                        "migDevices": [{"migDeviceUuid": "MIG-B-0"}],
+                        "migConfig": "4+3",
+                        "migConfigState": "success",
+                    },
+                },
+                "ignoredGpuDevices": [],
+            }
+        },
+    }
+    previous = {
+        "status": {
+            "activeQueue": ["A"],
+            "transitioningQueue": ["B"],
+            "bindings": {
+                "A": {"activeLogicalGpuId": 3},
+                "B": {"pendingLogicalGpuId": 8},
+            },
+        }
+    }
+
+    registry = build_physical_gpu_registry(
+        namespace="or-sim",
+        name="default",
+        observed_cluster_state=observed,
+        previous_registry=previous,
+    )
+
+    assert registry["status"]["bindings"]["A"]["activeLogicalGpuId"] == 3
+    assert "pendingLogicalGpuId" not in registry["status"]["bindings"]["A"]
+    assert registry["status"]["bindings"]["B"]["pendingLogicalGpuId"] == 8
+    assert "activeLogicalGpuId" not in registry["status"]["bindings"]["B"]
+
+
+def test_router_drain_annotation_queue_runtime_moves_queued_requests() -> None:
+    client = FakeKubernetesClient()
+    client.pods = [
+        {
+            "metadata": {
+                "name": "source-pod",
+                "namespace": "or-sim",
+                "annotations": {
+                    "mig.or-sim.io/queued": "3",
+                    "mig.or-sim.io/inflight": "0",
+                },
+            }
+        },
+        {
+            "metadata": {
+                "name": "target-pod",
+                "namespace": "or-sim",
+                "annotations": {},
+            }
+        },
+    ]
+    client.migactionplans[("or-sim", "queue-runtime-smoke")] = {
+        "apiVersion": "mig.or-sim.io/v1alpha1",
+        "kind": "MigActionPlan",
+        "metadata": {"name": "queue-runtime-smoke", "namespace": "or-sim", "generation": 1},
+        "spec": {
+            "dryRun": False,
+            "trafficAndDrainPreview": {
+                "trafficActions": [
+                    {
+                        "type": "stop_accepting_new",
+                        "workload": "resnet50",
+                        "sourcePod": "source-pod",
+                    },
+                    {
+                        "type": "reroute_queued_tasks",
+                        "workload": "resnet50",
+                        "sourcePod": "source-pod",
+                        "targetPod": "target-pod",
+                        "queued": 3,
+                    },
+                    {
+                        "type": "mark_draining_instance",
+                        "workload": "resnet50",
+                        "sourcePod": "source-pod",
+                    },
+                ]
+            },
+        },
+        "status": {"approved": True},
+    }
+
+    summary = apply_router_drain_from_action_plan(
+        "queue-runtime-smoke",
+        namespace="or-sim",
+        confirm_real_router_apply=True,
+        mode="annotation",
+        client=client,
+        timeout_s=1,
+        poll_interval_s=0.01,
+    )
+
+    source_annotations = client.get_pod("source-pod", "or-sim")["metadata"]["annotations"]
+    target_annotations = client.get_pod("target-pod", "or-sim")["metadata"]["annotations"]
+    assert summary["success"] is True
+    assert source_annotations["mig.or-sim.io/queued"] == "0"
+    assert source_annotations["mig.or-sim.io/last-rerouted-queued"] == "3"
+    assert target_annotations["mig.or-sim.io/accepted-queued"] == "3"
+    route_status = next(
+        status
+        for status in client.workloadrouteplan_statuses.values()
+        if status["result"].get("queuedMoved") == 3
+    )
+    assert route_status["result"]["queueRuntime"]["targetAcceptedQueued"] == 3
+    drain_spec = next(iter(client.servinginstancedrains.values()))["spec"]
+    assert drain_spec["waitForQueuedZero"] is True
 
 
 def test_upsert_migactionplan() -> None:
@@ -700,7 +925,7 @@ def test_load_scenario_from_configmap() -> None:
         "data": {
             "scenario.yaml": """
 name: stage0
-sourceStateRef: ../gpu-states/simulation-empty-9-a100.yaml
+sourceStateRef: ../gpu-states/migrant-empty-9-a100.yaml
 targetStateRef: target0
 workloadOrder: [llama]
 workloadRefs:
@@ -732,7 +957,7 @@ def test_load_scenario_profile_catalog_configmaps() -> None:
         "data": {
             "scenario.yaml": """
 name: stage0
-sourceStateRef: ../gpu-states/simulation-empty-9-a100.yaml
+sourceStateRef: ../gpu-states/migrant-empty-9-a100.yaml
 targetStateRef: target0
 workloadOrder: [llama]
 workloadRefs:
@@ -784,7 +1009,7 @@ def test_load_scenario_with_arrival_snapshot_configmap() -> None:
         "data": {
             "scenario.yaml": """
 name: stage0
-sourceStateRef: ../gpu-states/simulation-empty-9-a100.yaml
+sourceStateRef: ../gpu-states/migrant-empty-9-a100.yaml
 targetStateRef: target0
 workloadOrder: [llama]
 workloadRefs:
@@ -828,6 +1053,60 @@ targetArrival:
         "source": "external-forecast",
         "previewOnly": True,
     }
+
+
+def test_load_scenario_with_arrival_snapshot_crd() -> None:
+    client = FakeKubernetesClient()
+    client.configmaps[("or-sim", "scenario-stage0")] = {
+        "data": {
+            "scenario.yaml": """
+name: stage0
+sourceStateRef: ../gpu-states/migrant-empty-9-a100.yaml
+targetStateRef: target0
+workloadOrder: [llama]
+workloadRefs:
+  llama: ../../manifests/examples/workloadrequests/llama.yaml
+profileCatalogConfigMaps:
+  llama: profile-catalog-llama
+sourceArrival:
+  llama: 0
+targetArrival:
+  llama: 3
+"""
+        }
+    }
+    client.arrivalsnapshots[("or-sim", "arrival-stage0-epoch1")] = {
+        "apiVersion": "mig.or-sim.io/v1alpha1",
+        "kind": "ArrivalSnapshot",
+        "metadata": {"name": "arrival-stage0-epoch1", "namespace": "or-sim"},
+        "spec": {
+            "source": "poisson-generator",
+            "mode": "poisson",
+            "epoch": "1",
+            "targetStateRef": "target0-epoch1",
+            "targetArrival": {"llama": 8},
+        },
+    }
+
+    snapshot = load_arrival_snapshot_from_crd(
+        name="arrival-stage0-epoch1",
+        namespace="or-sim",
+        client=client,
+    )
+    assert snapshot["targetArrival"] == {"llama": 8}
+
+    scenario = load_scenario_for_migplan_spec(
+        spec={
+            "scenarioConfigMap": "scenario-stage0",
+            "arrivalSnapshotRef": "arrival-stage0-epoch1",
+        },
+        namespace="or-sim",
+        scenario_root="k8s-extension-prototype/mock/scenarios",
+        client=client,
+    )
+    assert scenario.target_state_ref == "target0-epoch1"
+    assert scenario.workloads[0].target_arrival == 8.0
+    assert scenario.transition["arrivalSnapshot"]["source"] == "poisson-generator"
 
 
 def test_current_state_feasible_arrival_snapshot_noop() -> None:
@@ -905,7 +1184,7 @@ def test_build_observed_cluster_state_from_k8s_lists() -> None:
     assert manifest["spec"]["observedState"]["ignoredGpuDevices"][0]["physicalGpuId"] == "gpu-node-0-gpu0"
     assert manifest["spec"]["observedState"]["podReadiness"][0]["ready"] is True
     assert "physical GPU UUID" not in manifest["spec"]["missingRealClusterInputs"]
-    assert "MIG device UUID and placement inventory" in manifest["spec"]["missingRealClusterInputs"]
+    assert "router queue and inflight metrics" in manifest["spec"]["missingRealClusterInputs"]
     assert status["phase"] == "NodePodInventoryObserved"
     assert status["readyForCanonicalization"] is False
 
@@ -979,7 +1258,8 @@ def test_build_observed_cluster_state_with_mig_profile_inventory() -> None:
     assert profile["multiprocessors"] == 28
     assert profile["slices"] == {"gi": 2, "ci": 2}
     assert profile["engines"]["copy"] == 2
-    assert "MIG device UUID and placement inventory" in manifest["spec"]["missingRealClusterInputs"]
+    assert "physical GPU UUID" in manifest["spec"]["missingRealClusterInputs"]
+    assert "router queue and inflight metrics" in manifest["spec"]["missingRealClusterInputs"]
     assert status["phase"] == "MigNodeInventoryObserved"
     assert status["readyForCanonicalization"] is False
 
@@ -1061,10 +1341,10 @@ def test_build_observed_cluster_state_from_gpu_operator_inventory_keeps_only_a10
     assert binding["gpuUuid"] == "GPU-real-a100"
     assert binding["migDevices"][0]["migDeviceUuid"] == "MIG-real-0"
     assert observed["ignoredGpuDevices"][0]["gpuUuid"] == "GPU-real-titan"
-    assert observed["ignoredGpuDevices"][0]["reason"] == "non-A100 GPU ignored by OR-SIM MIG planner"
+    assert observed["ignoredGpuDevices"][0]["reason"] == "non-A100 GPU ignored by MIGRANT MIG planner"
 
 
-def test_mig_label_executor_preflights_or_sim_configmap() -> None:
+def test_mig_label_executor_preflights_migrant_configmap() -> None:
     client = _fake_mig_label_client(target_configs=["or-sim-4-3"])
 
     summary = apply_mig_labels_from_action_plan(
@@ -1254,7 +1534,7 @@ def main() -> int:
     test_load_scenario_with_arrival_snapshot_configmap()
     test_current_state_feasible_arrival_snapshot_noop()
     test_build_observed_cluster_state_from_k8s_lists()
-    test_mig_label_executor_preflights_or_sim_configmap()
+    test_mig_label_executor_preflights_migrant_configmap()
     test_mig_label_executor_blocks_missing_gpu_operator_config()
     print("ok")
     return 0

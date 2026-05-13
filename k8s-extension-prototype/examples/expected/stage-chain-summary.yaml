@@ -1,6 +1,6 @@
 kind: ExpectedMigPlanStageChainSummary
 apiVersion: mig.or-sim.io/v1alpha1
-planner: v3
+planner: phase_greedy
 source: mock/scenarios/stage0.yaml..stage3.yaml
 stages:
   - stage: stage0

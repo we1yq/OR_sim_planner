@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir -r /app/controller/requirements.txt
 COPY controller /app/controller
 COPY manifests /app/manifests
 COPY mock /app/mock
-COPY simulation_core /app/simulation_core
+COPY migrant_core /app/migrant_core
 
 USER 65532:65532
 

@@ -1,0 +1,10 @@
+{
+  "actionCount": 32,
+  "outputs": {
+    "final_execution_dag": "k8s-extension-prototype/reports/dag-figures/stage2-resource-aware/final-execution-dag.svg"
+  },
+  "phaseCount": 11,
+  "planner": "offline_final_dag",
+  "plannerModule": "transition.offline_final_dag",
+  "scenario": "stage2"
+}

@@ -1,8 +1,8 @@
 name: stage0
 description: Baseline planning tick from an empty simulation cluster to the first target.
-policyRef: ../policies/simulation-default.yaml
+policyRef: ../policies/migrant-default.yaml
 migRulesRef: ../mig-rules/a100-40gb.yaml
-sourceStateRef: ../gpu-states/simulation-empty-9-a100.yaml
+sourceStateRef: ../gpu-states/migrant-empty-9-a100.yaml
 targetStateRef: target0
 workloadOrder:
   - llama

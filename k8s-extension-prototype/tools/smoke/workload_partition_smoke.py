@@ -10,7 +10,7 @@ from kubernetes import client, config, watch
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run an OR-SIM workload placement and live batch-size smoke test."
+        description="Run an MIGRANT workload placement and live batch-size smoke test."
     )
     parser.add_argument("--namespace", default="or-sim")
     parser.add_argument("--pod-name", default="or-sim-workload-smoke")
