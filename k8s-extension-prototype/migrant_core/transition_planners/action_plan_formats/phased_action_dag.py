@@ -213,6 +213,11 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
         resources.add(f"slot:{action.get('gpu_id')}:{tuple(action['slot'])}")
     if action.get("queue_transfer_id") is not None:
         resources.add(f"queue-transfer:{action['queue_transfer_id']}")
+    if action_type in {"delete_pods", "delete_gpu_pods", "stop_gpu_traffic"}:
+        for slot in _slots_for_action(action):
+            if action_type in {"delete_pods", "delete_gpu_pods"}:
+                resources.add(f"slot:{action.get('gpu_id')}:{slot}")
+            resources.add(f"traffic-slot:{action.get('gpu_id')}:{slot}")
     if action_type in {
         "allocate_gpu",
         "configure_full_template",
@@ -235,9 +240,20 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
         resources.add(f"physical:{action['physical_gpu_id']}")
     if action_type == "stop_gpu_traffic" and action.get("physical_gpu_id") is not None:
         resources.add(f"traffic:{action['physical_gpu_id']}")
-    if action_type in {"reroute_queued_tasks", "mark_draining_instance"} and action.get("slot") is not None:
+    if action_type in {"stop_accepting_new", "reroute_queued_tasks", "mark_draining_instance"} and action.get("slot") is not None:
         resources.add(f"traffic-slot:{action.get('gpu_id')}:{tuple(action['slot'])}")
     return resources
+
+
+def _slots_for_action(action: dict[str, Any]) -> list[tuple[Any, ...]]:
+    raw_slots = action.get("slots")
+    if raw_slots is None and action.get("slot") is not None:
+        raw_slots = [action.get("slot")]
+    out = []
+    for slot in list(raw_slots or []):
+        if isinstance(slot, (list, tuple)) and len(slot) >= 3:
+            out.append(tuple(slot[:3]))
+    return out
 
 
 def _read_only_dependency_resources(action: dict[str, Any]) -> set[str]:

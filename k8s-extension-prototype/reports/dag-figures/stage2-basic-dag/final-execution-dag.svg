@@ -5,7 +5,7 @@
 </marker>
 </defs>
 <rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
-<text x="24.0" y="30.0" text-anchor="start" font-family="Arial, sans-serif" font-size="22" fill="#111827">stage2 offline_final_dag - GPU-lane dependency DAG</text>
+<text x="24.0" y="30.0" text-anchor="start" font-family="Arial, sans-serif" font-size="22" fill="#111827">stage2 basic_dag - GPU-lane dependency DAG</text>
 <line x1="190" y1="62" x2="190" y2="764" stroke="#e5e7eb" stroke-width="1"/>
 <text x="246.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d0</text>
 <line x1="302" y1="62" x2="302" y2="764" stroke="#e5e7eb" stroke-width="1"/>
@@ -67,9 +67,9 @@
 <text x="245.0" y="509.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">5 pods</text>
 <text x="245.0" y="520.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">stop new requests</text>
 <text x="245.0" y="532.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
-<rect x="307" y="221" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 2-3 1g | delete pods | 1s</title></rect>
+<rect x="307" y="221" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 2-3 1g, 3-4 1g | delete pods | 1s</title></rect>
 <text x="357.0" y="233.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
-<text x="357.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">2-3 1g</text>
+<text x="357.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">2-3 1g, 3-4 1g</text>
 <text x="357.0" y="256.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
 <text x="357.0" y="268.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
 <rect x="307" y="89" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 0-4 4g, 4-7 3g | delete pods | 1s</title></rect>
@@ -97,11 +97,6 @@
 <text x="469.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 2-3 1g</text>
 <text x="469.0" y="256.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vgg16 bs=8</text>
 <text x="469.0" y="268.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
-<rect x="419" y="277" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 3-4 1g | delete pods | 1s</title></rect>
-<text x="469.0" y="289.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
-<text x="469.0" y="301.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">3-4 1g</text>
-<text x="469.0" y="312.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
-<text x="469.0" y="324.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
 <rect x="419" y="89" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>clear-binding | clear active gpu2 | C | 0.2s</title></rect>
 <text x="469.0" y="101.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">clear-binding</text>
 <text x="469.0" y="113.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">clear active gpu2</text>

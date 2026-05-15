@@ -2,7 +2,7 @@
   "description": "Paper-oriented abstract action DAG templates for MIGRANT transition actions.",
   "outputs": [
     "/home/we1yq/OR_sim_planner/k8s-extension-prototype/reports/abstract-action-dags/create-target-gpu.svg",
-    "/home/we1yq/OR_sim_planner/k8s-extension-prototype/reports/abstract-action-dags/target-first-reconfiguration.svg",
+    "/home/we1yq/OR_sim_planner/k8s-extension-prototype/reports/abstract-action-dags/bridge-reconfiguration.svg",
     "/home/we1yq/OR_sim_planner/k8s-extension-prototype/reports/abstract-action-dags/in-place-reconfiguration.svg",
     "/home/we1yq/OR_sim_planner/k8s-extension-prototype/reports/abstract-action-dags/delete-gpu.svg",
     "/home/we1yq/OR_sim_planner/k8s-extension-prototype/reports/abstract-action-dags/workload-replacement.svg",

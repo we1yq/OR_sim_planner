@@ -38,6 +38,10 @@ transition:
   from: target1
   to: target2
   kind: demand-down
+  runtime:
+    defaultQueued: 2
+    defaultInflight: 1
+    overrideExistingChangedSlots: true
   multipliers:
     llama: 0.72
     gpt2: 0.78

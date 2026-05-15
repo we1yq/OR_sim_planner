@@ -67,8 +67,59 @@ All transitions completed without timeout. Final restore completed to `all-2g.10
 | --- | --- | ---: | ---: |
 | empty MIG to `2+2+2` | `all-2g.10gb` | 72.401s | 112.620s |
 
+## Template-to-Template Times
+
+Date: 2026-05-15 KST
+
+These measurements start from the listed source template already ready on
+`rtx1-worker`, patch `nvidia.com/mig.config` directly to the target template,
+and wait for both `nvidia.com/mig.config.state=success` and target Kubernetes
+`allocatable` resources. The final state was restored to `or-sim-empty`.
+
+| From template | To template | Source config | Target config | Success | Allocatable |
+| --- | --- | --- | --- | ---: | ---: |
+| `4+3` | `3+2+1` | `or-sim-4-3` | `or-sim-3-2-1` | 40.165s | 80.237s |
+| `3+2+1` | `2+1+1+1+1+1` | `or-sim-3-2-1` | `or-sim-2-1-1-1-1-1` | 42.309s | 82.429s |
+| `2+1+1+1+1+1` | `4+3` | `or-sim-2-1-1-1-1-1` | `or-sim-4-3` | 40.142s | 82.414s |
+| `4+3` | `7` | `or-sim-4-3` | `all-7g.40gb` | 40.165s | 80.282s |
+
+Restore after the representative run:
+
+| Transition | Target MIG config | Success | Allocatable-empty |
+| --- | --- | ---: | ---: |
+| template to empty MIG | `or-sim-empty` | 39.458s | 10.607s |
+
+## Warm Empty-to-Template Times
+
+Date: 2026-05-15 KST
+
+These measurements start from `or-sim-empty` already ready after prior MIG
+reconfiguration experiments on the same cluster. They test whether repeated
+empty-to-template transitions become faster after the GPU Operator/device
+plugin path has been warmed.
+
+| From template | To template | Source config | Target config | Success | Allocatable |
+| --- | --- | --- | --- | ---: | ---: |
+| `empty` | `4+3` | `or-sim-empty` | `or-sim-4-3` | 40.157s | 78.177s |
+| `empty` | `3+2+1` | `or-sim-empty` | `or-sim-3-2-1` | 71.796s | 114.022s |
+| `empty` | `2+1+1+1+1+1` | `or-sim-empty` | `or-sim-2-1-1-1-1-1` | 71.874s | 111.999s |
+
+Final restore after the warm run:
+
+| Transition | Target MIG config | Success | Allocatable-empty |
+| --- | --- | ---: | ---: |
+| template to empty MIG | `or-sim-empty` | 39.433s | 10.606s |
+
 ## Notes
 
 - The first attempt failed because the GPU Operator reconciled `default-mig-parted-config` and removed the custom `or-sim-*` entries.
 - The fix is to use a separate ConfigMap, `or-sim-mig-parted-config`, and point `ClusterPolicy.spec.migManager.config.name` to it.
 - Kubernetes `capacity` can retain historical MIG resource keys. Use `allocatable` and `nvidia.com/mig.config.state=success` for readiness checks.
+- Direct template-to-template transitions are faster than modeling reconfiguration
+  as template-to-empty plus empty-to-template. Use the direct allocatable-ready
+  time when estimating in-place template rewrite cost.
+- Warm empty-to-template behavior is template-dependent. `empty -> 4+3` was much
+  faster in the warm run, while `empty -> 3+2+1` and
+  `empty -> 2+1+1+1+1+1` remained close to the original empty-to-template
+  timings. Do not globally replace empty-to-template constants with the fastest
+  warm result.

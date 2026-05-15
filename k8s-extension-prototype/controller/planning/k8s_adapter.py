@@ -109,6 +109,7 @@ def plan_scenario_as_migplan_status(
         workload_names=workload_names,
         stage_name=scenario.name,
         max_iters=max_iters,
+        **_transition_runtime_kwargs(scenario.transition),
     )
     transition_res["requested_transition_planner"] = transition_planner_name
     canonical_next = canonicalize_state_for_next_round(transition_res["executed_state"])
@@ -564,6 +565,12 @@ def _planning_trace(
             "finalPlanItems": _to_yamlable(
                 dict(transition_res.get("final_plan") or {}).get("plan_items", [])
             ),
+            "candidateDecisions": _to_yamlable(
+                dict(transition_res.get("final_plan") or {}).get("candidate_decisions", [])
+            ),
+            "runtimeAssumptions": _to_yamlable(
+                dict(transition_res.get("final_plan") or {}).get("runtime_assumptions", {})
+            ),
             "phasedActionPlanSummary": _to_yamlable(transition_res.get("phased_action_plan_summary")),
             "phasedActionPlan": _to_yamlable(transition_res.get("phased_action_plan")),
         },
@@ -639,6 +646,18 @@ def _transition_planner_name(scenario: PlanningScenario) -> str:
     return canonical_planner_name(raw)
 
 
+def _transition_runtime_kwargs(transition: dict[str, Any]) -> dict[str, Any]:
+    runtime = dict(transition.get("runtime") or transition.get("runtimeAssumptions") or {})
+    kwargs: dict[str, Any] = {}
+    if "defaultQueued" in runtime:
+        kwargs["default_queued"] = int(runtime["defaultQueued"])
+    if "defaultInflight" in runtime:
+        kwargs["default_inflight"] = int(runtime["defaultInflight"])
+    if "overrideExistingChangedSlots" in runtime:
+        kwargs["override_existing_runtime_for_changed_slots"] = bool(runtime["overrideExistingChangedSlots"])
+    return kwargs
+
+
 def _transition_iteration_summary(iterations: Any) -> list[dict[str, Any]]:
     out = []
     for iteration in list(iterations or []):
@@ -658,6 +677,7 @@ def _transition_iteration_summary(iterations: Any) -> list[dict[str, Any]]:
                 "chosenActions": _to_yamlable(chosen_actions),
                 "actionCountsByType": _action_counts_by_type(_to_yamlable(chosen_actions)),
                 "phasedActionPlan": _to_yamlable(iteration.get("phased_action_plan_summary")),
+                "candidateDecisions": _to_yamlable(iteration.get("candidate_decisions", [])),
                 "stateBefore": cluster_state_to_dict(iteration["state_before"]) if iteration.get("state_before") is not None else None,
                 "stateAfter": cluster_state_to_dict(iteration["state_after"]) if iteration.get("state_after") is not None else None,
                 "madeProgress": bool(iteration.get("made_progress", False)),

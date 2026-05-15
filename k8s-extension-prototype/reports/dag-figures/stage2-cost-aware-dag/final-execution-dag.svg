@@ -1,0 +1,330 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1584" height="1316" viewBox="0 0 1584 1316">
+<defs>
+<marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+<path d="M0,0 L0,6 L7,3 z" fill="#9ca3af"/>
+</marker>
+</defs>
+<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
+<text x="24.0" y="30.0" text-anchor="start" font-family="Arial, sans-serif" font-size="22" fill="#111827">stage2 cost_aware_dag - GPU-lane dependency DAG</text>
+<line x1="190" y1="62" x2="190" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="246.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d0</text>
+<line x1="302" y1="62" x2="302" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="358.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d1</text>
+<line x1="414" y1="62" x2="414" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="470.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d2</text>
+<line x1="526" y1="62" x2="526" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="582.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d3</text>
+<line x1="638" y1="62" x2="638" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="694.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d4</text>
+<line x1="750" y1="62" x2="750" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="806.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d5</text>
+<line x1="862" y1="62" x2="862" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="918.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d6</text>
+<line x1="974" y1="62" x2="974" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="1030.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d7</text>
+<line x1="1086" y1="62" x2="1086" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="1142.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d8</text>
+<line x1="1198" y1="62" x2="1198" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="1254.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d9</text>
+<line x1="1310" y1="62" x2="1310" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="1366.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d10</text>
+<line x1="1422" y1="62" x2="1422" y2="1268" stroke="#e5e7eb" stroke-width="1"/>
+<text x="1478.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d11</text>
+<text x="20.0" y="110.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#111827">A(gpu-0)</text>
+<line x1="190" y1="130" x2="1549" y2="130" stroke="#e5e7eb" stroke-width="1"/>
+<text x="20.0" y="242.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#111827">C(gpu-2)</text>
+<line x1="190" y1="262" x2="1549" y2="262" stroke="#e5e7eb" stroke-width="1"/>
+<text x="20.0" y="426.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#111827">D(gpu-3)</text>
+<line x1="190" y1="446" x2="1549" y2="446" stroke="#e5e7eb" stroke-width="1"/>
+<text x="20.0" y="666.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#111827">G(gpu-6)</text>
+<line x1="190" y1="686" x2="1549" y2="686" stroke="#e5e7eb" stroke-width="1"/>
+<text x="20.0" y="850.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#111827">H(gpu-7, old)</text>
+<line x1="190" y1="870" x2="1549" y2="870" stroke="#e5e7eb" stroke-width="1"/>
+<text x="20.0" y="1090.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#111827">I(gpu-8 old -&gt; gpu-7)</text>
+<line x1="190" y1="1110" x2="1549" y2="1110" stroke="#e5e7eb" stroke-width="1"/>
+<path d="M245.0,114.0 C283.0,114.0 319.0,966.0 357.0,966.0" fill="none" stroke="#d97706" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+<text x="301.0" y="534.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#d97706">queue handoff</text>
+<path d="M469.0,542.0 C507.0,542.0 543.0,854.0 581.0,854.0" fill="none" stroke="#d97706" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+<text x="525.0" y="692.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#d97706">queue handoff</text>
+<path d="M581.0,486.0 C619.0,486.0 655.0,910.0 693.0,910.0" fill="none" stroke="#d97706" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+<text x="637.0" y="692.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#d97706">queue handoff</text>
+<path d="M1029.0,854.0 C1067.0,854.0 1103.0,1094.0 1141.0,1094.0" fill="none" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="2 2" marker-end="url(#arrow)"/>
+<text x="1085.0" y="968.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#7c3aed">logical-id handoff</text>
+<line x1="861.0" y1="1069.0" x2="861.0" y2="1119.0" stroke="#dc2626" stroke-width="1.8" stroke-dasharray="6 4"/>
+<text x="866.0" y="1065.0" text-anchor="start" font-family="Arial, sans-serif" font-size="8" fill="#dc2626">reuse</text>
+<rect x="195" y="405" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>stop-gpu-traffic | 2 pods | stop new requests | 1s</title></rect>
+<text x="245.0" y="417.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">stop-gpu-traffic</text>
+<text x="245.0" y="429.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">2 pods</text>
+<text x="245.0" y="440.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">stop new requests</text>
+<text x="245.0" y="452.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="195" y="461" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>accept-queue | accept queued 2 | to gpu3 4-5 1g | from gpu3 | 1s</title></rect>
+<text x="245.0" y="473.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">accept-queue</text>
+<text x="245.0" y="485.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">accept queued 2</text>
+<text x="245.0" y="496.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">to gpu3 4-5 1g</text>
+<text x="245.0" y="508.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="195" y="221" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>stop-gpu-traffic | 2 pods | stop new requests | 1s</title></rect>
+<text x="245.0" y="233.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">stop-gpu-traffic</text>
+<text x="245.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">2 pods</text>
+<text x="245.0" y="256.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">stop new requests</text>
+<text x="245.0" y="268.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="195" y="645" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>stop-gpu-traffic | 2 pods | stop new requests | 1s</title></rect>
+<text x="245.0" y="657.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">stop-gpu-traffic</text>
+<text x="245.0" y="669.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">2 pods</text>
+<text x="245.0" y="680.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">stop new requests</text>
+<text x="245.0" y="692.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="195" y="1069" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>stop-gpu-traffic | 2 pods | stop new requests | 1s</title></rect>
+<text x="245.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">stop-gpu-traffic</text>
+<text x="245.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">2 pods</text>
+<text x="245.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">stop new requests</text>
+<text x="245.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="195" y="829" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>stop-gpu-traffic | 5 pods | stop new requests | 1s</title></rect>
+<text x="245.0" y="841.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">stop-gpu-traffic</text>
+<text x="245.0" y="853.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">5 pods</text>
+<text x="245.0" y="864.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">stop new requests</text>
+<text x="245.0" y="876.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="195" y="89" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>accept-queue | accept queued 2 | to gpu0 0-4 4g | from gpu7 | 1s</title></rect>
+<text x="245.0" y="101.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">accept-queue</text>
+<text x="245.0" y="113.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">accept queued 2</text>
+<text x="245.0" y="124.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">to gpu0 0-4 4g</text>
+<text x="245.0" y="136.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="307" y="405" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>reroute | queued 2 | to gpu3 4-5 1g | stable slot | 1s</title></rect>
+<text x="357.0" y="417.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">reroute</text>
+<text x="357.0" y="429.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">queued 2</text>
+<text x="357.0" y="440.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">to gpu3 4-5 1g</text>
+<text x="357.0" y="452.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="307" y="461" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>accept-queue | accept queued 2 | to gpu3 4-5 1g | from gpu3 | 1s</title></rect>
+<text x="357.0" y="473.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">accept-queue</text>
+<text x="357.0" y="485.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">accept queued 2</text>
+<text x="357.0" y="496.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">to gpu3 4-5 1g</text>
+<text x="357.0" y="508.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="307" y="221" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 0-4 4g | vit_base | 30s</title></rect>
+<text x="357.0" y="233.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="357.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 0-4 4g</text>
+<text x="357.0" y="256.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vit_base</text>
+<text x="357.0" y="268.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="307" y="277" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 4-7 3g | vit_base | 30s</title></rect>
+<text x="357.0" y="289.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="357.0" y="301.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 4-7 3g</text>
+<text x="357.0" y="312.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vit_base</text>
+<text x="357.0" y="324.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="307" y="645" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 0-4 4g | vit_base | 30s</title></rect>
+<text x="357.0" y="657.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="357.0" y="669.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 0-4 4g</text>
+<text x="357.0" y="680.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vit_base</text>
+<text x="357.0" y="692.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="307" y="701" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 4-7 3g | vit_base | 30s</title></rect>
+<text x="357.0" y="713.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="357.0" y="725.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 4-7 3g</text>
+<text x="357.0" y="736.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vit_base</text>
+<text x="357.0" y="748.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="307" y="1069" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 0-4 4g | vit_base | 30s</title></rect>
+<text x="357.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="357.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 0-4 4g</text>
+<text x="357.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vit_base</text>
+<text x="357.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="307" y="1125" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 4-7 3g | vit_base | 30s</title></rect>
+<text x="357.0" y="1137.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="357.0" y="1149.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 4-7 3g</text>
+<text x="357.0" y="1160.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vit_base</text>
+<text x="357.0" y="1172.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="307" y="829" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 2-3 1g | vgg16 | 30s</title></rect>
+<text x="357.0" y="841.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="357.0" y="853.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 2-3 1g</text>
+<text x="357.0" y="864.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vgg16</text>
+<text x="357.0" y="876.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="307" y="885" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 3-4 1g | vgg16 | 30s</title></rect>
+<text x="357.0" y="897.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="357.0" y="909.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 3-4 1g</text>
+<text x="357.0" y="920.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vgg16</text>
+<text x="357.0" y="932.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="307" y="941" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>reroute | queued 2 | to gpu0 0-4 4g | stable slot | 1s</title></rect>
+<text x="357.0" y="953.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">reroute</text>
+<text x="357.0" y="965.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">queued 2</text>
+<text x="357.0" y="976.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">to gpu0 0-4 4g</text>
+<text x="357.0" y="988.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="419" y="405" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 2-3 1g | gpt2 | 30s</title></rect>
+<text x="469.0" y="417.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="469.0" y="429.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 2-3 1g</text>
+<text x="469.0" y="440.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpt2</text>
+<text x="469.0" y="452.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="419" y="461" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>reroute | queued 2 | to gpu3 4-5 1g | stable slot | 1s</title></rect>
+<text x="469.0" y="473.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">reroute</text>
+<text x="469.0" y="485.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">queued 2</text>
+<text x="469.0" y="496.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">to gpu3 4-5 1g</text>
+<text x="469.0" y="508.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="419" y="221" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 0-4 4g, 4-7 3g | delete pods | 1s</title></rect>
+<text x="469.0" y="233.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
+<text x="469.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">0-4 4g, 4-7 3g</text>
+<text x="469.0" y="256.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
+<text x="469.0" y="268.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="419" y="645" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 0-4 4g, 4-7 3g | delete pods | 1s</title></rect>
+<text x="469.0" y="657.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
+<text x="469.0" y="669.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">0-4 4g, 4-7 3g</text>
+<text x="469.0" y="680.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
+<text x="469.0" y="692.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="419" y="1069" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 0-4 4g, 4-7 3g | delete pods | 1s</title></rect>
+<text x="469.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
+<text x="469.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">0-4 4g, 4-7 3g</text>
+<text x="469.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
+<text x="469.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="419" y="517" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>accept-queue | accept queued 2 | to gpu3 4-5 1g | from gpu7 | 1s</title></rect>
+<text x="469.0" y="529.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">accept-queue</text>
+<text x="469.0" y="541.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">accept queued 2</text>
+<text x="469.0" y="552.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">to gpu3 4-5 1g</text>
+<text x="469.0" y="564.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="419" y="829" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 4-7 3g | llama | 30s</title></rect>
+<text x="469.0" y="841.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="469.0" y="853.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 4-7 3g</text>
+<text x="469.0" y="864.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">llama</text>
+<text x="469.0" y="876.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="531" y="405" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 3-4 1g | gpt2 | 30s</title></rect>
+<text x="581.0" y="417.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="581.0" y="429.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 3-4 1g</text>
+<text x="581.0" y="440.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpt2</text>
+<text x="581.0" y="452.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="531" y="221" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>clear-binding | clear active gpu2 | C | 0.2s</title></rect>
+<text x="581.0" y="233.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">clear-binding</text>
+<text x="581.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">clear active gpu2</text>
+<text x="581.0" y="256.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">C</text>
+<text x="581.0" y="268.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
+<rect x="531" y="645" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>clear-binding | clear active gpu6 | G | 0.2s</title></rect>
+<text x="581.0" y="657.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">clear-binding</text>
+<text x="581.0" y="669.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">clear active gpu6</text>
+<text x="581.0" y="680.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">G</text>
+<text x="581.0" y="692.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
+<rect x="531" y="1069" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>clear-binding | clear active gpu8 | I | 0.2s</title></rect>
+<text x="581.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">clear-binding</text>
+<text x="581.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">clear active gpu8</text>
+<text x="581.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">I</text>
+<text x="581.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
+<rect x="531" y="829" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>reroute | queued 2 | to gpu3 4-5 1g | stable slot | 1s</title></rect>
+<text x="581.0" y="841.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">reroute</text>
+<text x="581.0" y="853.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">queued 2</text>
+<text x="581.0" y="864.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">to gpu3 4-5 1g</text>
+<text x="581.0" y="876.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="531" y="461" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>accept-queue | accept queued 2 | to gpu3 4-5 1g | from gpu7 | 1s</title></rect>
+<text x="581.0" y="473.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">accept-queue</text>
+<text x="581.0" y="485.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">accept queued 2</text>
+<text x="581.0" y="496.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">to gpu3 4-5 1g</text>
+<text x="581.0" y="508.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="643" y="405" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 2-3 1g, 3-4 1g | delete pods | 1s</title></rect>
+<text x="693.0" y="417.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
+<text x="693.0" y="429.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">2-3 1g, 3-4 1g</text>
+<text x="693.0" y="440.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
+<text x="693.0" y="452.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="643" y="221" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>clear-template | empty from 4+3 | wait success | 40.229s</title></rect>
+<text x="693.0" y="233.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">clear-template</text>
+<text x="693.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">empty from 4+3</text>
+<text x="693.0" y="256.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">wait success</text>
+<text x="693.0" y="268.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">40.229s success</text>
+<rect x="643" y="645" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>clear-template | empty from 4+3 | wait success | 40.229s</title></rect>
+<text x="693.0" y="657.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">clear-template</text>
+<text x="693.0" y="669.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">empty from 4+3</text>
+<text x="693.0" y="680.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">wait success</text>
+<text x="693.0" y="692.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">40.229s success</text>
+<rect x="643" y="1069" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>clear-template | empty from 4+3 | wait success | 40.229s</title></rect>
+<text x="693.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">clear-template</text>
+<text x="693.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">empty from 4+3</text>
+<text x="693.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">wait success</text>
+<text x="693.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">40.229s success</text>
+<rect x="643" y="829" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 0-1 1g | gpt2 | 30s</title></rect>
+<text x="693.0" y="841.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="693.0" y="853.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 0-1 1g</text>
+<text x="693.0" y="864.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpt2</text>
+<text x="693.0" y="876.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="643" y="885" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>reroute | queued 2 | to gpu3 4-5 1g | stable slot | 1s</title></rect>
+<text x="693.0" y="897.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">reroute</text>
+<text x="693.0" y="909.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">queued 2</text>
+<text x="693.0" y="920.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">to gpu3 4-5 1g</text>
+<text x="693.0" y="932.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="755" y="405" width="100.0" height="50" rx="4" fill="#dcfce7" stroke="#111827" stroke-width="1"><title>place-pod | slot 2-3 1g | vgg16 bs=8 | 1s</title></rect>
+<text x="805.0" y="417.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">place-pod</text>
+<text x="805.0" y="429.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 2-3 1g</text>
+<text x="805.0" y="440.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vgg16 bs=8</text>
+<text x="805.0" y="452.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="755" y="221" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>return-gpu | return C | availableQueue | 0.2s</title></rect>
+<text x="805.0" y="233.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">return-gpu</text>
+<text x="805.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">return C</text>
+<text x="805.0" y="256.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">availableQueue</text>
+<text x="805.0" y="268.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
+<rect x="755" y="645" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>return-gpu | return G | availableQueue | 0.2s</title></rect>
+<text x="805.0" y="657.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">return-gpu</text>
+<text x="805.0" y="669.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">return G</text>
+<text x="805.0" y="680.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">availableQueue</text>
+<text x="805.0" y="692.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
+<rect x="755" y="1069" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>return-gpu | return I | availableQueue | 0.2s</title></rect>
+<text x="805.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">return-gpu</text>
+<text x="805.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">return I</text>
+<text x="805.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">availableQueue</text>
+<text x="805.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
+<rect x="755" y="829" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 1-2 1g | gpt2 | 30s</title></rect>
+<text x="805.0" y="841.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="805.0" y="853.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 1-2 1g</text>
+<text x="805.0" y="864.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpt2</text>
+<text x="805.0" y="876.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
+<rect x="867" y="405" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>activate-route | gpu3 | serving active | 0.5s</title></rect>
+<text x="917.0" y="417.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">activate-route</text>
+<text x="917.0" y="429.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpu3</text>
+<text x="917.0" y="440.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">serving active</text>
+<text x="917.0" y="452.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.5s</text>
+<rect x="867" y="1069" width="100.0" height="50" rx="4" fill="#dbeafe" stroke="#111827" stroke-width="1"><title>allocate | reserve I | pending gpu7 | 0.2s</title></rect>
+<text x="917.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">allocate</text>
+<text x="917.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">reserve I</text>
+<text x="917.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">pending gpu7</text>
+<text x="917.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
+<rect x="867" y="829" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 5 slots | delete pods | 1s</title></rect>
+<text x="917.0" y="841.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
+<text x="917.0" y="853.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">5 slots</text>
+<text x="917.0" y="864.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
+<text x="917.0" y="876.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="979" y="1069" width="100.0" height="50" rx="4" fill="#dbeafe" stroke="#111827" stroke-width="1"><title>configure | template 2+1+1+3 | wait allocatable | 112.612s</title></rect>
+<text x="1029.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">configure</text>
+<text x="1029.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">template 2+1+1+3</text>
+<text x="1029.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">wait allocatable</text>
+<text x="1029.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">112.612s alloc</text>
+<rect x="979" y="829" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>clear-binding | clear active gpu7 | H | 0.2s</title></rect>
+<text x="1029.0" y="841.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">clear-binding</text>
+<text x="1029.0" y="853.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">clear active gpu7</text>
+<text x="1029.0" y="864.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">H</text>
+<text x="1029.0" y="876.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
+<rect x="1091" y="1069" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>bind-target-gpu | active gpu7 | I | 0.2s</title></rect>
+<text x="1141.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">bind-target-gpu</text>
+<text x="1141.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">active gpu7</text>
+<text x="1141.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">I</text>
+<text x="1141.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
+<rect x="1091" y="829" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>clear-template | empty from 1+1+1+1+3 | wait success | 40.237s</title></rect>
+<text x="1141.0" y="841.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">clear-template</text>
+<text x="1141.0" y="853.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">empty from 1+1+1+1+3</text>
+<text x="1141.0" y="864.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">wait success</text>
+<text x="1141.0" y="876.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">40.237s success</text>
+<rect x="1203" y="1069" width="100.0" height="50" rx="4" fill="#dbeafe" stroke="#111827" stroke-width="1"><title>resolve-uuid | gpu7 | slot -&gt; MIG UUID | 2s</title></rect>
+<text x="1253.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">resolve-uuid</text>
+<text x="1253.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpu7</text>
+<text x="1253.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot -&gt; MIG UUID</text>
+<text x="1253.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">2s</text>
+<rect x="1203" y="829" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>return-gpu | return H | availableQueue | 0.2s</title></rect>
+<text x="1253.0" y="841.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">return-gpu</text>
+<text x="1253.0" y="853.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">return H</text>
+<text x="1253.0" y="864.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">availableQueue</text>
+<text x="1253.0" y="876.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
+<rect x="1315" y="1069" width="100.0" height="50" rx="4" fill="#dcfce7" stroke="#111827" stroke-width="1"><title>deploy-workload | gpu7 | pods ready | 5s</title></rect>
+<text x="1365.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">deploy-workload</text>
+<text x="1365.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpu7</text>
+<text x="1365.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">pods ready</text>
+<text x="1365.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">5s</text>
+<rect x="1427" y="1069" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>activate-route | gpu7 | serving active | 0.5s</title></rect>
+<text x="1477.0" y="1081.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">activate-route</text>
+<text x="1477.0" y="1093.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpu7</text>
+<text x="1477.0" y="1104.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">serving active</text>
+<text x="1477.0" y="1116.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.5s</text>
+<rect x="1174" y="1279" width="14" height="14" fill="#dbeafe" stroke="#111827" stroke-width="0.8"/>
+<text x="1192.0" y="1291.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">mig-geometry</text>
+<rect x="1276" y="1279" width="14" height="14" fill="#ede9fe" stroke="#111827" stroke-width="0.8"/>
+<text x="1294.0" y="1291.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">binding/state</text>
+<rect x="1378" y="1279" width="14" height="14" fill="#dcfce7" stroke="#111827" stroke-width="0.8"/>
+<text x="1396.0" y="1291.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">workload/pod</text>
+<rect x="1480" y="1279" width="14" height="14" fill="#fef3c7" stroke="#111827" stroke-width="0.8"/>
+<text x="1498.0" y="1291.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">router-drain</text>
+<rect x="1582" y="1279" width="14" height="14" fill="#fee2e2" stroke="#111827" stroke-width="0.8"/>
+<text x="1600.0" y="1291.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">cleanup</text>
+</svg>

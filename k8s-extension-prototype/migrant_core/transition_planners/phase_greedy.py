@@ -11,7 +11,7 @@ DAG_OUTPUT_NAME = "transition.phase_greedy_with_dag_output"
 
 
 def run(**kwargs: Any) -> dict[str, Any]:
-    res = run_phase_greedy_stage(**kwargs)
+    res = run_phase_greedy_stage(**_phase_greedy_kwargs(kwargs))
     res["transition_planner_module"] = NAME
     return res
 
@@ -19,10 +19,25 @@ def run(**kwargs: Any) -> dict[str, Any]:
 def run_with_dag_output(**kwargs: Any) -> dict[str, Any]:
     """Run phase-greedy unchanged, then attach a phased action DAG view."""
 
-    res = run_phase_greedy_stage(**kwargs)
+    res = run_phase_greedy_stage(**_phase_greedy_kwargs(kwargs))
     _attach_phased_action_dag(res)
     res["transition_planner_module"] = DAG_OUTPUT_NAME
     return res
+
+
+def _phase_greedy_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Keep the legacy V3 planner independent from newer runtime kwargs."""
+
+    allowed = {
+        "source_state",
+        "target_state",
+        "src_arrival",
+        "tgt_arrival",
+        "workload_names",
+        "stage_name",
+        "max_iters",
+    }
+    return {key: value for key, value in kwargs.items() if key in allowed}
 
 
 def _attach_phased_action_dag(res: dict[str, Any]) -> None:

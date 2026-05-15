@@ -1,0 +1,60 @@
+{
+  "endedAt": "2026-05-15T14:29:11",
+  "finalRestoreToEmpty": {
+    "allocatableSeconds": 10.606,
+    "successSeconds": 39.433
+  },
+  "intermediateRestoreToEmpty": [
+    {
+      "allocatableSeconds": 10.622,
+      "beforeTarget": "or-sim-3-2-1",
+      "successSeconds": 39.461
+    },
+    {
+      "allocatableSeconds": 10.622,
+      "beforeTarget": "or-sim-2-1-1-1-1-1",
+      "successSeconds": 39.45
+    }
+  ],
+  "node": "rtx1-worker",
+  "results": [
+    {
+      "allocatableSeconds": 78.177,
+      "fromConfig": "or-sim-empty",
+      "fromTemplate": "empty",
+      "successSeconds": 40.157,
+      "targetAllocatable": {
+        "nvidia.com/mig-3g.20gb": 1,
+        "nvidia.com/mig-4g.20gb": 1
+      },
+      "toConfig": "or-sim-4-3",
+      "toTemplate": "4+3"
+    },
+    {
+      "allocatableSeconds": 114.022,
+      "fromConfig": "or-sim-empty",
+      "fromTemplate": "empty",
+      "successSeconds": 71.796,
+      "targetAllocatable": {
+        "nvidia.com/mig-1g.5gb": 1,
+        "nvidia.com/mig-2g.10gb": 1,
+        "nvidia.com/mig-3g.20gb": 1
+      },
+      "toConfig": "or-sim-3-2-1",
+      "toTemplate": "3+2+1"
+    },
+    {
+      "allocatableSeconds": 111.999,
+      "fromConfig": "or-sim-empty",
+      "fromTemplate": "empty",
+      "successSeconds": 71.874,
+      "targetAllocatable": {
+        "nvidia.com/mig-1g.5gb": 5,
+        "nvidia.com/mig-2g.10gb": 1
+      },
+      "toConfig": "or-sim-2-1-1-1-1-1",
+      "toTemplate": "2+1+1+1+1+1"
+    }
+  ],
+  "startedAt": "2026-05-15T14:22:07"
+}

@@ -598,7 +598,7 @@ def test_build_action_rule_previews() -> None:
                         "new_physical_gpu_id": "D",
                         "src_template": "3g+3g",
                         "tgt_template": "4g+3g",
-                        "mode": "target_first",
+                        "mode": "bridge",
                     }
                 ],
                 "finalPlanItems": [
@@ -635,8 +635,8 @@ def test_build_action_rule_previews() -> None:
     assert pod["deleteOrRecycle"][0]["podAction"] == "delete-or-recycle"
     assert pod["reloadInPlace"][0]["podAction"] == "reload-in-place"
     assert mig["internalStateActionsExcluded"] == []
-    assert abstract["actions"][0]["mode"] == "target_first"
-    assert "prepareTargetMigGeometry" in abstract["actions"][0]["gates"]
+    assert abstract["actions"][0]["mode"] == "bridge"
+    assert "prepareBridgeMigGeometry" in abstract["actions"][0]["gates"]
     assert adapter["adapters"]["router"]["wouldRerouteQueuedTasks"][0]["queued"] == 2
     assert observer["targetsToObserve"]["workloads"] == ["gpt2"]
 

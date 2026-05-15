@@ -110,13 +110,17 @@ The experimental planner is selected with:
 
 ```yaml
 transition:
-  transitionPlanner: resource_aware_dag
+  transitionPlanner: cost_aware_dag
 ```
 
-`resource_aware_dag` is a new scheduler, not an ablation entry yet. It builds
-the full candidate action DAG and executes the earliest dependency-ready phase
-per planning iteration. This is intentionally conservative for review: it
-exposes real resource barriers before we tune it for multi-A100 parallelism.
+`basic_dag` is the baseline DAG compiler. It builds a final dependency DAG
+from source/target layout differences and does not perform iterative prefix
+execution. `cost_aware_dag` keeps the same final-DAG execution contract, but
+scores candidate transition modes before lowering them into fine-grained
+actions. Its current score first filters service-infeasible candidates, then
+minimizes peak active physical GPUs, queued/drain work, MIG benchmark
+reconfiguration time, and disruptive operations such as reroute, bridge, and
+pod deletion.
 
 ## Who Reads UUIDs After Template Changes?
 

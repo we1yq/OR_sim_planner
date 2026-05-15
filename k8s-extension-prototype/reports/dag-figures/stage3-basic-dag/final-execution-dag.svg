@@ -5,7 +5,7 @@
 </marker>
 </defs>
 <rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
-<text x="24.0" y="30.0" text-anchor="start" font-family="Arial, sans-serif" font-size="22" fill="#111827">stage3 offline_final_dag - GPU-lane dependency DAG</text>
+<text x="24.0" y="30.0" text-anchor="start" font-family="Arial, sans-serif" font-size="22" fill="#111827">stage3 basic_dag - GPU-lane dependency DAG</text>
 <line x1="190" y1="62" x2="190" y2="632" stroke="#e5e7eb" stroke-width="1"/>
 <text x="246.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d0</text>
 <line x1="302" y1="62" x2="302" y2="632" stroke="#e5e7eb" stroke-width="1"/>

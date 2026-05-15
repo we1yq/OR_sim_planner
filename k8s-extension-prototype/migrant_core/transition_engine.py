@@ -200,11 +200,12 @@ def prepare_transition_runtime(
     target_state: ClusterState,
     default_queued: int = 2,
     default_inflight: int = 1,
+    override_existing_changed_slots: bool = False,
 ) -> ClusterState:
     state = deepcopy_state(source_state)
     ensure_state_metadata(state)
     bootstrap_physical_ids_for_state(state)
-    if state.metadata.get("transition_runtime_instances"):
+    if state.metadata.get("transition_runtime_instances") and not override_existing_changed_slots:
         _runtime_map(state)
         _drain_map(state)
         _reconfig_map(state)
@@ -302,6 +303,7 @@ def _reroute_destination_candidates(
     workload: str,
     exclude_gpu_id: int | None = None,
     exclude_slot: tuple[int, int, str] | None = None,
+    exclude_entire_gpu: bool = False,
 ) -> list[dict[str, Any]]:
     out = []
     seen = set()
@@ -319,14 +321,18 @@ def _reroute_destination_candidates(
         source_inst = get_inst_by_slot(gpu, slot)
         if source_inst is None:
             return False
-        return source_inst.workload == workload and target_inst.workload == workload
+        return (
+            source_inst.workload == workload
+            and target_inst.workload == workload
+            and source_inst.batch == target_inst.batch
+        )
 
     for gpu in source_state.real_gpus():
         physical_id = get_physical_id(source_state, gpu.gpu_id)
         target_gpu = target_map.get(gpu.gpu_id)
         for inst in _nonfree_instances(gpu):
             slot = (inst.start, inst.end, inst.profile)
-            if gpu.gpu_id == exclude_gpu_id and slot == exclude_slot:
+            if gpu.gpu_id == exclude_gpu_id and (exclude_entire_gpu or slot == exclude_slot):
                 continue
             if inst.workload != workload:
                 continue
@@ -337,11 +343,13 @@ def _reroute_destination_candidates(
     for gpu in target_state.real_gpus():
         for inst in _nonfree_instances(gpu):
             slot = (inst.start, inst.end, inst.profile)
-            if gpu.gpu_id == exclude_gpu_id and slot == exclude_slot:
+            if gpu.gpu_id == exclude_gpu_id and (exclude_entire_gpu or slot == exclude_slot):
                 record = _reconfig_map(source_state).get(str(gpu.gpu_id))
                 source_physical_id = get_physical_id(source_state, gpu.gpu_id)
                 if record is None or record.get("physical_gpu_id") == source_physical_id:
                     continue
+            elif gpu.gpu_id == exclude_gpu_id and exclude_entire_gpu:
+                continue
             if inst.workload != workload:
                 continue
             key = (gpu.gpu_id, slot)
@@ -996,7 +1004,7 @@ def plan_full_action_plan(
                         "src_template": src_gpu.template_str(),
                         "tgt_template": tgt_gpu.template_str(),
                         "alloc_policy": "free_pool_lifo",
-                        "mode": "target_first",
+                        "mode": "bridge",
                     }
                 )
                 if not prepared:
@@ -1009,7 +1017,7 @@ def plan_full_action_plan(
                                 logical_gpu_id=gpu_id,
                                 pendingLogicalGpuId=gpu_id,
                                 reconfigurationTarget=True,
-                                transitionMode="target_first",
+                                transitionMode="bridge",
                                 policy="free_pool_lifo",
                             ),
                             _action(
@@ -1019,7 +1027,7 @@ def plan_full_action_plan(
                                 logical_gpu_id=gpu_id,
                                 pendingLogicalGpuId=gpu_id,
                                 reconfigurationTarget=True,
-                                transitionMode="target_first",
+                                transitionMode="bridge",
                                 template=tgt_gpu.template_str(),
                             ),
                         ]

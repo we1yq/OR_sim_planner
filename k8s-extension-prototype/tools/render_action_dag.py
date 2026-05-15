@@ -103,8 +103,15 @@ CLASS_COLORS = {
 def main() -> None:
     parser = argparse.ArgumentParser(description="Render MIGRANT phased action DAG views as SVG.")
     parser.add_argument("--plan-scenario", required=True, help="PlanningScenario YAML.")
-    parser.add_argument("--planner", default="offline_final_dag", help="Transition planner to run.")
-    parser.add_argument("--output-dir", default=str(ROOT / "reports" / "dag-figures"), help="Output directory.")
+    parser.add_argument("--planner", default="basic_dag", help="Transition planner to run.")
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help=(
+            "Output directory. If omitted, writes to "
+            "reports/dag-figures/<scenario>-<planner> so different planners do not overwrite each other."
+        ),
+    )
     parser.add_argument("--gpu-alias", action="append", default=[], help="GPU alias override: GPU_ID=alias or physicalId=alias.")
     parser.add_argument("--title", default=None, help="Figure title prefix.")
     parser.add_argument("--force-transition", action="store_true", help="Render the explicit transition even if current-state feasibility would no-op.")
@@ -117,7 +124,7 @@ def main() -> None:
     dag = transition.get("phasedActionPlan") or {}
     executed_state = cluster_state_from_dict(status["status"]["executedState"])
     title = args.title or f"{status['spec']['scenario']} {status['spec']['planner']}"
-    output_dir = Path(args.output_dir)
+    output_dir = Path(args.output_dir) if args.output_dir else _default_output_dir(status)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     outputs = {
@@ -134,7 +141,7 @@ def main() -> None:
         "plannerModule": transition.get("plannerModule"),
         "actionCount": dag.get("actionCount", 0),
         "phaseCount": dag.get("phaseCount", 0),
-        "outputs": {name: str(path) for name, path in outputs.items()},
+        "outputs": {name: _display_path(path) for name, path in outputs.items()},
     }
     manifest_path = output_dir / "dag-figure-manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
@@ -142,9 +149,40 @@ def main() -> None:
         print(path)
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return str(path)
+
+
+def _default_output_dir(status: dict[str, Any]) -> Path:
+    scenario = _path_slug(str(status["spec"]["scenario"]))
+    planner = _path_slug(str(status["spec"]["planner"]))
+    return ROOT / "reports" / "dag-figures" / f"{scenario}-{planner}"
+
+
+def _path_slug(value: str) -> str:
+    out = []
+    for ch in value.strip().lower():
+        if ch.isalnum():
+            out.append(ch)
+        elif ch in {"-", "_", ".", " "}:
+            out.append("-")
+    slug = "".join(out).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug or "unnamed"
+
+
 def _plan_status(scenario_path: Path, planner: str, *, force_transition: bool = False) -> dict[str, Any]:
     scenario = load_planning_scenario(scenario_path)
     scenario.transition["transitionPlanner"] = planner
+    if planner in {"basic_dag", "transition.basic_dag", "offline_final_dag", "transition.offline_final_dag"}:
+        # Baseline figures should show the pure layout-diff DAG. Runtime queue
+        # and inflight assumptions are for cost-aware/runtime-aware planners.
+        scenario.transition.pop("runtime", None)
+        scenario.transition.pop("runtimeAssumptions", None)
     if force_transition:
         scenario.transition["forceReplan"] = True
     source_override = _chain_source_override(scenario_path, scenario, planner, force_transition=force_transition)
@@ -211,18 +249,32 @@ def render_gpu_lane_timeline(
     x0 = 190
     y0 = 82
     phase_w = 112
-    lane_h = 132
     stack_gap = 56
+    lane_heights = _timeline_lane_heights(
+        nodes,
+        lane_names,
+        executed_state,
+        logical_aliases,
+        physical_aliases,
+        lane_roles,
+        physical_reuse,
+        stack_gap,
+    )
+    lane_y = {}
+    cursor_y = y0
+    for lane in lane_names:
+        lane_y[lane] = cursor_y
+        cursor_y += lane_heights.get(lane, 132)
     width = x0 + max(phases, 1) * phase_w + 50
-    height = y0 + len(lane_names) * lane_h + 70
+    height = cursor_y + 70
     parts = _svg_header(width, height, f"{title} - GPU-lane dependency DAG")
 
     for phase in range(phases):
         x = x0 + phase * phase_w
         parts.append(f'<line x1="{x}" y1="62" x2="{x}" y2="{height - 48}" stroke="#e5e7eb" stroke-width="1"/>')
         parts.append(_svg_text(x + phase_w / 2, 58, f"d{phase}", 11, anchor="middle", fill="#4b5563"))
-    for lane_idx, lane in enumerate(lane_names):
-        y = y0 + lane_idx * lane_h
+    for lane in lane_names:
+        y = lane_y[lane]
         parts.append(_svg_text(20, y + 28, lane, 12, anchor="start"))
         parts.append(f'<line x1="{x0}" y1="{y + 48}" x2="{width - 35}" y2="{y + 48}" stroke="#e5e7eb" stroke-width="1"/>')
 
@@ -230,10 +282,9 @@ def render_gpu_lane_timeline(
     for node in nodes:
         action = dict(node.get("action", {}))
         lane = _lane_for_action(action, executed_state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
-        lane_idx = lane_names.index(lane) if lane in lane_names else 0
         phase = int(node.get("phase", 0))
         stack = _node_stack_index(node, nodes, lane, phase, executed_state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
-        y = y0 + lane_idx * lane_h + 7 + stack * stack_gap
+        y = lane_y.get(lane, y0) + 7 + stack * stack_gap
         w = phase_w - 12
         x = x0 + phase * phase_w + 5
         positions[str(node.get("id"))] = (x + w / 2, y + 25, lane)
@@ -281,10 +332,9 @@ def render_gpu_lane_timeline(
     for node in nodes:
         action = dict(node.get("action", {}))
         lane = _lane_for_action(action, executed_state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
-        lane_idx = lane_names.index(lane) if lane in lane_names else 0
         phase = int(node.get("phase", 0))
         stack = _node_stack_index(node, nodes, lane, phase, executed_state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
-        y = y0 + lane_idx * lane_h + 7 + stack * stack_gap
+        y = lane_y.get(lane, y0) + 7 + stack * stack_gap
         duration = _duration(action)
         w = phase_w - 12
         x = x0 + phase * phase_w + 5
@@ -298,6 +348,31 @@ def render_gpu_lane_timeline(
         parts.append(_svg_text(x + w / 2, y + 47, _duration_label(action, duration), 8, anchor="middle", fill="#4b5563"))
     parts.append(_legend(width - 410, height - 25))
     return "\n".join(parts + ["</svg>"]) + "\n"
+
+
+def _timeline_lane_heights(
+    nodes: list[dict[str, Any]],
+    lane_names: list[str],
+    state: Any,
+    logical_aliases: dict[int, str],
+    physical_aliases: dict[str, str],
+    lane_roles: dict[tuple[int, str], str] | None,
+    physical_reuse: dict[str, str] | None,
+    stack_gap: int,
+) -> dict[str, int]:
+    heights = {lane: 132 for lane in lane_names}
+    max_stack_by_lane = {lane: 0 for lane in lane_names}
+    for node in nodes:
+        action = dict(node.get("action", {}))
+        lane = _lane_for_action(action, state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
+        if lane not in max_stack_by_lane:
+            continue
+        phase = int(node.get("phase", 0))
+        stack = _node_stack_index(node, nodes, lane, phase, state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
+        max_stack_by_lane[lane] = max(max_stack_by_lane[lane], stack)
+    for lane, max_stack in max_stack_by_lane.items():
+        heights[lane] = max(132, 72 + (max_stack + 1) * stack_gap)
+    return heights
 
 
 def _node_stack_index(
@@ -1136,14 +1211,22 @@ def _timeline_detail_lines(action: dict[str, Any], state: Any) -> list[str]:
     if action_type == "return_gpu":
         return [f"return {action.get('physical_gpu_id', '-')}", "availableQueue"]
     if action_type == "accept_queued_requests":
-        return [f"accept queued {action.get('queued', '-')}", f"from gpu{action.get('from_gpu_id', '-')}"]
+        return [
+            f"accept queued {action.get('queued', '-')}",
+            f"to gpu{action.get('gpu_id', '-')} {_format_slot(action.get('slot'))}",
+            f"from gpu{action.get('from_gpu_id', '-')}",
+        ]
     if action_type in {"place_target_layout", "mark_reconfig_target_prepared"}:
         summary = _gpu_layout_summary(state, action.get("gpu_id"), action.get("physical_gpu_id"))
         return [summary[0] if summary else "target layout", summary[1] if len(summary) > 1 else ""]
     if action_type == "observe_mig_devices":
         return [f"gpu{action.get('gpu_id', '-')}", "slot -> MIG UUID"]
     if action_type == "reroute_queued_tasks":
-        return [f"queued {action.get('queued', '-')}", f"to {action.get('to') or 'stable slot'}"]
+        return [
+            f"queued {action.get('queued', '-')}",
+            f"to gpu{action.get('target_gpu_id', '-')} {_format_slot(action.get('target_slot'))}",
+            "stable slot",
+        ]
     if action_type == "deploy_target_workloads":
         return [f"gpu{action.get('gpu_id', '-')}", "pods ready"]
     if action_type == "activate_serving_route":
@@ -1222,6 +1305,12 @@ def _format_action_slots(action: dict[str, Any]) -> str:
     if len(formatted) <= 2:
         return ", ".join(formatted)
     return f"{len(formatted)} slots"
+
+
+def _format_slot(slot: Any) -> str:
+    if isinstance(slot, (list, tuple)) and len(slot) >= 3:
+        return f"{int(slot[0])}-{int(slot[1])} {slot[2]}"
+    return "slot -"
 
 
 def _svg_header(width: int, height: int, title: str) -> list[str]:

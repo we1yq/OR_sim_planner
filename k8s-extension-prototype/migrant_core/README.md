@@ -56,10 +56,14 @@ Current contents:
 - `transition_planners/phase_greedy.py`: phase-greedy transition planner. It
   exposes `run()` for the plain linear action output and `run_with_dag_output()`
   for the same execution semantics plus the phased action DAG representation.
-- `transition_planners/resource_aware_dag.py`: experimental action planner that
-  schedules directly from ready DAG phases instead of phase-greedy root scoring.
-  It reuses the shared full-action generator and simulator, then repeatedly
-  executes the earliest dependency-ready phase.
+- `transition_planners/basic_dag.py`: baseline DAG compiler that converts a
+  materialized MILP target and observed source state into rule-based abstract
+  transition actions, then lowers them into an executable dependency DAG.
+- `transition_planners/cost_aware_dag.py`: first cost-aware final-DAG planner.
+  It enumerates transition-mode candidates for reconfiguration and workload
+  replacement, filters service-infeasible candidates, and scores the remaining
+  choices by peak active GPU count, queue/drain cost, MIG benchmark time, and
+  disruption.
 
 Next migration targets:
 

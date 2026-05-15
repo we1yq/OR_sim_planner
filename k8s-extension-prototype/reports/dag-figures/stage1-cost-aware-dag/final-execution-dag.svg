@@ -5,7 +5,7 @@
 </marker>
 </defs>
 <rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
-<text x="24.0" y="30.0" text-anchor="start" font-family="Arial, sans-serif" font-size="22" fill="#111827">stage1 basic_dag - GPU-lane dependency DAG</text>
+<text x="24.0" y="30.0" text-anchor="start" font-family="Arial, sans-serif" font-size="22" fill="#111827">stage1 cost_aware_dag - GPU-lane dependency DAG</text>
 <line x1="190" y1="62" x2="190" y2="632" stroke="#e5e7eb" stroke-width="1"/>
 <text x="246.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d0</text>
 <line x1="302" y1="62" x2="302" y2="632" stroke="#e5e7eb" stroke-width="1"/>
@@ -46,11 +46,11 @@
 <text x="245.0" y="509.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">reserve I</text>
 <text x="245.0" y="520.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">pending gpu8</text>
 <text x="245.0" y="532.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.2s</text>
-<rect x="307" y="89" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 0-2 2g | delete pods | 1s</title></rect>
-<text x="357.0" y="101.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
-<text x="357.0" y="113.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">0-2 2g</text>
-<text x="357.0" y="124.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
-<text x="357.0" y="136.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="307" y="89" width="100.0" height="50" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 0-2 2g | vgg16 | 30s</title></rect>
+<text x="357.0" y="101.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
+<text x="357.0" y="113.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 0-2 2g</text>
+<text x="357.0" y="124.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vgg16</text>
+<text x="357.0" y="136.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">30s</text>
 <rect x="307" y="221" width="100.0" height="50" rx="4" fill="#dbeafe" stroke="#111827" stroke-width="1"><title>configure | template 4+3 | wait allocatable | 120.651s</title></rect>
 <text x="357.0" y="233.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">configure</text>
 <text x="357.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">template 4+3</text>
@@ -66,6 +66,11 @@
 <text x="357.0" y="509.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">template 4+3</text>
 <text x="357.0" y="520.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">wait allocatable</text>
 <text x="357.0" y="532.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">120.651s alloc</text>
+<rect x="419" y="89" width="100.0" height="50" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 0-2 2g | delete pods | 1s</title></rect>
+<text x="469.0" y="101.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
+<text x="469.0" y="113.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">0-2 2g</text>
+<text x="469.0" y="124.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
+<text x="469.0" y="136.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
 <rect x="419" y="221" width="100.0" height="50" rx="4" fill="#ede9fe" stroke="#111827" stroke-width="1"><title>bind-target-gpu | active gpu6 | G | 0.2s</title></rect>
 <text x="469.0" y="233.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">bind-target-gpu</text>
 <text x="469.0" y="245.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">active gpu6</text>

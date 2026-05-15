@@ -1,10 +1,10 @@
 {
   "actionCount": 36,
   "outputs": {
-    "final_execution_dag": "k8s-extension-prototype/reports/dag-figures/stage0-resource-aware/final-execution-dag.svg"
+    "final_execution_dag": "k8s-extension-prototype/reports/dag-figures/stage0-basic-dag/final-execution-dag.svg"
   },
   "phaseCount": 6,
-  "planner": "offline_final_dag",
-  "plannerModule": "transition.offline_final_dag",
+  "planner": "basic_dag",
+  "plannerModule": "transition.basic_dag",
   "scenario": "stage0"
 }

@@ -104,9 +104,9 @@ Accept Queued Requests -> -> Reroute Queued Requests
 ```
 
 ```text
-4. target-first-reconfiguration
+4. bridge-reconfiguration
 
-Target GPU line:
+Bridge GPU line:
 -> Allocate GPU: reserve a physical GPU from availableQueue; assign pendingLogicalGpuId
 -> Configure Template: move GPU to transitionQueue; apply target MIG template on the physical GPU
 -> Bind GPU: bind activeLogicalGpuId to this physical GPU; remove pendingLogicalGpuId; move GPU to activeQueue

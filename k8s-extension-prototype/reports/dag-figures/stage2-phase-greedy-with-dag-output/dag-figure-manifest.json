@@ -1,0 +1,10 @@
+{
+  "actionCount": 30,
+  "outputs": {
+    "final_execution_dag": "k8s-extension-prototype/reports/dag-figures/stage2-phase-greedy-with-dag-output/final-execution-dag.svg"
+  },
+  "phaseCount": 7,
+  "planner": "phase_greedy_with_dag_output",
+  "plannerModule": "transition.phase_greedy_with_dag_output",
+  "scenario": "stage2"
+}

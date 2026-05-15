@@ -7,7 +7,7 @@ The canonical action wording and queue/binding semantics live in [`docs/abstract
 ## Generated SVGs
 
 - `create-target-gpu.svg`
-- `target-first-reconfiguration.svg`
+- `bridge-reconfiguration.svg`
 - `in-place-reconfiguration.svg`
 - `delete-gpu.svg`
 - `workload-replacement.svg`

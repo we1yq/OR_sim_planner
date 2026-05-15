@@ -43,9 +43,9 @@ DIAGRAMS: list[dict[str, Any]] = [
         ],
     },
     {
-        "name": "target-first-reconfiguration",
-        "title": "Target-First Reconfiguration",
-        "description": "Prepare a target GPU with pendingLogicalGpuId, drain and clear the old active binding, then bind the target as active.",
+        "name": "bridge-reconfiguration",
+        "title": "Bridge Reconfiguration",
+        "description": "Prepare a bridge GPU with pendingLogicalGpuId, drain and clear the old active binding, then bind the bridge as active.",
         "nodes": [
             ("allocate", "Allocate GPU: reserve from availableQueue; assign pendingLogicalGpuId", "mig", 0, 0),
             ("configure", "Configure Template: move to transitionQueue; apply target MIG template", "mig", 1, 0),

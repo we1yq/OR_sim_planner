@@ -179,6 +179,21 @@ runtime:
   drainRemaining: null
 ```
 
+For the stage smoke scenarios, MIGRANT now injects conservative per-changed-slot
+runtime assumptions through the scenario `transition.runtime` block:
+
+```yaml
+transition:
+  runtime:
+    defaultQueued: 2
+    defaultInflight: 1
+    overrideExistingChangedSlots: true
+```
+
+This is a planning assumption for offline experiments, not a substitute for the
+real Router/Runtime observer. In production, these fields should come from the
+serving runtime queue and inflight metrics.
+
 ### 7. Physical GPU Identity Is Missing
 
 The notebook distinguishes logical `gpu_id` from physical identity labels such

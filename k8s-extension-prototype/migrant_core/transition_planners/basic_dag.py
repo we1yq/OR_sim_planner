@@ -28,7 +28,7 @@ from ..transition_engine import (
 from .action_plan_formats import build_phased_action_plan, compact_phased_action_plan
 
 
-NAME = "transition.offline_final_dag"
+NAME = "transition.basic_dag"
 
 
 def run(
@@ -38,8 +38,11 @@ def run(
     src_arrival: list[float] | tuple[float, ...] | dict[str, float],
     tgt_arrival: list[float] | tuple[float, ...] | dict[str, float],
     workload_names: list[str] | tuple[str, ...] | None = None,
-    stage_name: str = "stage_offline_final_dag",
+    stage_name: str = "stage_basic_dag",
     max_iters: int = 1,
+    default_queued: int = 2,
+    default_inflight: int = 1,
+    override_existing_runtime_for_changed_slots: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
     """Build one final transition DAG from current state to the MILP target.
@@ -51,7 +54,13 @@ def run(
     """
 
     start = time.perf_counter()
-    current_state = prepare_transition_runtime(source_state, target_state)
+    current_state = prepare_transition_runtime(
+        source_state,
+        target_state,
+        default_queued=default_queued,
+        default_inflight=default_inflight,
+        override_existing_changed_slots=override_existing_runtime_for_changed_slots,
+    )
     ensure_state_metadata(current_state)
     bootstrap_physical_ids_for_state(current_state)
     target_state = deepcopy_state(target_state)
@@ -63,6 +72,8 @@ def run(
         target_state=target_state,
         required=required,
     )
+    actions = _coalesce_slot_delete_pods(actions)
+    _assert_reroute_destinations_stable(current_state, target_state, actions)
     planned_state = _planned_state_for_actions(current_state, target_state, actions)
     executed_state = simulate_transition_actions(
         source_state=current_state,
@@ -112,6 +123,11 @@ def run(
                 "preserve service capacity and queue/drain safety",
                 "minimize transition time via DAG parallelism",
             ],
+            "runtime_assumptions": {
+                "defaultQueued": int(default_queued),
+                "defaultInflight": int(default_inflight),
+                "overrideExistingChangedSlots": bool(override_existing_runtime_for_changed_slots),
+            },
         },
         "phased_action_plan": dag,
         "phased_action_plan_summary": compact_phased_action_plan(dag),
@@ -160,13 +176,13 @@ def _build_final_actions(
 
     # Peak-GPU first: do work that can free or reuse capacity before allocating
     # brand-new physical GPUs. Reconfiguration chooses in-place whenever it is
-    # service-safe; target-first is reserved for the cases where old capacity
-    # must remain serving until a target side is ready.
+    # service-safe; bridge reconfiguration is reserved for the cases where old
+    # capacity must remain serving until bridge capacity is ready.
     for gpu_id in instance_diff_ids:
         _append_instance_diff_actions(actions, plan_items, source_state, target_state, gpu_id, required)
 
     for gpu_id in remove_ids:
-        _append_delete_gpu_actions(actions, plan_items, source_state, gpu_id, required)
+        _append_delete_gpu_actions(actions, plan_items, source_state, target_state, gpu_id, required)
         physical_id = get_physical_id(source_state, gpu_id)
         if physical_id is not None:
             free_pool.append(physical_id)
@@ -180,16 +196,18 @@ def _build_final_actions(
                 actions,
                 plan_items,
                 source_state,
+                target_state,
                 gpu_id,
                 old_physical_id,
                 tgt_gpu.template_str(),
             )
             continue
         new_physical_id = alloc_from_free_pool(free_pool)
-        _append_target_first_reconfiguration_actions(
+        _append_bridge_reconfiguration_actions(
             actions,
             plan_items,
             source_state,
+            target_state,
             gpu_id,
             old_physical_id,
             new_physical_id,
@@ -202,7 +220,126 @@ def _build_final_actions(
         physical_id = alloc_from_free_pool(free_pool)
         _append_create_target_gpu_actions(actions, plan_items, gpu_id, physical_id, tgt_gpu.template_str())
 
-    return actions, plan_items
+    return _coalesce_slot_delete_pods(actions), plan_items
+
+
+def _coalesce_slot_delete_pods(actions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Merge same-GPU slot pod deletions into one executable delete_pods call.
+
+    Slot-level replacement/removal roots may independently decide that their old
+    pods can be deleted. The actuator API is cleaner when one action carries the
+    full slot set for a physical GPU, while later place/activate actions remain
+    per slot. This keeps the DAG faithful to the executable interface:
+    delete_pods(gpu, slots=[...]) -> deploy replacement pods as needed.
+    """
+
+    groups: dict[tuple[int, str], list[int]] = {}
+    for idx, action in enumerate(actions):
+        if action.get("type") != "delete_pods":
+            continue
+        if action.get("slot") is None:
+            continue
+        slots = list(action.get("slots") or [])
+        if len(slots) != 1:
+            continue
+        mode = str(action.get("transitionMode", ""))
+        if mode in {"delete_gpu", "in_place_reconfiguration", "bridge_reconfiguration"}:
+            continue
+        gpu_id = action.get("gpu_id")
+        physical_id = action.get("physical_gpu_id")
+        if gpu_id is None or physical_id is None:
+            continue
+        groups.setdefault((int(gpu_id), str(physical_id)), []).append(idx)
+
+    merge_groups = {key: idxs for key, idxs in groups.items() if len(idxs) > 1}
+    if not merge_groups:
+        return actions
+
+    remove_indices: set[int] = set()
+    insert_after: dict[int, list[dict[str, Any]]] = {}
+    post_by_insert: dict[int, list[dict[str, Any]]] = {}
+
+    for (gpu_id, physical_id), delete_indices in merge_groups.items():
+        slots = [_slot_tuple(actions[idx].get("slot")) for idx in delete_indices]
+        slots = [slot for slot in slots if slot is not None]
+        affected_slots = set(slots)
+        affected_roots = {str(actions[idx].get("abstractRoot")) for idx in delete_indices}
+        post_indices = [
+            idx
+            for idx, action in enumerate(actions)
+            if int(action.get("gpu_id", -1)) == gpu_id
+            and str(action.get("physical_gpu_id")) == physical_id
+            and _slot_tuple(action.get("slot")) in affected_slots
+            and action.get("type") in {"place_instance", "activate_serving_route"}
+            and str(action.get("abstractRoot")) in affected_roots
+        ]
+        pre_indices = [
+            idx
+            for idx, action in enumerate(actions)
+            if str(action.get("abstractRoot")) in affected_roots
+            and idx not in set(delete_indices)
+            and idx not in set(post_indices)
+        ]
+        if not pre_indices:
+            continue
+        anchor = max(pre_indices)
+        merged = _action(
+            "delete_pods",
+            gpu_id=gpu_id,
+            physical_gpu_id=physical_id,
+            slots=sorted(affected_slots),
+            slotCount=len(affected_slots),
+            transitionMode="grouped_slot_delete_pods",
+            abstractRoot=f"GPU_DIFF_gpu{gpu_id}_delete_pods",
+        )
+        insert_after.setdefault(anchor, []).append(merged)
+        post_by_insert.setdefault(anchor, []).extend(dict(actions[idx]) for idx in sorted(post_indices))
+        remove_indices.update(delete_indices)
+        remove_indices.update(post_indices)
+
+    out: list[dict[str, Any]] = []
+    for idx, action in enumerate(actions):
+        if idx not in remove_indices:
+            out.append(action)
+        if idx in insert_after:
+            out.extend(insert_after[idx])
+            out.extend(post_by_insert.get(idx, []))
+    return out
+
+
+def _slot_tuple(value: Any) -> tuple[int, int, str] | None:
+    if not isinstance(value, (list, tuple)) or len(value) < 3:
+        return None
+    return (int(value[0]), int(value[1]), str(value[2]))
+
+
+def _assert_reroute_destinations_stable(
+    source_state: ClusterState,
+    target_state: ClusterState,
+    actions: list[dict[str, Any]],
+) -> None:
+    source_map = gpu_map_by_id(source_state)
+    target_map = gpu_map_by_id(target_state)
+    for action in actions:
+        if action.get("type") != "reroute_queued_tasks":
+            continue
+        target_gpu_id = action.get("target_gpu_id")
+        target_slot = _slot_tuple(action.get("target_slot"))
+        if target_gpu_id is None or target_slot is None:
+            raise ValueError(f"Reroute action is missing target slot: {action}")
+        source_gpu = source_map.get(int(target_gpu_id))
+        target_gpu = target_map.get(int(target_gpu_id))
+        source_inst = get_inst_by_slot(source_gpu, target_slot)
+        target_inst = get_inst_by_slot(target_gpu, target_slot)
+        if source_inst is None or target_inst is None:
+            raise ValueError(f"Reroute target slot is not present in source/target: {action}")
+        if source_inst.workload != target_inst.workload or source_inst.batch != target_inst.batch:
+            raise ValueError(
+                "Reroute target slot is not stable: "
+                f"gpu={target_gpu_id} slot={target_slot} "
+                f"source=({source_inst.workload}, bs={source_inst.batch}) "
+                f"target=({target_inst.workload}, bs={target_inst.batch})"
+            )
 
 
 def _append_create_target_gpu_actions(
@@ -252,6 +389,7 @@ def _append_delete_gpu_actions(
     actions: list[dict[str, Any]],
     plan_items: list[dict[str, Any]],
     source_state: ClusterState,
+    target_state: ClusterState,
     gpu_id: int,
     required: dict[str, float],
 ) -> None:
@@ -265,7 +403,19 @@ def _append_delete_gpu_actions(
             _action("stop_gpu_traffic", gpu_id=gpu_id, physical_gpu_id=physical_id, slots=slots, slotCount=len(slots), **common)
         )
     for inst in _nonfree_instances(src_gpu):
-        actions.extend(_queue_and_drain_actions(source_state, source_state, gpu_id, physical_id, inst, required, common, stop_new=False))
+        actions.extend(
+            _queue_and_drain_actions(
+                source_state,
+                target_state,
+                gpu_id,
+                physical_id,
+                inst,
+                required,
+                common,
+                stop_new=False,
+                exclude_entire_gpu=True,
+            )
+        )
     actions.extend(
         [
             _action("delete_pods", gpu_id=gpu_id, physical_gpu_id=physical_id, slots=slots, **common),
@@ -295,6 +445,7 @@ def _append_in_place_reconfiguration_actions(
     actions: list[dict[str, Any]],
     plan_items: list[dict[str, Any]],
     source_state: ClusterState,
+    target_state: ClusterState,
     gpu_id: int,
     physical_id: str,
     template: str,
@@ -308,7 +459,19 @@ def _append_in_place_reconfiguration_actions(
             _action("stop_gpu_traffic", gpu_id=gpu_id, physical_gpu_id=physical_id, slots=slots, slotCount=len(slots), **common)
         )
     for inst in _nonfree_instances(src_gpu):
-        actions.extend(_queue_and_drain_actions(source_state, source_state, gpu_id, physical_id, inst, {}, common, stop_new=False))
+        actions.extend(
+            _queue_and_drain_actions(
+                source_state,
+                target_state,
+                gpu_id,
+                physical_id,
+                inst,
+                {},
+                common,
+                stop_new=False,
+                exclude_entire_gpu=True,
+            )
+        )
     actions.extend(
         [
             _action("delete_pods", gpu_id=gpu_id, physical_gpu_id=physical_id, slots=slots, **common),
@@ -345,18 +508,19 @@ def _append_in_place_reconfiguration_actions(
     plan_items.append(_plan_item(root, "in_place_reconfiguration", gpu_id, physical_id, template=template))
 
 
-def _append_target_first_reconfiguration_actions(
+def _append_bridge_reconfiguration_actions(
     actions: list[dict[str, Any]],
     plan_items: list[dict[str, Any]],
     source_state: ClusterState,
+    target_state: ClusterState,
     gpu_id: int,
     old_physical_id: str,
     new_physical_id: str,
     template: str,
 ) -> None:
     src_gpu = gpu_map_by_id(source_state)[gpu_id]
-    root = f"TARGET_FIRST_RECONF_gpu{gpu_id}"
-    common = {"transitionMode": "target_first_reconfiguration", "abstractRoot": root}
+    root = f"BRIDGE_RECONF_gpu{gpu_id}"
+    common = {"transitionMode": "bridge_reconfiguration", "abstractRoot": root}
     actions.extend(
         [
             _action(
@@ -384,7 +548,19 @@ def _append_target_first_reconfiguration_actions(
             _action("stop_gpu_traffic", gpu_id=gpu_id, physical_gpu_id=old_physical_id, slots=slots, slotCount=len(slots), **common)
         )
     for inst in _nonfree_instances(src_gpu):
-        actions.extend(_queue_and_drain_actions(source_state, source_state, gpu_id, old_physical_id, inst, {}, common, stop_new=False))
+        actions.extend(
+            _queue_and_drain_actions(
+                source_state,
+                target_state,
+                gpu_id,
+                old_physical_id,
+                inst,
+                {},
+                common,
+                stop_new=False,
+                exclude_entire_gpu=True,
+            )
+        )
     actions.extend(
         [
             _action("delete_pods", gpu_id=gpu_id, physical_gpu_id=old_physical_id, slots=slots, **common),
@@ -420,7 +596,7 @@ def _append_target_first_reconfiguration_actions(
     plan_items.append(
         _plan_item(
             root,
-            "target_first_reconfiguration",
+            "bridge_reconfiguration",
             gpu_id,
             old_physical_id,
             target_physical_gpu_id=new_physical_id,
@@ -635,6 +811,7 @@ def _queue_and_drain_actions(
     required: dict[str, float],
     common: dict[str, Any],
     stop_new: bool = True,
+    exclude_entire_gpu: bool = False,
 ) -> list[dict[str, Any]]:
     slot = (inst.start, inst.end, inst.profile)
     runtime = _get_runtime_entry(source_state, gpu_id, slot)
@@ -651,6 +828,7 @@ def _queue_and_drain_actions(
         inst.workload,
         exclude_gpu_id=gpu_id,
         exclude_slot=slot,
+        exclude_entire_gpu=exclude_entire_gpu,
     )
     reroute_candidate = candidates[0] if candidates else None
     if queued > 0 and reroute_candidate is not None:

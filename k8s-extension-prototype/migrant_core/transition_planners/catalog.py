@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .interfaces import TransitionPlanner
-from . import offline_final_dag, phase_greedy, root_scheduling_baselines
+from . import basic_dag, cost_aware_dag, phase_greedy, root_scheduling_baselines
 
 
 PlannerRole = Literal["production", "compatibility-output", "ablation-baseline", "experimental"]
@@ -20,20 +20,32 @@ class TransitionPlannerEntry:
 
 
 PLANNER_CATALOG: dict[str, TransitionPlannerEntry] = {
-    "offline_final_dag": TransitionPlannerEntry(
-        name="offline_final_dag",
-        runner=offline_final_dag.run,
+    "basic_dag": TransitionPlannerEntry(
+        name="basic_dag",
+        runner=basic_dag.run,
         role="production",
         description=(
-            "MIGRANT final-DAG planner: materialized MILP target -> abstract "
-            "transition actions -> executable dependency DAG."
+            "MIGRANT baseline final-DAG planner: materialized MILP target -> "
+            "rule-based abstract transition actions -> executable dependency DAG."
         ),
         aliases=(
+            "offline_final_dag",
             "resource_aware_dag",
             "transition.resource_aware_dag",
             "transition.offline_final_dag",
+            "transition.basic_dag",
             "final_dag",
         ),
+    ),
+    "cost_aware_dag": TransitionPlannerEntry(
+        name="cost_aware_dag",
+        runner=cost_aware_dag.run,
+        role="experimental",
+        description=(
+            "Cost-aware DAG planner entry point. It will score transition "
+            "candidates with queue, drain, profile, and MIG benchmark costs."
+        ),
+        aliases=("transition.cost_aware_dag",),
     ),
     "phase_greedy": TransitionPlannerEntry(
         name="phase_greedy",

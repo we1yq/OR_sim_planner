@@ -229,7 +229,7 @@ def build_abstract_action_preview(status: dict[str, Any]) -> dict[str, Any]:
             "keep_gpu": "Source and target MIG layout plus workload payload are unchanged.",
             "create_gpu": "Source has no logical GPU and target has one; prepare target-side MIG geometry.",
             "remove_gpu": "Target no longer needs the GPU; stop/reroute/drain active slots before clearing geometry.",
-            "reconfiguration": "Source and target MIG templates differ; choose target_first unless old workloads have unchanged stable reroute slots.",
+            "reconfiguration": "Source and target MIG templates differ; choose bridge reconfiguration unless old workloads have unchanged stable reroute slots.",
             "instance_diff": "MIG geometry is unchanged but slot workload or batch payload differs.",
         },
         "notes": [
@@ -426,8 +426,8 @@ def _plan_item_brief(item: dict[str, Any]) -> dict[str, Any]:
 def _abstract_rule(action: dict[str, Any]) -> str:
     action_type = str(action.get("type"))
     mode = action.get("mode")
-    if action_type == "reconfiguration" and mode == "target_first":
-        return "No unchanged reroute destination exists for every old workload slot, so prepare target-side GPU before old-side cutover."
+    if action_type == "reconfiguration" and mode in {"bridge", "bridge_reconfiguration"}:
+        return "No unchanged reroute destination exists for every old workload slot, so bridge through a prepared GPU before old-side cutover."
     if action_type == "reconfiguration" and mode == "in_place_old_first":
         return "Every old workload slot has unchanged reroute capacity, so drain old side and reconfigure in place."
     if action_type == "remove_gpu":
@@ -446,8 +446,8 @@ def _abstract_gates(action_type: str, mode: Any) -> list[str]:
         return ["observeFreePhysicalGpu", "prepareMigGeometry", "observeTargetMigReady", "prepareServingCapacity"]
     if action_type == "remove_gpu":
         return ["findStableRerouteCapacity", "stopAcceptingOldSlots", "rerouteQueuedRequests", "waitQueuedAndRunningWorkZero", "deleteOrRecyclePods", "clearOldMigGeometry"]
-    if action_type == "reconfiguration" and mode == "target_first":
-        return ["prepareTargetMigGeometry", "prepareTargetServingCapacity", "shiftRouting", "waitOldInflightZero", "clearOldMigGeometry", "observeAndBindTarget"]
+    if action_type == "reconfiguration" and mode in {"bridge", "bridge_reconfiguration"}:
+        return ["prepareBridgeMigGeometry", "prepareBridgeServingCapacity", "shiftRouting", "waitOldInflightZero", "clearOldMigGeometry", "observeAndBindBridge"]
     if action_type == "reconfiguration":
         return ["stopAcceptingOldSlots", "rerouteQueuedRequests", "waitQueuedAndRunningWorkZero", "clearOldMigGeometry", "prepareMigGeometryInPlace", "observeAndBindTarget"]
     if action_type == "instance_diff":
@@ -468,7 +468,7 @@ def _abstract_pod_impact(action_type: str, mode: Any, related_items: list[dict[s
 def _abstract_mig_impact(action_type: str, mode: Any) -> dict[str, Any]:
     return {
         "requiresMigManager": action_type in {"create_gpu", "remove_gpu", "reconfiguration"},
-        "requiresNewTargetGpu": action_type == "create_gpu" or (action_type == "reconfiguration" and mode == "target_first"),
+        "requiresNewTargetGpu": action_type == "create_gpu" or (action_type == "reconfiguration" and mode in {"bridge", "bridge_reconfiguration"}),
         "clearOldGpuAfterDrain": action_type in {"remove_gpu", "reconfiguration"},
         "inPlaceGeometryChange": action_type == "reconfiguration" and mode == "in_place_old_first",
     }
