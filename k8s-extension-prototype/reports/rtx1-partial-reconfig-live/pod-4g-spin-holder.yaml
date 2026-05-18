@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: partial-reconfig-4g-spin-holder
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: partial-reconfig-4g-spin-holder
+    mig.or-sim.io/test: partial-reconfig-live
+  annotations:
+    nvidia.cdi.k8s.io/container.worker: management.nvidia.com/gpu=MIG-7aafc298-b386-508f-80b7-938481c587bc
+spec:
+  restartPolicy: Never
+  runtimeClassName: nvidia
+  nodeSelector:
+    kubernetes.io/hostname: rtx1-worker
+  containers:
+    - name: worker
+      image: nvcr.io/nvidia/gpu-operator:v26.3.1
+      imagePullPolicy: IfNotPresent
+      command:
+        - sleep
+        - "300"
+      env:
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: all
+      securityContext:
+        privileged: true

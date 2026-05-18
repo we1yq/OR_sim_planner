@@ -209,7 +209,7 @@ def _root_id_for_action(action: dict[str, Any]) -> str:
 def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
     resources: set[str] = set()
     action_type = str(action.get("type", ""))
-    if action.get("slot") is not None:
+    if action.get("slot") is not None and action_type != "accept_queued_requests":
         resources.add(f"slot:{action.get('gpu_id')}:{tuple(action['slot'])}")
     if action.get("queue_transfer_id") is not None:
         resources.add(f"queue-transfer:{action['queue_transfer_id']}")
@@ -221,10 +221,10 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
     if action_type in {
         "allocate_gpu",
         "configure_full_template",
+        "configure_partial_profile",
         "observe_mig_devices",
         "deploy_target_workloads",
         "bind_target_gpu",
-        "delete_pods",
         "delete_gpu_pods",
         "clear_gpu_binding",
         "clear_template",
@@ -232,6 +232,10 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
         "stop_gpu_traffic",
     } and action.get("physical_gpu_id") is not None:
         resources.add(f"physical:{action['physical_gpu_id']}")
+    if action_type == "delete_pods" and action.get("physical_gpu_id") is not None:
+        slots = _slots_for_action(action)
+        if action.get("slot") is None or len(slots) != 1:
+            resources.add(f"physical:{action['physical_gpu_id']}")
     if action_type == "observe_mig_devices" and action.get("gpu_id") is not None and action.get("physical_gpu_id") is not None:
         resources.add(f"mig-devices:{action['gpu_id']}:{action['physical_gpu_id']}")
     if action_type in {"clear_gpu_binding", "bind_target_gpu"} and action.get("gpu_id") is not None:

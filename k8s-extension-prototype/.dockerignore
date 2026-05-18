@@ -4,3 +4,5 @@
 examples
 docs
 tools
+!tools/fast-mig-node-agent
+!tools/fast-mig-node-agent/main.go

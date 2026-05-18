@@ -1,0 +1,33 @@
+{
+  "runtimeAssumption": "scenario default stress runtime",
+  "reroutePolicy": {
+    "localCompletionThresholdSeconds": 5.0,
+    "rule": "skip reroute when queued plus inflight work is estimated to finish locally within threshold"
+  },
+  "figures": [
+    {
+      "dir": "stage1-cost-aware-dag",
+      "scenario": "stage1",
+      "planner": "cost_aware_dag",
+      "actionCount": 21,
+      "phaseCount": 6,
+      "svg": "stage1-cost-aware-dag/final-execution-dag.svg"
+    },
+    {
+      "dir": "stage2-cost-aware-dag",
+      "scenario": "stage2",
+      "planner": "cost_aware_dag",
+      "actionCount": 37,
+      "phaseCount": 7,
+      "svg": "stage2-cost-aware-dag/final-execution-dag.svg"
+    },
+    {
+      "dir": "stage3-cost-aware-dag",
+      "scenario": "stage3",
+      "planner": "cost_aware_dag",
+      "actionCount": 39,
+      "phaseCount": 12,
+      "svg": "stage3-cost-aware-dag/final-execution-dag.svg"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "command": "clear",
+  "gpuIndex": "0",
+  "success": true,
+  "nvidiaSmiL": "GPU 0: NVIDIA A100-PCIE-40GB (UUID: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f)\nGPU 1: NVIDIA TITAN RTX (UUID: GPU-21058121-c040-c847-712d-da7a5cf48e4b)\nGPU 2: NVIDIA TITAN RTX (UUID: GPU-edc7db6f-0fec-bc09-9cbe-5a8d2598a62e)\nGPU 3: NVIDIA GeForce RTX 3090 (UUID: GPU-1e09b62e-bae8-23dd-a55d-03b34ee00182)\n"
+}

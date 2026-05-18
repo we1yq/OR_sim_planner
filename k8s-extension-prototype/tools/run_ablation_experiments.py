@@ -54,17 +54,18 @@ from migrant_core.transition_planners import PLANNER_CATALOG  # noqa: E402
 
 REPORT_DIR = ROOT / "reports"
 
-# Empirical constants from docs/mig-reconfig-benchmark-2026-05-10.md.
-# These are intentionally rough: the simulation produces action plans, not real
-# wall-clock GPU-operator reconciliations.
+# Empirical constants from the rtx1 fast-mig-node-agent DaemonSet benchmark.
+# These are intentionally rough averages: the simulation produces action plans,
+# not real wall-clock reconciliations.
 HARDWARE_SECONDS = {
-    "configure_full_template": 113.2,
+    "configure_full_template": 1.009,
+    "configure_partial_profile": 1.059,
     "place_target_layout": 0.0,
     "bind_target_gpu": 0.0,
     "clear_gpu": 10.4,
     "delete_gpu_pods": 1.0,
     "clear_gpu_binding": 0.0,
-    "clear_template": 0.0,
+    "clear_template": 0.655,
     "return_gpu": 0.0,
     "allocate_gpu": 0.0,
     "mark_reconfig_target_prepared": 0.0,

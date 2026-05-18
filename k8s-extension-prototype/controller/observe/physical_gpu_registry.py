@@ -121,6 +121,10 @@ def build_physical_gpu_registry(
         str(physical_id): dict(binding)
         for physical_id, binding in dict(previous_status.get("bindings", {})).items()
     }
+    previous_provisional = {
+        str(physical_id): dict(value)
+        for physical_id, value in dict(previous_status.get("provisionalAgentSlotMaps", {})).items()
+    }
 
     observed_bindings = {
         str(physical_id): dict(binding)
@@ -150,6 +154,12 @@ def build_physical_gpu_registry(
             mig_config=mig_config,
             mig_config_state=mig_config_state,
         )
+        verification = _slot_map_verification(
+            observed_slots=logical_slots,
+            provisional=previous_provisional.get(physical_id),
+        )
+        if verification == "verified":
+            logical_slots = [{**dict(slot), "verification": "verified"} for slot in logical_slots]
         available_eligible, availability_reason = _available_eligibility(
             clean=clean,
             mig_config=mig_config,
@@ -176,6 +186,7 @@ def build_physical_gpu_registry(
             "migDevices": mig_devices,
             "logicalMigSlots": logical_slots,
             "migDevicesFresh": bool(binding.get("migDevicesFresh", True)),
+            "slotMapVerification": verification,
             "currentMigConfig": mig_config,
             "currentMigConfigState": mig_config_state,
             "cleanliness": "empty" if clean else "configured",
@@ -185,6 +196,13 @@ def build_physical_gpu_registry(
             "bindingSource": binding.get("bindingSource"),
             "confidence": binding.get("confidence"),
         }
+        mig_readiness = _mig_readiness_from_previous(
+            previous_binding=previous_binding,
+            verification=verification,
+            logical_slots=logical_slots,
+        )
+        if mig_readiness:
+            record["migReadiness"] = mig_readiness
         if queue_state == "active":
             active_logical_id = _logical_gpu_id_value(previous_binding.get("activeLogicalGpuId"))
             if active_logical_id is not None:
@@ -217,6 +235,17 @@ def build_physical_gpu_registry(
             "ignored": len(ignored),
             "missingActive": len(missing_active),
         },
+        "provisionalAgentSlotMaps": {
+            physical_id: provisional
+            for physical_id, provisional in previous_provisional.items()
+            if physical_id in discovered
+            and list(bindings.get(physical_id, {}).get("logicalMigSlots", []))
+            and _slot_map_verification(
+                observed_slots=list(bindings.get(physical_id, {}).get("logicalMigSlots", [])),
+                provisional=provisional,
+            )
+            == "provisional"
+        },
         "notes": [
             "activeQueue is planner-owned and preserved from the previous registry status.",
             f"availableQueue contains only observed A100 GPUs with no MIG devices, {EMPTY_MIG_CONFIG}=success, and not active.",
@@ -235,6 +264,34 @@ def build_physical_gpu_registry(
         "spec": {"policy": policy},
         "status": status,
     }
+
+
+def _slot_map_verification(
+    observed_slots: list[dict[str, Any]],
+    provisional: dict[str, Any] | None,
+) -> str:
+    if not provisional:
+        return "observed"
+    expected = _slot_signature_list(list(provisional.get("slots", [])))
+    observed = _slot_signature_list(observed_slots)
+    return "verified" if expected and expected == observed else "provisional"
+
+
+def _slot_signature_list(slots: list[dict[str, Any]]) -> list[tuple[int, int, str, str]]:
+    out = []
+    for slot in slots:
+        try:
+            out.append(
+                (
+                    int(slot.get("slotStart")),
+                    int(slot.get("slotEnd")),
+                    str(slot.get("profile") or ""),
+                    str(slot.get("migDeviceUuid") or ""),
+                )
+            )
+        except (TypeError, ValueError):
+            continue
+    return sorted(out)
 
 
 def _merge_cached_bindings_for_unresolved_devices(
@@ -290,6 +347,239 @@ def registry_queue_summary(registry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def apply_agent_mig_result_to_registry(
+    physical_gpu_id: str,
+    agent_result: dict[str, Any],
+    namespace: str = "or-sim",
+    registry_name: str = DEFAULT_REGISTRY_NAME,
+    apply: bool = False,
+    client: KubernetesClient | None = None,
+) -> dict[str, Any]:
+    client = client or PythonKubernetesClient()
+    registry = client.get_physicalgpuregistry(name=registry_name, namespace=namespace)
+    if registry is None:
+        raise ValueError(f"PhysicalGpuRegistry {namespace}/{registry_name} does not exist")
+    if not bool(agent_result.get("success", False)):
+        raise ValueError("Refusing to write unsuccessful agent result to registry")
+
+    status = dict(registry.get("status", {}))
+    bindings = {
+        str(physical_id): dict(binding)
+        for physical_id, binding in dict(status.get("bindings", {})).items()
+    }
+    if physical_gpu_id not in bindings:
+        raise ValueError(f"{physical_gpu_id} is not in registry bindings")
+
+    binding = dict(bindings[physical_gpu_id])
+    slots = [_slot_from_agent_result(physical_gpu_id, binding, item) for item in list(agent_result.get("migSlots", []))]
+    command = str(agent_result.get("command") or "")
+    if not slots and command != "clear":
+        raise ValueError("Agent result does not include migSlots; cannot write provisional registry state")
+
+    if command == "clear":
+        observed_at = datetime.now(timezone.utc).isoformat()
+        binding["migDevices"] = []
+        binding["logicalMigSlots"] = []
+        binding["migDevicesFresh"] = True
+        binding["slotMapVerification"] = "empty"
+        binding["slotMapSource"] = "fast-mig-node-agent"
+        binding["state"] = "transitioning"
+        binding.pop("migReadiness", None)
+        binding.pop("activeLogicalGpuId", None)
+        binding.pop("pendingLogicalGpuId", None)
+        binding["lastAgentResult"] = {
+            "command": agent_result.get("command"),
+            "gpuIndex": agent_result.get("gpuIndex"),
+            "profileIds": agent_result.get("profileIds"),
+            "createSeconds": agent_result.get("createSeconds"),
+            "deleteSeconds": agent_result.get("deleteSeconds"),
+            "message": agent_result.get("message"),
+            "observedAt": observed_at,
+        }
+        bindings[physical_gpu_id] = binding
+        provisional = dict(status.get("provisionalAgentSlotMaps", {}))
+        provisional.pop(physical_gpu_id, None)
+        status["bindings"] = bindings
+        status["provisionalAgentSlotMaps"] = provisional
+        status["activeQueue"] = _without(list(status.get("activeQueue", [])), physical_gpu_id)
+        status["availableQueue"] = _without(list(status.get("availableQueue", [])), physical_gpu_id)
+        status["transitioningQueue"] = _without(list(status.get("transitioningQueue", [])), physical_gpu_id) + [physical_gpu_id]
+        status["queueCounts"] = _queue_counts(status)
+        status["phase"] = "AgentClearedMig"
+        status["observedAt"] = observed_at
+        if apply:
+            client.patch_physicalgpuregistry_status(name=registry_name, namespace=namespace, status=status)
+        return {**registry, "status": status}
+
+    binding["migDevices"] = [
+        {
+            "profile": slot.get("gpuOperatorProfile"),
+            "migDeviceIndex": idx,
+            "migDeviceUuid": slot.get("migDeviceUuid"),
+            "slotStart": slot.get("slotStart"),
+            "slotEnd": slot.get("slotEnd"),
+            "slot": slot.get("slot"),
+            "gpuInstanceId": slot.get("gpuInstanceId"),
+            "profileId": slot.get("profileId"),
+            "placementSource": "fast-mig-node-agent-result",
+        }
+        for idx, slot in enumerate(slots)
+    ]
+    binding["logicalMigSlots"] = slots
+    binding["migDevicesFresh"] = True
+    binding["slotMapVerification"] = "provisional"
+    binding["slotMapSource"] = "fast-mig-node-agent"
+    binding["state"] = "transitioning"
+    binding["lastAgentResult"] = {
+        "command": agent_result.get("command"),
+        "gpuIndex": agent_result.get("gpuIndex"),
+        "profileIds": agent_result.get("profileIds"),
+        "createSeconds": agent_result.get("createSeconds"),
+        "deleteSeconds": agent_result.get("deleteSeconds"),
+        "message": agent_result.get("message"),
+        "observedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    binding["migReadiness"] = {
+        "phase": "uuid-provisional",
+        "slotMapVerification": "provisional",
+        "cdiRefreshed": False,
+        "directUuidUsable": False,
+        "source": "fast-mig-node-agent",
+        "observedAt": binding["lastAgentResult"]["observedAt"],
+        "message": "MIG UUIDs returned by agent; waiting for CDI refresh before direct CDI pod launch.",
+    }
+    bindings[physical_gpu_id] = binding
+    provisional = dict(status.get("provisionalAgentSlotMaps", {}))
+    provisional[physical_gpu_id] = {
+        "physicalGpuId": physical_gpu_id,
+        "verification": "provisional",
+        "source": "fast-mig-node-agent",
+        "observedAt": binding["lastAgentResult"]["observedAt"],
+        "slots": slots,
+    }
+    status["bindings"] = bindings
+    status["provisionalAgentSlotMaps"] = provisional
+    status["activeQueue"] = _without(list(status.get("activeQueue", [])), physical_gpu_id)
+    status["availableQueue"] = _without(list(status.get("availableQueue", [])), physical_gpu_id)
+    status["transitioningQueue"] = _without(list(status.get("transitioningQueue", [])), physical_gpu_id) + [physical_gpu_id]
+    status["queueCounts"] = _queue_counts(status)
+    status["phase"] = "ProvisionalAgentSlotMap"
+    status["observedAt"] = datetime.now(timezone.utc).isoformat()
+    if apply:
+        client.patch_physicalgpuregistry_status(name=registry_name, namespace=namespace, status=status)
+    return {**registry, "status": status}
+
+
+def mark_physical_gpu_mig_cdi_ready(
+    physical_gpu_id: str,
+    logical_gpu_id: Any | None = None,
+    cdi_result: dict[str, Any] | None = None,
+    namespace: str = "or-sim",
+    registry_name: str = DEFAULT_REGISTRY_NAME,
+    apply: bool = False,
+    client: KubernetesClient | None = None,
+) -> dict[str, Any]:
+    client = client or PythonKubernetesClient()
+    registry = client.get_physicalgpuregistry(name=registry_name, namespace=namespace)
+    if registry is None:
+        raise ValueError(f"PhysicalGpuRegistry {namespace}/{registry_name} does not exist")
+    if cdi_result is not None and not bool(cdi_result.get("success", False)):
+        raise ValueError("Refusing to mark CDI ready from an unsuccessful agent refresh-cdi result")
+
+    status = dict(registry.get("status", {}))
+    bindings = {
+        str(item): dict(value)
+        for item, value in dict(status.get("bindings", {})).items()
+    }
+    if physical_gpu_id not in bindings:
+        raise ValueError(f"{physical_gpu_id} is not in registry bindings")
+
+    binding = dict(bindings[physical_gpu_id])
+    if not list(binding.get("logicalMigSlots", [])):
+        raise ValueError(f"{physical_gpu_id} has no logicalMigSlots to expose through direct UUID binding")
+
+    observed_at = datetime.now(timezone.utc).isoformat()
+    verification = str(binding.get("slotMapVerification") or "unknown")
+    readiness = {
+        **dict(binding.get("migReadiness", {})),
+        "phase": "cdi-ready",
+        "slotMapVerification": verification,
+        "cdiRefreshed": True,
+        "directUuidUsable": True,
+        "source": "fast-mig-node-agent",
+        "observedAt": observed_at,
+        "message": "CDI refreshed; direct CDI annotation pod binding is allowed.",
+    }
+    if cdi_result is not None:
+        readiness["lastCdiRefresh"] = {
+            "command": cdi_result.get("command"),
+            "gpuIndex": cdi_result.get("gpuIndex"),
+            "seconds": cdi_result.get("createSeconds"),
+            "message": cdi_result.get("message"),
+            "observedAt": observed_at,
+        }
+    binding["migReadiness"] = readiness
+    binding["state"] = "active"
+    active_logical_id = _logical_gpu_id_value(
+        logical_gpu_id if logical_gpu_id is not None else binding.get("pendingLogicalGpuId")
+    )
+    if active_logical_id is not None:
+        binding["activeLogicalGpuId"] = active_logical_id
+    binding.pop("pendingLogicalGpuId", None)
+    bindings[physical_gpu_id] = binding
+
+    status["bindings"] = bindings
+    status["activeQueue"] = _without(list(status.get("activeQueue", [])), physical_gpu_id) + [physical_gpu_id]
+    status["availableQueue"] = _without(list(status.get("availableQueue", [])), physical_gpu_id)
+    status["transitioningQueue"] = _without(list(status.get("transitioningQueue", [])), physical_gpu_id)
+    status["queueCounts"] = _queue_counts(status)
+    status["phase"] = "MigCdiReady"
+    status["observedAt"] = observed_at
+    if apply:
+        client.patch_physicalgpuregistry_status(name=registry_name, namespace=namespace, status=status)
+    return {**registry, "status": status}
+
+
+def _slot_from_agent_result(
+    physical_gpu_id: str,
+    binding: dict[str, Any],
+    item: dict[str, Any],
+) -> dict[str, Any]:
+    start = int(item.get("slotStart"))
+    end = int(item.get("slotEnd"))
+    profile = str(item.get("profile") or "")
+    return {
+        "physicalGpuId": physical_gpu_id,
+        "nodeName": binding.get("nodeName"),
+        "deviceIndex": binding.get("deviceIndex"),
+        "gpuUuid": binding.get("gpuUuid"),
+        "migConfig": binding.get("currentMigConfig") or binding.get("migConfig"),
+        "migConfigState": binding.get("currentMigConfigState") or binding.get("migConfigState"),
+        "slotStart": start,
+        "slotEnd": end,
+        "slot": [start, end, profile],
+        "profile": profile,
+        "gpuOperatorProfile": _gpu_operator_profile(profile),
+        "migDeviceIndex": item.get("migDeviceIndex"),
+        "migDeviceUuid": item.get("migDeviceUuid"),
+        "gpuInstanceId": item.get("gpuInstanceId"),
+        "profileId": item.get("profileId"),
+        "bindingSource": "fast-mig-node-agent-result",
+        "confidence": "provisional-agent-returned-slot-map",
+        "verification": "provisional",
+    }
+
+
+def _gpu_operator_profile(profile: str) -> str:
+    return {
+        "1g": "1g.5gb",
+        "2g": "2g.10gb",
+        "3g": "3g.20gb",
+        "4g": "4g.20gb",
+        "7g": "7g.40gb",
+    }.get(str(profile), str(profile))
+
+
 def mark_physical_gpu_active(
     physical_gpu_id: str,
     logical_gpu_id: Any | None = None,
@@ -325,6 +615,9 @@ def mark_physical_gpu_active(
             "bindings": bindings,
         }
     )
+    provisional = dict(status.get("provisionalAgentSlotMaps", {}))
+    provisional.pop(physical_gpu_id, None)
+    status["provisionalAgentSlotMaps"] = provisional
     status["queueCounts"] = _queue_counts(status)
     if apply:
         client.patch_physicalgpuregistry_status(name=registry_name, namespace=namespace, status=status)
@@ -392,6 +685,7 @@ def mark_physical_gpu_released(
     available = _without(list(status.get("availableQueue", [])), physical_gpu_id)
     transitioning = _without(list(status.get("transitioningQueue", [])), physical_gpu_id)
     binding.pop("activeLogicalGpuId", None)
+    binding.pop("migReadiness", None)
     if binding.get("availableEligible") is True:
         available.append(physical_gpu_id)
         binding["state"] = "available"
@@ -485,6 +779,27 @@ def _logical_gpu_id_value(value: Any) -> Any | None:
         return int(value)
     except (TypeError, ValueError):
         return str(value)
+
+
+def _mig_readiness_from_previous(
+    previous_binding: dict[str, Any],
+    verification: str,
+    logical_slots: list[dict[str, Any]],
+) -> dict[str, Any]:
+    previous = dict(previous_binding.get("migReadiness", {}))
+    if not previous:
+        return {}
+    if not logical_slots:
+        return {}
+    readiness = dict(previous)
+    readiness["slotMapVerification"] = verification
+    if verification == "verified" and readiness.get("phase") == "cdi-ready":
+        readiness["directUuidUsable"] = True
+        readiness["cdiRefreshed"] = True
+        readiness["message"] = "CDI refreshed and slot map verified by observer."
+    elif verification == "provisional":
+        readiness["slotMapVerification"] = "provisional"
+    return readiness
 
 
 def _queue_counts(status: dict[str, Any]) -> dict[str, int]:

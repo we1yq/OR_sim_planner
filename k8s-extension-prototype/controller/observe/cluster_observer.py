@@ -379,6 +379,7 @@ def _bindings_from_gpu_operator_inventory(row: dict[str, Any]) -> list[dict[str,
     source = row.get("source") or "gpu-operator-device-plugin-nvidia-smi"
     bindings: list[dict[str, Any]] = []
     current: dict[str, Any] | None = None
+    placements_by_gpu = _mig_placements_by_gpu(str(row.get("nvidiaSmiMigLGI") or ""))
     for line in str(row.get("nvidiaSmiL") or "").splitlines():
         gpu_match = re.match(r"^GPU\s+(\d+):\s+(.+?)\s+\(UUID:\s+(GPU-[^)]+)\)", line)
         if gpu_match:
@@ -392,6 +393,7 @@ def _bindings_from_gpu_operator_inventory(row: dict[str, Any]) -> list[dict[str,
                 "product": product,
                 "migCapable": _is_a100_product(product),
                 "migDevices": [],
+                "migPlacementSource": "nvidia-smi mig -lgi" if device_index in placements_by_gpu else None,
                 "bindingSource": source,
                 "confidence": "gpu-operator-nvidia-smi",
             }
@@ -407,7 +409,86 @@ def _bindings_from_gpu_operator_inventory(row: dict[str, Any]) -> list[dict[str,
                     "migDeviceUuid": mig_match.group(3),
                 }
             )
+    for binding in bindings:
+        device_index = binding.get("deviceIndex")
+        if not isinstance(device_index, int):
+            continue
+        _attach_mig_placements(
+            mig_devices=list(binding.get("migDevices", [])),
+            placements=list(placements_by_gpu.get(device_index, [])),
+        )
     return bindings
+
+
+def _mig_placements_by_gpu(output: str) -> dict[int, list[dict[str, Any]]]:
+    placements: dict[int, list[dict[str, Any]]] = {}
+    for line in str(output or "").splitlines():
+        match = re.match(
+            r"^\|\s+(\d+)\s+(MIG\s+[0-9]+g\.[0-9]+gb)\s+(\d+)\s+(\d+)\s+(\d+):(\d+)\s+\|",
+            line,
+        )
+        if not match:
+            continue
+        gpu_index = int(match.group(1))
+        start = int(match.group(5))
+        size = int(match.group(6))
+        profile = match.group(2).removeprefix("MIG ").strip()
+        placements.setdefault(gpu_index, []).append(
+            {
+                "profile": profile,
+                "profileId": int(match.group(3)),
+                "gpuInstanceId": int(match.group(4)),
+                "slotStart": start,
+                "slotEnd": start + size,
+                "slotSize": size,
+            }
+        )
+    for rows in placements.values():
+        rows.sort(key=lambda item: (int(item["slotStart"]), int(item["slotEnd"]), str(item["profile"])))
+    return placements
+
+
+def _attach_mig_placements(
+    mig_devices: list[dict[str, Any]],
+    placements: list[dict[str, Any]],
+) -> None:
+    if not mig_devices or not placements:
+        return
+    queues_by_profile: dict[str, list[dict[str, Any]]] = {}
+    for placement in placements:
+        queues_by_profile.setdefault(
+            _canonical_mig_profile(str(placement.get("profile") or "")),
+            [],
+        ).append(dict(placement))
+    for device in sorted(
+        mig_devices,
+        key=lambda item: (int(item.get("migDeviceIndex", 0)), str(item.get("migDeviceUuid") or "")),
+    ):
+        profile = _canonical_mig_profile(str(device.get("profile") or ""))
+        queue = queues_by_profile.get(profile, [])
+        if not queue:
+            continue
+        placement = queue.pop(0)
+        device["slotStart"] = placement["slotStart"]
+        device["slotEnd"] = placement["slotEnd"]
+        device["slot"] = [
+            int(placement["slotStart"]),
+            int(placement["slotEnd"]),
+            _short_mig_profile(profile),
+        ]
+        device["gpuInstanceId"] = placement.get("gpuInstanceId")
+        device["profileId"] = placement.get("profileId")
+        device["placementSource"] = "nvidia-smi mig -lgi"
+
+
+def _canonical_mig_profile(value: str) -> str:
+    match = re.search(r"([12347]g(?:\.\d+gb)?)", value)
+    return match.group(1) if match else value
+
+
+def _short_mig_profile(value: str) -> str:
+    match = re.search(r"([12347]g)", value)
+    return match.group(1) if match else value
 
 
 def _explicit_physical_gpu_bindings(

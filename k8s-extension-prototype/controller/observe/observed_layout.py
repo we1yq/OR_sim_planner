@@ -71,6 +71,15 @@ def logical_mig_slots_for_binding(
     ]
     if not mig_devices:
         return []
+    placement_slots = _logical_slots_from_observed_placements(
+        physical_gpu_id=physical_gpu_id,
+        binding=binding,
+        mig_config=mig_config,
+        mig_config_state=mig_config_state,
+        mig_devices=mig_devices,
+    )
+    if placement_slots:
+        return placement_slots
     intervals = _intervals_for_mig_config(str(mig_config or ""), mig_devices)
     if not intervals:
         intervals = _inferred_intervals_from_devices(mig_devices)
@@ -117,6 +126,51 @@ def logical_mig_slots_for_binding(
                 "migDeviceUuid": device.get("migDeviceUuid"),
                 "bindingSource": binding.get("bindingSource"),
                 "confidence": _slot_confidence(str(mig_config or "")),
+            }
+        )
+    return rows
+
+
+def _logical_slots_from_observed_placements(
+    physical_gpu_id: str,
+    binding: dict[str, Any],
+    mig_config: str | None,
+    mig_config_state: str | None,
+    mig_devices: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rows = []
+    for device in sorted(
+        mig_devices,
+        key=lambda item: (
+            int(item.get("slotStart", 99)),
+            int(item.get("slotEnd", 99)),
+            int(item.get("migDeviceIndex", 0)),
+        ),
+    ):
+        if device.get("slotStart") is None or device.get("slotEnd") is None:
+            return []
+        start = int(device.get("slotStart"))
+        end = int(device.get("slotEnd"))
+        profile = _canonical_profile(str(device.get("profile") or ""))
+        rows.append(
+            {
+                "physicalGpuId": physical_gpu_id,
+                "nodeName": binding.get("nodeName"),
+                "deviceIndex": binding.get("deviceIndex"),
+                "gpuUuid": binding.get("gpuUuid"),
+                "migConfig": mig_config,
+                "migConfigState": mig_config_state,
+                "slotStart": start,
+                "slotEnd": end,
+                "slot": [start, end, profile],
+                "profile": profile,
+                "gpuOperatorProfile": _gpu_operator_profile(profile),
+                "migDeviceIndex": device.get("migDeviceIndex"),
+                "migDeviceUuid": device.get("migDeviceUuid"),
+                "gpuInstanceId": device.get("gpuInstanceId"),
+                "profileId": device.get("profileId"),
+                "bindingSource": binding.get("bindingSource"),
+                "confidence": "logical-slot-from-nvidia-smi-mig-lgi-placement",
             }
         )
     return rows

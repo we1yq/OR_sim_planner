@@ -24,8 +24,9 @@ from migrant_core.transition_planners.action_plan_formats import build_phased_ac
 
 
 ACTION_SECONDS = {
-    "configure_full_template": 113.203,
-    "clear_template": 40.238,
+    "configure_full_template": 1.009,
+    "configure_partial_profile": 1.059,
+    "clear_template": 0.655,
     "clear_gpu": 10.365,
     "clear_gpu_binding": 0.2,
     "delete_gpu_pods": 1.0,
@@ -55,38 +56,41 @@ ACTION_SECONDS = {
 }
 
 TEMPLATE_ALLOCATABLE_SECONDS = {
-    "7": 102.539,
-    "4+3": 120.651,
-    "4+2+1": 112.627,
-    "4+1+1+1": 112.629,
-    "3+3": 110.611,
-    "3+2+1": 112.603,
-    "3+1+1+1": 114.648,
-    "2+2+3": 112.619,
-    "3+2+1+1": 112.612,
-    "3+1+1+1+1": 112.652,
-    "2+2+2+1": 112.609,
-    "2+2+1+1+1": 114.619,
-    "2+1+1+1+1+1": 120.811,
-    "1+1+1+1+1+1+1": 112.613,
-    "2+2+2": 112.620,
+    # Measured on rtx1 through the fast-mig-node-agent DaemonSet.
+    # These are direct nvidia-smi template create times.
+    "7": 0.358,
+    "4+3": 0.609,
+    "4+2+1": 1.096,
+    "4+1+1+1": 1.008,
+    "3+3": 0.569,
+    "3+2+1": 0.781,
+    "3+1+1+1": 0.965,
+    "3+2+2": 0.844,
+    "2+2+3": 0.844,
+    "3+2+1+1": 0.981,
+    "3+1+1+1+1": 1.198,
+    "2+2+2+1": 1.374,
+    "2+2+1+1+1": 1.211,
+    "2+1+1+1+1+1": 1.432,
+    "1+1+1+1+1+1+1": 1.704,
 }
 
 EMPTY_SUCCESS_SECONDS = {
-    "7": 42.237,
-    "4+3": 40.229,
-    "4+2+1": 40.238,
-    "4+1+1+1": 40.237,
-    "3+3": 40.236,
-    "3+2+1": 40.238,
-    "3+1+1+1": 40.238,
-    "2+2+3": 40.235,
-    "3+2+1+1": 40.244,
-    "3+1+1+1+1": 40.237,
-    "2+2+2+1": 40.235,
-    "2+2+1+1+1": 42.247,
-    "2+1+1+1+1+1": 40.236,
-    "1+1+1+1+1+1+1": 40.236,
+    "7": 0.329,
+    "4+3": 0.464,
+    "4+2+1": 0.509,
+    "4+1+1+1": 0.560,
+    "3+3": 0.504,
+    "3+2+1": 0.708,
+    "3+1+1+1": 0.612,
+    "3+2+2": 0.751,
+    "2+2+3": 0.751,
+    "3+2+1+1": 0.611,
+    "3+1+1+1+1": 0.618,
+    "2+2+2+1": 0.756,
+    "2+2+1+1+1": 0.802,
+    "2+1+1+1+1+1": 1.075,
+    "1+1+1+1+1+1+1": 0.870,
 }
 
 CLASS_COLORS = {
@@ -115,11 +119,19 @@ def main() -> None:
     parser.add_argument("--gpu-alias", action="append", default=[], help="GPU alias override: GPU_ID=alias or physicalId=alias.")
     parser.add_argument("--title", default=None, help="Figure title prefix.")
     parser.add_argument("--force-transition", action="store_true", help="Render the explicit transition even if current-state feasibility would no-op.")
+    parser.add_argument("--default-queued", type=int, default=None, help="Override transition.runtime.defaultQueued for this render.")
+    parser.add_argument("--default-inflight", type=int, default=None, help="Override transition.runtime.defaultInflight for this render.")
     args = parser.parse_args()
 
     logical_aliases, physical_aliases = _parse_aliases(args.gpu_alias)
     scenario_path = Path(args.plan_scenario)
-    status = _plan_status(scenario_path, args.planner, force_transition=args.force_transition)
+    status = _plan_status(
+        scenario_path,
+        args.planner,
+        force_transition=args.force_transition,
+        default_queued=args.default_queued,
+        default_inflight=args.default_inflight,
+    )
     transition = status["status"]["planningTrace"]["transition"]
     dag = transition.get("phasedActionPlan") or {}
     executed_state = cluster_state_from_dict(status["status"]["executedState"])
@@ -175,7 +187,14 @@ def _path_slug(value: str) -> str:
     return slug or "unnamed"
 
 
-def _plan_status(scenario_path: Path, planner: str, *, force_transition: bool = False) -> dict[str, Any]:
+def _plan_status(
+    scenario_path: Path,
+    planner: str,
+    *,
+    force_transition: bool = False,
+    default_queued: int | None = None,
+    default_inflight: int | None = None,
+) -> dict[str, Any]:
     scenario = load_planning_scenario(scenario_path)
     scenario.transition["transitionPlanner"] = planner
     if planner in {"basic_dag", "transition.basic_dag", "offline_final_dag", "transition.offline_final_dag"}:
@@ -183,6 +202,13 @@ def _plan_status(scenario_path: Path, planner: str, *, force_transition: bool = 
         # and inflight assumptions are for cost-aware/runtime-aware planners.
         scenario.transition.pop("runtime", None)
         scenario.transition.pop("runtimeAssumptions", None)
+    else:
+        if default_queued is not None or default_inflight is not None:
+            runtime = scenario.transition.setdefault("runtime", {})
+            if default_queued is not None:
+                runtime["defaultQueued"] = int(default_queued)
+            if default_inflight is not None:
+                runtime["defaultInflight"] = int(default_inflight)
     if force_transition:
         scenario.transition["forceReplan"] = True
     source_override = _chain_source_override(scenario_path, scenario, planner, force_transition=force_transition)
@@ -387,6 +413,45 @@ def _node_stack_index(
     physical_reuse: dict[str, str] | None,
 ) -> int:
     node_id = str(node.get("id"))
+    action_type = str(dict(node.get("action", {})).get("type", ""))
+    by_id = {str(candidate.get("id")): candidate for candidate in nodes}
+    same_lane_dep_stacks = []
+    preferred_dep_types = None
+    if action_type == "reroute_queued_tasks":
+        preferred_dep_types = {"stop_accepting_new", "stop_gpu_traffic"}
+    dep_ids = list(node.get("dependsOn", []))
+    if preferred_dep_types is not None:
+        dep_ids = [
+            dep_id
+            for dep_id in dep_ids
+            if str(dict(by_id.get(str(dep_id), {}).get("action", {})).get("type", "")) in preferred_dep_types
+        ] or dep_ids
+    for dep_id in dep_ids:
+        dep = by_id.get(str(dep_id))
+        if dep is None:
+            continue
+        dep_action = dict(dep.get("action", {}))
+        dep_lane = _lane_for_action(dep_action, state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
+        if dep_lane != lane:
+            continue
+        dep_phase = int(dep.get("phase", 0))
+        if dep_phase >= int(depth):
+            continue
+        same_lane_dep_stacks.append(
+            _node_stack_index(dep, nodes, lane, dep_phase, state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
+        )
+    if same_lane_dep_stacks:
+        preferred = same_lane_dep_stacks[-1]
+        occupied = {
+            _node_stack_index(candidate, nodes, lane, depth, state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
+            for candidate in nodes
+            if str(candidate.get("id")) != node_id
+            and int(candidate.get("phase", 0)) == int(depth)
+            and int(candidate.get("index", 0)) < int(node.get("index", 0))
+            and _lane_for_action(dict(candidate.get("action", {})), state, logical_aliases, physical_aliases, lane_roles, physical_reuse) == lane
+        }
+        if preferred not in occupied:
+            return preferred
     peers = []
     for candidate in nodes:
         action = dict(candidate.get("action", {}))
@@ -703,9 +768,19 @@ def _timeline_nodes(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     grouped: dict[tuple[int, Any], list[dict[str, Any]]] = defaultdict(list)
     consumed: set[str] = set()
     out: list[dict[str, Any]] = []
+    reroute_source_stop_ids = {
+        str(dep)
+        for node in nodes
+        if dict(node.get("action", {})).get("type") == "reroute_queued_tasks"
+        for dep in list(node.get("dependsOn", []))
+    }
     for node in nodes:
         action = dict(node.get("action", {}))
-        if action.get("type") == "stop_accepting_new" and action.get("gpu_id") is not None:
+        if (
+            action.get("type") == "stop_accepting_new"
+            and action.get("gpu_id") is not None
+            and str(node.get("id")) not in reroute_source_stop_ids
+        ):
             grouped[(int(node.get("phase", 0)), action.get("gpu_id"))].append(node)
     for (phase, gpu_id), group in grouped.items():
         if len(group) <= 1:
@@ -865,8 +940,9 @@ def _abstract_label_for_action(action: dict[str, Any]) -> str:
     return {
         "allocate_gpu": "Allocate GPU",
         "configure_full_template": "Configure Template",
+        "configure_partial_profile": "Partial Reconfiguration",
         "bind_target_gpu": "Bind GPU",
-        "observe_mig_devices": "Resolve UUIDs",
+        "observe_mig_devices": "Observe MIG devices",
         "deploy_target_workloads": "Deploy Pods",
         "activate_serving_route": "Activate Route",
         "stop_gpu_traffic": "Stop GPU Traffic",
@@ -889,7 +965,7 @@ def _abstract_label_for_action(action: dict[str, Any]) -> str:
 
 
 def _operation_class_for_type(action_type: str) -> str:
-    if action_type in {"allocate_gpu", "configure_full_template", "place_target_layout", "observe_mig_devices"}:
+    if action_type in {"allocate_gpu", "configure_full_template", "configure_partial_profile", "place_target_layout", "observe_mig_devices"}:
         return "mig-geometry"
     if action_type in {"bind_target_gpu", "mark_reconfig_target_prepared", "unbind_target_gpu", "clear_gpu_binding", "return_gpu"}:
         return "binding-state"
@@ -1055,6 +1131,8 @@ def _gpu_id_for_physical(state: Any, physical_id: Any) -> int | None:
 
 
 def _timeline_dependency_style(dep_kind: str, action_kind: str, same_lane: bool) -> dict[str, str] | None:
+    if dep_kind == "accept_queued_requests" and action_kind == "reroute_queued_tasks":
+        return {"stroke": "#d97706", "width": "1.4", "dash": "4 3", "label": "queue handoff"}
     if same_lane:
         if dep_kind == "deploy_target_workloads" and action_kind == "bind_target_gpu":
             return {"stroke": "#7c3aed", "width": "1.2", "dash": "4 3", "label": ""}
@@ -1063,8 +1141,6 @@ def _timeline_dependency_style(dep_kind: str, action_kind: str, same_lane: bool)
         return None
     if dep_kind == "clear_gpu_binding" and action_kind == "bind_target_gpu":
         return {"stroke": "#7c3aed", "width": "1.6", "dash": "2 2", "label": "logical-id handoff"}
-    if dep_kind == "accept_queued_requests" and action_kind == "reroute_queued_tasks":
-        return {"stroke": "#d97706", "width": "1.4", "dash": "4 3", "label": "queue handoff"}
     return None
 
 
@@ -1126,6 +1202,8 @@ def _duration(action: dict[str, Any]) -> float:
         return float(TEMPLATE_ALLOCATABLE_SECONDS.get(template, ACTION_SECONDS["configure_full_template"]))
     if action_type == "clear_template":
         return float(EMPTY_SUCCESS_SECONDS.get(template, ACTION_SECONDS["clear_template"]))
+    if action_type == "mark_draining_instance" and action.get("estimatedLocalCompletionSeconds") is not None:
+        return max(0.0, float(action.get("estimatedLocalCompletionSeconds", 0.0) or 0.0))
     return float(ACTION_SECONDS.get(str(action.get("type", "")), 1.0))
 
 
@@ -1151,8 +1229,9 @@ def _short_action(action: dict[str, Any]) -> str:
     value = str(action.get("type", "unknown"))
     aliases = {
         "configure_full_template": "configure",
+        "configure_partial_profile": "partial-reconfig",
         "place_target_layout": "desired-layout",
-        "observe_mig_devices": "resolve-uuid",
+        "observe_mig_devices": "observe-mig",
         "deploy_target_workloads": "deploy-workload",
         "activate_serving_route": "activate-route",
         "mark_reconfig_target_prepared": "prepared",
@@ -1196,9 +1275,11 @@ def _timeline_detail_lines(action: dict[str, Any], state: Any) -> list[str]:
     if action_type == "allocate_gpu":
         return [f"reserve {action.get('physical_gpu_id', '-')}", f"pending gpu{action.get('logical_gpu_id', action.get('gpu_id', '-'))}"]
     if action_type == "configure_full_template":
-        return [f"template {action.get('template', '-')}", "wait allocatable"]
+        return [f"template {action.get('template', '-')}", "agent apply"]
+    if action_type == "configure_partial_profile":
+        return [f"template {action.get('template', '-')}", "agent patch-slots"]
     if action_type == "clear_template":
-        return [f"empty from {action.get('template', '-')}", "wait success"]
+        return [f"empty from {action.get('template', '-')}", "agent clear"]
     if action_type == "bind_target_gpu":
         return [f"active gpu{action.get('gpu_id', '-')}", str(action.get("physical_gpu_id", "-"))]
     if action_type == "stop_gpu_traffic":
@@ -1224,8 +1305,15 @@ def _timeline_detail_lines(action: dict[str, Any], state: Any) -> list[str]:
     if action_type == "reroute_queued_tasks":
         return [
             f"queued {action.get('queued', '-')}",
+            f"from gpu{action.get('gpu_id', '-')} {_format_slot(action.get('slot'))}",
             f"to gpu{action.get('target_gpu_id', '-')} {_format_slot(action.get('target_slot'))}",
-            "stable slot",
+            f"spare {action.get('estimatedRerouteSpareMu', '-')} backlog {action.get('estimatedBacklogDrainSeconds', '-')}s",
+        ]
+    if action_type == "mark_draining_instance" and action.get("rerouteSkippedReason"):
+        return [
+            f"slot {_format_slot(action.get('slot'))}",
+            str(action.get("workload") or "-"),
+            f"local {action.get('estimatedLocalCompletionSeconds', '-')}s <= {action.get('rerouteThresholdSeconds', '-')}s",
         ]
     if action_type == "deploy_target_workloads":
         return [f"gpu{action.get('gpu_id', '-')}", "pods ready"]

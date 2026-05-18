@@ -1,0 +1,80 @@
+{
+  "runtimeAssumption": {
+    "defaultQueued": 0,
+    "defaultInflight": 0
+  },
+  "figures": [
+    {
+      "dir": "stage0-basic-dag",
+      "scenario": "stage0",
+      "planner": "basic_dag",
+      "plannerModule": "transition.basic_dag",
+      "actionCount": 36,
+      "phaseCount": 6,
+      "svg": "stage0-basic-dag/final-execution-dag.svg"
+    },
+    {
+      "dir": "stage0-cost-aware-dag",
+      "scenario": "stage0",
+      "planner": "cost_aware_dag",
+      "plannerModule": "transition.cost_aware_dag",
+      "actionCount": 36,
+      "phaseCount": 6,
+      "svg": "stage0-cost-aware-dag/final-execution-dag.svg"
+    },
+    {
+      "dir": "stage1-basic-dag",
+      "scenario": "stage1",
+      "planner": "basic_dag",
+      "plannerModule": "transition.basic_dag",
+      "actionCount": 20,
+      "phaseCount": 6,
+      "svg": "stage1-basic-dag/final-execution-dag.svg"
+    },
+    {
+      "dir": "stage1-cost-aware-dag",
+      "scenario": "stage1",
+      "planner": "cost_aware_dag",
+      "plannerModule": "transition.cost_aware_dag",
+      "actionCount": 20,
+      "phaseCount": 6,
+      "svg": "stage1-cost-aware-dag/final-execution-dag.svg"
+    },
+    {
+      "dir": "stage2-basic-dag",
+      "scenario": "stage2",
+      "planner": "basic_dag",
+      "plannerModule": "transition.basic_dag",
+      "actionCount": 26,
+      "phaseCount": 6,
+      "svg": "stage2-basic-dag/final-execution-dag.svg"
+    },
+    {
+      "dir": "stage2-cost-aware-dag",
+      "scenario": "stage2",
+      "planner": "cost_aware_dag",
+      "plannerModule": "transition.cost_aware_dag",
+      "actionCount": 26,
+      "phaseCount": 6,
+      "svg": "stage2-cost-aware-dag/final-execution-dag.svg"
+    },
+    {
+      "dir": "stage3-basic-dag",
+      "scenario": "stage3",
+      "planner": "basic_dag",
+      "plannerModule": "transition.basic_dag",
+      "actionCount": 33,
+      "phaseCount": 11,
+      "svg": "stage3-basic-dag/final-execution-dag.svg"
+    },
+    {
+      "dir": "stage3-cost-aware-dag",
+      "scenario": "stage3",
+      "planner": "cost_aware_dag",
+      "plannerModule": "transition.cost_aware_dag",
+      "actionCount": 33,
+      "phaseCount": 11,
+      "svg": "stage3-cost-aware-dag/final-execution-dag.svg"
+    }
+  ]
+}

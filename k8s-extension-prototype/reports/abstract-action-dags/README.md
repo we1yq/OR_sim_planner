@@ -10,6 +10,7 @@ The canonical action wording and queue/binding semantics live in [`docs/abstract
 - `bridge-reconfiguration.svg`
 - `in-place-reconfiguration.svg`
 - `delete-gpu.svg`
+- `partial-reconfiguration.svg`
 - `workload-replacement.svg`
 - `bridge-workload-replacement.svg`
 - `batch-update.svg`

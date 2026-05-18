@@ -1,0 +1,10 @@
+{
+  "actionCount": 33,
+  "outputs": {
+    "final_execution_dag": "k8s-extension-prototype/reports/dag-figures/full-planner-regression-forced/stage3-basic-dag/final-execution-dag.svg"
+  },
+  "phaseCount": 11,
+  "planner": "basic_dag",
+  "plannerModule": "transition.basic_dag",
+  "scenario": "stage3"
+}

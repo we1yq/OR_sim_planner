@@ -1,0 +1,12 @@
+FROM golang:1.23 AS build
+
+WORKDIR /src
+COPY tools/fast-mig-node-agent/main.go /src/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/fast-mig-node-agent /src/main.go
+
+FROM nvcr.io/nvidia/k8s/dcgm-exporter:3.3.9-3.6.1-ubuntu22.04
+
+COPY --from=build /out/fast-mig-node-agent /usr/local/bin/fast-mig-node-agent
+
+ENTRYPOINT ["/usr/local/bin/fast-mig-node-agent"]
+CMD ["list"]

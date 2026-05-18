@@ -10,6 +10,8 @@ from planning.k8s_adapter import plan_scenario_as_migplan_status, plan_scenario_
 from executors.mig_label_executor import apply_mig_labels_from_action_plan, summarize_mig_labels_from_action_plan
 from mig_rules import load_mig_rules, mig_rules_summary_dict, validate_gpu_state_against_mig_rules
 from observe.physical_gpu_registry import (
+    apply_agent_mig_result_to_registry,
+    mark_physical_gpu_mig_cdi_ready,
     mark_physical_gpu_active,
     mark_physical_gpu_pending,
     mark_physical_gpu_released,
@@ -152,6 +154,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--release-physical-gpu",
         help="Move a physicalGpuId out of activeQueue; it returns to available only if observed clean.",
+    )
+    parser.add_argument(
+        "--apply-agent-mig-result-to-registry",
+        type=Path,
+        help="Read a fast-mig-node-agent JSON/YAML result and write a provisional slot map to PhysicalGpuRegistry.",
+    )
+    parser.add_argument(
+        "--mark-mig-cdi-ready",
+        type=Path,
+        help="Read a successful fast-mig-node-agent refresh-cdi result and move the physical GPU to activeQueue.",
+    )
+    parser.add_argument(
+        "--physical-gpu-id",
+        help="PhysicalGpuId updated by agent/register operations.",
     )
     parser.add_argument(
         "--summarize-mig-labels-from-action-plan",
@@ -387,6 +403,33 @@ def main() -> int:
     if args.release_physical_gpu:
         registry = mark_physical_gpu_released(
             physical_gpu_id=args.release_physical_gpu,
+            namespace=args.namespace,
+            registry_name=args.registry_name,
+            apply=args.apply_physical_gpu_registry,
+        )
+        print(dump_yaml(registry_queue_summary(registry)), end="")
+        return 0
+
+    if args.apply_agent_mig_result_to_registry:
+        if not args.physical_gpu_id:
+            raise SystemExit("--physical-gpu-id is required with --apply-agent-mig-result-to-registry")
+        registry = apply_agent_mig_result_to_registry(
+            physical_gpu_id=args.physical_gpu_id,
+            agent_result=load_yaml(args.apply_agent_mig_result_to_registry),
+            namespace=args.namespace,
+            registry_name=args.registry_name,
+            apply=args.apply_physical_gpu_registry,
+        )
+        print(dump_yaml(registry_queue_summary(registry)), end="")
+        return 0
+
+    if args.mark_mig_cdi_ready:
+        if not args.physical_gpu_id:
+            raise SystemExit("--physical-gpu-id is required with --mark-mig-cdi-ready")
+        registry = mark_physical_gpu_mig_cdi_ready(
+            physical_gpu_id=args.physical_gpu_id,
+            logical_gpu_id=args.logical_gpu_id,
+            cdi_result=load_yaml(args.mark_mig_cdi_ready),
             namespace=args.namespace,
             registry_name=args.registry_name,
             apply=args.apply_physical_gpu_registry,

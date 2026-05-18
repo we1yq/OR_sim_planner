@@ -29,8 +29,8 @@
 <text x="631.0" y="151.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">pendingLogicalGpuId; move to</text>
 <text x="631.0" y="162.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">activeQueue</text>
 <rect x="766.0" y="92.0" width="206" height="98" rx="5" fill="#dbeafe" stroke="#111827" stroke-width="1"/>
-<title>Resolve UUIDs: map target slots to real MIG device UUIDs</title>
-<text x="869.0" y="134.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Resolve UUIDs</text>
+<title>Observe MIG devices: map target slots to real MIG device UUIDs</title>
+<text x="869.0" y="134.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Observe MIG devices</text>
 <text x="869.0" y="145.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">map target slots to real MIG</text>
 <text x="869.0" y="156.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">device UUIDs</text>
 <rect x="1004.0" y="92.0" width="206" height="98" rx="5" fill="#dcfce7" stroke="#111827" stroke-width="1"/>

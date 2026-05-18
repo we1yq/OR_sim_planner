@@ -1,0 +1,7 @@
+{
+  "command": "refresh-cdi",
+  "gpuIndex": "0",
+  "createSeconds": 0.299812065,
+  "success": true,
+  "message": "refreshed /host/var/run/cdi/management.nvidia.com-gpu.yaml"
+}

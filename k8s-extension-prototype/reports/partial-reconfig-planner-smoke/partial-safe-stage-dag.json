@@ -1,0 +1,806 @@
+{
+  "planner": "transition.cost_aware_dag",
+  "plannerElapsedSec": 0.0014498271048069,
+  "wallElapsedSec": 0.0015969891101121902,
+  "reachedTarget": true,
+  "peakActiveGpu": 1,
+  "sourceActiveGpu": 1,
+  "finalActiveGpu": 1,
+  "actionTypes": [
+    "stop_gpu_traffic",
+    "delete_pods",
+    "configure_partial_profile",
+    "observe_mig_devices",
+    "deploy_target_workloads",
+    "activate_serving_route"
+  ],
+  "actions": [
+    {
+      "type": "stop_gpu_traffic",
+      "gpu_id": 0,
+      "physical_gpu_id": "A",
+      "slots": [
+        [
+          0,
+          1,
+          "1g"
+        ],
+        [
+          1,
+          2,
+          "1g"
+        ],
+        [
+          2,
+          3,
+          "1g"
+        ],
+        [
+          3,
+          4,
+          "1g"
+        ]
+      ],
+      "slotCount": 4,
+      "transitionMode": "partial_reconfiguration",
+      "abstractRoot": "PARTIAL_RECONF_gpu0",
+      "abstractAction": "Stop GPU Traffic"
+    },
+    {
+      "type": "delete_pods",
+      "gpu_id": 0,
+      "physical_gpu_id": "A",
+      "slots": [
+        [
+          0,
+          1,
+          "1g"
+        ],
+        [
+          1,
+          2,
+          "1g"
+        ],
+        [
+          2,
+          3,
+          "1g"
+        ],
+        [
+          3,
+          4,
+          "1g"
+        ]
+      ],
+      "partial": true,
+      "transitionMode": "partial_reconfiguration",
+      "abstractRoot": "PARTIAL_RECONF_gpu0",
+      "abstractAction": "Delete Pods"
+    },
+    {
+      "type": "configure_partial_profile",
+      "gpu_id": 0,
+      "physical_gpu_id": "A",
+      "logical_gpu_id": 0,
+      "pendingLogicalGpuId": 0,
+      "template": "2+2+2+1",
+      "partial": true,
+      "sourceTemplate": "1+1+1+1+2+1",
+      "targetTemplate": "2+2+2+1",
+      "preserveSlots": [
+        [
+          4,
+          6,
+          "2g"
+        ],
+        [
+          6,
+          7,
+          "1g"
+        ]
+      ],
+      "deleteSlots": [
+        [
+          0,
+          1,
+          "1g"
+        ],
+        [
+          1,
+          2,
+          "1g"
+        ],
+        [
+          2,
+          3,
+          "1g"
+        ],
+        [
+          3,
+          4,
+          "1g"
+        ]
+      ],
+      "createSlots": [
+        [
+          0,
+          2,
+          "2g"
+        ],
+        [
+          2,
+          4,
+          "2g"
+        ]
+      ],
+      "deleteSpec": "0:1:1g,1:1:1g,2:1:1g,3:1:1g",
+      "createSpec": "0:2:2g,2:2:2g",
+      "preserveSpec": "4:2:2g,6:1:1g",
+      "transitionMode": "partial_reconfiguration",
+      "abstractRoot": "PARTIAL_RECONF_gpu0",
+      "abstractAction": "Partial Reconfiguration"
+    },
+    {
+      "type": "observe_mig_devices",
+      "gpu_id": 0,
+      "physical_gpu_id": "A",
+      "slots": [
+        [
+          0,
+          2,
+          "2g"
+        ],
+        [
+          2,
+          4,
+          "2g"
+        ]
+      ],
+      "preserveSlots": [
+        [
+          4,
+          6,
+          "2g"
+        ],
+        [
+          6,
+          7,
+          "1g"
+        ]
+      ],
+      "partial": true,
+      "transitionMode": "partial_reconfiguration",
+      "abstractRoot": "PARTIAL_RECONF_gpu0",
+      "abstractAction": "Observe MIG devices"
+    },
+    {
+      "type": "deploy_target_workloads",
+      "gpu_id": 0,
+      "physical_gpu_id": "A",
+      "slots": [
+        [
+          0,
+          2,
+          "2g"
+        ],
+        [
+          2,
+          4,
+          "2g"
+        ]
+      ],
+      "partial": true,
+      "transitionMode": "partial_reconfiguration",
+      "abstractRoot": "PARTIAL_RECONF_gpu0",
+      "abstractAction": "Deploy Pods"
+    },
+    {
+      "type": "activate_serving_route",
+      "gpu_id": 0,
+      "physical_gpu_id": "A",
+      "slots": [
+        [
+          0,
+          2,
+          "2g"
+        ],
+        [
+          2,
+          4,
+          "2g"
+        ]
+      ],
+      "partial": true,
+      "transitionMode": "partial_reconfiguration",
+      "abstractRoot": "PARTIAL_RECONF_gpu0",
+      "abstractAction": "Activate Route"
+    }
+  ],
+  "phasedActionPlanSummary": {
+    "representation": "migrant.phased-action-dag/v1",
+    "actionCount": 6,
+    "nodeCount": 6,
+    "edgeCount": 5,
+    "phaseCount": 6,
+    "criticalPathLength": 6,
+    "phases": [
+      {
+        "phase": 0,
+        "nodeCount": 1,
+        "actionCountsByType": {
+          "stop_gpu_traffic": 1
+        },
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ]
+      },
+      {
+        "phase": 1,
+        "nodeCount": 1,
+        "actionCountsByType": {
+          "delete_pods": 1
+        },
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ]
+      },
+      {
+        "phase": 2,
+        "nodeCount": 1,
+        "actionCountsByType": {
+          "configure_partial_profile": 1
+        },
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ]
+      },
+      {
+        "phase": 3,
+        "nodeCount": 1,
+        "actionCountsByType": {
+          "observe_mig_devices": 1
+        },
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ]
+      },
+      {
+        "phase": 4,
+        "nodeCount": 1,
+        "actionCountsByType": {
+          "deploy_target_workloads": 1
+        },
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ]
+      },
+      {
+        "phase": 5,
+        "nodeCount": 1,
+        "actionCountsByType": {
+          "activate_serving_route": 1
+        },
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ]
+      }
+    ]
+  },
+  "phasedActionPlan": {
+    "representation": "migrant.phased-action-dag/v1",
+    "name": "partial-reconfig-smoke-final",
+    "actionCount": 6,
+    "nodeCount": 6,
+    "edgeCount": 5,
+    "phaseCount": 6,
+    "criticalPathLength": 6,
+    "phases": [
+      {
+        "phase": 0,
+        "name": "phase-00",
+        "nodeCount": 1,
+        "nodeIds": [
+          "a0000_stop_gpu_traffic_PARTIAL-RECONF-gpu0"
+        ],
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ],
+        "actionCountsByType": {
+          "stop_gpu_traffic": 1
+        },
+        "operationClasses": {
+          "router-drain": 1
+        }
+      },
+      {
+        "phase": 1,
+        "name": "phase-01",
+        "nodeCount": 1,
+        "nodeIds": [
+          "a0001_delete_pods_PARTIAL-RECONF-gpu0"
+        ],
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ],
+        "actionCountsByType": {
+          "delete_pods": 1
+        },
+        "operationClasses": {
+          "cleanup": 1
+        }
+      },
+      {
+        "phase": 2,
+        "name": "phase-02",
+        "nodeCount": 1,
+        "nodeIds": [
+          "a0002_configure_partial_profile_PARTIAL-RECONF-gpu0"
+        ],
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ],
+        "actionCountsByType": {
+          "configure_partial_profile": 1
+        },
+        "operationClasses": {
+          "other": 1
+        }
+      },
+      {
+        "phase": 3,
+        "name": "phase-03",
+        "nodeCount": 1,
+        "nodeIds": [
+          "a0003_observe_mig_devices_PARTIAL-RECONF-gpu0"
+        ],
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ],
+        "actionCountsByType": {
+          "observe_mig_devices": 1
+        },
+        "operationClasses": {
+          "mig-geometry": 1
+        }
+      },
+      {
+        "phase": 4,
+        "name": "phase-04",
+        "nodeCount": 1,
+        "nodeIds": [
+          "a0004_deploy_target_workloads_PARTIAL-RECONF-gpu0"
+        ],
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ],
+        "actionCountsByType": {
+          "deploy_target_workloads": 1
+        },
+        "operationClasses": {
+          "pod-lifecycle": 1
+        }
+      },
+      {
+        "phase": 5,
+        "name": "phase-05",
+        "nodeCount": 1,
+        "nodeIds": [
+          "a0005_activate_serving_route_PARTIAL-RECONF-gpu0"
+        ],
+        "rootIds": [
+          "PARTIAL_RECONF_gpu0"
+        ],
+        "actionCountsByType": {
+          "activate_serving_route": 1
+        },
+        "operationClasses": {
+          "router-drain": 1
+        }
+      }
+    ],
+    "roots": [
+      {
+        "rootId": "PARTIAL_RECONF_gpu0",
+        "nodeIds": [
+          "a0000_stop_gpu_traffic_PARTIAL-RECONF-gpu0",
+          "a0001_delete_pods_PARTIAL-RECONF-gpu0",
+          "a0002_configure_partial_profile_PARTIAL-RECONF-gpu0",
+          "a0003_observe_mig_devices_PARTIAL-RECONF-gpu0",
+          "a0004_deploy_target_workloads_PARTIAL-RECONF-gpu0",
+          "a0005_activate_serving_route_PARTIAL-RECONF-gpu0"
+        ],
+        "planItem": {
+          "id": "PARTIAL_RECONF_gpu0",
+          "type": "partial_reconfiguration",
+          "current_phase": "final_dag",
+          "status": "ready",
+          "blocked_by": null,
+          "gpu_id": 0,
+          "physical_gpu_id": "A",
+          "sourceTemplate": "1+1+1+1+2+1",
+          "targetTemplate": "2+2+2+1",
+          "preserveSlots": [
+            [
+              4,
+              6,
+              "2g"
+            ],
+            [
+              6,
+              7,
+              "1g"
+            ]
+          ],
+          "deleteSlots": [
+            [
+              0,
+              1,
+              "1g"
+            ],
+            [
+              1,
+              2,
+              "1g"
+            ],
+            [
+              2,
+              3,
+              "1g"
+            ],
+            [
+              3,
+              4,
+              "1g"
+            ]
+          ],
+          "createSlots": [
+            [
+              0,
+              2,
+              "2g"
+            ],
+            [
+              2,
+              4,
+              "2g"
+            ]
+          ],
+          "deleteSpec": "0:1:1g,1:1:1g,2:1:1g,3:1:1g",
+          "createSpec": "0:2:2g,2:2:2g",
+          "preserveSpec": "4:2:2g,6:1:1g"
+        },
+        "phaseSpan": {
+          "first": 0,
+          "last": 5
+        }
+      }
+    ],
+    "nodes": [
+      {
+        "id": "a0000_stop_gpu_traffic_PARTIAL-RECONF-gpu0",
+        "index": 0,
+        "rootId": "PARTIAL_RECONF_gpu0",
+        "operationClass": "router-drain",
+        "action": {
+          "type": "stop_gpu_traffic",
+          "gpu_id": 0,
+          "physical_gpu_id": "A",
+          "slots": [
+            [
+              0,
+              1,
+              "1g"
+            ],
+            [
+              1,
+              2,
+              "1g"
+            ],
+            [
+              2,
+              3,
+              "1g"
+            ],
+            [
+              3,
+              4,
+              "1g"
+            ]
+          ],
+          "slotCount": 4,
+          "transitionMode": "partial_reconfiguration",
+          "abstractRoot": "PARTIAL_RECONF_gpu0",
+          "abstractAction": "Stop GPU Traffic"
+        },
+        "resources": [
+          "physical:A",
+          "traffic-slot:0:(0, 1, '1g')",
+          "traffic-slot:0:(1, 2, '1g')",
+          "traffic-slot:0:(2, 3, '1g')",
+          "traffic-slot:0:(3, 4, '1g')",
+          "traffic:A"
+        ],
+        "dependsOn": [],
+        "phase": 0
+      },
+      {
+        "id": "a0001_delete_pods_PARTIAL-RECONF-gpu0",
+        "index": 1,
+        "rootId": "PARTIAL_RECONF_gpu0",
+        "operationClass": "cleanup",
+        "action": {
+          "type": "delete_pods",
+          "gpu_id": 0,
+          "physical_gpu_id": "A",
+          "slots": [
+            [
+              0,
+              1,
+              "1g"
+            ],
+            [
+              1,
+              2,
+              "1g"
+            ],
+            [
+              2,
+              3,
+              "1g"
+            ],
+            [
+              3,
+              4,
+              "1g"
+            ]
+          ],
+          "partial": true,
+          "transitionMode": "partial_reconfiguration",
+          "abstractRoot": "PARTIAL_RECONF_gpu0",
+          "abstractAction": "Delete Pods"
+        },
+        "resources": [
+          "physical:A",
+          "slot:0:(0, 1, '1g')",
+          "slot:0:(1, 2, '1g')",
+          "slot:0:(2, 3, '1g')",
+          "slot:0:(3, 4, '1g')",
+          "traffic-slot:0:(0, 1, '1g')",
+          "traffic-slot:0:(1, 2, '1g')",
+          "traffic-slot:0:(2, 3, '1g')",
+          "traffic-slot:0:(3, 4, '1g')"
+        ],
+        "dependsOn": [
+          "a0000_stop_gpu_traffic_PARTIAL-RECONF-gpu0"
+        ],
+        "phase": 1
+      },
+      {
+        "id": "a0002_configure_partial_profile_PARTIAL-RECONF-gpu0",
+        "index": 2,
+        "rootId": "PARTIAL_RECONF_gpu0",
+        "operationClass": "other",
+        "action": {
+          "type": "configure_partial_profile",
+          "gpu_id": 0,
+          "physical_gpu_id": "A",
+          "logical_gpu_id": 0,
+          "pendingLogicalGpuId": 0,
+          "template": "2+2+2+1",
+          "partial": true,
+          "sourceTemplate": "1+1+1+1+2+1",
+          "targetTemplate": "2+2+2+1",
+          "preserveSlots": [
+            [
+              4,
+              6,
+              "2g"
+            ],
+            [
+              6,
+              7,
+              "1g"
+            ]
+          ],
+          "deleteSlots": [
+            [
+              0,
+              1,
+              "1g"
+            ],
+            [
+              1,
+              2,
+              "1g"
+            ],
+            [
+              2,
+              3,
+              "1g"
+            ],
+            [
+              3,
+              4,
+              "1g"
+            ]
+          ],
+          "createSlots": [
+            [
+              0,
+              2,
+              "2g"
+            ],
+            [
+              2,
+              4,
+              "2g"
+            ]
+          ],
+          "deleteSpec": "0:1:1g,1:1:1g,2:1:1g,3:1:1g",
+          "createSpec": "0:2:2g,2:2:2g",
+          "preserveSpec": "4:2:2g,6:1:1g",
+          "transitionMode": "partial_reconfiguration",
+          "abstractRoot": "PARTIAL_RECONF_gpu0",
+          "abstractAction": "Partial Reconfiguration"
+        },
+        "resources": [
+          "physical:A"
+        ],
+        "dependsOn": [
+          "a0001_delete_pods_PARTIAL-RECONF-gpu0"
+        ],
+        "phase": 2
+      },
+      {
+        "id": "a0003_observe_mig_devices_PARTIAL-RECONF-gpu0",
+        "index": 3,
+        "rootId": "PARTIAL_RECONF_gpu0",
+        "operationClass": "mig-geometry",
+        "action": {
+          "type": "observe_mig_devices",
+          "gpu_id": 0,
+          "physical_gpu_id": "A",
+          "slots": [
+            [
+              0,
+              2,
+              "2g"
+            ],
+            [
+              2,
+              4,
+              "2g"
+            ]
+          ],
+          "preserveSlots": [
+            [
+              4,
+              6,
+              "2g"
+            ],
+            [
+              6,
+              7,
+              "1g"
+            ]
+          ],
+          "partial": true,
+          "transitionMode": "partial_reconfiguration",
+          "abstractRoot": "PARTIAL_RECONF_gpu0",
+          "abstractAction": "Observe MIG devices"
+        },
+        "resources": [
+          "mig-devices:0:A",
+          "physical:A"
+        ],
+        "dependsOn": [
+          "a0002_configure_partial_profile_PARTIAL-RECONF-gpu0"
+        ],
+        "phase": 3
+      },
+      {
+        "id": "a0004_deploy_target_workloads_PARTIAL-RECONF-gpu0",
+        "index": 4,
+        "rootId": "PARTIAL_RECONF_gpu0",
+        "operationClass": "pod-lifecycle",
+        "action": {
+          "type": "deploy_target_workloads",
+          "gpu_id": 0,
+          "physical_gpu_id": "A",
+          "slots": [
+            [
+              0,
+              2,
+              "2g"
+            ],
+            [
+              2,
+              4,
+              "2g"
+            ]
+          ],
+          "partial": true,
+          "transitionMode": "partial_reconfiguration",
+          "abstractRoot": "PARTIAL_RECONF_gpu0",
+          "abstractAction": "Deploy Pods"
+        },
+        "resources": [
+          "physical:A"
+        ],
+        "dependsOn": [
+          "a0003_observe_mig_devices_PARTIAL-RECONF-gpu0"
+        ],
+        "phase": 4
+      },
+      {
+        "id": "a0005_activate_serving_route_PARTIAL-RECONF-gpu0",
+        "index": 5,
+        "rootId": "PARTIAL_RECONF_gpu0",
+        "operationClass": "router-drain",
+        "action": {
+          "type": "activate_serving_route",
+          "gpu_id": 0,
+          "physical_gpu_id": "A",
+          "slots": [
+            [
+              0,
+              2,
+              "2g"
+            ],
+            [
+              2,
+              4,
+              "2g"
+            ]
+          ],
+          "partial": true,
+          "transitionMode": "partial_reconfiguration",
+          "abstractRoot": "PARTIAL_RECONF_gpu0",
+          "abstractAction": "Activate Route"
+        },
+        "resources": [
+          "physical:A"
+        ],
+        "dependsOn": [
+          "a0004_deploy_target_workloads_PARTIAL-RECONF-gpu0"
+        ],
+        "phase": 5
+      }
+    ]
+  },
+  "decisionTrace": [],
+  "executedSlots": [
+    {
+      "start": 0,
+      "end": 2,
+      "profile": "2g",
+      "workload": "x",
+      "batch": 1,
+      "mu": 10
+    },
+    {
+      "start": 2,
+      "end": 4,
+      "profile": "2g",
+      "workload": "y",
+      "batch": 1,
+      "mu": 10
+    },
+    {
+      "start": 4,
+      "end": 6,
+      "profile": "2g",
+      "workload": "keep2",
+      "batch": 1,
+      "mu": 10
+    },
+    {
+      "start": 6,
+      "end": 7,
+      "profile": "1g",
+      "workload": "keep1",
+      "batch": 1,
+      "mu": 5
+    }
+  ]
+}

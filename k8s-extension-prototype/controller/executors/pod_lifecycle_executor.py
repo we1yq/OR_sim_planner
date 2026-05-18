@@ -182,6 +182,11 @@ def _create_or_reuse_workload_pod(
     expected_placement = expected_placement_from_row(row)
     placement_attempts = []
     reservations: list[dict[str, Any]] = []
+    direct_mig_uuid = _expected_mig_uuid_from_registry(
+        client_=client_,
+        namespace=namespace,
+        row=row,
+    )
 
     _apply_batch_configmap(core, namespace, configmap_name, batch_size, action_plan_name)
     max_attempts = int(row.get("placementRetryLimit") or (3 if expected_placement else 1))
@@ -220,6 +225,7 @@ def _create_or_reuse_workload_pod(
                     node_name=node_name,
                     mig_resource=mig_resource,
                     image=image,
+                    mig_device_uuid=direct_mig_uuid,
                 ),
             )
             pod_uid = _wait_for_pod_ready(core, namespace, pod_name, timeout_s)
@@ -260,6 +266,7 @@ def _create_or_reuse_workload_pod(
         "configMapName": configmap_name,
         "nodeName": node_name,
         "requestedMigResource": mig_resource,
+        "directMigDeviceUuid": direct_mig_uuid,
         "batchSize": batch_size,
         "podUid": pod_uid,
         "reused": reused,
@@ -381,8 +388,23 @@ def _workload_pod_manifest(
     node_name: str,
     mig_resource: str,
     image: str,
+    mig_device_uuid: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    env = [
+        {"name": "NVIDIA_DRIVER_CAPABILITIES", "value": "compute,utility"},
+    ]
+    resources = {"limits": {mig_resource: 1}}
+    annotations = _placement_annotations(action_plan_name=action_plan_name)
+    if mig_device_uuid:
+        annotations["nvidia.cdi.k8s.io/container.worker"] = (
+            f"management.nvidia.com/gpu={mig_device_uuid}"
+        )
+        annotations["mig.or-sim.io/direct-cdi-device"] = (
+            f"management.nvidia.com/gpu={mig_device_uuid}"
+        )
+        env.append({"name": "NVIDIA_VISIBLE_DEVICES", "value": "all"})
+        resources = {}
+    manifest = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
@@ -392,7 +414,7 @@ def _workload_pod_manifest(
                 "mig.or-sim.io/owner-action-plan": action_plan_name,
                 "mig.or-sim.io/workload": _label_value(workload),
             },
-            "annotations": _placement_annotations(action_plan_name=action_plan_name),
+            "annotations": annotations,
         },
         "spec": {
             "restartPolicy": "Never",
@@ -419,12 +441,42 @@ def _workload_pod_manifest(
                     "volumeMounts": [
                         {"name": "batch-config", "mountPath": "/etc/or-sim", "readOnly": True}
                     ],
-                    "resources": {"limits": {mig_resource: 1}},
+                    "env": env,
+                    "resources": resources,
                 }
             ],
             "volumes": [{"name": "batch-config", "configMap": {"name": configmap_name}}],
         },
     }
+    if mig_device_uuid:
+        manifest["spec"]["runtimeClassName"] = "nvidia"
+    return manifest
+
+
+def _expected_mig_uuid_from_registry(
+    client_: KubernetesClient,
+    namespace: str,
+    row: dict[str, Any],
+) -> str | None:
+    expected = expected_placement_from_row(row)
+    if not expected:
+        return None
+    registry = client_.get_physicalgpuregistry(name="default", namespace=namespace)
+    registry_status = dict((registry or {}).get("status", {}))
+    bindings = {
+        str(physical_id): dict(binding)
+        for physical_id, binding in dict(registry_status.get("bindings", {})).items()
+    }
+    logical_slots = []
+    for binding in bindings.values():
+        logical_slots.extend(list(binding.get("logicalMigSlots", [])))
+    if not logical_slots:
+        logical_slots = logical_mig_slots_from_bindings(bindings)
+    expected_slot = find_logical_slot(logical_slots, expected)
+    if expected_slot is None:
+        return None
+    value = expected_slot.get("migDeviceUuid")
+    return str(value) if value else None
 
 
 def _verify_expected_placement(

@@ -33,7 +33,7 @@
 <text x="393.0" y="294.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Reroute Queued Requests</text>
 <text x="393.0" y="305.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">move queued requests to stable</text>
 <text x="393.0" y="316.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">serving slots</text>
-<rect x="528.0" y="252.0" width="206" height="98" rx="5" fill="#fef3c7" stroke="#111827" stroke-width="1"/>
+<rect x="528.0" y="252.0" width="206" height="98" rx="5" fill="#fef3c7" stroke="#111827" stroke-width="1" stroke-dasharray="5 4"/>
 <title>Wait Drain: wait until queued requests and running work are zero</title>
 <text x="631.0" y="294.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Wait Drain</text>
 <text x="631.0" y="305.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">wait until queued requests and</text>
@@ -60,8 +60,8 @@
 <text x="1583.0" y="311.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">pendingLogicalGpuId; move to</text>
 <text x="1583.0" y="322.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">activeQueue</text>
 <rect x="1718.0" y="252.0" width="206" height="98" rx="5" fill="#dbeafe" stroke="#111827" stroke-width="1"/>
-<title>Resolve UUIDs: map target slots to real MIG device UUIDs</title>
-<text x="1821.0" y="294.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Resolve UUIDs</text>
+<title>Observe MIG devices: map target slots to real MIG device UUIDs</title>
+<text x="1821.0" y="294.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#111827">Observe MIG devices</text>
 <text x="1821.0" y="305.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">map target slots to real MIG</text>
 <text x="1821.0" y="316.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">device UUIDs</text>
 <rect x="1956.0" y="252.0" width="206" height="98" rx="5" fill="#dcfce7" stroke="#111827" stroke-width="1"/>

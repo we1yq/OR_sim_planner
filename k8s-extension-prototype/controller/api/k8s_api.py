@@ -296,6 +296,20 @@ class PythonKubernetesClient:
                 stdout=True,
                 tty=False,
             )
+            try:
+                lgi_output = stream(
+                    self.core.connect_get_namespaced_pod_exec,
+                    pod_name,
+                    namespace,
+                    container=container_name,
+                    command=["nvidia-smi", "mig", "-lgi"],
+                    stderr=True,
+                    stdin=False,
+                    stdout=True,
+                    tty=False,
+                )
+            except Exception as exc:
+                lgi_output = f"nvidia-smi mig -lgi failed: {exc}"
             inventory.append(
                 {
                     "nodeName": spec.get("nodeName"),
@@ -303,6 +317,7 @@ class PythonKubernetesClient:
                     "namespace": namespace,
                     "source": source,
                     "nvidiaSmiL": str(output),
+                    "nvidiaSmiMigLGI": str(lgi_output),
                 }
             )
         return inventory

@@ -144,6 +144,21 @@ def safe_after_removing_instance(
     return provided.get(inst.workload, 0.0) + 1e-9 >= required.get(inst.workload, 0.0)
 
 
+def safe_after_removing_instances(
+    state: ClusterState,
+    instances: list[MigInstance] | tuple[MigInstance, ...],
+    required: dict[str, float],
+) -> bool:
+    provided = provided_by_workload(state)
+    for inst in instances:
+        if inst.workload is not None:
+            provided[inst.workload] = provided.get(inst.workload, 0.0) - float(inst.mu)
+    for workload, required_rate in required.items():
+        if provided.get(workload, 0.0) + 1e-9 < required_rate:
+            return False
+    return True
+
+
 def safe_after_removing_gpu(
     state: ClusterState,
     gpu: GPUState,

@@ -44,9 +44,20 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
                 targetInflight:
                   type: integer
+                targetQueued:
+                  type: integer
                 currentInflightApprox:
                   type: integer
+                currentQueuedApprox:
+                  type: integer
+                estimatedDrainSeconds:
+                  type: number
+                reroutePressure:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
                 waitForInflightZero:
+                  type: boolean
+                waitForQueuedZero:
                   type: boolean
             status:
               type: object

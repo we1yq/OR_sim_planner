@@ -1,0 +1,10 @@
+{
+  "actionCount": 33,
+  "outputs": {
+    "final_execution_dag": "k8s-extension-prototype/reports/dag-figures/full-planner-regression-forced/stage3-cost-aware-dag/final-execution-dag.svg"
+  },
+  "phaseCount": 11,
+  "planner": "cost_aware_dag",
+  "plannerModule": "transition.cost_aware_dag",
+  "scenario": "stage3"
+}

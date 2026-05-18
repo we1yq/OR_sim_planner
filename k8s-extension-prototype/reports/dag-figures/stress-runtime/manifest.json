@@ -1,0 +1,21 @@
+{
+  "runtimeAssumption": "scenario default stress runtime",
+  "figures": [
+    {
+      "dir": "stage2-cost-aware-dag",
+      "scenario": "stage2",
+      "planner": "cost_aware_dag",
+      "actionCount": 45,
+      "phaseCount": 8,
+      "svg": "stage2-cost-aware-dag/final-execution-dag.svg"
+    },
+    {
+      "dir": "stage3-cost-aware-dag",
+      "scenario": "stage3",
+      "planner": "cost_aware_dag",
+      "actionCount": 43,
+      "phaseCount": 13,
+      "svg": "stage3-cost-aware-dag/final-execution-dag.svg"
+    }
+  ]
+}

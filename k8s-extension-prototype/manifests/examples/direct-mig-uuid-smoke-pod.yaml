@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: direct-mig-uuid-smoke
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: direct-mig-uuid-smoke
+spec:
+  restartPolicy: Never
+  runtimeClassName: nvidia
+  nodeSelector:
+    kubernetes.io/hostname: rtx1-worker
+  containers:
+    - name: worker
+      image: or-sim-fast-mig-node-agent:dev
+      imagePullPolicy: IfNotPresent
+      command:
+        - /bin/sh
+        - -c
+      args:
+        - |
+          nvidia-smi -L
+          nvidia-smi
+      env:
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: MIG-a26ad80d-ce97-5ca7-ae94-ecc0bca3216c
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: compute,utility

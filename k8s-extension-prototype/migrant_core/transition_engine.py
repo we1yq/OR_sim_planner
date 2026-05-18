@@ -130,8 +130,9 @@ def _abstract_action_label(action_type: str) -> str:
     return {
         "allocate_gpu": "Allocate GPU",
         "configure_full_template": "Configure Template",
+        "configure_partial_profile": "Partial Reconfiguration",
         "bind_target_gpu": "Bind GPU",
-        "observe_mig_devices": "Resolve UUIDs",
+        "observe_mig_devices": "Observe MIG devices",
         "deploy_target_workloads": "Deploy Pods",
         "activate_serving_route": "Activate Route",
         "stop_gpu_traffic": "Stop GPU Traffic",
@@ -440,7 +441,6 @@ def simulate_transition_actions(
 
         if action_type in {
             "allocate_gpu",
-            "configure_partial_profile",
             "accept_queued_requests",
             "patch_batch_config",
             "verify_batch",
@@ -503,6 +503,37 @@ def simulate_transition_actions(
             _reconfig_map(executed_state).pop(str(gpu_id), None)
             continue
 
+        if action_type == "configure_partial_profile":
+            gpu_id = int(action["gpu_id"])
+            physical_id = action["physical_gpu_id"]
+            target_gpu = target_map.get(gpu_id)
+            if target_gpu is None or get_physical_id(executed_state, gpu_id) != physical_id:
+                continue
+            cur_gpu = get_gpu_by_id_mut(executed_state, gpu_id)
+            if cur_gpu is None:
+                continue
+            delete_slots = _slots_from_action_field(action, "deleteSlots")
+            create_slots = _slots_from_action_field(action, "createSlots")
+            for inst in list(cur_gpu.instances):
+                slot = (inst.start, inst.end, inst.profile)
+                if slot in delete_slots:
+                    cur_gpu.instances.remove(inst)
+                    _clear_runtime_entry(executed_state, gpu_id, slot)
+                    _clear_drain(executed_state, gpu_id, slot)
+            for slot in sorted(create_slots, key=lambda item: (item[0], item[1], item[2])):
+                target_inst = get_inst_by_slot(target_gpu, slot)
+                if target_inst is None:
+                    start, end, profile = slot
+                    target_inst = MigInstance(start, end, profile)
+                cur_gpu.instances.append(copy.deepcopy(target_inst))
+                runtime = _get_runtime_entry(executed_state, gpu_id, slot)
+                runtime.setdefault("queued", 0)
+                runtime.setdefault("inflight", 0)
+                runtime["accepting_new"] = False
+            cur_gpu.sort_instances()
+            set_physical_id(executed_state, gpu_id, physical_id)
+            continue
+
         if action_type == "place_target_layout":
             gpu_id = int(action["gpu_id"])
             physical_id = action["physical_gpu_id"]
@@ -536,9 +567,10 @@ def simulate_transition_actions(
                 continue
             target_gpu = target_map.get(gpu_id)
             if target_gpu is not None and get_physical_id(executed_state, gpu_id) == physical_id:
-                replace_or_append_gpu(executed_state, copy.deepcopy(target_gpu))
-                set_physical_id(executed_state, gpu_id, physical_id)
-                for inst in _nonfree_instances(target_gpu):
+                if not bool(action.get("partial", False)):
+                    replace_or_append_gpu(executed_state, copy.deepcopy(target_gpu))
+                    set_physical_id(executed_state, gpu_id, physical_id)
+                for inst in _instances_for_action_slots(target_gpu, action):
                     slot = (inst.start, inst.end, inst.profile)
                     runtime = _get_runtime_entry(executed_state, gpu_id, slot)
                     runtime.setdefault("queued", 0)
@@ -558,12 +590,12 @@ def simulate_transition_actions(
             if get_physical_id(executed_state, gpu_id) != physical_id:
                 continue
             target_gpu = target_map.get(gpu_id)
-            if target_gpu is not None:
+            if target_gpu is not None and not bool(action.get("partial", False)):
                 replace_or_append_gpu(executed_state, copy.deepcopy(target_gpu))
                 set_physical_id(executed_state, gpu_id, physical_id)
             cur_gpu = get_gpu_by_id_mut(executed_state, gpu_id)
             if cur_gpu is not None:
-                for inst in _nonfree_instances(cur_gpu):
+                for inst in _instances_for_action_slots(cur_gpu, action):
                     slot = (inst.start, inst.end, inst.profile)
                     runtime = _get_runtime_entry(executed_state, gpu_id, slot)
                     runtime.setdefault("queued", 0)
@@ -663,6 +695,25 @@ def _slots_from_delete_pods_action(action: dict[str, Any]) -> set[tuple[int, int
         if isinstance(slot, (list, tuple)) and len(slot) >= 3:
             out.add((int(slot[0]), int(slot[1]), str(slot[2])))
     return out
+
+
+def _slots_from_action_field(action: dict[str, Any], field: str) -> set[tuple[int, int, str]]:
+    out: set[tuple[int, int, str]] = set()
+    for slot in list(action.get(field) or []):
+        if isinstance(slot, (list, tuple)) and len(slot) >= 3:
+            out.add((int(slot[0]), int(slot[1]), str(slot[2])))
+    return out
+
+
+def _instances_for_action_slots(gpu: GPUState, action: dict[str, Any]) -> list[MigInstance]:
+    slots = _slots_from_delete_pods_action(action)
+    if not slots:
+        return _nonfree_instances(gpu)
+    return [
+        inst
+        for inst in _nonfree_instances(gpu)
+        if (inst.start, inst.end, inst.profile) in slots
+    ]
 
 
 def plan_full_action_plan(

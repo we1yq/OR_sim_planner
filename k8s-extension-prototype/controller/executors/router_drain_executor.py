@@ -364,6 +364,7 @@ def _record_workload_route_plan(
             "queued": int(action.get("queued", 0) or 0),
             "target": action.get("targetEndpoint") or action.get("toEndpoint") or action.get("to"),
             "targetInstanceRef": _target_instance_ref(action),
+            "reroutePressure": _reroute_pressure(action),
             "queueRuntime": result.get("queueRuntime"),
             "queuedMoved": int(result.get("queuedMoved", 0) or 0),
         },
@@ -414,6 +415,8 @@ def _record_serving_instance_drain(
             "targetQueued": 0,
             "currentInflightApprox": int(metrics.get("inflight", 0) or 0),
             "currentQueuedApprox": int(metrics.get("queued", 0) or 0),
+            "estimatedDrainSeconds": action.get("estimatedBacklogDrainSeconds"),
+            "reroutePressure": _reroute_pressure(action),
             "waitForInflightZero": True,
             "waitForQueuedZero": True,
         },
@@ -451,6 +454,18 @@ def _target_instance_ref(action: dict[str, Any]) -> dict[str, Any]:
         "slot": action.get("targetSlot") or action.get("toSlot"),
         "physicalGpuId": action.get("target_physical_gpu_id") or action.get("targetPhysicalGpuId"),
     }
+
+
+def _reroute_pressure(action: dict[str, Any]) -> dict[str, Any]:
+    keys = [
+        "targetMu",
+        "workloadRequiredMu",
+        "workloadProvidedAfterSourceRemoval",
+        "estimatedRerouteSpareMu",
+        "estimatedBacklogDrainSeconds",
+        "rerouteCapacitySafe",
+    ]
+    return {key: action.get(key) for key in keys if key in action}
 
 
 def _child_name(action_plan_name: str, action_name: str, action: dict[str, Any]) -> str:

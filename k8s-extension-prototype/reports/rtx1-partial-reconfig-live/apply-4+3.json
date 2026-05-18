@@ -1,0 +1,30 @@
+{
+  "command": "apply",
+  "gpuIndex": "0",
+  "template": "4+3",
+  "profileIds": "5,9",
+  "createSeconds": 0.502145579,
+  "success": true,
+  "message": "Successfully created GPU instance ID  1 on GPU  0 using profile MIG 4g.20gb (ID  5)\nSuccessfully created compute instance ID  0 on GPU  0 GPU instance ID  1 using profile MIG 4g.20gb (ID  3)\nSuccessfully created GPU instance ID  2 on GPU  0 using profile MIG 3g.20gb (ID  9)\nSuccessfully created compute instance ID  0 on GPU  0 GPU instance ID  2 using profile MIG 3g.20gb (ID  2)",
+  "nvidiaSmiL": "GPU 0: NVIDIA A100-PCIE-40GB (UUID: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f)\n  MIG 4g.20gb     Device  0: (UUID: MIG-7aafc298-b386-508f-80b7-938481c587bc)\n  MIG 3g.20gb     Device  1: (UUID: MIG-7d094e15-b1b4-59a8-b3ee-80dcdea24aa5)\nGPU 1: NVIDIA TITAN RTX (UUID: GPU-21058121-c040-c847-712d-da7a5cf48e4b)\nGPU 2: NVIDIA TITAN RTX (UUID: GPU-edc7db6f-0fec-bc09-9cbe-5a8d2598a62e)\nGPU 3: NVIDIA GeForce RTX 3090 (UUID: GPU-1e09b62e-bae8-23dd-a55d-03b34ee00182)\n",
+  "migSlots": [
+    {
+      "slotStart": 0,
+      "slotEnd": 4,
+      "profile": "4g",
+      "migDeviceUuid": "MIG-7aafc298-b386-508f-80b7-938481c587bc",
+      "gpuInstanceId": "1",
+      "profileId": "5",
+      "source": "fast-mig-node-agent-provisional"
+    },
+    {
+      "slotStart": 4,
+      "slotEnd": 7,
+      "profile": "3g",
+      "migDeviceUuid": "MIG-7d094e15-b1b4-59a8-b3ee-80dcdea24aa5",
+      "gpuInstanceId": "2",
+      "profileId": "9",
+      "source": "fast-mig-node-agent-provisional"
+    }
+  ]
+}

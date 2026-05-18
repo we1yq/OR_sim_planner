@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from ..partial_reconfig import build_partial_reconfig_plan
 from ..physical_ids import bootstrap_physical_ids_for_state, ensure_state_metadata, get_physical_id
 from ..state import ClusterState, MigInstance, deepcopy_state, gpu_map_by_id
 from ..transition_common import (
@@ -35,6 +36,7 @@ class CandidateScore:
     peak_active_gpu: int
     service_risk: int
     queued_wait: int
+    reroute_backlog_seconds: float
     drain_rounds: int
     reroutes: int
     bridges: int
@@ -50,6 +52,7 @@ class CandidateScore:
             self.peak_active_gpu,
             self.service_risk,
             self.queued_wait,
+            self.reroute_backlog_seconds,
             self.drain_rounds,
             self.reconfig_seconds,
             self.reroutes,
@@ -64,6 +67,7 @@ class CandidateScore:
             "peakActiveGpu": self.peak_active_gpu,
             "serviceRisk": self.service_risk,
             "queuedWait": self.queued_wait,
+            "rerouteBacklogSeconds": self.reroute_backlog_seconds,
             "drainRounds": self.drain_rounds,
             "reroutes": self.reroutes,
             "bridges": self.bridges,
@@ -241,6 +245,29 @@ def _build_cost_aware_actions(
         old_physical_id = get_physical_id(source_state, gpu_id)
         target_template = tgt_gpu.template_str()
         candidates: list[tuple[str, str | None, list[dict[str, Any]], list[dict[str, Any]], bool]] = []
+
+        partial_plan = build_partial_reconfig_plan(src_gpu, tgt_gpu)
+        if partial_plan is not None:
+            local_actions = []
+            local_items = []
+            basic_dag._append_partial_reconfiguration_actions(
+                local_actions,
+                local_items,
+                source_state,
+                target_state,
+                gpu_id,
+                old_physical_id,
+                partial_plan,
+            )
+            candidates.append(
+                (
+                    "partial_reconfiguration",
+                    old_physical_id,
+                    local_actions,
+                    local_items,
+                    basic_dag._partial_reconfiguration_capacity_safe(source_state, src_gpu, partial_plan, required),
+                )
+            )
 
         local_actions: list[dict[str, Any]] = []
         local_items: list[dict[str, Any]] = []
@@ -450,6 +477,7 @@ def _score_actions(source_state: ClusterState, actions: list[dict[str, Any]], fe
         peak_active_gpu=basic_dag._peak_serving_gpu_from_actions(source_state, actions),
         service_risk=0 if feasible else 1,
         queued_wait=sum(_queued_wait(action) for action in actions),
+        reroute_backlog_seconds=round(sum(_reroute_backlog_seconds(action) for action in actions), 6),
         drain_rounds=sum(int(action.get("rounds", 0) or 0) for action in actions if action.get("type") == "mark_draining_instance"),
         reroutes=sum(1 for action in actions if action.get("type") == "reroute_queued_tasks"),
         bridges=sum(1 for action in actions if action.get("type") == "bridge_place_instance"),
@@ -465,10 +493,18 @@ def _queued_wait(action: dict[str, Any]) -> int:
     return 0
 
 
+def _reroute_backlog_seconds(action: dict[str, Any]) -> float:
+    if action.get("type") != "reroute_queued_tasks":
+        return 0.0
+    return max(0.0, float(action.get("estimatedBacklogDrainSeconds", 0.0) or 0.0))
+
+
 def _estimated_reconfig_seconds(action: dict[str, Any]) -> float:
     action_type = action.get("type")
     if action_type == "configure_full_template":
         return _TEMPLATE_ALLOCATABLE_SECONDS.get(_canonical_template(str(action.get("template", ""))), _DEFAULT_TEMPLATE_ALLOCATABLE_SECONDS)
+    if action_type == "configure_partial_profile":
+        return _PARTIAL_PROFILE_SECONDS
     if action_type == "clear_template":
         return _EMPTY_SUCCESS_SECONDS.get(_canonical_template(str(action.get("template", ""))), _DEFAULT_EMPTY_SUCCESS_SECONDS)
     return 0.0
@@ -482,36 +518,40 @@ def _canonical_template(template: str) -> str:
 
 
 _TEMPLATE_ALLOCATABLE_SECONDS = {
-    "7": 102.539,
-    "4+3": 120.651,
-    "4+2+1": 112.627,
-    "4+1+1+1": 112.629,
-    "3+3": 110.611,
-    "3+2+1": 112.603,
-    "3+1+1+1": 114.648,
-    "3+2+2": 112.619,
-    "3+2+1+1": 112.612,
-    "3+1+1+1+1": 112.652,
-    "2+2+2+1": 112.609,
-    "2+2+1+1+1": 114.619,
-    "2+1+1+1+1+1": 120.811,
-    "1+1+1+1+1+1+1": 112.613,
+    # Measured on rtx1 through the fast-mig-node-agent DaemonSet.
+    # These are direct nvidia-smi template create times, not GPU Operator
+    # allocatable propagation times.
+    "7": 0.358,
+    "4+3": 0.609,
+    "4+2+1": 1.096,
+    "4+1+1+1": 1.008,
+    "3+3": 0.569,
+    "3+2+1": 0.781,
+    "3+1+1+1": 0.965,
+    "3+2+2": 0.844,
+    "3+2+1+1": 0.981,
+    "3+1+1+1+1": 1.198,
+    "2+2+2+1": 1.374,
+    "2+2+1+1+1": 1.211,
+    "2+1+1+1+1+1": 1.432,
+    "1+1+1+1+1+1+1": 1.704,
 }
 _EMPTY_SUCCESS_SECONDS = {
-    "7": 42.237,
-    "4+3": 40.229,
-    "4+2+1": 40.238,
-    "4+1+1+1": 40.237,
-    "3+3": 40.236,
-    "3+2+1": 40.238,
-    "3+1+1+1": 40.238,
-    "3+2+2": 40.235,
-    "3+2+1+1": 40.244,
-    "3+1+1+1+1": 40.237,
-    "2+2+2+1": 40.235,
-    "2+2+1+1+1": 42.247,
-    "2+1+1+1+1+1": 40.236,
-    "1+1+1+1+1+1+1": 40.236,
+    "7": 0.329,
+    "4+3": 0.464,
+    "4+2+1": 0.509,
+    "4+1+1+1": 0.560,
+    "3+3": 0.504,
+    "3+2+1": 0.708,
+    "3+1+1+1": 0.612,
+    "3+2+2": 0.751,
+    "3+2+1+1": 0.611,
+    "3+1+1+1+1": 0.618,
+    "2+2+2+1": 0.756,
+    "2+2+1+1+1": 0.802,
+    "2+1+1+1+1+1": 1.075,
+    "1+1+1+1+1+1+1": 0.870,
 }
-_DEFAULT_TEMPLATE_ALLOCATABLE_SECONDS = 113.203
-_DEFAULT_EMPTY_SUCCESS_SECONDS = 40.5
+_DEFAULT_TEMPLATE_ALLOCATABLE_SECONDS = 1.009
+_DEFAULT_EMPTY_SUCCESS_SECONDS = 0.655
+_PARTIAL_PROFILE_SECONDS = 1.059

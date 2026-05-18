@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: partial-reconfig-4g-validator-10s
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: partial-reconfig-4g-validator-10s
+    mig.or-sim.io/test: partial-reconfig-live
+  annotations:
+    nvidia.cdi.k8s.io/container.worker: management.nvidia.com/gpu=MIG-7aafc298-b386-508f-80b7-938481c587bc
+spec:
+  restartPolicy: Never
+  runtimeClassName: nvidia
+  nodeSelector:
+    kubernetes.io/hostname: rtx1-worker
+  containers:
+    - name: worker
+      image: nvcr.io/nvidia/gpu-operator:v26.3.1
+      imagePullPolicy: IfNotPresent
+      command:
+        - sh
+        - -c
+      args:
+        - |
+          set -eu
+          echo "pod-start=$(date -Iseconds)"
+          echo "CDI_DEVICE=management.nvidia.com/gpu=MIG-7aafc298-b386-508f-80b7-938481c587bc"
+          end=$(( $(date +%s) + 20 ))
+          runs=0
+          while [ "$(date +%s)" -lt "$end" ]; do
+            vectorAdd >/tmp/vectorAdd.last 2>&1
+            runs=$((runs + 1))
+          done
+          echo "vectorAdd-runs=${runs}"
+          cat /tmp/vectorAdd.last
+          echo "pod-end=$(date -Iseconds)"
+      env:
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: all
+      securityContext:
+        privileged: true

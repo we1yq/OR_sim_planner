@@ -48,6 +48,29 @@ spec:
                   type: integer
                 target:
                   type: string
+                targetInstanceRef:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                reroutePressure:
+                  type: object
+                  properties:
+                    targetMu:
+                      type: number
+                    workloadRequiredMu:
+                      type: number
+                    workloadProvidedAfterSourceRemoval:
+                      type: number
+                    estimatedRerouteSpareMu:
+                      type: number
+                    estimatedBacklogDrainSeconds:
+                      type: number
+                    rerouteCapacitySafe:
+                      type: boolean
+                queueRuntime:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                queuedMoved:
+                  type: integer
             status:
               type: object
               properties:

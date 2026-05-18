@@ -1,0 +1,10 @@
+{
+  "actionCount": 45,
+  "outputs": {
+    "final_execution_dag": "k8s-extension-prototype/reports/dag-figures/stress-runtime/stage2-cost-aware-dag/final-execution-dag.svg"
+  },
+  "phaseCount": 8,
+  "planner": "cost_aware_dag",
+  "plannerModule": "transition.cost_aware_dag",
+  "scenario": "stage2"
+}

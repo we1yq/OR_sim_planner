@@ -34,7 +34,7 @@ planner-facing `type` values intentionally stay executable:
 Allocate GPU -> allocate_gpu
 Configure Template -> configure_full_template
 Bind GPU -> bind_target_gpu
-Resolve UUIDs -> observe_mig_devices
+Observe MIG devices -> observe_mig_devices
 Deploy Pods -> deploy_target_workloads
 Activate Route -> activate_serving_route
 Stop GPU/Slot Traffic -> stop_accepting_new
@@ -43,6 +43,7 @@ Reroute Queued Requests -> reroute_queued_tasks
 Wait Drain -> mark_draining_instance
 Delete Pods -> delete_pods
 Delete Pod -> delete_pods with one target slot
+Partial Reconfiguration -> configure_partial_profile
 Clear GPU Binding -> clear_gpu_binding
 Clear Template -> clear_template
 Return GPU -> return_gpu
@@ -57,7 +58,7 @@ Verify Batch -> verify_batch
 -> Allocate GPU: reserve a physical GPU from availableQueue; assign pendingLogicalGpuId
 -> Configure Template: move GPU to transitionQueue; apply target MIG template on the physical GPU
 -> Bind GPU: bind activeLogicalGpuId to this physical GPU; remove pendingLogicalGpuId; move GPU to activeQueue
--> Resolve UUIDs: map each target slot to real MIG device UUID
+-> Observe MIG devices: map each target slot to real MIG device UUID
 -> Deploy Pods: deploy workload pods on resolved target slots
 -> Activate Route: route new requests to deployed pods
 ```
@@ -78,7 +79,7 @@ Optional destination line:
 -> [optional] Accept Queued Requests: stable serving slot accepts rerouted queued requests
 
 Cross-line edge:
-Accept Queued Requests -> -> Reroute Queued Requests
+Accept Queued Requests -> Reroute Queued Requests: destination slot must be ready before queued requests are moved
 ```
 
 ```text
@@ -92,7 +93,7 @@ Main GPU line:
 -> Clear GPU Binding: remove activeLogicalGpuId; keep/assign pendingLogicalGpuId; move GPU to transitionQueue
 -> Configure Template: keep GPU in transitionQueue; apply target MIG template on the same physical GPU
 -> Bind GPU: bind activeLogicalGpuId back to this physical GPU; remove pendingLogicalGpuId; move GPU to activeQueue
--> Resolve UUIDs: map each target slot to real MIG device UUID
+-> Observe MIG devices: map each target slot to real MIG device UUID
 -> Deploy Pods: deploy target workload pods
 -> Activate Route: route new requests to target pods
 
@@ -100,7 +101,7 @@ Optional destination line:
 -> [optional] Accept Queued Requests: stable serving slot accepts rerouted queued requests
 
 Cross-line edge:
-Accept Queued Requests -> -> Reroute Queued Requests
+Accept Queued Requests -> Reroute Queued Requests: destination slot must be ready before queued requests are moved
 ```
 
 ```text
@@ -110,24 +111,44 @@ Bridge GPU line:
 -> Allocate GPU: reserve a physical GPU from availableQueue; assign pendingLogicalGpuId
 -> Configure Template: move GPU to transitionQueue; apply target MIG template on the physical GPU
 -> Bind GPU: bind activeLogicalGpuId to this physical GPU; remove pendingLogicalGpuId; move GPU to activeQueue
--> Resolve UUIDs: map each target slot to real MIG device UUID
+-> Observe MIG devices: map each target slot to real MIG device UUID
 -> Deploy Pods: deploy workload pods on resolved target slots
 -> Activate Route: route new requests to deployed pods
 
 Old GPU line:
 -> Stop GPU Traffic: stop new requests entering pods on the source GPU
--> Wait Drain: wait until queued requests == 0 and running work == 0
+-> [optional] Wait Drain: wait until queued requests == 0 and running work == 0
 -> Delete Pods: delete workload pods on the source GPU; pass all source slots
 -> Clear GPU Binding: remove activeLogicalGpuId from the physical GPU; assign pendingLogicalGpuId; move old GPU to transitionQueue
 -> Clear Template: reset MIG template / set or-sim-empty
 -> Return GPU: remove pendingLogicalGpuId; move old physical GPU back to availableQueue
 
 Cross-line edge:
-Clear GPU Binding -> -> Bind GPU
+Clear GPU Binding -> Bind GPU: target GPU must be active before the old GPU binding is cleared
 ```
 
 ```text
-5. workload-replacement
+5. partial-reconfiguration
+
+Changed source slot line:
+-> Stop Slot Traffic: stop new requests entering pods on the slots that will be deleted
+-> [optional] Reroute Queued Requests: move queued requests from deleted slots to stable serving slots
+-> [optional] Wait Drain: wait until queued requests == 0 and running work == 0 on deleted slots
+-> Delete Pods: delete workload pods only on the slots that will be deleted
+-> Partial Reconfiguration: patch MIG geometry on the same physical GPU using delete/create/preserve slot specs
+-> Observe MIG devices: map newly created target slots to real MIG device UUIDs and confirm preserved slots still exist
+-> Deploy Pods: deploy workload pods only on newly created target slots
+-> Activate Route: route new requests to newly created target pods while preserved slots keep serving
+
+Optional destination line:
+-> [optional] Accept Queued Requests: stable serving slot accepts rerouted queued requests
+
+Cross-line edge:
+Accept Queued Requests -> Reroute Queued Requests: stable destination slot must be ready before queued requests leave changed slots
+```
+
+```text
+6. workload-replacement
 
 Main source slot line:
 -> Stop Slot Traffic: stop new requests entering this slot/pod
@@ -141,32 +162,32 @@ Optional destination line:
 -> [optional] Accept Queued Requests: stable serving slot accepts rerouted queued requests
 
 Cross-line edge:
-Accept Queued Requests -> -> Reroute Queued Requests
+Accept Queued Requests -> Reroute Queued Requests: destination slot must be ready before queued requests are moved
 ```
 
 ```text
-6. bridge-workload-replacement
+7. bridge-workload-replacement
 
 Bridge slot line:
 -> Deploy Bridge Pod: deploy temporary old-workload pod on compatible free slot
 -> Accept Queued Requests: bridge pod accepts rerouted queued requests
--> Drain Bridge: wait until bridge queued requests == 0 and running work == 0
+-> [optional] Drain Bridge: wait until bridge queued requests == 0 and running work == 0
 -> Delete Bridge Pod: delete temporary bridge pod
 
 Original slot line:
 -> Stop Slot Traffic: stop new requests entering this slot/pod
 -> Reroute Queued Requests: move queued requests to bridge pod
--> Wait Drain: wait until original pod running work == 0
+-> [optional] Wait Drain: wait until original pod running work == 0
 -> Delete Pods: delete old workload pod on this slot
 -> Deploy Pod: deploy replacement workload pod on the same slot
 -> Activate Route: route new requests to replacement pod
 
 Cross-line edge:
-Reroute Queued Requests -> -> Accept Queued Requests
+Reroute Queued Requests -> Accept Queued Requests: bridge slot receives queued work before the original slot drains
 ```
 
 ```text
-7. batch-update
+8. batch-update
 
 -> Patch Config: update batch size in workload/runtime config
 -> Apply Batch: runtime reloads or applies new batch size without pod deletion

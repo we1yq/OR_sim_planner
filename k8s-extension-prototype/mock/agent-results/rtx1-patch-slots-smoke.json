@@ -1,0 +1,48 @@
+{
+  "command": "patch-slots",
+  "gpuIndex": "0",
+  "profileIds": "14:0,14:2",
+  "createSeconds": 0.446216188,
+  "deleteSeconds": 0.612721938,
+  "success": true,
+  "message": "deleted [0:1:1g,1:1:1g,2:1:1g,3:1:1g]; created [0:2:2g,2:2:2g]; preserved [4:2:2g,6:1:1g]",
+  "nvidiaSmiL": "GPU 0: NVIDIA A100-PCIE-40GB (UUID: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f)\n  MIG 2g.10gb     Device  0: (UUID: MIG-a26ad80d-ce97-5ca7-ae94-ecc0bca3216c)\n  MIG 2g.10gb     Device  1: (UUID: MIG-886e5ff0-56a2-543e-a920-0e689dc47ad4)\n  MIG 2g.10gb     Device  2: (UUID: MIG-3c4950a8-4201-5715-97e9-6e7cf24b7c7d)\n  MIG 1g.5gb      Device  3: (UUID: MIG-ae85698a-295e-5122-bb06-2b6a973d840e)\nGPU 1: NVIDIA TITAN RTX (UUID: GPU-21058121-c040-c847-712d-da7a5cf48e4b)\nGPU 2: NVIDIA TITAN RTX (UUID: GPU-edc7db6f-0fec-bc09-9cbe-5a8d2598a62e)\nGPU 3: NVIDIA GeForce RTX 3090 (UUID: GPU-1e09b62e-bae8-23dd-a55d-03b34ee00182)\n",
+  "migSlots": [
+    {
+      "slotStart": 0,
+      "slotEnd": 2,
+      "profile": "2g",
+      "migDeviceUuid": "MIG-a26ad80d-ce97-5ca7-ae94-ecc0bca3216c",
+      "gpuInstanceId": "3",
+      "profileId": "14",
+      "source": "fast-mig-node-agent-provisional"
+    },
+    {
+      "slotStart": 2,
+      "slotEnd": 4,
+      "profile": "2g",
+      "migDeviceUuid": "MIG-886e5ff0-56a2-543e-a920-0e689dc47ad4",
+      "gpuInstanceId": "4",
+      "profileId": "14",
+      "source": "fast-mig-node-agent-provisional"
+    },
+    {
+      "slotStart": 4,
+      "slotEnd": 6,
+      "profile": "2g",
+      "migDeviceUuid": "MIG-3c4950a8-4201-5715-97e9-6e7cf24b7c7d",
+      "gpuInstanceId": "5",
+      "profileId": "14",
+      "source": "fast-mig-node-agent-provisional"
+    },
+    {
+      "slotStart": 6,
+      "slotEnd": 7,
+      "profile": "1g",
+      "migDeviceUuid": "MIG-ae85698a-295e-5122-bb06-2b6a973d840e",
+      "gpuInstanceId": "13",
+      "profileId": "19",
+      "source": "fast-mig-node-agent-provisional"
+    }
+  ]
+}

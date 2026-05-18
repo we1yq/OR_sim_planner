@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 from ..physical_ids import PHYSICAL_ID_POOL, bootstrap_physical_ids_for_state, ensure_state_metadata, get_physical_id
+from ..partial_reconfig import PartialReconfigPlan, build_partial_reconfig_plan
 from ..state import ClusterState, MigInstance, deepcopy_state, get_inst_by_slot, gpu_map_by_id
 from ..transition_common import (
     alloc_from_free_pool,
@@ -11,8 +12,10 @@ from ..transition_common import (
     diff_instances_within_same_template,
     find_active_bridge_slot,
     matches_target_state,
+    provided_by_workload,
     safe_after_removing_gpu,
     safe_after_removing_instance,
+    safe_after_removing_instances,
 )
 from ..transition_engine import (
     _action,
@@ -29,6 +32,7 @@ from .action_plan_formats import build_phased_action_plan, compact_phased_action
 
 
 NAME = "transition.basic_dag"
+_REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS = 5.0
 
 
 def run(
@@ -191,6 +195,18 @@ def _build_final_actions(
         src_gpu = src_map[gpu_id]
         tgt_gpu = tgt_map[gpu_id]
         old_physical_id = get_physical_id(source_state, gpu_id)
+        partial_plan = build_partial_reconfig_plan(src_gpu, tgt_gpu)
+        if partial_plan is not None and _partial_reconfiguration_capacity_safe(source_state, src_gpu, partial_plan, required):
+            _append_partial_reconfiguration_actions(
+                actions,
+                plan_items,
+                source_state,
+                target_state,
+                gpu_id,
+                old_physical_id,
+                partial_plan,
+            )
+            continue
         if safe_after_removing_gpu(source_state, src_gpu, required):
             _append_in_place_reconfiguration_actions(
                 actions,
@@ -224,87 +240,17 @@ def _build_final_actions(
 
 
 def _coalesce_slot_delete_pods(actions: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Merge same-GPU slot pod deletions into one executable delete_pods call.
+    """Keep slot deletions independent.
 
-    Slot-level replacement/removal roots may independently decide that their old
-    pods can be deleted. The actuator API is cleaner when one action carries the
-    full slot set for a physical GPU, while later place/activate actions remain
-    per slot. This keeps the DAG faithful to the executable interface:
-    delete_pods(gpu, slots=[...]) -> deploy replacement pods as needed.
+    Slot-level delete actions may become ready at different times because each
+    slot can have its own queue/reroute/drain chain. Merging them into one
+    delete_pods action serializes later per-slot placement behind the slowest
+    deleted slot, so the planner keeps the independent delete actions here.
+    Multi-slot operations that are intrinsically atomic, such as full template
+    reconfiguration, are emitted as multi-slot delete_pods by their callers.
     """
 
-    groups: dict[tuple[int, str], list[int]] = {}
-    for idx, action in enumerate(actions):
-        if action.get("type") != "delete_pods":
-            continue
-        if action.get("slot") is None:
-            continue
-        slots = list(action.get("slots") or [])
-        if len(slots) != 1:
-            continue
-        mode = str(action.get("transitionMode", ""))
-        if mode in {"delete_gpu", "in_place_reconfiguration", "bridge_reconfiguration"}:
-            continue
-        gpu_id = action.get("gpu_id")
-        physical_id = action.get("physical_gpu_id")
-        if gpu_id is None or physical_id is None:
-            continue
-        groups.setdefault((int(gpu_id), str(physical_id)), []).append(idx)
-
-    merge_groups = {key: idxs for key, idxs in groups.items() if len(idxs) > 1}
-    if not merge_groups:
-        return actions
-
-    remove_indices: set[int] = set()
-    insert_after: dict[int, list[dict[str, Any]]] = {}
-    post_by_insert: dict[int, list[dict[str, Any]]] = {}
-
-    for (gpu_id, physical_id), delete_indices in merge_groups.items():
-        slots = [_slot_tuple(actions[idx].get("slot")) for idx in delete_indices]
-        slots = [slot for slot in slots if slot is not None]
-        affected_slots = set(slots)
-        affected_roots = {str(actions[idx].get("abstractRoot")) for idx in delete_indices}
-        post_indices = [
-            idx
-            for idx, action in enumerate(actions)
-            if int(action.get("gpu_id", -1)) == gpu_id
-            and str(action.get("physical_gpu_id")) == physical_id
-            and _slot_tuple(action.get("slot")) in affected_slots
-            and action.get("type") in {"place_instance", "activate_serving_route"}
-            and str(action.get("abstractRoot")) in affected_roots
-        ]
-        pre_indices = [
-            idx
-            for idx, action in enumerate(actions)
-            if str(action.get("abstractRoot")) in affected_roots
-            and idx not in set(delete_indices)
-            and idx not in set(post_indices)
-        ]
-        if not pre_indices:
-            continue
-        anchor = max(pre_indices)
-        merged = _action(
-            "delete_pods",
-            gpu_id=gpu_id,
-            physical_gpu_id=physical_id,
-            slots=sorted(affected_slots),
-            slotCount=len(affected_slots),
-            transitionMode="grouped_slot_delete_pods",
-            abstractRoot=f"GPU_DIFF_gpu{gpu_id}_delete_pods",
-        )
-        insert_after.setdefault(anchor, []).append(merged)
-        post_by_insert.setdefault(anchor, []).extend(dict(actions[idx]) for idx in sorted(post_indices))
-        remove_indices.update(delete_indices)
-        remove_indices.update(post_indices)
-
-    out: list[dict[str, Any]] = []
-    for idx, action in enumerate(actions):
-        if idx not in remove_indices:
-            out.append(action)
-        if idx in insert_after:
-            out.extend(insert_after[idx])
-            out.extend(post_by_insert.get(idx, []))
-    return out
+    return actions
 
 
 def _slot_tuple(value: Any) -> tuple[int, int, str] | None:
@@ -506,6 +452,126 @@ def _append_in_place_reconfiguration_actions(
         ]
     )
     plan_items.append(_plan_item(root, "in_place_reconfiguration", gpu_id, physical_id, template=template))
+
+
+def _append_partial_reconfiguration_actions(
+    actions: list[dict[str, Any]],
+    plan_items: list[dict[str, Any]],
+    source_state: ClusterState,
+    target_state: ClusterState,
+    gpu_id: int,
+    physical_id: str,
+    partial_plan: PartialReconfigPlan,
+) -> None:
+    src_gpu = gpu_map_by_id(source_state)[gpu_id]
+    root = f"PARTIAL_RECONF_gpu{gpu_id}"
+    common = {"transitionMode": "partial_reconfiguration", "abstractRoot": root}
+    delete_slots = list(partial_plan.delete_slots)
+    if delete_slots:
+        actions.append(
+            _action(
+                "stop_gpu_traffic",
+                gpu_id=gpu_id,
+                physical_gpu_id=physical_id,
+                slots=delete_slots,
+                slotCount=len(delete_slots),
+                **common,
+            )
+        )
+    for slot in delete_slots:
+        inst = get_inst_by_slot(src_gpu, slot)
+        if inst is None:
+            continue
+        actions.extend(
+            _queue_and_drain_actions(
+                source_state,
+                target_state,
+                gpu_id,
+                physical_id,
+                inst,
+                {},
+                common,
+                stop_new=False,
+                exclude_entire_gpu=False,
+            )
+        )
+    fields = partial_plan.to_action_fields()
+    create_slots = list(partial_plan.create_slots)
+    preserve_slots = list(partial_plan.preserve_slots)
+    actions.extend(
+        [
+            _action(
+                "delete_pods",
+                gpu_id=gpu_id,
+                physical_gpu_id=physical_id,
+                slots=delete_slots,
+                partial=True,
+                **common,
+            ),
+            _action(
+                "configure_partial_profile",
+                gpu_id=gpu_id,
+                physical_gpu_id=physical_id,
+                logical_gpu_id=gpu_id,
+                pendingLogicalGpuId=gpu_id,
+                template=partial_plan.target_template,
+                partial=True,
+                **fields,
+                **common,
+            ),
+            _action(
+                "observe_mig_devices",
+                gpu_id=gpu_id,
+                physical_gpu_id=physical_id,
+                slots=create_slots,
+                preserveSlots=preserve_slots,
+                partial=True,
+                **common,
+            ),
+            _action(
+                "deploy_target_workloads",
+                gpu_id=gpu_id,
+                physical_gpu_id=physical_id,
+                slots=create_slots,
+                partial=True,
+                **common,
+            ),
+            _action(
+                "activate_serving_route",
+                gpu_id=gpu_id,
+                physical_gpu_id=physical_id,
+                slots=create_slots,
+                partial=True,
+                **common,
+            ),
+        ]
+    )
+    plan_items.append(
+        _plan_item(
+            root,
+            "partial_reconfiguration",
+            gpu_id,
+            physical_id,
+            **fields,
+        )
+    )
+
+
+def _partial_reconfiguration_capacity_safe(
+    source_state: ClusterState,
+    src_gpu: GPUState,
+    partial_plan: PartialReconfigPlan,
+    required: dict[str, float],
+) -> bool:
+    if not required:
+        return True
+    delete_slots = set(partial_plan.delete_slots)
+    delete_instances = [
+        inst
+        for inst in _nonfree_instances(src_gpu)
+        if (inst.start, inst.end, inst.profile) in delete_slots
+    ]
+    return safe_after_removing_instances(source_state, delete_instances, required)
 
 
 def _append_bridge_reconfiguration_actions(
@@ -822,6 +888,7 @@ def _queue_and_drain_actions(
         )
     queued = int(runtime.get("queued", 0) or 0)
     inflight = int(runtime.get("inflight", 0) or 0)
+    local_completion_seconds = _local_completion_estimate_seconds(inst, queued, inflight)
     candidates = _reroute_destination_candidates(
         source_state,
         target_state,
@@ -831,8 +898,20 @@ def _queue_and_drain_actions(
         exclude_entire_gpu=exclude_entire_gpu,
     )
     reroute_candidate = candidates[0] if candidates else None
-    if queued > 0 and reroute_candidate is not None:
+    should_reroute = (
+        queued > 0
+        and reroute_candidate is not None
+        and local_completion_seconds > _REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS
+    )
+    if should_reroute:
         transfer_id = f"queue_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}_{inst.workload}"
+        pressure = _reroute_pressure_estimate(source_state, target_state, inst, reroute_candidate, required, queued)
+        pressure.update(
+            {
+                "estimatedLocalCompletionSeconds": round(local_completion_seconds, 6),
+                "rerouteThresholdSeconds": _REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS,
+            }
+        )
         actions.extend(
             [
                 _action(
@@ -846,6 +925,7 @@ def _queue_and_drain_actions(
                     from_physical_gpu_id=physical_id,
                     from_slot=slot,
                     queue_transfer_id=transfer_id,
+                    **pressure,
                     **common,
                 ),
                 _action(
@@ -860,12 +940,19 @@ def _queue_and_drain_actions(
                     target_physical_gpu_id=reroute_candidate.get("physical_gpu_id"),
                     target_slot=reroute_candidate.get("slot"),
                     queue_transfer_id=transfer_id,
+                    **pressure,
                     **common,
                 ),
             ]
         )
-    if inflight > 0 or (queued > 0 and reroute_candidate is None):
-        drain_rounds = max(1, inflight + (queued if reroute_candidate is None else 0))
+    queued_to_drain_locally = queued if queued > 0 and not should_reroute else 0
+    if inflight > 0 or queued_to_drain_locally > 0:
+        drain_rounds = max(1, inflight + queued_to_drain_locally)
+        skip_reason = None
+        if queued > 0 and reroute_candidate is None:
+            skip_reason = "no_reroute_destination"
+        elif queued > 0 and not should_reroute:
+            skip_reason = "local_completion_within_threshold"
         actions.append(
             _action(
                 "mark_draining_instance",
@@ -874,11 +961,73 @@ def _queue_and_drain_actions(
                 slot=slot,
                 workload=inst.workload,
                 rounds=drain_rounds,
+                queued=queued_to_drain_locally,
+                inflight=inflight,
+                estimatedLocalCompletionSeconds=round(local_completion_seconds, 6),
+                rerouteThresholdSeconds=_REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS,
+                rerouteSkippedReason=skip_reason,
                 capacitySafe=safe_after_removing_instance(source_state, inst, required) if required else None,
                 **common,
             )
         )
     return actions
+
+
+def _local_completion_estimate_seconds(inst: MigInstance, queued: int, inflight: int) -> float:
+    mu = max(float(getattr(inst, "mu", 0.0) or 0.0), 1e-9)
+    return (max(0, int(queued)) + max(0, int(inflight))) / mu
+
+
+def _reroute_pressure_estimate(
+    source_state: ClusterState,
+    target_state: ClusterState,
+    inst: MigInstance,
+    candidate: dict[str, Any],
+    required: dict[str, float],
+    queued: int,
+) -> dict[str, Any]:
+    """Estimate reroute pressure using the current static profile catalog values.
+
+    This is intentionally conservative and hardware-profile based. It does not
+    replace future Pod-inside runtime measurements; it only makes today's DAG and
+    candidate scores aware that queued traffic consumes destination spare
+    throughput.
+    """
+
+    workload = str(inst.workload or "")
+    provided = provided_by_workload(source_state)
+    provided_after_source = max(0.0, float(provided.get(workload, 0.0)) - float(inst.mu))
+    required_mu = float(required.get(workload, 0.0)) if required else 0.0
+    global_spare = max(0.0, provided_after_source - required_mu)
+    target_mu = _candidate_mu(source_state, target_state, candidate)
+    estimated_spare = max(0.0, min(float(target_mu), global_spare))
+    if int(queued) <= 0:
+        backlog_seconds = 0.0
+    elif estimated_spare > 1e-9:
+        backlog_seconds = float(queued) / estimated_spare
+    else:
+        backlog_seconds = 1_000_000.0
+    return {
+        "targetMu": round(float(target_mu), 6),
+        "workloadRequiredMu": round(required_mu, 6),
+        "workloadProvidedAfterSourceRemoval": round(provided_after_source, 6),
+        "estimatedRerouteSpareMu": round(estimated_spare, 6),
+        "estimatedBacklogDrainSeconds": round(backlog_seconds, 6),
+        "rerouteCapacitySafe": provided_after_source + 1e-9 >= required_mu,
+    }
+
+
+def _candidate_mu(source_state: ClusterState, target_state: ClusterState, candidate: dict[str, Any]) -> float:
+    gpu_id = candidate.get("gpu_id")
+    slot = _slot_tuple(candidate.get("slot"))
+    if gpu_id is None or slot is None:
+        return 0.0
+    for state in (source_state, target_state):
+        gpu = gpu_map_by_id(state).get(int(gpu_id))
+        inst = get_inst_by_slot(gpu, slot)
+        if inst is not None:
+            return float(inst.mu)
+    return 0.0
 
 
 def _planned_state_for_actions(
