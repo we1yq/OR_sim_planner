@@ -41,6 +41,7 @@ Stop GPU/Slot Traffic -> stop_accepting_new
 Wait Drain -> mark_draining_instance
 Delete Pods -> delete_pods
 Delete Pod -> delete_pods with one target slot
+Workload Change -> workload_change
 Partial Reconfiguration -> configure_partial_profile
 Clear GPU Binding -> clear_gpu_binding
 Clear Template -> clear_template
@@ -129,6 +130,12 @@ Changed source slot line:
 -> Register MIG devices: map newly created target slots to real MIG device UUIDs and confirm preserved slots still exist
 -> Deploy Pods: deploy workload pods only on newly created target slots
 -> Activate Route: route new requests to newly created target pods while preserved slots keep serving
+
+Preserved slot workload/remove and batch changes, when target semantics differ,
+are emitted as sibling
+abstract actions for that slot. They are not part of the partial-reconfiguration
+geometry DAG; the planner connects them through ordinary slot, router, and
+capacity dependencies.
 ```
 
 ```text

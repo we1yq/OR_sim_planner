@@ -237,6 +237,10 @@ def render_diagram(diagram: dict[str, Any]) -> str:
             f'<line x1="{x1 + node_w / 2 - 4}" y1="{y1}" x2="{x2 - node_w / 2 + 4}" y2="{y2}" '
             f'stroke="#6b7280" stroke-width="1.4"{dash_attr} marker-end="url(#arrow)"/>'
         )
+    for label, col, row in diagram.get("lane_labels", []):
+        x = margin_x + col * col_w
+        y = margin_y + row * row_h - node_h / 2 - 12
+        parts.append(text(x, y, label, 11, anchor="start", fill="#4b5563"))
     for node_id, label, kind, _col, _row, *rest in diagram["nodes"]:
         x, y = positions[node_id]
         fill = COLORS[kind]
