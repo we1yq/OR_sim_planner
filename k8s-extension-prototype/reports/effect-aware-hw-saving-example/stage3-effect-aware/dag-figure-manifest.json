@@ -1,0 +1,10 @@
+{
+  "actionCount": 21,
+  "outputs": {
+    "final_execution_dag": "k8s-extension-prototype/reports/effect-aware-hw-saving-example/stage3-effect-aware/final-execution-dag.svg"
+  },
+  "phaseCount": 13,
+  "planner": "effect_aware_dag",
+  "plannerModule": "transition.effect_aware_dag",
+  "scenario": "stage3"
+}
