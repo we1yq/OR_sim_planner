@@ -1,5 +1,5 @@
 {
-  "actionCount": 37,
+  "actionCount": 50,
   "outputs": {
     "final_execution_dag": "k8s-extension-prototype/reports/dag-figures/stage2-cost-aware-dag-router-queue-inline/final-execution-dag.svg"
   },

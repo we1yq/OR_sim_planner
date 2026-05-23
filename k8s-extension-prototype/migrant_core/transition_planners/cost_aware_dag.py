@@ -25,7 +25,7 @@ from ..transition_engine import (
 )
 from . import basic_dag
 from .action_plan_formats import build_phased_action_plan, compact_phased_action_plan
-from .effect_aware_dag import _add_capacity_dependency_edges, _annotate_effects
+from .effect_aware_dag import _add_capacity_dependency_edges, _annotate_effects, _append_preserved_slot_serving_updates
 
 
 NAME = "transition.cost_aware_dag"
@@ -260,6 +260,16 @@ def _build_cost_aware_actions(
                 gpu_id,
                 old_physical_id,
                 partial_plan,
+            )
+            _append_preserved_slot_serving_updates(
+                local_actions,
+                local_items,
+                source_state,
+                target_state,
+                gpu_id,
+                old_physical_id,
+                partial_plan,
+                required,
             )
             candidates.append(
                 (
