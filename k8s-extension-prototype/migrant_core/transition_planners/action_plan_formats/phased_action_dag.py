@@ -271,6 +271,8 @@ def _slots_for_action(action: dict[str, Any]) -> list[tuple[Any, ...]]:
 def _read_only_dependency_resources(action: dict[str, Any]) -> set[str]:
     action_type = str(action.get("type", ""))
     if action_type in {"deploy_target_workloads", "place_instance", "bridge_place_instance", "workload_change"}:
+        if action.get("preservedSlotUpdate"):
+            return set()
         if action.get("gpu_id") is not None and action.get("physical_gpu_id") is not None:
             return {f"mig-devices:{action['gpu_id']}:{action['physical_gpu_id']}"}
     return set()

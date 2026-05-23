@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2146" height="760" viewBox="0 0 2146 760">
+<svg xmlns="http://www.w3.org/2000/svg" width="2004" height="760" viewBox="0 0 2004 760">
 <defs>
 <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
 <path d="M0,0 L0,6 L7,3 z" fill="#9ca3af"/>
 </marker>
 </defs>
 <rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
-<text x="24.0" y="30.0" text-anchor="start" font-family="Arial, sans-serif" font-size="22" fill="#111827">stage3 effect_aware_dag - GPU-lane dependency DAG</text>
+<text x="24.0" y="30.0" text-anchor="start" font-family="Arial, sans-serif" font-size="22" fill="#111827">Stage 3 Effect-Aware DAG - GPU-lane dependency DAG</text>
 <line x1="250" y1="62" x2="250" y2="712" stroke="#e5e7eb" stroke-width="1"/>
 <text x="321.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d0</text>
 <line x1="392" y1="62" x2="392" y2="712" stroke="#e5e7eb" stroke-width="1"/>
@@ -30,16 +30,14 @@
 <text x="1741.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d10</text>
 <line x1="1812" y1="62" x2="1812" y2="712" stroke="#e5e7eb" stroke-width="1"/>
 <text x="1883.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d11</text>
-<line x1="1954" y1="62" x2="1954" y2="712" stroke="#e5e7eb" stroke-width="1"/>
-<text x="2025.0" y="58.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#4b5563">d12</text>
 <text x="20.0" y="100.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#111827">D(gpu-2)</text>
-<line x1="250" y1="130" x2="2111" y2="130" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="250" y1="130" x2="1969" y2="130" stroke="#e5e7eb" stroke-width="1"/>
 <text x="20.0" y="252.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#111827">H(gpu-5)</text>
-<line x1="250" y1="282" x2="2111" y2="282" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="250" y1="282" x2="1969" y2="282" stroke="#e5e7eb" stroke-width="1"/>
 <text x="20.0" y="404.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#111827">C(gpu-6)</text>
-<line x1="250" y1="434" x2="2111" y2="434" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="250" y1="434" x2="1969" y2="434" stroke="#e5e7eb" stroke-width="1"/>
 <text x="20.0" y="556.0" text-anchor="start" font-family="Arial, sans-serif" font-size="12" fill="#111827">G(gpu-7)</text>
-<line x1="250" y1="586" x2="2111" y2="586" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="250" y1="586" x2="1969" y2="586" stroke="#e5e7eb" stroke-width="1"/>
 <path d="M1030.0,418.0 C1068.0,418.0 1134.0,266.0 1172.0,266.0" fill="none" stroke="#dc2626" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#arrow)"/>
 <text x="1101.0" y="336.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#dc2626">capacity gate</text>
 <rect x="255" y="89" width="130.0" height="60" rx="4" fill="#dcfce7" stroke="#111827" stroke-width="1"><title>place-pod | slot 3-4 1g | gpt2 bs=1 | 1s</title></rect>
@@ -117,37 +115,31 @@
 <text x="1172.0" y="265.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">1 pods</text>
 <text x="1172.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">stop new requests</text>
 <text x="1172.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
-<rect x="1249" y="241" width="130.0" height="60" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>drain | slot 0-2 2g | vit_base | local 0.003498s &lt;= 5.0s | 0.003498s</title></rect>
-<text x="1314.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">drain</text>
-<text x="1314.0" y="265.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot 0-2 2g</text>
-<text x="1314.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">vit_base</text>
-<text x="1314.0" y="285.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">local 0.003498s &lt;= ...</text>
-<text x="1314.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.003498s</text>
-<rect x="1391" y="241" width="130.0" height="60" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 0-2 2g | delete pods | 1s</title></rect>
-<text x="1456.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
-<text x="1456.0" y="265.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">0-2 2g</text>
-<text x="1456.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
-<text x="1456.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
-<rect x="1533" y="241" width="130.0" height="60" rx="4" fill="#f3f4f6" stroke="#111827" stroke-width="1"><title>partial-reconfig | template 1+1+1+1+3 | agent patch-slots | 1.059s</title></rect>
-<text x="1598.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">partial-reconfig</text>
-<text x="1598.0" y="265.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">template 1+1+1+1+3</text>
-<text x="1598.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">agent patch-slots</text>
-<text x="1598.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1.059s</text>
-<rect x="1675" y="241" width="130.0" height="60" rx="4" fill="#dbeafe" stroke="#111827" stroke-width="1"><title>register-mig | gpu5 | slot -&gt; MIG UUID | 2s</title></rect>
-<text x="1740.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">register-mig</text>
+<rect x="1249" y="241" width="130.0" height="60" rx="4" fill="#fee2e2" stroke="#111827" stroke-width="1"><title>delete-pods | 0-2 2g | delete pods | 1s</title></rect>
+<text x="1314.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">delete-pods</text>
+<text x="1314.0" y="265.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">0-2 2g</text>
+<text x="1314.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">delete pods</text>
+<text x="1314.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1s</text>
+<rect x="1391" y="241" width="130.0" height="60" rx="4" fill="#f3f4f6" stroke="#111827" stroke-width="1"><title>partial-reconfig | template 1+1+1+1+3 | agent patch-slots | 1.059s</title></rect>
+<text x="1456.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">partial-reconfig</text>
+<text x="1456.0" y="265.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">template 1+1+1+1+3</text>
+<text x="1456.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">agent patch-slots</text>
+<text x="1456.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">1.059s</text>
+<rect x="1533" y="241" width="130.0" height="60" rx="4" fill="#dbeafe" stroke="#111827" stroke-width="1"><title>register-mig | gpu5 | slot -&gt; MIG UUID | 2s</title></rect>
+<text x="1598.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">register-mig</text>
+<text x="1598.0" y="265.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpu5</text>
+<text x="1598.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot -&gt; MIG UUID</text>
+<text x="1598.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">2s</text>
+<rect x="1675" y="241" width="130.0" height="60" rx="4" fill="#dcfce7" stroke="#111827" stroke-width="1"><title>deploy-workload | gpu5 | pods ready | 5s</title></rect>
+<text x="1740.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">deploy-workload</text>
 <text x="1740.0" y="265.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpu5</text>
-<text x="1740.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">slot -&gt; MIG UUID</text>
-<text x="1740.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">2s</text>
-<rect x="1817" y="241" width="130.0" height="60" rx="4" fill="#dcfce7" stroke="#111827" stroke-width="1"><title>deploy-workload | gpu5 | pods ready | 5s</title></rect>
-<text x="1882.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">deploy-workload</text>
+<text x="1740.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">pods ready</text>
+<text x="1740.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">5s</text>
+<rect x="1817" y="241" width="130.0" height="60" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>activate-route | gpu5 | serving active | 0.5s</title></rect>
+<text x="1882.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">activate-route</text>
 <text x="1882.0" y="265.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpu5</text>
-<text x="1882.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">pods ready</text>
-<text x="1882.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">5s</text>
-<rect x="1959" y="241" width="130.0" height="60" rx="4" fill="#fef3c7" stroke="#111827" stroke-width="1"><title>activate-route | gpu5 | serving active | 0.5s</title></rect>
-<text x="2024.0" y="253.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#111827">activate-route</text>
-<text x="2024.0" y="265.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">gpu5</text>
-<text x="2024.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">serving active</text>
-<text x="2024.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.5s</text>
+<text x="1882.0" y="275.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#374151">serving active</text>
+<text x="1882.0" y="298.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4b5563">0.5s</text>
 <rect x="24" y="723" width="14" height="14" fill="#dbeafe" stroke="#111827" stroke-width="0.8"/>
 <text x="42.0" y="735.0" text-anchor="start" font-family="Arial, sans-serif" font-size="10" fill="#4b5563">mig-geometry</text>
 <rect x="126" y="723" width="14" height="14" fill="#ede9fe" stroke="#111827" stroke-width="0.8"/>

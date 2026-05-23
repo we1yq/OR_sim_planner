@@ -1,7 +1,7 @@
 stage,planner,reached_target,actions,edges,phases,critical_path,peak_gpu,transition_elapsed_sec,planning_call_wall_sec,estimated_hardware_sec,blocked,workload_change,register_mig_devices,workload_bridge_action_count,capacity_gate_edges
-stage1,cost_aware_dag,True,21,18,9,9,9,0.004907,0.771133,28.122,0,0,3,0,1
-stage2,cost_aware_dag,True,50,51,7,7,9,0.010984,0.507989,48.349,0,2,1,0,0
-stage3,cost_aware_dag,True,28,29,18,18,8,0.005678,0.675795,30.64,0,0,3,0,1
-stage1,effect_aware_dag,True,21,18,9,9,9,0.004616,0.774133,28.122,0,0,3,0,1
-stage2,effect_aware_dag,True,50,51,7,7,9,0.010624,0.517783,48.349,0,2,1,0,0
-stage3,effect_aware_dag,True,21,19,13,13,8,0.004985,0.686591,29.08,0,0,3,0,1
+stage1,cost_aware_dag,True,20,17,8,8,9,0.005235,1.308324,28.116,0,0,3,0,1
+stage1,effect_aware_dag,True,20,17,8,8,9,0.004996,1.092192,28.116,0,0,3,0,1
+stage2,cost_aware_dag,True,37,28,6,6,9,0.01101,1.599341,33.651,0,2,1,0,0
+stage2,effect_aware_dag,True,37,28,6,6,9,0.01105,1.620265,33.651,0,2,1,0,0
+stage3,cost_aware_dag,True,25,23,17,17,8,0.006257,2.243091,30.627,0,0,3,0,1
+stage3,effect_aware_dag,True,20,17,12,12,8,0.005527,2.306772,29.077,0,0,3,0,1

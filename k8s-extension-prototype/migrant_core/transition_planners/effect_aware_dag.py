@@ -516,8 +516,9 @@ def _append_preserved_slot_serving_updates(
         common = {
             "transitionMode": f"preserved_slot_{inst_action['type']}",
             "abstractRoot": root,
-            "partial": True,
             "preservedSlotUpdate": True,
+            "siblingOfPartialReconfiguration": True,
+            "partialContextRoot": f"PARTIAL_RECONF_gpu{gpu_id}",
         }
         change_type = inst_action["type"]
         if change_type == "batch_change":
@@ -588,6 +589,7 @@ def _add_capacity_dependency_edges(
     required: dict[str, float],
 ) -> None:
     ready_capacity = provided_by_workload(source_state)
+    dependency_context = _capacity_dependency_context(actions)
     producers_by_workload: dict[str, list[dict[str, Any]]] = {}
     seen_producer_keys: set[tuple[str, str]] = set()
     for action in actions:
@@ -613,20 +615,16 @@ def _add_capacity_dependency_edges(
                 continue
             needed = required_mu - remaining
             selected_keys = []
-            for producer in producers_by_workload.get(workload, []):
+            producers = sorted(
+                producers_by_workload.get(workload, []),
+                key=lambda producer: _capacity_producer_sort_key(producer, dependency_context),
+            )
+            for producer in producers:
                 if producer is action:
                     continue
-                # A capacity-removal milestone cannot wait on capacity produced
-                # by the same lowered root: for partial/in-place reconfiguration
-                # that producer is structurally downstream of the removal.
-                if producer.get("abstractRoot") == action.get("abstractRoot"):
+                if _same_physical_gpu(action, producer) and not _same_physical_capacity_dependency_allowed(action, producer):
                     continue
-                if (
-                    action.get("physical_gpu_id") is not None
-                    and producer.get("physical_gpu_id") is not None
-                    and str(action.get("physical_gpu_id")) == str(producer.get("physical_gpu_id"))
-                    and producer.get("abstractRoot") != action.get("abstractRoot")
-                ):
+                if _capacity_dependency_would_cycle(action, producer, dependency_context):
                     continue
                 key = producer.get("actionKey")
                 if key is None:
@@ -651,6 +649,111 @@ def _add_capacity_dependency_edges(
         if blocked:
             action["blockedByCapacity"] = True
             action["capacityGate"] = {**gate, "blockedCapacityDeficit": blocked}
+
+
+def _capacity_dependency_context(actions: list[dict[str, Any]]) -> dict[str, Any]:
+    dag = build_phased_action_plan(actions, name="capacity-dependency-base")
+    key_to_node: dict[str, str] = {}
+    phase_by_key: dict[str, int] = {}
+    index_by_key: dict[str, int] = {}
+    dependents: dict[str, set[str]] = {}
+    for node in list(dag.get("nodes", [])):
+        node_id = str(node.get("id"))
+        action = dict(node.get("action") or {})
+        key = action.get("actionKey")
+        if key is not None:
+            key_to_node[str(key)] = node_id
+            phase_by_key[str(key)] = int(node.get("phase", 0) or 0)
+            index_by_key[str(key)] = int(node.get("index", 0) or 0)
+        for dep in list(node.get("dependsOn") or []):
+            dependents.setdefault(str(dep), set()).add(node_id)
+    return {
+        "keyToNode": key_to_node,
+        "phaseByKey": phase_by_key,
+        "indexByKey": index_by_key,
+        "dependents": dependents,
+    }
+
+
+def _capacity_producer_sort_key(producer: dict[str, Any], context: dict[str, Any]) -> tuple[int, int, float]:
+    key = str(producer.get("actionKey"))
+    produced_mu = sum(float(item.get("mu", 0.0) or 0.0) for item in list(producer.get("producesCapacity") or []))
+    return (
+        int(dict(context.get("phaseByKey") or {}).get(key, 1_000_000)),
+        int(dict(context.get("indexByKey") or {}).get(key, 1_000_000)),
+        -produced_mu,
+    )
+
+
+def _same_physical_gpu(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    left_physical = left.get("physical_gpu_id")
+    right_physical = right.get("physical_gpu_id")
+    if left_physical is None or right_physical is None:
+        return False
+    return str(left_physical) == str(right_physical)
+
+
+def _same_physical_capacity_dependency_allowed(consumer: dict[str, Any], producer: dict[str, Any]) -> bool:
+    """Same-GPU capacity can only protect partial-compatible transitions.
+
+    Full in-place reconfiguration cannot use capacity produced on the same
+    physical GPU to justify deleting the old side: the old side must be gone
+    before that new capacity exists. Partial reconfiguration is different
+    because preserved slots and locally-created slots can coexist after the
+    partial patch, as long as the dependency does not form a structural cycle.
+    """
+
+    return _partial_capacity_context(consumer) and _partial_capacity_context(producer)
+
+
+def _partial_capacity_context(action: dict[str, Any]) -> bool:
+    if action.get("partial") or action.get("preservedSlotUpdate") or action.get("siblingOfPartialReconfiguration"):
+        return True
+    mode = str(action.get("transitionMode") or "")
+    root = str(action.get("abstractRoot") or "")
+    context_root = str(action.get("partialContextRoot") or "")
+    return (
+        mode == "partial_reconfiguration"
+        or mode.startswith("preserved_slot_")
+        or root.startswith("PARTIAL_RECONF_")
+        or root.startswith("PRESERVE_SLOT_")
+        or context_root.startswith("PARTIAL_RECONF_")
+    )
+
+
+def _capacity_dependency_would_cycle(
+    consumer: dict[str, Any],
+    producer: dict[str, Any],
+    context: dict[str, Any],
+) -> bool:
+    consumer_key = consumer.get("actionKey")
+    producer_key = producer.get("actionKey")
+    if consumer_key is None or producer_key is None:
+        return False
+    key_to_node = dict(context.get("keyToNode") or {})
+    consumer_node = key_to_node.get(str(consumer_key))
+    producer_node = key_to_node.get(str(producer_key))
+    if consumer_node is None or producer_node is None:
+        return False
+    if consumer_node == producer_node:
+        return True
+    return _node_reaches(consumer_node, producer_node, context)
+
+
+def _node_reaches(src_node: str, dst_node: str, context: dict[str, Any]) -> bool:
+    dependents = dict(context.get("dependents") or {})
+    seen: set[str] = set()
+    stack = [src_node]
+    while stack:
+        node = stack.pop()
+        for nxt in sorted(dependents.get(node, set())):
+            if nxt == dst_node:
+                return True
+            if nxt in seen:
+                continue
+            seen.add(nxt)
+            stack.append(nxt)
+    return False
 
 
 def _add_physical_reuse_dependency_edges(actions: list[dict[str, Any]]) -> None:
