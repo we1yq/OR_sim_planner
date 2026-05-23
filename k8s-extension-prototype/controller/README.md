@@ -7,8 +7,8 @@ Phase 5 starts with a local CLI controller that:
 - reads scenario YAML and workload request references,
 - reads mock GPU/MIG state,
 - validates mock MIG rules,
-- adapts inputs into the notebook-derived real MILP target builder and phase-greedy
-  transition planner.
+- adapts inputs into the notebook-derived real MILP target builder and
+  effect-aware transition planner.
 
 The controller must not execute real Kubernetes scheduling changes or MIG
 reconfiguration commands in the first prototype.
@@ -57,7 +57,7 @@ python3 k8s-extension-prototype/controller/main.py \
   --scenario k8s-extension-prototype/mock/scenarios/stage0.yaml
 ```
 
-## Run Real MILP + phase-greedy Dry-Run Planning
+## Run Real MILP + Effect-Aware Dry-Run Planning
 
 Single stage:
 
@@ -82,17 +82,17 @@ This path intentionally calls:
 ```text
 solve_milp_gurobi_batch_unified
   -> build_target_state_from_milp
-  -> run_phase_greedy_stage
+  -> effect_aware_dag
   -> canonicalize_state_for_next_round
 ```
 
-It does not include an approximate planner or the old full-plan planner.
+It does not include an approximate planner or the old phase-greedy planner.
 
 ## Reconcile One MigPlan CR
 
 The first Kubernetes adapter path is a one-shot dry-run reconciler. It reads a
 `MigPlan`, resolves `spec.scenario` under `mock/scenarios`, runs the same real
-MILP plus phase-greedy flow, and patches only `MigPlan.status`.
+MILP plus effect-aware transition flow, and patches only `MigPlan.status`.
 
 ```bash
 kubectl apply -f k8s-extension-prototype/manifests/crds/migplan-crd.yaml
@@ -115,11 +115,11 @@ stage2 spec.sourceStateConfigMap: target1-state -> ConfigMap/target2-state
 stage3 spec.sourceStateConfigMap: target2-state -> ConfigMap/target3-state
 ```
 
-In the current dry-run prototype, `canonicalNextState` is derived from the phase-greedy
-transition simulator's executed state. In a real actuator-backed controller, this
-must change: actions must be applied to the cluster first, the controller must
-observe the actual post-action GPU/MIG state, and only that observed executed
-state should be passed through `canonicalize_state_for_next_round`. The
+In the current dry-run prototype, `canonicalNextState` is derived from the
+effect-aware transition simulator's executed state. In a real actuator-backed
+controller, this must change: actions must be applied to the cluster first, the
+controller must observe the actual post-action GPU/MIG state, and only that
+observed executed state should be passed through `canonicalize_state_for_next_round`. The
 canonical state is the next planning round's stable input, not proof that a
 planned action succeeded.
 
@@ -150,7 +150,7 @@ kubectl get migplan stage0 -n or-sim -o yaml | yq '.status.planningSummary'
 ```
 
 The summary includes feasible option count, MILP status/GPU count, target-build
-GPU count, phase-greedy transition iterations/action counts, action counts by type, chosen
+GPU count, effect-aware transition iterations/action counts, action counts by type, chosen
 templates, and the canonical physical GPU id mapping.
 
 Verbose debug output is stored separately:
@@ -286,8 +286,8 @@ spec.migGeometryPreview.wouldPatchNodeLabels:
     nvidia.com/mig.config: <generated-config-name>
 ```
 
-`trafficAndDrainPreview` exposes the phase-greedy abstract-action rules that are not MIG
-geometry: stop accepting new requests, reroute queued work, wait for inflight
+`trafficAndDrainPreview` exposes the effect-aware abstract-action rules that are not MIG
+geometry: stop accepting new requests, router-level backlog handling, wait for inflight
 work to drain, and defer actions when takeover capacity or drain completion is
 missing. It is intended for a future router/drain adapter.
 
@@ -297,7 +297,7 @@ traffic. It identifies which actions would need target serving capacity
 deleted or recycled only after drain, and which changes should prefer in-place
 runtime reload.
 
-`abstractActionPreview` is a human-readable report over phase-greedy coarse actions. It
+`abstractActionPreview` is a human-readable report over effect-aware transition roots. It
 shows why an action is `create_gpu`, `remove_gpu`, `reconfiguration`, or
 `instance_diff`, which gates must pass, and the expected MIG/Pod impact. This is
 the object to inspect when reviewing planner rules rather than individual fine

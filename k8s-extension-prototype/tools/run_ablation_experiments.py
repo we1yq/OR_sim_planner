@@ -71,8 +71,6 @@ HARDWARE_SECONDS = {
     "mark_reconfig_target_prepared": 0.0,
     "stop_gpu_traffic": 1.0,
     "stop_accepting_new": 1.0,
-    "accept_queued_requests": 1.0,
-    "reroute_queued_tasks": 1.0,
     "mark_draining_instance": 30.0,
     "remove_instance": 1.0,
     "delete_bridge_pod": 1.0,
@@ -153,6 +151,12 @@ VARIANTS = {
         "transition": PLANNER_CATALOG["phase_greedy_with_dag_output"].runner,
         "description": "Ablate transition representation: phase-greedy execution plus explicit phased/DAG action-plan output.",
     },
+    "transition_effect_aware_dag": {
+        "placement": milp_enhanced.solve,
+        "target": preserve_greedy.build,
+        "transition": PLANNER_CATALOG["effect_aware_dag"].runner,
+        "description": "Ablate transition planner: effect-aware final-DAG planner with explicit action effects.",
+    },
 }
 
 
@@ -175,6 +179,7 @@ VARIANT_GROUPS = {
         "transition_drain_aware_baseline",
         "transition_full_plan_baseline",
         "transition_phase_greedy_dag",
+        "transition_effect_aware_dag",
     ],
 }
 

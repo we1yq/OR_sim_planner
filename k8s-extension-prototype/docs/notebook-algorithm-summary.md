@@ -7,8 +7,9 @@ the planner with a greedy or approximate implementation.
 
 ## Scope
 
-Only phase-greedy is carried forward as the planner path. legacy and full-plan candidate are useful notebook
-history, but they are not part of the Kubernetes prototype target behavior.
+The production Stage3 path is now `effect_aware_dag`. Older phase-greedy,
+basic-DAG, and cost-aware planners are useful notebook/prototype history and
+ablation baselines, but they are not the controller default.
 
 The extension should reproduce the notebook experiment:
 
@@ -178,42 +179,34 @@ freePhysicalGpuPool:
   ids: [...]
 ```
 
-## phase-greedy planner
+## effect-aware Stage3 planner
 
-The retained planner is:
+The production transition planner is:
 
 ```text
-run_phase_greedy_stage(...)
+effect_aware_dag.run(...)
 ```
 
-phase-greedy uses the full-plan candidate full-plan/action item generation as candidate generation, then
-adds scoring, grouping, conflict checks, and iterative execution.
+It compares current and target layouts by logical GPU id, classifies each diff,
+lowers roots into fine-grained actions, annotates actions with capacity/router/MIG
+and physical-GPU effects, and emits a dependency DAG. Capacity safety and
+physical GPU availability are hard constraints; disruption preferences are used
+only after feasibility.
 
-Main phase-greedy flow:
+Main effect-aware flow:
 
 ```text
 current_state
-  -> plan_full_action_plan(...) produces full_plan and plan_items
-  -> _group_scores(...)
-  -> _choose_nonconflicting_groups(...)
-  -> _select_actions_for_root(...)
-  -> apply selected actions
-  -> repeat until converged or max_iters
+  -> compare current/target logical gpu ids
+  -> classify keep/create/remove/instance_diff/reconfiguration
+  -> generate roots and candidate fragments
+  -> filter infeasible candidates
+  -> annotate produces/consumes capacity and physical GPU effects
+  -> add dependency edges
+  -> execute ready DAG nodes
 ```
 
-phase-greedy scoring includes:
-
-- takeover readiness,
-- capacity headroom,
-- peak GPU delta cost,
-- drain wait cost,
-- unlock count,
-- release GPU score,
-- target-backed enable score,
-- in-place reconfiguration score.
-
-The extension should migrate this planner rather than generating a simplified
-dry-run action list.
+The old phase-greedy planner remains as an ablation baseline.
 
 ## Main Stage Behavior
 
@@ -234,7 +227,7 @@ PlanningScenario / CR inputs
   -> notebook-compatible planning inputs
   -> solve_milp_gurobi_batch_unified
   -> build_target_state_from_milp
-  -> run_phase_greedy_stage
+  -> effect_aware_dag
   -> dry-run MigPlan/status output
 ```
 

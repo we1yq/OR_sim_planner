@@ -52,7 +52,6 @@ def apply_router_drain_from_action_plan(
 
     started = time.monotonic()
     stop_results = []
-    reroute_results = []
     drain_results = []
     verification_results = []
 
@@ -60,23 +59,6 @@ def apply_router_drain_from_action_plan(
         action_type = str(action.get("type") or "")
         if action_type == "stop_accepting_new":
             result = _stop_accepting_new(
-                client=client,
-                namespace=namespace,
-                action=action,
-                mode=mode,
-            )
-            _record_workload_route_plan(
-                client=client,
-                namespace=namespace,
-                action_plan_name=name,
-                action_plan_generation=int(action_plan.get("metadata", {}).get("generation", 0)),
-                action=action,
-                result=result,
-                route_action="StopAcceptingNew",
-            )
-            stop_results.append(result)
-        elif action_type == "reroute_queued_tasks":
-            result = _reroute_queued_tasks(
                 client=client,
                 namespace=namespace,
                 action=action,
@@ -90,9 +72,9 @@ def apply_router_drain_from_action_plan(
                 action_plan_generation=int(action_plan.get("metadata", {}).get("generation", 0)),
                 action=action,
                 result=result,
-                route_action="RerouteQueuedTasks",
+                route_action="StopAcceptingNew",
             )
-            reroute_results.append(result)
+            stop_results.append(result)
         elif action_type == "mark_draining_instance":
             result = _mark_draining_instance(
                 client=client,
@@ -114,7 +96,7 @@ def apply_router_drain_from_action_plan(
 
     if mode == "http" and router_endpoint:
         for action in actions:
-            if action.get("type") == "reroute_queued_tasks":
+            if action.get("type") == "stop_accepting_new" and action.get("routerQueueRedispatch"):
                 workload = str(action.get("workload") or "")
                 if workload:
                     verification_results.append(
@@ -132,11 +114,10 @@ def apply_router_drain_from_action_plan(
         "mode": mode,
         "routerEndpoint": router_endpoint,
         "stopAcceptingNew": stop_results,
-        "reroutes": reroute_results,
         "drains": drain_results,
         "verifications": verification_results,
         "timingsSeconds": {"total": round(time.monotonic() - started, 3)},
-        "success": all(item.get("success", False) for item in stop_results + reroute_results + drain_results + verification_results),
+        "success": all(item.get("success", False) for item in stop_results + drain_results + verification_results),
     }
     status = {
         "phase": "SucceededRealRouterDrain" if summary["success"] else "FailedRealRouterDrain",
@@ -158,9 +139,15 @@ def _stop_accepting_new(
     namespace: str,
     action: dict[str, Any],
     mode: str,
+    router_endpoint: str,
 ) -> dict[str, Any]:
     source_pod = str(action.get("sourcePod") or action.get("podName") or "")
     source_endpoint = str(action.get("sourceEndpoint") or "")
+    workload = str(action.get("workload") or "")
+    target_endpoint = str(action.get("targetEndpoint") or action.get("toEndpoint") or "")
+    target_pod = str(action.get("targetPod") or action.get("toPod") or "")
+    queued_requested = int(action.get("queued", 0) or 0)
+    queued_moved = queued_requested if action.get("routerQueueRedispatch") else 0
     response = {}
     if mode == "http" and source_endpoint:
         response = _http_json(f"{source_endpoint.rstrip('/')}/drain")
@@ -174,41 +161,15 @@ def _stop_accepting_new(
                 "mig.or-sim.io/draining": "true",
             },
         )
-    return {
-        "workload": action.get("workload"),
-        "sourcePod": source_pod or None,
-        "sourceEndpoint": source_endpoint or None,
-        "mode": mode,
-        "response": response,
-        "success": True,
-    }
-
-
-def _reroute_queued_tasks(
-    client: KubernetesClient,
-    namespace: str,
-    action: dict[str, Any],
-    mode: str,
-    router_endpoint: str,
-) -> dict[str, Any]:
-    workload = str(action.get("workload") or "")
-    target_endpoint = str(action.get("targetEndpoint") or action.get("toEndpoint") or "")
-    source_pod = str(action.get("sourcePod") or action.get("podName") or "")
-    target_pod = str(action.get("targetPod") or action.get("toPod") or "")
-    queued_requested = int(action.get("queued", 0) or 0)
-    queued_moved = queued_requested
-    response = {}
-    if mode == "http":
-        if not workload or not target_endpoint:
-            raise RouterDrainApplyError(
-                "mode=http reroute requires workload and targetEndpoint."
-            )
-        response = _http_json(
-            f"{router_endpoint.rstrip('/')}/reroute?"
-            + urlencode({"workload": workload, "target": target_endpoint, "queued": str(queued_requested)})
-        )
+    if action.get("routerQueueRedispatch") and mode == "http":
+        if not workload:
+            raise RouterDrainApplyError("mode=http stop_accepting_new queue redispatch requires workload.")
+        params = {"workload": workload, "queued": str(queued_requested)}
+        if target_endpoint:
+            params["target"] = target_endpoint
+        response = _http_json(f"{router_endpoint.rstrip('/')}/dispatch-backlog?" + urlencode(params))
         queued_moved = int(response.get("queuedMoved", response.get("moved", queued_requested)) or 0)
-    elif mode == "annotation":
+    elif action.get("routerQueueRedispatch") and mode == "annotation":
         if source_pod:
             _patch_pod_annotations(
                 client=client,
@@ -216,8 +177,8 @@ def _reroute_queued_tasks(
                 pod_name=source_pod,
                 annotations={
                     "mig.or-sim.io/queued": "0",
-                    "mig.or-sim.io/reroute-target": target_pod or target_endpoint or str(action.get("to") or ""),
-                    "mig.or-sim.io/last-rerouted-queued": str(queued_moved),
+                    "mig.or-sim.io/router-backlog-target": target_pod or target_endpoint or str(action.get("to") or ""),
+                    "mig.or-sim.io/last-dispatched-backlog": str(queued_moved),
                 },
             )
         if target_pod:
@@ -226,28 +187,29 @@ def _reroute_queued_tasks(
                 namespace=namespace,
                 pod_name=target_pod,
                 annotations={
-                    "mig.or-sim.io/accepted-queued": str(queued_moved),
-                    "mig.or-sim.io/reroute-source": source_pod,
+                    "mig.or-sim.io/dispatched-backlog": str(queued_moved),
+                    "mig.or-sim.io/router-backlog-source": source_pod,
                 },
             )
-    elif mode == "no-traffic":
+    elif action.get("routerQueueRedispatch") and mode == "no-traffic":
         queued_moved = 0
     return {
         "workload": workload,
         "sourcePod": source_pod or None,
+        "sourceEndpoint": source_endpoint or None,
         "targetPod": target_pod or None,
         "targetEndpoint": target_endpoint or None,
         "queuedRequested": queued_requested,
         "queuedMoved": queued_moved,
         "queueRuntime": {
             "mode": mode,
-            "supportsQueuedReroute": mode in {"http", "annotation"},
+            "supportsRouterBacklogDispatch": mode in {"http", "annotation"},
             "sourceQueueAfter": 0 if mode in {"http", "annotation"} else queued_requested,
-            "targetAcceptedQueued": queued_moved if mode in {"http", "annotation"} else 0,
+            "routerBacklogDispatched": queued_moved if mode in {"http", "annotation"} else 0,
         },
         "mode": mode,
         "response": response,
-        "success": mode != "no-traffic" or queued_requested == 0,
+        "success": not action.get("routerQueueRedispatch") or mode != "no-traffic" or queued_requested == 0,
     }
 
 

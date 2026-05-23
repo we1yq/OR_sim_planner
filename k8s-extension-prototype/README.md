@@ -11,8 +11,8 @@ prototype code and Kubernetes manifests should live here.
 Phase 5: mock-based controller with file inputs.
 
 The controller reads workload request YAML, mock GPU state, and normalized
-profile catalogs. It prints a dry-run phase-greedy action plan. No real GPU or MIG
-operations are performed.
+profile catalogs. It prints a dry-run effect-aware Stage3 action DAG. No real
+GPU or MIG operations are performed.
 
 ## Safety Rules
 

@@ -133,8 +133,6 @@ def build_traffic_and_drain_preview(status: dict[str, Any]) -> dict[str, Any]:
     traffic_types = {
         "stop_gpu_traffic",
         "stop_accepting_new",
-        "accept_queued_requests",
-        "reroute_queued_tasks",
         "mark_draining_instance",
         "defer_remove_gpu",
         "defer_remove_instance",
@@ -197,7 +195,7 @@ def build_pod_lifecycle_preview(status: dict[str, Any]) -> dict[str, Any]:
             _pod_lifecycle_row(action, reason="old serving instance must stop accepting and drain")
             for action in actions
             if str(action.get("type"))
-            in {"stop_gpu_traffic", "stop_accepting_new", "accept_queued_requests", "reroute_queued_tasks", "mark_draining_instance"}
+            in {"stop_gpu_traffic", "stop_accepting_new", "mark_draining_instance"}
         ],
         "deleteOrRecycle": [
             _pod_lifecycle_row(action, reason="safe only after queued requests reroute and running work reaches zero")
@@ -259,9 +257,9 @@ def build_adapter_dry_run_preview(status: dict[str, Any]) -> dict[str, Any]:
                     action for action in traffic.get("trafficActions", [])
                     if action.get("type") == "stop_accepting_new"
                 ],
-                "wouldRerouteQueuedTasks": [
+                "wouldRedispatchRouterQueue": [
                     action for action in traffic.get("trafficActions", [])
-                    if action.get("type") == "reroute_queued_tasks"
+                    if action.get("type") == "stop_accepting_new" and action.get("routerQueueRedispatch")
                 ],
                 "wouldStartDrains": [
                     action for action in traffic.get("trafficActions", [])
@@ -534,7 +532,7 @@ def _pod_lifecycle_row(action: dict[str, Any], reason: str) -> dict[str, Any]:
 def _pod_action_for_type(action_type: str) -> str:
     if action_type in {"place_instance", "bridge_place_instance", "deploy_target_workloads"}:
         return "create-or-reuse"
-    if action_type in {"stop_gpu_traffic", "stop_accepting_new", "accept_queued_requests", "reroute_queued_tasks", "mark_draining_instance"}:
+    if action_type in {"stop_gpu_traffic", "stop_accepting_new", "mark_draining_instance"}:
         return "drain"
     if action_type in {"delete_pods", "remove_instance", "delete_gpu_pods", "delete_bridge_pod", "clear_gpu", "clear_gpu_binding"}:
         return "delete-or-recycle"

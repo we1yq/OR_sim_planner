@@ -12,7 +12,7 @@ path.
 | --- | --- | --- |
 | MIG label executor | `controller/executors/mig_label_executor.py` | Applies `MigActionPlan.spec.executorPreview` by patching GPU Operator node labels such as `nvidia.com/mig.config`. |
 | Pod lifecycle executor | `controller/executors/pod_lifecycle_executor.py` | Applies `MigActionPlan.spec.podLifecyclePreview` by creating/reusing workload Pods, patching live batch configuration, and deleting owned Pods when requested. |
-| Router/drain executor | `controller/executors/router_drain_executor.py` | Applies `MigActionPlan.spec.trafficAndDrainPreview` by stopping new traffic on the source instance, rerouting queued/new traffic to a target endpoint, waiting for source inflight/queued work to drain, and recording `WorkloadRoutePlan` / `ServingInstanceDrain` status. |
+| Router/drain executor | `controller/executors/router_drain_executor.py` | Applies `MigActionPlan.spec.trafficAndDrainPreview` by stopping new traffic on the source instance, letting the router keep backlog at workload level, waiting for source inflight work to drain, and recording `WorkloadRoutePlan` / `ServingInstanceDrain` status. |
 | Physical GPU registry monitor | `controller/observe/physical_gpu_registry.py` | Maintains `PhysicalGpuRegistry/default`, including `availableQueue`, `activeQueue`, `transitioningQueue`, and stable `physicalGpuId -> gpuUuid` bindings. |
 | Cluster observer | `controller/observe/cluster_observer.py` | Observes nodes, pods, GPU Operator inventory, physical GPU UUIDs, and MIG device UUIDs. |
 | Observed logical layout mapper | `controller/observe/observed_layout.py` | Converts observed GPU/MIG UUID inventory into the stable MIGRANT layout contract: `physicalGpuId + slot/range + profile -> currentMigDeviceUuid`. |
@@ -20,7 +20,8 @@ path.
 | Observed state adapter | `controller/observe/observed_state_adapter.py` | Converts `ObservedClusterState` into `migrant_core.ClusterState` so real planning epochs can diff from actual cluster state. |
 | Transition planner catalog | `migrant_core/transition_planners/catalog.py` | Lists canonical transition planners, compatibility aliases, roles, and runner functions so algorithm count is explicit even when variants share implementation modules. |
 | Phased action DAG format | `migrant_core/transition_planners/action_plan_formats/phased_action_dag.py` | Compiles a linear action list into `migrant.phased-action-dag/v1` nodes, dependencies, phases, and resource-conflict summaries. This is a format/compiler helper, not a planner. |
-| Phase-greedy transition planner | `migrant_core/transition_planners/phase_greedy.py` | Provides plain phase-greedy action planning and a `run_with_dag_output()` compatibility entry that attaches the phased action DAG representation for actuators and ablation. |
+| Effect-aware transition planner | `migrant_core/transition_planners/effect_aware_dag.py` | Production Stage3 planner. It lowers current/target diffs into fine-grained actions annotated with capacity, router, MIG, and physical-GPU effects, then emits the dependency DAG consumed by previews and actuators. |
+| Phase-greedy transition planner | `migrant_core/transition_planners/phase_greedy.py` | Compatibility and ablation planner. |
 
 ## Dry-Run Adapter Components
 
@@ -30,7 +31,7 @@ change real Pods, routing state, or MIG geometry.
 | Adapter | Path | Purpose |
 | --- | --- | --- |
 | `DryRunMigGeometryAdapter` | `controller/adapters/contracts.py` | Summarizes node-label patches and MIG Manager configs that would be applied. |
-| `DryRunRouterDrainAdapter` | `controller/adapters/contracts.py` | Summarizes route/drain actions such as stop accepting, reroute queued work, and start drain. |
+| `DryRunRouterDrainAdapter` | `controller/adapters/contracts.py` | Summarizes route/drain actions such as stop accepting, router-level backlog handling, and start drain. |
 | `DryRunPodLifecycleAdapter` | `controller/adapters/contracts.py` | Summarizes Pod lifecycle actions such as create/reuse, delete/recycle, and reload in place. |
 | `DryRunObserverAdapter` | `controller/adapters/contracts.py` | Summarizes the observations required after real execution. |
 | Router dry-run plan builder | `controller/adapters/router_adapter.py` | Builds preview-only `WorkloadRoutePlan` and `ServingInstanceDrain` resources. |
@@ -46,7 +47,7 @@ planner output path.
 | Component | Path | Purpose |
 | --- | --- | --- |
 | Workload lifecycle smoke action-plan builder | `controller/test_harness/workload_lifecycle_smoke.py` | Creates synthetic `MigActionPlan` resources with `createOrReuse` and `reloadInPlace` rows for single-A100 validation. |
-| Router/drain smoke action-plan builder | `controller/test_harness/router_drain_smoke.py` | Creates synthetic `MigActionPlan` resources with stop-accepting-new, reroute, and drain rows for single-A100 validation. |
+| Router/drain smoke action-plan builder | `controller/test_harness/router_drain_smoke.py` | Creates synthetic `MigActionPlan` resources with stop-accepting-new and drain rows for single-A100 validation. |
 | Workload partition smoke test | `tools/smoke/workload_partition_smoke.py` | Standalone smoke tool for scheduling a Pod on a MIG resource and patching batch size. |
 | CUDA profile test workload | `tools/test_workloads/cuda_profile_workload.cu` | Short CUDA program used to verify that a profile-backed workload option can run on a MIG device. |
 | Router smoke workload | `tools/test_workloads/simple_router_workload.c` | Minimal HTTP workload/router used only for controlled router/drain adapter tests. |
@@ -103,9 +104,9 @@ The current implementation completes the Kubernetes-native adapter contract:
 
 - stop accepting new requests on the source instance through `/drain` or pod
   annotations;
-- reroute traffic through a router HTTP endpoint or annotation-only mode;
+- keep queued work at the router and dispatch it to remaining ready instances;
 - poll source instance `/metrics` or annotations until `inflight=0` and
-  `queued=0`;
+  router-level backlog no longer targets the draining instance;
 - record real execution status in `MigActionPlan`, `WorkloadRoutePlan`, and
   `ServingInstanceDrain`.
 

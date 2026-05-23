@@ -5,7 +5,7 @@ metadata:
   namespace: or-sim
 spec:
   dryRun: true
-  planner: phase_greedy
+  planner: effect_aware_dag
   scenario: stage0
   scenarioConfigMap: scenario-stage0
   observedStateRef: cluster-observed-state

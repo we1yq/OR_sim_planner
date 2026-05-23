@@ -1,0 +1,10 @@
+{
+  "actionCount": 21,
+  "outputs": {
+    "final_execution_dag": "k8s-extension-prototype/reports/dag-figures/stage1-effect-aware-dag/final-execution-dag.svg"
+  },
+  "phaseCount": 9,
+  "planner": "effect_aware_dag",
+  "plannerModule": "transition.effect_aware_dag",
+  "scenario": "stage1"
+}

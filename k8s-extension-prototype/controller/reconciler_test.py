@@ -373,13 +373,9 @@ def test_router_drain_annotation_queue_runtime_moves_queued_requests() -> None:
                         "type": "stop_accepting_new",
                         "workload": "resnet50",
                         "sourcePod": "source-pod",
-                    },
-                    {
-                        "type": "reroute_queued_tasks",
-                        "workload": "resnet50",
-                        "sourcePod": "source-pod",
                         "targetPod": "target-pod",
                         "queued": 3,
+                        "routerQueueRedispatch": True,
                     },
                     {
                         "type": "mark_draining_instance",
@@ -552,15 +548,9 @@ def test_build_action_rule_previews() -> None:
                 "physical_gpu_id": "B",
                 "slot": (0, 3, "3g"),
                 "workload": "gpt2",
-            },
-            {
-                "type": "reroute_queued_tasks",
-                "gpu_id": 1,
-                "physical_gpu_id": "B",
-                "slot": (0, 3, "3g"),
-                "workload": "gpt2",
                 "queued": 2,
                 "to": "target-backed[gpu2:3g[0,3)]",
+                "routerQueueRedispatch": True,
             },
             {
                 "type": "mark_draining_instance",
@@ -630,14 +620,14 @@ def test_build_action_rule_previews() -> None:
     adapter = build_adapter_dry_run_preview(status)
     observer = build_observer_preview(status)
     assert traffic["planItems"][0]["blockedBy"] == "drain_started"
-    assert traffic["trafficActions"][1]["queued"] == 2
+    assert traffic["trafficActions"][0]["queued"] == 2
     assert pod["drain"][0]["podAction"] == "drain"
     assert pod["deleteOrRecycle"][0]["podAction"] == "delete-or-recycle"
     assert pod["reloadInPlace"][0]["podAction"] == "reload-in-place"
     assert mig["internalStateActionsExcluded"] == []
     assert abstract["actions"][0]["mode"] == "bridge"
     assert "prepareBridgeMigGeometry" in abstract["actions"][0]["gates"]
-    assert adapter["adapters"]["router"]["wouldRerouteQueuedTasks"][0]["queued"] == 2
+    assert adapter["adapters"]["router"]["wouldRedispatchRouterQueue"][0]["queued"] == 2
     assert observer["targetsToObserve"]["workloads"] == ["gpt2"]
 
 

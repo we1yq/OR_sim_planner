@@ -27,7 +27,6 @@ from .transition_common import (
     build_initial_free_pool,
     classify_gpu_change,
     diff_instances_within_same_template,
-    find_active_bridge_slot,
     get_gpu_by_id_mut,
     matches_target_state,
     remove_gpu_if_bound_to_pid,
@@ -123,7 +122,7 @@ def _target_geometry_only_gpu(target_gpu: GPUState) -> GPUState:
 
 def _target_activation_actions(gpu_id: int, physical_id: str) -> list[dict[str, Any]]:
     return [
-        _action("observe_mig_devices", gpu_id=gpu_id, physical_gpu_id=physical_id),
+        _action("register_mig_devices", gpu_id=gpu_id, physical_gpu_id=physical_id),
         _action("deploy_target_workloads", gpu_id=gpu_id, physical_gpu_id=physical_id),
         _action("activate_serving_route", gpu_id=gpu_id, physical_gpu_id=physical_id),
     ]
@@ -142,13 +141,11 @@ def _abstract_action_label(action_type: str) -> str:
         "configure_full_template": "Configure Template",
         "configure_partial_profile": "Partial Reconfiguration",
         "bind_target_gpu": "Bind GPU",
-        "observe_mig_devices": "Observe MIG devices",
+        "register_mig_devices": "Register MIG devices",
         "deploy_target_workloads": "Deploy Pods",
         "activate_serving_route": "Activate Route",
         "stop_gpu_traffic": "Stop GPU Traffic",
         "stop_accepting_new": "Stop Traffic",
-        "accept_queued_requests": "Accept Queued Requests",
-        "reroute_queued_tasks": "Reroute Queued Requests",
         "mark_draining_instance": "Wait Drain",
         "delete_pods": "Delete Pods",
         "delete_gpu_pods": "Delete Pods",
@@ -452,7 +449,6 @@ def simulate_transition_actions(
 
         if action_type in {
             "allocate_gpu",
-            "accept_queued_requests",
             "patch_batch_config",
             "verify_batch",
             "return_gpu",
@@ -472,12 +468,9 @@ def simulate_transition_actions(
         if action_type == "stop_accepting_new":
             runtime = _get_runtime_entry(executed_state, int(action["gpu_id"]), tuple(action["slot"]))
             runtime["accepting_new"] = False
-            continue
-
-        if action_type == "reroute_queued_tasks":
-            runtime = _get_runtime_entry(executed_state, int(action["gpu_id"]), tuple(action["slot"]))
-            runtime["queued"] = 0
-            runtime["rerouted_to"] = action.get("to")
+            if action.get("routerQueueRedispatch"):
+                runtime["queued"] = 0
+                runtime["rerouted_to"] = action.get("to")
             continue
 
         if action_type == "mark_draining_instance":
@@ -561,7 +554,7 @@ def simulate_transition_actions(
                 runtime["accepting_new"] = False
             continue
 
-        if action_type == "observe_mig_devices":
+        if action_type in {"observe_mig_devices", "register_mig_devices"}:
             gpu_id = int(action["gpu_id"])
             physical_id = action["physical_gpu_id"]
             observed = executed_state.metadata.setdefault("observed_mig_devices", {})
@@ -621,6 +614,9 @@ def simulate_transition_actions(
 
         if action_type in {"delete_gpu_pods", "delete_pods"}:
             gpu_id = int(action["gpu_id"])
+            physical_id = action.get("physical_gpu_id")
+            if physical_id is not None and get_physical_id(executed_state, gpu_id) != physical_id:
+                continue
             cur_gpu = get_gpu_by_id_mut(executed_state, gpu_id)
             if cur_gpu is not None:
                 wanted_slots = _slots_from_delete_pods_action(action)
@@ -792,6 +788,20 @@ def plan_full_action_plan(
             blocked_by = "no_reroute_destination_capacity"
         else:
             if stop_new and bool(runtime.get("accepting_new", True)):
+                redispatch_fields = {}
+                if int(runtime.get("queued", 0)) > 0:
+                    redispatch_fields = {
+                        "queued": int(runtime.get("queued", 0)),
+                        "to": reroute_destination,
+                        "target_gpu_id": (reroute_candidate or {}).get("gpu_id"),
+                        "target_physical_gpu_id": (reroute_candidate or {}).get("physical_gpu_id"),
+                        "target_slot": (reroute_candidate or {}).get("slot"),
+                        "queue_transfer_id": queue_transfer_id,
+                        "routerQueueRedispatch": True,
+                    }
+                    phase = reroute_title
+                else:
+                    phase = "stop_accepting_new"
                 local_actions.append(
                     _action(
                         "stop_accepting_new",
@@ -799,42 +809,9 @@ def plan_full_action_plan(
                         physical_gpu_id=physical_id,
                         slot=slot,
                         workload=workload,
+                        **redispatch_fields,
                     )
                 )
-                phase = "stop_accepting_new"
-                status = "in_progress"
-            if int(runtime.get("queued", 0)) > 0:
-                if reroute_candidate is not None:
-                    local_actions.append(
-                        _action(
-                            "accept_queued_requests",
-                            gpu_id=reroute_candidate.get("gpu_id"),
-                            physical_gpu_id=reroute_candidate.get("physical_gpu_id"),
-                            slot=reroute_candidate.get("slot"),
-                            workload=workload,
-                            queued=int(runtime.get("queued", 0)),
-                            from_gpu_id=gpu_id,
-                            from_physical_gpu_id=physical_id,
-                            from_slot=slot,
-                            queue_transfer_id=queue_transfer_id,
-                        )
-                    )
-                local_actions.append(
-                    _action(
-                        "reroute_queued_tasks",
-                        gpu_id=gpu_id,
-                        physical_gpu_id=physical_id,
-                        slot=slot,
-                        workload=workload,
-                        queued=int(runtime.get("queued", 0)),
-                        to=reroute_destination,
-                        target_gpu_id=(reroute_candidate or {}).get("gpu_id"),
-                        target_physical_gpu_id=(reroute_candidate or {}).get("physical_gpu_id"),
-                        target_slot=(reroute_candidate or {}).get("slot"),
-                        queue_transfer_id=queue_transfer_id,
-                    )
-                )
-                phase = reroute_title
                 status = "in_progress"
             if remaining is None and int(runtime.get("inflight", 0)) > 0:
                 local_actions.append(
@@ -980,7 +957,7 @@ def plan_full_action_plan(
                 )
                 phase_actions.extend(acts)
                 any_stop = any_stop or gpu_stop_added
-                any_reroute = any_reroute or any(action["type"] == "reroute_queued_tasks" for action in acts)
+                any_reroute = any_reroute or any(action.get("routerQueueRedispatch") for action in acts)
                 any_drain = any_drain or phase == "drain_old"
                 slot_blocked = slot_blocked or status == "blocked"
             if slot_blocked or any_stop or any_reroute or any_drain:
@@ -1130,7 +1107,7 @@ def plan_full_action_plan(
                 )
                 phase_actions.extend(acts)
                 any_stop = any_stop or gpu_stop_added
-                any_reroute = any_reroute or any(action["type"] == "reroute_queued_tasks" for action in acts)
+                any_reroute = any_reroute or any(action.get("routerQueueRedispatch") for action in acts)
                 any_drain = any_drain or phase == "drain_old"
                 slot_blocked = slot_blocked or status == "blocked"
             if slot_blocked or any_stop or any_reroute or any_drain:
@@ -1425,96 +1402,19 @@ def plan_full_action_plan(
                         )
                         plan_items[-1]["current_phase"] = "replace_slot"
                     else:
-                        bridge_slot = None
-                        if safe:
-                            bridge_slot = None
-                        elif status == "blocked" and phase == "reroute_destination_ready":
-                            bridge_slot = find_active_bridge_slot(
-                                source_state=source_state,
-                                target_state=target_state,
-                                profile=inst_action["src"].profile,
-                                avoid_gpu_id=gpu_id,
-                                avoid_slot=slot,
-                            )
-                        if bridge_slot is not None:
-                            bridge_pid = get_physical_id(source_state, bridge_slot["gpu_id"])
-                            capacity_actions.extend(
-                                [
-                                    _action(
-                                        "bridge_place_instance",
-                                        gpu_id=int(bridge_slot["gpu_id"]),
-                                        physical_gpu_id=bridge_pid,
-                                        slot=bridge_slot["slot"],
-                                        workload=inst_action["src"].workload,
-                                        batch=inst_action["src"].batch,
-                                        mu=float(inst_action["src"].mu),
-                                        bridge_for={
-                                            "gpu_id": gpu_id,
-                                            "slot": slot,
-                                            "old_workload": inst_action["src"].workload,
-                                            "new_workload": inst_action["tgt"].workload,
-                                        },
-                                    ),
-                                    _action(
-                                        "accept_queued_requests",
-                                        gpu_id=int(bridge_slot["gpu_id"]),
-                                        physical_gpu_id=bridge_pid,
-                                        slot=bridge_slot["slot"],
-                                        workload=inst_action["src"].workload,
-                                        from_gpu_id=gpu_id,
-                                        from_physical_gpu_id=physical_id,
-                                        from_slot=slot,
-                                        bridge=True,
-                                    ),
-                                    _action(
-                                        "remove_instance",
-                                        gpu_id=gpu_id,
-                                        physical_gpu_id=physical_id,
-                                        slot=slot,
-                                        workload=inst_action["src"].workload,
-                                        safe_now=True,
-                                        bridged=True,
-                                    ),
-                                    _action(
-                                        "place_instance",
-                                        gpu_id=gpu_id,
-                                        physical_gpu_id=physical_id,
-                                        slot=slot,
-                                        workload=inst_action["tgt"].workload,
-                                        batch=inst_action["tgt"].batch,
-                                        bridged=True,
-                                    ),
-                                    _action(
-                                        "activate_serving_route",
-                                        gpu_id=gpu_id,
-                                        physical_gpu_id=physical_id,
-                                        slot=slot,
-                                        workload=inst_action["tgt"].workload,
-                                    ),
-                                    _action(
-                                        "delete_bridge_pod",
-                                        gpu_id=int(bridge_slot["gpu_id"]),
-                                        physical_gpu_id=bridge_pid,
-                                        slot=bridge_slot["slot"],
-                                        workload=inst_action["src"].workload,
-                                    ),
-                                ]
-                            )
-                            plan_items[-1]["current_phase"] = "bridge_then_replace"
-                            plan_items[-1]["status"] = "ready"
-                            plan_items[-1]["blocked_by"] = None
-                        else:
-                            blocked_actions.append(
-                                {
-                                    "type": "defer_workload_change",
-                                    "gpu_id": gpu_id,
-                                    "physical_gpu_id": physical_id,
-                                    "slot": slot,
-                                    "old_workload": inst_action["src"].workload,
-                                    "new_workload": inst_action["tgt"].workload,
-                                    "phase": phase,
-                                }
-                            )
+                        blocked_actions.append(
+                            {
+                                "type": "defer_workload_change",
+                                "gpu_id": gpu_id,
+                                "physical_gpu_id": physical_id,
+                                "slot": slot,
+                                "old_workload": inst_action["src"].workload,
+                                "new_workload": inst_action["tgt"].workload,
+                                "phase": phase,
+                                "blockedByCapacity": True,
+                                "reason": "no_same_workload_capacity_producer",
+                            }
+                        )
                     continue
 
     fine_actions = capacity_actions + phase_actions + cleanup_actions + finalize_actions + blocked_actions

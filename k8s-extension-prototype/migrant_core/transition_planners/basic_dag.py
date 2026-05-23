@@ -10,7 +10,6 @@ from ..transition_common import (
     alloc_from_free_pool,
     classify_gpu_change,
     diff_instances_within_same_template,
-    find_active_bridge_slot,
     matches_target_state,
     provided_by_workload,
     safe_after_removing_gpu,
@@ -276,21 +275,21 @@ def _assert_reroute_destinations_stable(
     source_map = gpu_map_by_id(source_state)
     target_map = gpu_map_by_id(target_state)
     for action in actions:
-        if action.get("type") != "reroute_queued_tasks":
+        if not action.get("routerQueueRedispatch"):
             continue
         target_gpu_id = action.get("target_gpu_id")
         target_slot = _slot_tuple(action.get("target_slot"))
         if target_gpu_id is None or target_slot is None:
-            raise ValueError(f"Reroute action is missing target slot: {action}")
+            raise ValueError(f"Router queue redispatch action is missing target slot: {action}")
         source_gpu = source_map.get(int(target_gpu_id))
         target_gpu = target_map.get(int(target_gpu_id))
         source_inst = get_inst_by_slot(source_gpu, target_slot)
         target_inst = get_inst_by_slot(target_gpu, target_slot)
         if source_inst is None or target_inst is None:
-            raise ValueError(f"Reroute target slot is not present in source/target: {action}")
+            raise ValueError(f"Router queue redispatch target slot is not present in source/target: {action}")
         if source_inst.workload != target_inst.workload or source_inst.batch != target_inst.batch:
             raise ValueError(
-                "Reroute target slot is not stable: "
+                "Router queue redispatch target slot is not stable: "
                 f"gpu={target_gpu_id} slot={target_slot} "
                 f"source=({source_inst.workload}, bs={source_inst.batch}) "
                 f"target=({target_inst.workload}, bs={target_inst.batch})"
@@ -535,7 +534,7 @@ def _append_partial_reconfiguration_actions(
                 **common,
             ),
             _action(
-                "observe_mig_devices",
+                "register_mig_devices",
                 gpu_id=gpu_id,
                 physical_gpu_id=physical_id,
                 slots=create_slots,
@@ -782,109 +781,28 @@ def _append_workload_replacement_actions(
         plan_items.append(_plan_item(root, "workload_replacement", gpu_id, physical_id, slot=slot, workload=src.workload))
         return
 
-    bridge_slot = find_active_bridge_slot(
-        source_state=source_state,
-        target_state=target_state,
-        profile=src.profile,
-        avoid_gpu_id=gpu_id,
-        avoid_slot=slot,
-    )
-    if bridge_slot is None:
-        actions.extend(_queue_and_drain_actions(source_state, target_state, gpu_id, physical_id, src, required, common))
-        bridge_mode = False
-    else:
-        bridge_pid = get_physical_id(source_state, int(bridge_slot["gpu_id"]))
-        queue_transfer_id = f"bridge_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}_{src.workload}"
-        actions.extend(
-            [
-                _action(
-                    "bridge_place_instance",
-                    gpu_id=int(bridge_slot["gpu_id"]),
-                    physical_gpu_id=bridge_pid,
-                    slot=bridge_slot["slot"],
-                    workload=src.workload,
-                    batch=src.batch,
-                    mu=float(src.mu),
-                    queue_transfer_id=queue_transfer_id,
-                    **common,
-                ),
-                _action(
-                    "stop_accepting_new",
-                    gpu_id=gpu_id,
-                    physical_gpu_id=physical_id,
-                    slot=slot,
-                    workload=src.workload,
-                    **common,
-                ),
-                _action(
-                    "reroute_queued_tasks",
-                    gpu_id=gpu_id,
-                    physical_gpu_id=physical_id,
-                    slot=slot,
-                    workload=src.workload,
-                    to=f"bridge[{bridge_slot['gpu_id']}:{bridge_slot['slot']}]",
-                    target_gpu_id=int(bridge_slot["gpu_id"]),
-                    target_physical_gpu_id=bridge_pid,
-                    target_slot=bridge_slot["slot"],
-                    queue_transfer_id=queue_transfer_id,
-                    **common,
-                ),
-                _action(
-                    "accept_queued_requests",
-                    gpu_id=int(bridge_slot["gpu_id"]),
-                    physical_gpu_id=bridge_pid,
-                    slot=bridge_slot["slot"],
-                    workload=src.workload,
-                    from_gpu_id=gpu_id,
-                    from_physical_gpu_id=physical_id,
-                    from_slot=slot,
-                    queue_transfer_id=queue_transfer_id,
-                    bridge=True,
-                    **common,
-                ),
-                _action(
-                    "mark_draining_instance",
-                    gpu_id=gpu_id,
-                    physical_gpu_id=physical_id,
-                    slot=slot,
-                    workload=src.workload,
-                    rounds=max(1, int(_get_runtime_entry(source_state, gpu_id, slot).get("inflight", 0))),
-                    **common,
-                ),
-            ]
+    actions.extend(_queue_and_drain_actions(source_state, target_state, gpu_id, physical_id, src, required, common))
+    actions.append(
+        _action(
+            "defer_workload_change",
+            gpu_id=gpu_id,
+            physical_gpu_id=physical_id,
+            slot=slot,
+            workload=src.workload,
+            new_workload=tgt.workload,
+            blockedByCapacity=True,
+            requiredRate=float(required.get(src.workload, 0.0)) if src.workload is not None else 0.0,
+            reason="no_same_workload_capacity_producer",
+            **common,
         )
-        bridge_mode = True
-    actions.extend(
-        [
-            _action("delete_pods", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, slots=[slot], workload=src.workload, bridged=bridge_mode, **common),
-            _action("place_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, batch=tgt.batch, bridged=bridge_mode, **common),
-            _action("activate_serving_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **common),
-        ]
     )
-    if bridge_slot is not None:
-        actions.extend(
-            [
-                _action(
-                    "mark_draining_instance",
-                    gpu_id=int(bridge_slot["gpu_id"]),
-                    physical_gpu_id=get_physical_id(source_state, int(bridge_slot["gpu_id"])),
-                    slot=bridge_slot["slot"],
-                    workload=src.workload,
-                    rounds=1,
-                    bridge=True,
-                    **common,
-                ),
-                _action(
-                    "delete_bridge_pod",
-                    gpu_id=int(bridge_slot["gpu_id"]),
-                    physical_gpu_id=get_physical_id(source_state, int(bridge_slot["gpu_id"])),
-                    slot=bridge_slot["slot"],
-                    workload=src.workload,
-                    **common,
-                ),
-            ]
-        )
-    plan_items.append(_plan_item(root, "bridge_workload_replacement" if bridge_mode else "workload_replacement", gpu_id, physical_id, slot=slot, workload=src.workload))
+    plan_items.append(
+        {
+            **_plan_item(root, "workload_replacement", gpu_id, physical_id, slot=slot, workload=src.workload),
+            "status": "blocked",
+            "blocked_by": "no_same_workload_capacity_producer",
+        }
+    )
 
 
 def _queue_and_drain_actions(
@@ -901,10 +819,6 @@ def _queue_and_drain_actions(
     slot = (inst.start, inst.end, inst.profile)
     runtime = _get_runtime_entry(source_state, gpu_id, slot)
     actions: list[dict[str, Any]] = []
-    if stop_new and bool(runtime.get("accepting_new", True)):
-        actions.append(
-            _action("stop_accepting_new", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=inst.workload, **common)
-        )
     queued = int(runtime.get("queued", 0) or 0)
     inflight = int(runtime.get("inflight", 0) or 0)
     local_completion_seconds = _local_completion_estimate_seconds(inst, queued, inflight)
@@ -922,47 +836,33 @@ def _queue_and_drain_actions(
         and reroute_candidate is not None
         and local_completion_seconds > _REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS
     )
+    redispatch_fields: dict[str, Any] = {}
     if should_reroute:
         transfer_id = f"queue_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}_{inst.workload}"
         pressure = _reroute_pressure_estimate(source_state, target_state, inst, reroute_candidate, required, queued)
-        pressure.update(
-            {
-                "estimatedLocalCompletionSeconds": round(local_completion_seconds, 6),
-                "rerouteThresholdSeconds": _REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS,
-            }
-        )
-        actions.extend(
-            [
-                _action(
-                    "accept_queued_requests",
-                    gpu_id=reroute_candidate.get("gpu_id"),
-                    physical_gpu_id=reroute_candidate.get("physical_gpu_id"),
-                    slot=reroute_candidate.get("slot"),
-                    workload=inst.workload,
-                    queued=queued,
-                    from_gpu_id=gpu_id,
-                    from_physical_gpu_id=physical_id,
-                    from_slot=slot,
-                    queue_transfer_id=transfer_id,
-                    **pressure,
-                    **common,
-                ),
-                _action(
-                    "reroute_queued_tasks",
-                    gpu_id=gpu_id,
-                    physical_gpu_id=physical_id,
-                    slot=slot,
-                    workload=inst.workload,
-                    queued=queued,
-                    to=_reroute_destination_label(candidates),
-                    target_gpu_id=reroute_candidate.get("gpu_id"),
-                    target_physical_gpu_id=reroute_candidate.get("physical_gpu_id"),
-                    target_slot=reroute_candidate.get("slot"),
-                    queue_transfer_id=transfer_id,
-                    **pressure,
-                    **common,
-                ),
-            ]
+        redispatch_fields = {
+            "queued": queued,
+            "routerQueueRedispatch": True,
+            "to": _reroute_destination_label(candidates),
+            "target_gpu_id": reroute_candidate.get("gpu_id"),
+            "target_physical_gpu_id": reroute_candidate.get("physical_gpu_id"),
+            "target_slot": reroute_candidate.get("slot"),
+            "queue_transfer_id": transfer_id,
+            "estimatedLocalCompletionSeconds": round(local_completion_seconds, 6),
+            "rerouteThresholdSeconds": _REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS,
+            **pressure,
+        }
+    if stop_new and bool(runtime.get("accepting_new", True)):
+        actions.append(
+            _action(
+                "stop_accepting_new",
+                gpu_id=gpu_id,
+                physical_gpu_id=physical_id,
+                slot=slot,
+                workload=inst.workload,
+                **redispatch_fields,
+                **common,
+            )
         )
     queued_to_drain_locally = queued if queued > 0 and not should_reroute else 0
     if inflight > 0 or queued_to_drain_locally > 0:

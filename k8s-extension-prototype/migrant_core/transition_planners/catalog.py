@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .interfaces import TransitionPlanner
-from . import basic_dag, cost_aware_dag, phase_greedy, root_scheduling_baselines
+from . import basic_dag, cost_aware_dag, effect_aware_dag, phase_greedy, root_scheduling_baselines
 
 
 PlannerRole = Literal["production", "compatibility-output", "ablation-baseline", "experimental"]
@@ -46,6 +46,17 @@ PLANNER_CATALOG: dict[str, TransitionPlannerEntry] = {
             "candidates with queue, drain, profile, and MIG benchmark costs."
         ),
         aliases=("transition.cost_aware_dag",),
+    ),
+    "effect_aware_dag": TransitionPlannerEntry(
+        name="effect_aware_dag",
+        runner=effect_aware_dag.run,
+        role="current",
+        description=(
+            "Effect-aware final-DAG planner: lower current/target diffs into "
+            "fine-grained milestones annotated with capacity, router, MIG, and "
+            "physical-GPU effects; hard constraints first, disruption preference second."
+        ),
+        aliases=("transition.effect_aware_dag", "effect_aware", "transition.effect_aware"),
     ),
     "phase_greedy": TransitionPlannerEntry(
         name="phase_greedy",

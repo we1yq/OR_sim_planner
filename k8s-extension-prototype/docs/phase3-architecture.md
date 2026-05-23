@@ -12,7 +12,7 @@ read-only references. The prototype starts from mock data and dry-run plans.
 - Build a minimal Kubernetes-native prototype around the simulation ideas.
 - Keep the first version safe: no real MIG reconfiguration, no scheduler
   modification, no workload deletion.
-- Preserve only the phase-greedy planning direction for action ordering.
+- Preserve a dependency-DAG action interface for dry-run execution.
 - Separate external inputs from system-owned planning work.
 - Make the architecture ready to later read real A100 MIG state.
 
@@ -59,7 +59,7 @@ read-only references. The prototype starts from mock data and dry-run plans.
                    Target State Planner
                              |
                              v
-                     phase-greedy action planner
+                     effect-aware action DAG planner
                              |
                              v
                    Dry-Run ActionPlan
@@ -78,7 +78,7 @@ read-only references. The prototype starts from mock data and dry-run plans.
 5. Controller normalizes all inputs into internal data models.
 6. Feasible Option Builder computes valid workload/batch/profile options.
 7. Target State Planner computes the desired MIG/workload placement.
-8. phase-greedy action planner compares current state and target state.
+8. effect-aware action DAG planner compares current state and target state.
 9. Controller writes a dry-run action plan to status/logs.
 ```
 
@@ -189,7 +189,7 @@ Example fields:
 dryRun: true
 allowMigReconfiguration: false
 maxGpuCount: 1
-planner: phase_greedy
+planner: effect_aware_dag
 ```
 
 In the first prototype, `dryRun` must stay true.
@@ -260,33 +260,31 @@ Prototype simplification:
 - The interface should allow replacing it with MILP later.
 - Do not require Gurobi in the first controller image.
 
-### phase-greedy action planner
+### effect-aware action DAG planner
 
 Responsibilities:
 
 - Compare current state and target state.
-- Generate candidate transition actions.
-- Score and choose action groups using phase-greedy ordering logic.
-- Produce a dry-run action plan.
+- Classify logical-GPU diffs into create, remove, instance-diff, and
+  reconfiguration roots.
+- Lower roots into fine-grained action milestones annotated with capacity,
+  router, MIG, and physical-GPU effects.
+- Add dependency edges for structure, resources, capacity safety, and physical
+  GPU reuse.
+- Produce a dry-run action DAG.
 
 Important design decision:
 
 ```text
-The prototype exposes only phase-greedy planner behavior.
-legacy/full-plan candidate planner variants are not part of the system surface.
+The controller default exposes effect_aware_dag behavior.
+legacy phase-greedy/cost-aware planner variants remain comparison baselines.
 ```
 
-Notebook phase-greedy currently reuses full-plan candidate candidate-generation code internally. The
-prototype should rename and isolate this as:
+The effect-aware planner does not take the old planner output as input. It reads
+Stage2 target state, current allocation/runtime state, required rate, and
+physical GPU registry/free-pool metadata, then constructs the final dependency
+DAG directly.
 
-```text
-CandidateActionGenerator
-phase-greedyScorer
-phase-greedySelector
-phase-greedyPlanner
-```
-
-So the public planner remains phase-greedy-only.
 
 ### Dry-Run ActionPlan Writer
 
@@ -301,7 +299,7 @@ Example:
 
 ```yaml
 dryRun: true
-planner: phase_greedy
+planner: effect_aware_dag
 actions:
   - type: drain_old
     gpuId: 0
@@ -413,7 +411,7 @@ These must remain disabled until explicit future phases.
 | Workload requests | YAML/CRD | YAML/CRD | Real CRD/API |
 | Profile data | Static mock/profile CSV-derived data | Static profile catalog | Profile database |
 | Target planner | Greedy/simple first | MILP-capable interface | Production planner |
-| Action planner | phase-greedy dry-run | phase-greedy dry-run | phase-greedy gated execution |
+| Action planner | effect-aware dry-run DAG | effect-aware dry-run DAG | effect-aware gated execution |
 | MIG changes | None | None | Via MIG Manager or controlled executor |
 | Scheduler | Default scheduler | Default scheduler | Possible scheduler integration later |
 
@@ -430,7 +428,7 @@ Migrate as data structures or algorithms:
 - workload/profile/batch feasible option logic
 - target state representation
 - action plan representation
-- phase-greedy action group scoring and selection
+- effect-aware action DAG representation and capacity/physical-GPU dependency rules
 
 Do not migrate directly:
 
@@ -477,6 +475,6 @@ This structure will be created and filled incrementally in later phases.
 - Use mock GPU state locally.
 - Keep real A100 integration read-only at first.
 - Keep all actions dry-run.
-- Expose only phase-greedy planner behavior.
+- Expose `effect_aware_dag` as the default Stage3 planner behavior.
 - Treat NVIDIA GPU Operator/device plugin/DCGM as future data sources or
   execution helpers, not as things to rewrite.

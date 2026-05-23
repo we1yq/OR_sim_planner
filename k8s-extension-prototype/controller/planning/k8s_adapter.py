@@ -149,7 +149,7 @@ def plan_scenario_chain_as_migplan_statuses(
         "kind": "MigPlanStageChain",
         "apiVersion": "mig.or-sim.io/v1alpha1",
         "dryRun": True,
-        "planner": "phase_greedy",
+        "planner": "effect_aware_dag",
         "stageCount": len(statuses),
         "stages": statuses,
     }
@@ -363,7 +363,7 @@ def _status_from_current_state_noop(
         "metadata": {"name": f"{scenario.name}-dry-run"},
         "spec": {
             "dryRun": True,
-            "planner": "phase_greedy",
+            "planner": "effect_aware_dag",
             "scenario": scenario.name,
             "sourceStateRef": scenario.source_state_ref,
             "targetStateRef": scenario.target_state_ref,
@@ -448,7 +448,7 @@ def _status_from_infeasible_milp(scenario: PlanningScenario, milp_res: dict[str,
         "apiVersion": "mig.or-sim.io/v1alpha1",
         "kind": "MigPlan",
         "metadata": {"name": f"{scenario.name}-dry-run"},
-        "spec": {"dryRun": True, "planner": "phase_greedy", "scenario": scenario.name},
+        "spec": {"dryRun": True, "planner": "effect_aware_dag", "scenario": scenario.name},
         "status": {
             "phase": "Infeasible",
             "reachedTarget": False,
@@ -486,7 +486,7 @@ def _planning_trace(
         "scenario": scenario.name,
         "pipeline": (
             "source -> feasible-options -> milp -> target-build -> "
-            f"{transition_res.get('requested_transition_planner', 'phase_greedy')} -> "
+            f"{transition_res.get('requested_transition_planner', 'effect_aware_dag')} -> "
             "canonical-next-state"
         ),
         "inputs": {
@@ -548,7 +548,7 @@ def _planning_trace(
         "transition": {
             "stageName": transition_res.get("stage_name"),
             "planner": transition_res.get("requested_transition_planner"),
-            "plannerModule": transition_res.get("transition_planner_module", "transition.phase_greedy"),
+            "plannerModule": transition_res.get("transition_planner_module", "transition.effect_aware_dag"),
             "elapsedSec": float(transition_res.get("elapsed_sec", 0.0)),
             "reachedTarget": bool(transition_res.get("reached_target", False)),
             "iterationCount": int(transition_res.get("iteration_count", 0)),
@@ -641,7 +641,7 @@ def _transition_planner_name(scenario: PlanningScenario) -> str:
         scenario.transition.get("transitionPlanner")
         or scenario.transition.get("actionPlanner")
         or scenario.transition.get("planner")
-        or "phase_greedy"
+        or "effect_aware_dag"
     )
     return canonical_planner_name(raw)
 

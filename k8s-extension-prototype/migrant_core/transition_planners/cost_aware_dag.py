@@ -25,6 +25,7 @@ from ..transition_engine import (
 )
 from . import basic_dag
 from .action_plan_formats import build_phased_action_plan, compact_phased_action_plan
+from .effect_aware_dag import _add_capacity_dependency_edges, _annotate_effects
 
 
 NAME = "transition.cost_aware_dag"
@@ -120,6 +121,8 @@ def run(
         target_state=target_state,
         required=required,
     )
+    actions = _annotate_effects(actions, current_state, target_state, required)
+    _add_capacity_dependency_edges(actions, current_state, required)
     actions = basic_dag._coalesce_slot_delete_pods(actions)
     basic_dag._assert_reroute_destinations_stable(current_state, target_state, actions)
     planned_state = basic_dag._planned_state_for_actions(current_state, target_state, actions)
@@ -243,7 +246,6 @@ def _build_cost_aware_actions(
         src_gpu = src_map[gpu_id]
         tgt_gpu = tgt_map[gpu_id]
         old_physical_id = get_physical_id(source_state, gpu_id)
-        target_template = tgt_gpu.template_str()
         candidates: list[tuple[str, str | None, list[dict[str, Any]], list[dict[str, Any]], bool]] = []
 
         partial_plan = build_partial_reconfig_plan(src_gpu, tgt_gpu)
@@ -278,7 +280,7 @@ def _build_cost_aware_actions(
             target_state,
             gpu_id,
             old_physical_id,
-            target_template,
+            tgt_gpu,
         )
         candidates.append(
             (
@@ -302,7 +304,7 @@ def _build_cost_aware_actions(
                 gpu_id,
                 old_physical_id,
                 new_physical_id,
-                target_template,
+                tgt_gpu,
             )
             candidates.append(("bridge_reconfiguration", new_physical_id, local_actions, local_items, True))
 
@@ -321,7 +323,7 @@ def _build_cost_aware_actions(
         tgt_gpu = tgt_map[gpu_id]
         physical_id = alloc_from_free_pool(free_pool)
         before = len(actions)
-        basic_dag._append_create_target_gpu_actions(actions, plan_items, gpu_id, physical_id, tgt_gpu.template_str())
+        basic_dag._append_create_target_gpu_actions(actions, plan_items, gpu_id, physical_id, tgt_gpu)
         _record_fixed_decision(decision_trace, "create_target_gpu", gpu_id, actions[before:], source_state)
 
     return actions, plan_items, decision_trace
@@ -402,7 +404,7 @@ def _append_cost_aware_workload_replacement(
         root,
     )
     has_bridge = any(action.get("type") == "bridge_place_instance" for action in direct_actions)
-    has_reroute = any(action.get("type") == "reroute_queued_tasks" for action in direct_actions)
+    has_reroute = any(action.get("routerQueueRedispatch") for action in direct_actions)
     safe = safe_after_removing_instance(source_state, src, required)
     mode = "bridge_workload_replacement" if has_bridge else ("reroute_workload_replacement" if has_reroute else "direct_workload_replacement")
     candidates.append((mode, physical_id, direct_actions, direct_items, safe or has_reroute or has_bridge))
@@ -479,7 +481,7 @@ def _score_actions(source_state: ClusterState, actions: list[dict[str, Any]], fe
         queued_wait=sum(_queued_wait(action) for action in actions),
         reroute_backlog_seconds=round(sum(_reroute_backlog_seconds(action) for action in actions), 6),
         drain_rounds=sum(int(action.get("rounds", 0) or 0) for action in actions if action.get("type") == "mark_draining_instance"),
-        reroutes=sum(1 for action in actions if action.get("type") == "reroute_queued_tasks"),
+        reroutes=sum(1 for action in actions if action.get("routerQueueRedispatch")),
         bridges=sum(1 for action in actions if action.get("type") == "bridge_place_instance"),
         pod_deletes=sum(1 for action in actions if action.get("type") in {"delete_pods", "delete_bridge_pod"}),
         reconfig_seconds=sum(_estimated_reconfig_seconds(action) for action in actions),
@@ -494,7 +496,7 @@ def _queued_wait(action: dict[str, Any]) -> int:
 
 
 def _reroute_backlog_seconds(action: dict[str, Any]) -> float:
-    if action.get("type") != "reroute_queued_tasks":
+    if not action.get("routerQueueRedispatch"):
         return 0.0
     return max(0.0, float(action.get("estimatedBacklogDrainSeconds", 0.0) or 0.0))
 

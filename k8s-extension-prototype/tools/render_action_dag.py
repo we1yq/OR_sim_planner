@@ -35,8 +35,6 @@ ACTION_SECONDS = {
     "mark_draining_instance": 30.0,
     "stop_gpu_traffic": 1.0,
     "stop_accepting_new": 1.0,
-    "accept_queued_requests": 1.0,
-    "reroute_queued_tasks": 1.0,
     "remove_instance": 1.0,
     "delete_bridge_pod": 1.0,
     "place_instance": 1.0,
@@ -48,6 +46,7 @@ ACTION_SECONDS = {
     "verify_batch": 0.5,
     "allocate_gpu": 0.2,
     "place_target_layout": 0.2,
+    "register_mig_devices": 2.0,
     "observe_mig_devices": 2.0,
     "deploy_target_workloads": 5.0,
     "activate_serving_route": 0.5,
@@ -255,7 +254,7 @@ def render_global_action_dag(dag: dict[str, Any], title: str) -> str:
         parts.append(f'<rect x="{x - 65}" y="{y - 23}" width="130" height="46" rx="4" fill="{color}" stroke="#111827" stroke-width="1"/>')
         parts.append(_svg_text(x, y - 6, _short_action(action), 10, anchor="middle"))
         parts.append(_svg_text(x, y + 9, _action_target(action), 9, anchor="middle", fill="#4b5563"))
-    parts.append(_legend(width - 410, height - 28))
+    parts.append(_legend(24, height - 28))
     return "\n".join(parts + ["</svg>"]) + "\n"
 
 
@@ -272,10 +271,10 @@ def render_gpu_lane_timeline(
     physical_reuse = _physical_reuse_labels(nodes, logical_aliases)
     lanes = _lanes_for_nodes(nodes, executed_state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
     lane_names = list(lanes)
-    x0 = 190
+    x0 = 250
     y0 = 82
-    phase_w = 112
-    stack_gap = 56
+    phase_w = 142
+    stack_gap = 70
     lane_heights = _timeline_lane_heights(
         nodes,
         lane_names,
@@ -301,7 +300,9 @@ def render_gpu_lane_timeline(
         parts.append(_svg_text(x + phase_w / 2, 58, f"d{phase}", 11, anchor="middle", fill="#4b5563"))
     for lane in lane_names:
         y = lane_y[lane]
-        parts.append(_svg_text(20, y + 28, lane, 12, anchor="start"))
+        parts.append(_svg_text(20, y + 18, _fit_svg_label(lane, 32), 12, anchor="start"))
+        if len(lane) > 32:
+            parts.append(_svg_text(20, y + 33, _fit_svg_label(lane[32:], 32), 10, anchor="start", fill="#4b5563"))
         parts.append(f'<line x1="{x0}" y1="{y + 48}" x2="{width - 35}" y2="{y + 48}" stroke="#e5e7eb" stroke-width="1"/>')
 
     positions: dict[str, tuple[float, float, str]] = {}
@@ -331,6 +332,7 @@ def render_gpu_lane_timeline(
             dep_kind = str(dep_action.get("type", ""))
             action_kind = str(action.get("type", ""))
             style = _timeline_dependency_style(dep_kind, action_kind, lane1 == lane2)
+            style = _dependency_style_with_effect_label(style, action, dep_action)
             if dep_kind == "return_gpu" and action_kind == "allocate_gpu":
                 reuse_markers.append(((x1 + x2) / 2, y1, y2))
                 continue
@@ -367,12 +369,12 @@ def render_gpu_lane_timeline(
         color = CLASS_COLORS.get(str(node.get("operationClass", "other")), "#f3f4f6")
         details = _timeline_detail_lines(action, executed_state)
         full_title = " | ".join([_short_action(action), *details, f"{duration:g}s"])
-        parts.append(f'<rect x="{x}" y="{y}" width="{w:.1f}" height="50" rx="4" fill="{color}" stroke="#111827" stroke-width="1"><title>{html.escape(full_title)}</title></rect>')
-        parts.append(_svg_text(x + w / 2, y + 12, _short_action(action), 9, anchor="middle"))
-        for line_idx, line in enumerate(details[:2]):
-            parts.append(_svg_text(x + w / 2, y + 24 + line_idx * 11, line, 8, anchor="middle", fill="#374151"))
-        parts.append(_svg_text(x + w / 2, y + 47, _duration_label(action, duration), 8, anchor="middle", fill="#4b5563"))
-    parts.append(_legend(width - 410, height - 25))
+        parts.append(f'<rect x="{x}" y="{y}" width="{w:.1f}" height="60" rx="4" fill="{color}" stroke="#111827" stroke-width="1"><title>{html.escape(full_title)}</title></rect>')
+        parts.append(_svg_text(x + w / 2, y + 12, _fit_svg_label(_short_action(action), 20), 9, anchor="middle"))
+        for line_idx, line in enumerate(details[:3]):
+            parts.append(_svg_text(x + w / 2, y + 24 + line_idx * 10, _fit_svg_label(line, 22), 8, anchor="middle", fill="#374151"))
+        parts.append(_svg_text(x + w / 2, y + 57, _duration_label(action, duration), 8, anchor="middle", fill="#4b5563"))
+    parts.append(_legend(24, height - 25))
     return "\n".join(parts + ["</svg>"]) + "\n"
 
 
@@ -386,7 +388,7 @@ def _timeline_lane_heights(
     physical_reuse: dict[str, str] | None,
     stack_gap: int,
 ) -> dict[str, int]:
-    heights = {lane: 132 for lane in lane_names}
+    heights = {lane: 148 for lane in lane_names}
     max_stack_by_lane = {lane: 0 for lane in lane_names}
     for node in nodes:
         action = dict(node.get("action", {}))
@@ -397,7 +399,7 @@ def _timeline_lane_heights(
         stack = _node_stack_index(node, nodes, lane, phase, state, logical_aliases, physical_aliases, lane_roles, physical_reuse)
         max_stack_by_lane[lane] = max(max_stack_by_lane[lane], stack)
     for lane, max_stack in max_stack_by_lane.items():
-        heights[lane] = max(132, 72 + (max_stack + 1) * stack_gap)
+        heights[lane] = max(148, 82 + (max_stack + 1) * stack_gap)
     return heights
 
 
@@ -417,8 +419,6 @@ def _node_stack_index(
     by_id = {str(candidate.get("id")): candidate for candidate in nodes}
     same_lane_dep_stacks = []
     preferred_dep_types = None
-    if action_type == "reroute_queued_tasks":
-        preferred_dep_types = {"stop_accepting_new", "stop_gpu_traffic"}
     dep_ids = list(node.get("dependsOn", []))
     if preferred_dep_types is not None:
         dep_ids = [
@@ -560,7 +560,7 @@ def render_final_execution_gantt(
                 parts.append(_svg_text(x + w / 2, y + 24 + line_idx * 11, line, 8, fill="#374151"))
         if w >= 32:
             parts.append(_svg_text(x + w / 2, y + 47, f"{duration:g}s", 8, fill="#4b5563"))
-    parts.append(_legend(width - 410, height - 25))
+    parts.append(_legend(24, height - 25))
     return "\n".join(parts + ["</svg>"]) + "\n"
 
 
@@ -655,7 +655,7 @@ def render_final_execution_sequence(
         parts.append(_svg_text(x + box_w / 2, y + 13, _short_action(action), 9))
         for line_idx, line in enumerate(details[:2]):
             parts.append(_svg_text(x + box_w / 2, y + 26 + line_idx * 10, line, 8, fill="#374151"))
-    parts.append(_legend(width - 410, height - 25))
+    parts.append(_legend(24, height - 25))
     return "\n".join(parts + ["</svg>"]) + "\n"
 
 
@@ -740,7 +740,7 @@ def render_selected_prefix_trace(
                 parts.append(_svg_text(x + w / 2, y + 16, _short_action(action), 8))
             if w >= 28:
                 parts.append(_svg_text(x + w / 2, y + 29, f"{duration:g}s", 7, fill="#4b5563"))
-    parts.append(_legend(width - 410, height - 25))
+    parts.append(_legend(24, height - 25))
     return "\n".join(parts + ["</svg>"]) + "\n"
 
 
@@ -768,18 +768,11 @@ def _timeline_nodes(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     grouped: dict[tuple[int, Any], list[dict[str, Any]]] = defaultdict(list)
     consumed: set[str] = set()
     out: list[dict[str, Any]] = []
-    reroute_source_stop_ids = {
-        str(dep)
-        for node in nodes
-        if dict(node.get("action", {})).get("type") == "reroute_queued_tasks"
-        for dep in list(node.get("dependsOn", []))
-    }
     for node in nodes:
         action = dict(node.get("action", {}))
         if (
             action.get("type") == "stop_accepting_new"
             and action.get("gpu_id") is not None
-            and str(node.get("id")) not in reroute_source_stop_ids
         ):
             grouped[(int(node.get("phase", 0)), action.get("gpu_id"))].append(node)
     for (phase, gpu_id), group in grouped.items():
@@ -855,7 +848,7 @@ def render_workload_flow(dag: dict[str, Any], title: str) -> str:
             parts.append(f'<rect x="{x}" y="{y + 9}" width="88" height="34" rx="4" fill="{color}" stroke="#111827" stroke-width="1"/>')
             parts.append(_svg_text(x + 44, y + 23, _short_action(action), 9, anchor="middle"))
             parts.append(_svg_text(x + 44, y + 35, _action_target(action), 8, anchor="middle", fill="#4b5563"))
-    parts.append(_legend(width - 410, height - 25))
+    parts.append(_legend(24, height - 25))
     return "\n".join(parts + ["</svg>"]) + "\n"
 
 
@@ -942,13 +935,12 @@ def _abstract_label_for_action(action: dict[str, Any]) -> str:
         "configure_full_template": "Configure Template",
         "configure_partial_profile": "Partial Reconfiguration",
         "bind_target_gpu": "Bind GPU",
-        "observe_mig_devices": "Observe MIG devices",
+        "register_mig_devices": "Register MIG devices",
+        "observe_mig_devices": "Register MIG devices",
         "deploy_target_workloads": "Deploy Pods",
         "activate_serving_route": "Activate Route",
         "stop_gpu_traffic": "Stop GPU Traffic",
         "stop_accepting_new": "Stop Slot Traffic",
-        "accept_queued_requests": "Accept Queued Requests",
-        "reroute_queued_tasks": "Reroute Queued Requests",
         "mark_draining_instance": "Wait Drain",
         "delete_pods": "Delete Pods",
         "delete_gpu_pods": "Delete Pods",
@@ -965,11 +957,11 @@ def _abstract_label_for_action(action: dict[str, Any]) -> str:
 
 
 def _operation_class_for_type(action_type: str) -> str:
-    if action_type in {"allocate_gpu", "configure_full_template", "configure_partial_profile", "place_target_layout", "observe_mig_devices"}:
+    if action_type in {"allocate_gpu", "configure_full_template", "configure_partial_profile", "place_target_layout", "register_mig_devices", "observe_mig_devices"}:
         return "mig-geometry"
     if action_type in {"bind_target_gpu", "mark_reconfig_target_prepared", "unbind_target_gpu", "clear_gpu_binding", "return_gpu"}:
         return "binding-state"
-    if action_type in {"stop_gpu_traffic", "stop_accepting_new", "accept_queued_requests", "reroute_queued_tasks", "mark_draining_instance", "activate_serving_route"}:
+    if action_type in {"stop_gpu_traffic", "stop_accepting_new", "mark_draining_instance", "activate_serving_route"}:
         return "router-drain"
     if action_type in {"place_instance", "bridge_place_instance", "update_batch", "patch_batch_config", "apply_batch", "verify_batch", "workload_change", "deploy_target_workloads"}:
         return "pod-lifecycle"
@@ -983,8 +975,6 @@ def _operation_class_for_type(action_type: str) -> str:
 def _gantt_dependency_style(dep_kind: str, action_kind: str, same_lane: bool) -> dict[str, str] | None:
     if dep_kind == "clear_gpu_binding" and action_kind == "bind_target_gpu":
         return {"stroke": "#7c3aed", "width": "1.6", "dash": "2 2", "label": "logical-id handoff"}
-    if dep_kind == "accept_queued_requests" and action_kind == "reroute_queued_tasks":
-        return {"stroke": "#d97706", "width": "1.4", "dash": "4 3", "label": "queue handoff"}
     if same_lane:
         return {"stroke": "#7c3aed", "width": "1.0", "dash": "4 3", "label": ""}
     return {"stroke": "#9ca3af", "width": "1.0", "dash": "4 3", "label": ""}
@@ -1061,6 +1051,7 @@ def _lane_role_for_action(action: dict[str, Any]) -> str:
         "allocate_gpu",
         "configure_full_template",
         "bind_target_gpu",
+        "register_mig_devices",
         "observe_mig_devices",
         "deploy_target_workloads",
         "activate_serving_route",
@@ -1069,7 +1060,6 @@ def _lane_role_for_action(action: dict[str, Any]) -> str:
     if action_type in {
         "stop_gpu_traffic",
         "stop_accepting_new",
-        "reroute_queued_tasks",
         "mark_draining_instance",
         "delete_gpu_pods",
         "delete_pods",
@@ -1131,8 +1121,6 @@ def _gpu_id_for_physical(state: Any, physical_id: Any) -> int | None:
 
 
 def _timeline_dependency_style(dep_kind: str, action_kind: str, same_lane: bool) -> dict[str, str] | None:
-    if dep_kind == "accept_queued_requests" and action_kind == "reroute_queued_tasks":
-        return {"stroke": "#d97706", "width": "1.4", "dash": "4 3", "label": "queue handoff"}
     if same_lane:
         if dep_kind == "deploy_target_workloads" and action_kind == "bind_target_gpu":
             return {"stroke": "#7c3aed", "width": "1.2", "dash": "4 3", "label": ""}
@@ -1142,6 +1130,22 @@ def _timeline_dependency_style(dep_kind: str, action_kind: str, same_lane: bool)
     if dep_kind == "clear_gpu_binding" and action_kind == "bind_target_gpu":
         return {"stroke": "#7c3aed", "width": "1.6", "dash": "2 2", "label": "logical-id handoff"}
     return None
+
+
+def _dependency_style_with_effect_label(
+    style: dict[str, str] | None,
+    action: dict[str, Any],
+    dep_action: dict[str, Any],
+) -> dict[str, str] | None:
+    dep_key = dep_action.get("actionKey")
+    if dep_key is None:
+        return style
+    selected = dict(dict(action.get("capacityGate") or {}).get("selectedProducerActionKeys") or {})
+    selected_keys = {str(key) for keys in selected.values() for key in list(keys or [])}
+    if str(dep_key) not in selected_keys:
+        return style
+    base = style or {"stroke": "#dc2626", "width": "1.4", "dash": "5 3", "label": ""}
+    return {**base, "stroke": "#dc2626", "width": "1.6", "label": "capacity gate"}
 
 
 def _lane_sort_key(lane: str) -> tuple[int, int, str]:
@@ -1231,7 +1235,8 @@ def _short_action(action: dict[str, Any]) -> str:
         "configure_full_template": "configure",
         "configure_partial_profile": "partial-reconfig",
         "place_target_layout": "desired-layout",
-        "observe_mig_devices": "observe-mig",
+        "register_mig_devices": "register-mig",
+        "observe_mig_devices": "register-mig",
         "deploy_target_workloads": "deploy-workload",
         "activate_serving_route": "activate-route",
         "mark_reconfig_target_prepared": "prepared",
@@ -1241,8 +1246,6 @@ def _short_action(action: dict[str, Any]) -> str:
         "return_gpu": "return-gpu",
         "stop_gpu_traffic": "stop-gpu-traffic",
         "stop_accepting_new": "stop-new",
-        "accept_queued_requests": "accept-queue",
-        "reroute_queued_tasks": "reroute",
         "mark_draining_instance": "drain",
         "place_instance": "place-pod",
         "bridge_place_instance": "bridge-pod",
@@ -1292,20 +1295,14 @@ def _timeline_detail_lines(action: dict[str, Any], state: Any) -> list[str]:
         return [f"clear active gpu{action.get('gpu_id', '-')}", str(action.get("physical_gpu_id", "-"))]
     if action_type == "return_gpu":
         return [f"return {action.get('physical_gpu_id', '-')}", "availableQueue"]
-    if action_type == "accept_queued_requests":
-        return [
-            f"accept queued {action.get('queued', '-')}",
-            f"to gpu{action.get('gpu_id', '-')} {_format_slot(action.get('slot'))}",
-            f"from gpu{action.get('from_gpu_id', '-')}",
-        ]
     if action_type in {"place_target_layout", "mark_reconfig_target_prepared"}:
         summary = _gpu_layout_summary(state, action.get("gpu_id"), action.get("physical_gpu_id"))
         return [summary[0] if summary else "target layout", summary[1] if len(summary) > 1 else ""]
-    if action_type == "observe_mig_devices":
+    if action_type in {"observe_mig_devices", "register_mig_devices"}:
         return [f"gpu{action.get('gpu_id', '-')}", "slot -> MIG UUID"]
-    if action_type == "reroute_queued_tasks":
+    if action_type == "stop_accepting_new" and action.get("routerQueueRedispatch"):
         return [
-            f"queued {action.get('queued', '-')}",
+            f"stop + redispatch {action.get('queued', '-')}",
             f"from gpu{action.get('gpu_id', '-')} {_format_slot(action.get('slot'))}",
             f"to gpu{action.get('target_gpu_id', '-')} {_format_slot(action.get('target_slot'))}",
             f"spare {action.get('estimatedRerouteSpareMu', '-')} backlog {action.get('estimatedBacklogDrainSeconds', '-')}s",
@@ -1434,6 +1431,13 @@ def _legend(x: int, y: int) -> str:
 
 def _svg_text(x: float, y: float, text: Any, size: int, *, anchor: str = "middle", fill: str = "#111827") -> str:
     return f'<text x="{x:.1f}" y="{y:.1f}" text-anchor="{anchor}" font-family="Arial, sans-serif" font-size="{size}" fill="{fill}">{html.escape(str(text))}</text>'
+
+
+def _fit_svg_label(text: Any, max_chars: int) -> str:
+    value = " ".join(str(text).split())
+    if len(value) <= max_chars:
+        return value
+    return value[: max(1, max_chars - 3)] + "..."
 
 
 if __name__ == "__main__":

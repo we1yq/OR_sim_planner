@@ -186,8 +186,8 @@ Fine action types are grouped as follows.
 | --- | --- | --- |
 | MIG geometry | `allocate_gpu`, `configure_full_template`, `place_target_layout`, `clear_gpu`, `clear_template` | Candidate inputs to GPU Operator/MIG Manager. |
 | Internal binding | `bind_target_gpu`, `mark_reconfig_target_prepared` | Controller bookkeeping only. Never send directly to MIG Manager. |
-| Router/drain | `stop_accepting_new`, `reroute_queued_tasks`, `mark_draining_instance` | Traffic and drain gates before pod deletion or MIG clearing. |
-| Pod/serving | `place_instance`, `bridge_place_instance`, `remove_instance`, `workload_change`, `update_batch` | Serving capacity and pod lifecycle intent. |
+| Router/drain | `stop_accepting_new`, `mark_draining_instance` | Traffic and drain gates before pod deletion or MIG clearing. Router backlog handling is metadata on `stop_accepting_new`, not a separate action. |
+| Pod/serving | `place_instance`, `deploy_target_workloads`, `remove_instance`, `workload_change`, `update_batch` | Serving capacity and pod lifecycle intent. |
 | Deferred gates | `defer_remove_gpu`, `defer_remove_instance`, `defer_workload_change` | Not executable; explain why the abstract action is blocked. |
 
 Stable rules:
@@ -312,8 +312,8 @@ Purpose: router/drain subset of the plan.
 Important fields:
 
 - `planItems`: current phase and blocker per abstract root/slot.
-- `trafficActions`: `stop_accepting_new`, `reroute_queued_tasks`,
-  `mark_draining_instance`, and defer actions.
+- `trafficActions`: `stop_accepting_new`, `mark_draining_instance`, and defer
+  actions.
 
 ### podLifecyclePreview
 

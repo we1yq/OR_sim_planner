@@ -22,7 +22,7 @@ class DryRunRouterPlanBuilder:
             "workloadRoutePlans": [
                 _workload_route_plan(action_plan_name, action)
                 for action in actions
-                if action.get("type") in {"stop_accepting_new", "reroute_queued_tasks"}
+                if action.get("type") == "stop_accepting_new"
             ],
             "servingInstanceDrains": [
                 _serving_instance_drain(action_plan_name, action)
@@ -46,12 +46,13 @@ def _workload_route_plan(action_plan_name: str, action: dict[str, Any]) -> dict[
         },
         "spec": {
             "previewOnly": True,
-            "action": "StopAcceptingNew" if action_type == "stop_accepting_new" else "RerouteQueuedTasks",
+            "action": "StopAcceptingNew",
             "workload": action.get("workload"),
             "sourceInstanceRef": _instance_ref(action),
             "queued": action.get("queued"),
             "target": action.get("to"),
             "targetInstanceRef": _target_instance_ref(action),
+            "routerQueueRedispatch": bool(action.get("routerQueueRedispatch")),
             "reroutePressure": _reroute_pressure(action),
         },
     }

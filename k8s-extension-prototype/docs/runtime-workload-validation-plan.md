@@ -98,20 +98,19 @@ Patch Config
 -> Verify Batch
 ```
 
-### 5. Reroute And Queue Drain
+### 5. Router Backlog And Drain
 
-During transition, measure what happens when queued requests are moved from one
-slot to another stable slot.
+During transition, measure what happens when the router stops assigning new work
+to a draining instance while queued requests remain at workload/router level.
 
 Current implementation status:
 
-- reroute is only allowed to a stable destination slot with the same workload
-  and batch size;
-- reroute actions now carry a hardware-profile-based pressure estimate:
-  `targetMu`, `workloadRequiredMu`, `workloadProvidedAfterSourceRemoval`,
-  `estimatedRerouteSpareMu`, and `estimatedBacklogDrainSeconds`;
-- the cost-aware transition planner includes estimated reroute backlog time in
-  candidate scoring;
+- `stop_accepting_new` owns router backlog handling; there is no independent
+  workload-level queue reroute action;
+- effect-aware capacity gates compare remaining ready capacity with
+  `required_rate`;
+- the old reroute pressure estimate is retained only as historical calibration
+  context;
 - this estimate is conservative and should be replaced or calibrated once
   Pod-inside runtime measurements exist.
 

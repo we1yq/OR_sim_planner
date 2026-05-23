@@ -84,43 +84,42 @@ The source-of-truth planner list is
 planner names from backward-compatible aliases and labels each planner as
 production, compatibility-output, ablation-baseline, or experimental.
 
-MIGRANT keeps the old phase-greedy transition planner for compatibility and ablation:
+MIGRANT's production transition planner is effect-aware:
+
+```yaml
+transition:
+  transitionPlanner: effect_aware_dag
+```
+
+`effect_aware_dag` compares current and target layouts by logical GPU id,
+lowers each diff into fine-grained milestones, annotates actions with capacity,
+router, MIG, and physical-GPU effects, and emits a dependency DAG for the
+executor. Capacity safety and physical GPU availability are hard constraints;
+candidate preferences such as partial before in-place before bridge are applied
+only after feasibility.
+
+MIGRANT keeps the old phase-greedy and cost-aware transition planners for
+compatibility and ablation. They are not the controller default:
 
 ```yaml
 transition:
   transitionPlanner: phase_greedy
 ```
 
-The new phased/DAG mode is selected per scenario:
+`phase_greedy_with_dag_output` remains available as a compatibility view of the
+old planner. It runs phase-greedy execution semantics, then compiles the chosen
+linear actions into `migrant.phased-action-dag/v1`.
 
-```yaml
-transition:
-  transitionPlanner: phase_greedy_with_dag_output
-```
-
-`phase_greedy_with_dag_output` does not change the old phase-greedy execution
-semantics. It runs the same phase-greedy action planner, then compiles the chosen linear actions into
-`migrant.phased-action-dag/v1`, including nodes, dependency edges, roots,
-resource conflicts, and phase summaries. This gives the real actuator a
-parallelizable execution contract while preserving `phase_greedy` as the
-baseline for ablation experiments. `phase_greedy_dag` remains accepted as a
-backward-compatible alias.
-
-The experimental planner is selected with:
+The older cost-aware planner is selected with:
 
 ```yaml
 transition:
   transitionPlanner: cost_aware_dag
 ```
 
-`basic_dag` is the baseline DAG compiler. It builds a final dependency DAG
-from source/target layout differences and does not perform iterative prefix
-execution. `cost_aware_dag` keeps the same final-DAG execution contract, but
-scores candidate transition modes before lowering them into fine-grained
-actions. Its current score first filters service-infeasible candidates, then
-minimizes peak active physical GPUs, queued/drain work, MIG benchmark
-reconfiguration time, and disruptive operations such as reroute, bridge, and
-pod deletion.
+`cost_aware_dag` keeps the same final-DAG execution contract, but scores
+candidate transition modes before lowering them into fine-grained actions. It is
+kept for comparison with the effect-aware planner.
 
 ## Who Reads UUIDs After Template Changes?
 

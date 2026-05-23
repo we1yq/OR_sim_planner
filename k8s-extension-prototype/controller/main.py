@@ -46,7 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--plan-scenario",
         type=Path,
-        help="Path to a PlanningScenario YAML file. Runs MILP target build plus phase-greedy dry-run planning.",
+        help="Path to a PlanningScenario YAML file. Runs MILP target build plus effect-aware dry-run planning.",
     )
     parser.add_argument(
         "--plan-scenario-chain",
@@ -58,7 +58,7 @@ def parse_args() -> argparse.Namespace:
         "--max-iters",
         type=int,
         default=20,
-        help="Maximum phase-greedy transition iterations per stage.",
+        help="Maximum transition iterations per stage for compatibility planners.",
     )
     parser.add_argument(
         "--milp-time-limit-s",

@@ -25,14 +25,8 @@ def create_router_drain_smoke_action_plan(
             "sourceEndpoint": source_endpoint,
             "targetPod": target_pod,
             "targetEndpoint": target_endpoint,
-        },
-        {
-            "type": "reroute_queued_tasks",
-            "workload": workload,
-            "sourcePod": source_pod,
-            "sourceEndpoint": source_endpoint,
-            "targetPod": target_pod,
-            "targetEndpoint": target_endpoint,
+            "queued": 1,
+            "routerQueueRedispatch": True,
         },
         {
             "type": "mark_draining_instance",
@@ -72,7 +66,6 @@ def create_router_drain_smoke_action_plan(
             "actionCount": len(traffic_actions),
             "actionCountsByType": {
                 "stop_accepting_new": 1,
-                "reroute_queued_tasks": 1,
                 "mark_draining_instance": 1,
             },
             "trafficAndDrainPreview": preview,

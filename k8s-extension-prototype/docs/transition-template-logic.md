@@ -177,7 +177,7 @@ Workload requests
   -> feasible options
   -> abstract capacity target
   -> physical target layout
-  -> phase-greedy dry-run action plan
+  -> effect-aware dry-run action DAG
 ```
 
 Later:
@@ -185,5 +185,4 @@ Later:
 - Reimplement the target builder interface from the notebook without copying
   notebook code directly.
 - Keep MILP optional behind an interface.
-- Keep phase-greedy as the only public action planner.
-
+- Keep `effect_aware_dag` as the public Stage3 action planner.

@@ -27,6 +27,14 @@ def build_phased_action_plan(
         for item in list(plan_items or [])
         if isinstance(item, dict) and item.get("id")
     }
+    action_key_to_node_id: dict[str, str] = {}
+    for index, raw_action in enumerate(actions):
+        action = _yamlable(dict(raw_action))
+        action_key = action.get("actionKey")
+        if action_key is None:
+            continue
+        root_id = _root_id_for_action(action)
+        action_key_to_node_id[str(action_key)] = _node_id(index, action, root_id)
 
     for index, raw_action in enumerate(actions):
         action = _yamlable(dict(raw_action))
@@ -42,8 +50,8 @@ def build_phased_action_plan(
             if resource in last_by_resource:
                 dependencies.add(last_by_resource[resource])
         for action_key in action.get("dependsOnActionKeys", []) or []:
-            key_node_id = last_by_resource.get(f"action-key:{action_key}")
-            if key_node_id is not None:
+            key_node_id = action_key_to_node_id.get(str(action_key)) or last_by_resource.get(f"action-key:{action_key}")
+            if key_node_id is not None and key_node_id != node_id:
                 dependencies.add(key_node_id)
         for dep in dependencies:
             dependents_by_node[dep].add(node_id)
@@ -209,7 +217,7 @@ def _root_id_for_action(action: dict[str, Any]) -> str:
 def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
     resources: set[str] = set()
     action_type = str(action.get("type", ""))
-    if action.get("slot") is not None and action_type != "accept_queued_requests":
+    if action.get("slot") is not None:
         resources.add(f"slot:{action.get('gpu_id')}:{tuple(action['slot'])}")
     if action.get("queue_transfer_id") is not None:
         resources.add(f"queue-transfer:{action['queue_transfer_id']}")
@@ -222,7 +230,7 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
         "allocate_gpu",
         "configure_full_template",
         "configure_partial_profile",
-        "observe_mig_devices",
+        "register_mig_devices",
         "deploy_target_workloads",
         "bind_target_gpu",
         "delete_gpu_pods",
@@ -236,7 +244,7 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
         slots = _slots_for_action(action)
         if action.get("slot") is None or len(slots) != 1:
             resources.add(f"physical:{action['physical_gpu_id']}")
-    if action_type == "observe_mig_devices" and action.get("gpu_id") is not None and action.get("physical_gpu_id") is not None:
+    if action_type in {"observe_mig_devices", "register_mig_devices"} and action.get("gpu_id") is not None and action.get("physical_gpu_id") is not None:
         resources.add(f"mig-devices:{action['gpu_id']}:{action['physical_gpu_id']}")
     if action_type in {"clear_gpu_binding", "bind_target_gpu"} and action.get("gpu_id") is not None:
         resources.add(f"logical-binding:{action['gpu_id']}")
@@ -244,7 +252,7 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
         resources.add(f"physical:{action['physical_gpu_id']}")
     if action_type == "stop_gpu_traffic" and action.get("physical_gpu_id") is not None:
         resources.add(f"traffic:{action['physical_gpu_id']}")
-    if action_type in {"stop_accepting_new", "reroute_queued_tasks", "mark_draining_instance"} and action.get("slot") is not None:
+    if action_type in {"stop_accepting_new", "mark_draining_instance"} and action.get("slot") is not None:
         resources.add(f"traffic-slot:{action.get('gpu_id')}:{tuple(action['slot'])}")
     return resources
 
@@ -270,11 +278,11 @@ def _read_only_dependency_resources(action: dict[str, Any]) -> set[str]:
 
 def _operation_class(action: dict[str, Any]) -> str:
     action_type = str(action.get("type", ""))
-    if action_type in {"allocate_gpu", "configure_full_template", "place_target_layout", "observe_mig_devices"}:
+    if action_type in {"allocate_gpu", "configure_full_template", "place_target_layout", "register_mig_devices", "observe_mig_devices"}:
         return "mig-geometry"
     if action_type in {"bind_target_gpu", "mark_reconfig_target_prepared", "unbind_target_gpu", "clear_gpu_binding", "return_gpu"}:
         return "binding-state"
-    if action_type in {"stop_gpu_traffic", "stop_accepting_new", "accept_queued_requests", "reroute_queued_tasks", "mark_draining_instance", "activate_serving_route"}:
+    if action_type in {"stop_gpu_traffic", "stop_accepting_new", "mark_draining_instance", "activate_serving_route"}:
         return "router-drain"
     if action_type in {"place_instance", "bridge_place_instance", "update_batch", "patch_batch_config", "apply_batch", "verify_batch", "workload_change", "deploy_target_workloads"}:
         return "pod-lifecycle"

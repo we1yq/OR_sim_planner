@@ -16,8 +16,8 @@ Readiness definitions:
 
 - `MIG create` is the elapsed time reported by `nvidia-smi mig -cgi ... -C` inside the runtime controller.
 - `MIG clear` is the wall time of the controller `clear` command, including best-effort CI/GI deletion and postcondition `nvidia-smi -L` verification.
-- `Observe MIG devices` includes post-mutation `nvidia-smi -L`, `nvidia-smi mig -lgi`, slot-to-MIG-UUID mapping, CDI spec refresh at `/var/run/cdi/management.nvidia.com-gpu.yaml`, and registry writes/mark-ready.
-- After `Observe MIG devices` succeeds, MIGRANT marks the physical GPU `activeQueue` for configured layouts. Pods may then bind directly with CDI annotation to the returned MIG UUID.
+- `Register MIG devices` includes post-mutation `nvidia-smi -L`, `nvidia-smi mig -lgi`, slot-to-MIG-UUID mapping, CDI spec refresh at `/var/run/cdi/management.nvidia.com-gpu.yaml`, and registry writes/mark-ready.
+- After `Register MIG devices` succeeds, MIGRANT marks the physical GPU `activeQueue` for configured layouts. Pods may then bind directly with CDI annotation to the returned MIG UUID.
 - For template-to-empty, `Other cleanup` includes registry clear, CDI refresh after deletion, registry sync, and release back to `availableQueue`.
 
 ## Summary
@@ -30,7 +30,7 @@ Readiness definitions:
 
 ## Empty To Template
 
-| Template | Total ready | MIG create | Observe MIG devices | CDI refresh |
+| Template | Total ready | MIG create | Register MIG devices | CDI refresh |
 | --- | ---: | ---: | ---: | ---: |
 | `7` | 1.816s | 0.315s | 1.359s | 0.271s |
 | `4+3` | 2.101s | 0.502s | 1.409s | 0.276s |
@@ -70,7 +70,7 @@ Readiness definitions:
 
 The table contains every partial source-target pair that is executable against the controller-observed NVIDIA placement layout. The preserved slots are not deleted or recreated by the runtime controller.
 
-| From | To | Preserved slots | Total ready | MIG delete+create | MIG delete | MIG create | Observe MIG devices |
+| From | To | Preserved slots | Total ready | MIG delete+create | MIG delete | MIG create | Register MIG devices |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | `4+3` | `4+2+1` | `4g [0,4)` | 2.689s | 0.946s | 0.195s | 0.751s | 1.591s |
 | `4+3` | `4+1+1+1` | `4g [0,4)` | 2.843s | 0.769s | 0.139s | 0.630s | 1.896s |

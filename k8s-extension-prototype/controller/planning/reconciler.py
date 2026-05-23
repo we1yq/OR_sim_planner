@@ -201,7 +201,7 @@ def reconcile_migplan_once(
         scenario_root=scenario_root,
         client=client,
     )
-    scenario.transition["transitionPlanner"] = str(spec.get("planner", "phase_greedy"))
+    scenario.transition["transitionPlanner"] = str(spec.get("planner", "effect_aware_dag"))
     source_state = None
     if spec.get("sourceStateConfigMap"):
         source_state = load_cluster_state_from_configmap(
@@ -830,7 +830,7 @@ def _validate_supported_spec(spec: dict[str, Any]) -> None:
     if bool(spec.get("dryRun", True)) is not True:
         raise ValueError("Only dryRun MigPlan reconciliation is supported")
     try:
-        canonical_planner_name(str(spec.get("planner", "phase_greedy")))
+        canonical_planner_name(str(spec.get("planner", "effect_aware_dag")))
     except ValueError as exc:
         raise ValueError(
             "Unsupported planner. See migrant_core.transition_planners.PLANNER_CATALOG "
