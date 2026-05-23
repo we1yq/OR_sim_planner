@@ -3,22 +3,7 @@ set -u
 
 GPU_INDEX="${GPU_INDEX:-0}"
 
-PROFILE_IDS_7="0"
-PROFILE_IDS_4_3="5,9"
-PROFILE_IDS_4_2_1="5,14,19"
-PROFILE_IDS_4_1_1_1="5,19,19,19"
-PROFILE_IDS_3_3="9,9"
-PROFILE_IDS_3_2_1="9,14,19"
-PROFILE_IDS_3_1_1_1="9,19,19,19"
-PROFILE_IDS_3_2_2="9,14,14"
-PROFILE_IDS_3_2_1_1="9,14,19,19"
-PROFILE_IDS_3_1_1_1_1="9,19,19,19,19"
-PROFILE_IDS_2_2_2_1="14,14,14,19"
-PROFILE_IDS_2_2_1_1_1="14,14,19,19,19"
-PROFILE_IDS_2_1_1_1_1_1="14,19,19,19,19,19"
-PROFILE_IDS_1_1_1_1_1_1_1="19,19,19,19,19,19,19"
-
-TEMPLATES="7 4+3 4+2+1 4+1+1+1 3+3 3+2+1 3+1+1+1 3+2+2 3+2+1+1 3+1+1+1+1 2+2+2+1 2+2+1+1+1 2+1+1+1+1+1 1+1+1+1+1+1+1"
+TEMPLATES="7 4+3 4+2+1 4+1+1+1 3+3 3+2+1 3+1+1+1 2+2+3 3+2+1+1 3+1+1+1+1 2+2+2+1 2+2+1+1+1 2+1+1+1+1+1 1+1+1+1+1+1+1"
 
 usage() {
     cat <<'EOF'
@@ -27,7 +12,7 @@ fast_mig_node_agent.sh: minimal local MIG actuator for A100 40GB experiments
 Usage:
   fast_mig_node_agent.sh list
   fast_mig_node_agent.sh clear [--gpu-index N]
-  fast_mig_node_agent.sh apply TEMPLATE [--gpu-index N]
+  fast_mig_node_agent.sh apply-slots CREATE_SPEC [--gpu-index N]
   fast_mig_node_agent.sh benchmark [--gpu-index N]
 
 Templates:
@@ -38,7 +23,7 @@ Templates:
   3+3
   3+2+1
   3+1+1+1
-  3+2+2
+  2+2+3
   3+2+1+1
   3+1+1+1+1
   2+2+2+1
@@ -66,24 +51,45 @@ elapsed_seconds() {
     awk -v a="$1" -v b="$2" 'BEGIN { printf "%.3f", b - a }'
 }
 
-template_to_ids() {
+template_to_slot_spec() {
     case "$1" in
-        7) echo "$PROFILE_IDS_7" ;;
-        4+3) echo "$PROFILE_IDS_4_3" ;;
-        4+2+1) echo "$PROFILE_IDS_4_2_1" ;;
-        4+1+1+1) echo "$PROFILE_IDS_4_1_1_1" ;;
-        3+3) echo "$PROFILE_IDS_3_3" ;;
-        3+2+1) echo "$PROFILE_IDS_3_2_1" ;;
-        3+1+1+1) echo "$PROFILE_IDS_3_1_1_1" ;;
-        3+2+2) echo "$PROFILE_IDS_3_2_2" ;;
-        3+2+1+1) echo "$PROFILE_IDS_3_2_1_1" ;;
-        3+1+1+1+1) echo "$PROFILE_IDS_3_1_1_1_1" ;;
-        2+2+2+1) echo "$PROFILE_IDS_2_2_2_1" ;;
-        2+2+1+1+1) echo "$PROFILE_IDS_2_2_1_1_1" ;;
-        2+1+1+1+1+1) echo "$PROFILE_IDS_2_1_1_1_1_1" ;;
-        1+1+1+1+1+1+1) echo "$PROFILE_IDS_1_1_1_1_1_1_1" ;;
+        7) echo "0:8:7g" ;;
+        4+3) echo "0:4:4g,4:4:3g" ;;
+        4+2+1) echo "0:4:4g,4:2:2g,6:1:1g" ;;
+        4+1+1+1) echo "0:4:4g,4:1:1g,5:1:1g,6:1:1g" ;;
+        3+3) echo "0:4:3g,4:4:3g" ;;
+        3+2+1) echo "0:4:3g,4:2:2g,6:1:1g" ;;
+        3+1+1+1) echo "0:4:3g,4:1:1g,5:1:1g,6:1:1g" ;;
+        2+2+3) echo "0:2:2g,2:2:2g,4:4:3g" ;;
+        3+2+1+1) echo "0:2:2g,2:1:1g,3:1:1g,4:4:3g" ;;
+        3+1+1+1+1) echo "0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g" ;;
+        2+2+2+1) echo "0:2:2g,2:2:2g,4:2:2g,6:1:1g" ;;
+        2+2+1+1+1) echo "0:2:2g,2:1:1g,3:1:1g,4:2:2g,6:1:1g" ;;
+        2+1+1+1+1+1) echo "0:2:2g,2:1:1g,3:1:1g,4:1:1g,5:1:1g,6:1:1g" ;;
+        1+1+1+1+1+1+1) echo "0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:1:1g,5:1:1g,6:1:1g" ;;
         *) return 1 ;;
     esac
+}
+
+slot_spec_to_ids() {
+    echo "$1" | awk -F, '
+      function profile_id(profile) {
+        if (profile == "7g") return "0"
+        if (profile == "4g") return "5"
+        if (profile == "3g") return "9"
+        if (profile == "2g") return "14"
+        if (profile == "1g") return "19"
+        return ""
+      }
+      {
+        for (i = 1; i <= NF; i++) {
+          split($i, parts, ":")
+          id = profile_id(parts[3])
+          if (id == "" || parts[1] == "") exit 2
+          out = out (out == "" ? "" : ",") id ":" parts[1]
+        }
+        print out
+      }'
 }
 
 require_tools() {
@@ -97,9 +103,9 @@ clear_mig() {
     nvidia-smi mig -dgi -i "$GPU_INDEX" >/dev/null 2>&1 || true
 }
 
-apply_template() {
-    template="$1"
-    ids="$(template_to_ids "$template")" || die "unknown template: $template"
+apply_slots() {
+    create_spec="$1"
+    ids="$(slot_spec_to_ids "$create_spec")" || die "invalid create spec: $create_spec"
     clear_mig
     start="$(now_seconds)"
     output="$(nvidia-smi mig -cgi "$ids" -C -i "$GPU_INDEX" 2>&1)"
@@ -108,16 +114,17 @@ apply_template() {
     elapsed="$(elapsed_seconds "$start" "$end")"
     if [ "$rc" -ne 0 ]; then
         echo "$output" >&2
-        echo "RESULT|apply|$template|$ids|$elapsed|CREATE_FAILED"
+        echo "RESULT|apply-slots|$create_spec|$ids|$elapsed|CREATE_FAILED"
         exit "$rc"
     fi
     echo "$output"
-    echo "RESULT|apply|$template|$ids|$elapsed|OK"
+    echo "RESULT|apply-slots|$create_spec|$ids|$elapsed|OK"
 }
 
 benchmark_template() {
     template="$1"
-    ids="$(template_to_ids "$template")" || die "unknown template: $template"
+    create_spec="$(template_to_slot_spec "$template")" || die "unknown template: $template"
+    ids="$(slot_spec_to_ids "$create_spec")" || die "invalid slot spec for template: $template"
     clear_mig
     create_start="$(now_seconds)"
     create_output="$(nvidia-smi mig -cgi "$ids" -C -i "$GPU_INDEX" 2>&1)"
@@ -180,11 +187,14 @@ main() {
             nvidia-smi -L
             ;;
         apply)
-            [ "$#" -gt 0 ] || die "apply requires TEMPLATE"
-            template="$1"
+            die "apply TEMPLATE has been removed; use apply-slots CREATE_SPEC"
+            ;;
+        apply-slots)
+            [ "$#" -gt 0 ] || die "apply-slots requires CREATE_SPEC"
+            create_spec="$1"
             shift
             parse_gpu_index "$@"
-            apply_template "$template"
+            apply_slots "$create_spec"
             nvidia-smi -L
             ;;
         benchmark)

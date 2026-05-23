@@ -79,7 +79,17 @@ def partial_reconfig_template_targets() -> dict[str, list[str]]:
 
 
 def agent_slot_spec(slots: tuple[Slot, ...] | list[Slot]) -> str:
-    return ",".join(f"{start}:{end - start}:{profile}" for start, end, profile in slots)
+    return ",".join(f"{start}:{agent_placement_size(start, end, profile)}:{profile}" for start, end, profile in slots)
+
+
+def agent_placement_size(start: int, end: int, profile: str) -> int:
+    """Return the A100 placement size used by nvidia-smi MIG slot commands."""
+
+    if profile == "7g":
+        return 8
+    if profile == "3g":
+        return 4
+    return int(end) - int(start)
 
 
 def _templates_have_partial_pair(src_name: str, tgt_name: str) -> bool:

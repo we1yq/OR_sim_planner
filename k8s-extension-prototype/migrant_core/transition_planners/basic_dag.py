@@ -4,8 +4,8 @@ import time
 from typing import Any
 
 from ..physical_ids import PHYSICAL_ID_POOL, bootstrap_physical_ids_for_state, ensure_state_metadata, get_physical_id
-from ..partial_reconfig import PartialReconfigPlan, build_partial_reconfig_plan
-from ..state import ClusterState, MigInstance, deepcopy_state, get_inst_by_slot, gpu_map_by_id
+from ..partial_reconfig import PartialReconfigPlan, agent_slot_spec, build_partial_reconfig_plan
+from ..state import ClusterState, GPUState, MigInstance, deepcopy_state, get_inst_by_slot, gpu_map_by_id
 from ..transition_common import (
     alloc_from_free_pool,
     classify_gpu_change,
@@ -215,7 +215,7 @@ def _build_final_actions(
                 target_state,
                 gpu_id,
                 old_physical_id,
-                tgt_gpu.template_str(),
+                tgt_gpu,
             )
             continue
         new_physical_id = alloc_from_free_pool(free_pool)
@@ -227,14 +227,14 @@ def _build_final_actions(
             gpu_id,
             old_physical_id,
             new_physical_id,
-            tgt_gpu.template_str(),
+            tgt_gpu,
         )
         free_pool.append(old_physical_id)
 
     for gpu_id in create_ids:
         tgt_gpu = tgt_map[gpu_id]
         physical_id = alloc_from_free_pool(free_pool)
-        _append_create_target_gpu_actions(actions, plan_items, gpu_id, physical_id, tgt_gpu.template_str())
+        _append_create_target_gpu_actions(actions, plan_items, gpu_id, physical_id, tgt_gpu)
 
     return _coalesce_slot_delete_pods(actions), plan_items
 
@@ -251,6 +251,15 @@ def _coalesce_slot_delete_pods(actions: list[dict[str, Any]]) -> list[dict[str, 
     """
 
     return actions
+
+
+def _gpu_create_spec(gpu: GPUState) -> str:
+    slots = [
+        (int(inst.start), int(inst.end), str(inst.profile))
+        for inst in gpu.instances
+        if str(inst.profile) != "void"
+    ]
+    return agent_slot_spec(slots)
 
 
 def _slot_tuple(value: Any) -> tuple[int, int, str] | None:
@@ -293,8 +302,10 @@ def _append_create_target_gpu_actions(
     plan_items: list[dict[str, Any]],
     gpu_id: int,
     physical_id: str,
-    template: str,
+    target_gpu: GPUState,
 ) -> None:
+    template = target_gpu.template_str()
+    create_spec = _gpu_create_spec(target_gpu)
     root = f"CREATE_gpu{gpu_id}"
     common = {"transitionMode": "create_target_gpu", "abstractRoot": root}
     actions.extend(
@@ -314,6 +325,7 @@ def _append_create_target_gpu_actions(
                 logical_gpu_id=gpu_id,
                 pendingLogicalGpuId=gpu_id,
                 template=template,
+                createSpec=create_spec,
                 **common,
             ),
             _action(
@@ -328,7 +340,7 @@ def _append_create_target_gpu_actions(
             *_tag_actions(_target_activation_actions(gpu_id, physical_id), common),
         ]
     )
-    plan_items.append(_plan_item(root, "create_target_gpu", gpu_id, physical_id, template=template))
+    plan_items.append(_plan_item(root, "create_target_gpu", gpu_id, physical_id, template=template, createSpec=create_spec))
 
 
 def _append_delete_gpu_actions(
@@ -394,9 +406,11 @@ def _append_in_place_reconfiguration_actions(
     target_state: ClusterState,
     gpu_id: int,
     physical_id: str,
-    template: str,
+    target_gpu: GPUState,
 ) -> None:
     src_gpu = gpu_map_by_id(source_state)[gpu_id]
+    template = target_gpu.template_str()
+    create_spec = _gpu_create_spec(target_gpu)
     root = f"INPLACE_RECONF_gpu{gpu_id}"
     common = {"transitionMode": "in_place_reconfiguration", "abstractRoot": root}
     slots = [(inst.start, inst.end, inst.profile) for inst in _nonfree_instances(src_gpu)]
@@ -437,6 +451,7 @@ def _append_in_place_reconfiguration_actions(
                 logical_gpu_id=gpu_id,
                 pendingLogicalGpuId=gpu_id,
                 template=template,
+                createSpec=create_spec,
                 **common,
             ),
             _action(
@@ -451,7 +466,7 @@ def _append_in_place_reconfiguration_actions(
             *_tag_actions(_target_activation_actions(gpu_id, physical_id), common),
         ]
     )
-    plan_items.append(_plan_item(root, "in_place_reconfiguration", gpu_id, physical_id, template=template))
+    plan_items.append(_plan_item(root, "in_place_reconfiguration", gpu_id, physical_id, template=template, createSpec=create_spec))
 
 
 def _append_partial_reconfiguration_actions(
@@ -582,9 +597,11 @@ def _append_bridge_reconfiguration_actions(
     gpu_id: int,
     old_physical_id: str,
     new_physical_id: str,
-    template: str,
+    target_gpu: GPUState,
 ) -> None:
     src_gpu = gpu_map_by_id(source_state)[gpu_id]
+    template = target_gpu.template_str()
+    create_spec = _gpu_create_spec(target_gpu)
     root = f"BRIDGE_RECONF_gpu{gpu_id}"
     common = {"transitionMode": "bridge_reconfiguration", "abstractRoot": root}
     actions.extend(
@@ -604,6 +621,7 @@ def _append_bridge_reconfiguration_actions(
                 logical_gpu_id=gpu_id,
                 pendingLogicalGpuId=gpu_id,
                 template=template,
+                createSpec=create_spec,
                 **common,
             ),
         ]
@@ -667,6 +685,7 @@ def _append_bridge_reconfiguration_actions(
             old_physical_id,
             target_physical_gpu_id=new_physical_id,
             template=template,
+            createSpec=create_spec,
         )
     )
 

@@ -54,21 +54,21 @@ type slotSpec struct {
 	InstanceID string
 }
 
-var templates = map[string]string{
-	"7":             "0",
-	"4+3":           "5,9",
-	"4+2+1":         "5,14,19",
-	"4+1+1+1":       "5,19,19,19",
-	"3+3":           "9,9",
-	"3+2+1":         "9,14,19",
-	"3+1+1+1":       "9,19,19,19",
-	"3+2+2":         "9,14,14",
-	"3+2+1+1":       "9,14,19,19",
-	"3+1+1+1+1":     "9,19,19,19,19",
-	"2+2+2+1":       "14,14,14,19",
-	"2+2+1+1+1":     "14,14,19,19,19",
-	"2+1+1+1+1+1":   "14,19,19,19,19,19",
-	"1+1+1+1+1+1+1": "19,19,19,19,19,19,19",
+var templateSlotSpecs = map[string]string{
+	"7":             "0:8:7g",
+	"4+3":           "0:4:4g,4:4:3g",
+	"4+2+1":         "0:4:4g,4:2:2g,6:1:1g",
+	"4+1+1+1":       "0:4:4g,4:1:1g,5:1:1g,6:1:1g",
+	"3+3":           "0:4:3g,4:4:3g",
+	"3+2+1":         "0:4:3g,4:2:2g,6:1:1g",
+	"3+1+1+1":       "0:4:3g,4:1:1g,5:1:1g,6:1:1g",
+	"2+2+3":         "0:2:2g,2:2:2g,4:4:3g",
+	"3+2+1+1":       "0:2:2g,2:1:1g,3:1:1g,4:4:3g",
+	"3+1+1+1+1":     "0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g",
+	"2+2+2+1":       "0:2:2g,2:2:2g,4:2:2g,6:1:1g",
+	"2+2+1+1+1":     "0:2:2g,2:1:1g,3:1:1g,4:2:2g,6:1:1g",
+	"2+1+1+1+1+1":   "0:2:2g,2:1:1g,3:1:1g,4:1:1g,5:1:1g,6:1:1g",
+	"1+1+1+1+1+1+1": "0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:1:1g,5:1:1g,6:1:1g",
 }
 
 var profileToCreateID = map[string]string{
@@ -138,10 +138,14 @@ func main() {
 			os.Exit(1)
 		}
 	case "apply":
+		res := result{Command: command, GPUIndex: gpuIndex, Success: false, Message: "apply TEMPLATE has been removed; use apply-slots CREATE_SPEC"}
+		printResult(jsonOut, res)
+		os.Exit(2)
+	case "apply-slots":
 		if flag.NArg() != 2 {
-			fail(jsonOut, result{Command: command, GPUIndex: gpuIndex, Success: false, Message: "apply requires exactly one TEMPLATE"}, 2)
+			fail(jsonOut, result{Command: command, GPUIndex: gpuIndex, Success: false, Message: "apply-slots requires exactly one CREATE_SPEC"}, 2)
 		}
-		res := applyTemplate(gpuIndex, flag.Arg(1))
+		res := applySlots(gpuIndex, flag.Arg(1))
 		printResult(jsonOut, res)
 		if !res.Success {
 			os.Exit(1)
@@ -188,18 +192,26 @@ func main() {
 	}
 }
 
-func applyTemplate(gpuIndex, template string) result {
-	ids, ok := templates[template]
-	if !ok {
-		return result{Command: "apply", GPUIndex: gpuIndex, Template: template, Success: false, Message: "unknown template"}
+func applySlots(gpuIndex, createArg string) result {
+	command := "apply-slots"
+	createSpecs, err := parseSlotSpecs(createArg, false, true)
+	if err != nil {
+		return result{Command: command, GPUIndex: gpuIndex, Success: false, Message: "invalid create spec: " + err.Error()}
+	}
+	if len(createSpecs) == 0 {
+		return result{Command: command, GPUIndex: gpuIndex, Success: false, Message: "apply-slots requires at least one create slot"}
+	}
+	if err := rejectOverlaps("create", createSpecs); err != nil {
+		return result{Command: command, GPUIndex: gpuIndex, Success: false, Message: err.Error()}
 	}
 	clearMIG(gpuIndex)
+	createSpec := createSpecArg(createSpecs)
 	start := time.Now()
-	out, err := run("nvidia-smi", "mig", "-cgi", ids, "-C", "-i", gpuIndex)
+	out, err := run("nvidia-smi", "mig", "-cgi", createSpec, "-C", "-i", gpuIndex)
 	elapsed := time.Since(start).Seconds()
 	if err != nil {
 		clearMIG(gpuIndex)
-		return result{Command: "apply", GPUIndex: gpuIndex, Template: template, ProfileIDs: ids, CreateSeconds: elapsed, Success: false, Message: err.Error() + "\n" + out}
+		return result{Command: command, GPUIndex: gpuIndex, ProfileIDs: createSpec, CreateSeconds: elapsed, Success: false, Message: err.Error() + "\n" + out}
 	}
 	smi, smiErr := run("nvidia-smi", "-L")
 	msg := strings.TrimSpace(out)
@@ -210,11 +222,17 @@ func applyTemplate(gpuIndex, template string) result {
 	if giErr != nil {
 		msg = msg + "\npost-apply nvidia-smi mig -lgi failed: " + giErr.Error() + "\n" + rawGI
 	}
+	if giErr == nil {
+		for _, spec := range createSpecs {
+			if findInstanceBySlot(instances, spec) == nil {
+				return result{Command: command, GPUIndex: gpuIndex, ProfileIDs: createSpec, CreateSeconds: elapsed, Success: false, NvidiaSMIL: smi, MIGSlots: migSlotsFromObservation(smi, instances, gpuIndex), Message: "created slot does not exist after apply: " + formatSlot(spec)}
+			}
+		}
+	}
 	return result{
-		Command:       "apply",
+		Command:       command,
 		GPUIndex:      gpuIndex,
-		Template:      template,
-		ProfileIDs:    ids,
+		ProfileIDs:    createSpec,
 		CreateSeconds: elapsed,
 		Success:       smiErr == nil && giErr == nil,
 		Message:       msg,
@@ -224,7 +242,15 @@ func applyTemplate(gpuIndex, template string) result {
 }
 
 func benchmarkTemplate(gpuIndex, template string) result {
-	ids := templates[template]
+	createArg, ok := templateSlotSpecs[template]
+	if !ok {
+		return result{Command: "benchmark", GPUIndex: gpuIndex, Template: template, Success: false, Message: "unknown template"}
+	}
+	createSpecs, err := parseSlotSpecs(createArg, false, true)
+	if err != nil {
+		return result{Command: "benchmark", GPUIndex: gpuIndex, Template: template, Success: false, Message: "invalid template slot spec: " + err.Error()}
+	}
+	ids := createSpecArg(createSpecs)
 	clearMIG(gpuIndex)
 	createStart := time.Now()
 	out, err := run("nvidia-smi", "mig", "-cgi", ids, "-C", "-i", gpuIndex)
@@ -872,8 +898,8 @@ func acquireLock(path string) (func(), error) {
 }
 
 func templateNames() []string {
-	names := make([]string, 0, len(templates))
-	for name := range templates {
+	names := make([]string, 0, len(templateSlotSpecs))
+	for name := range templateSlotSpecs {
 		names = append(names, name)
 	}
 	sort.Slice(names, func(i, j int) bool {
@@ -883,7 +909,7 @@ func templateNames() []string {
 }
 
 func templateRank(name string) int {
-	order := []string{"7", "4+3", "4+2+1", "4+1+1+1", "3+3", "3+2+1", "3+1+1+1", "3+2+2", "3+2+1+1", "3+1+1+1+1", "2+2+2+1", "2+2+1+1+1", "2+1+1+1+1+1", "1+1+1+1+1+1+1"}
+	order := []string{"7", "4+3", "4+2+1", "4+1+1+1", "3+3", "3+2+1", "3+1+1+1", "2+2+3", "3+2+1+1", "3+1+1+1+1", "2+2+2+1", "2+2+1+1+1", "2+1+1+1+1+1", "1+1+1+1+1+1+1"}
 	for idx, item := range order {
 		if item == name {
 			return idx

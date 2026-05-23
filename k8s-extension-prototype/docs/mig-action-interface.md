@@ -151,6 +151,7 @@ executed_actions:
   - type: configure_full_template
     physical_gpu_id: C
     template: 4+3
+    createSpec: 0:4:4g,4:4:3g
   - type: place_target_layout
     gpu_id: 2
     physical_gpu_id: C

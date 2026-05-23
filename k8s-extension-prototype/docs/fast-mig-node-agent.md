@@ -7,6 +7,24 @@ MIG UUIDs and binds workloads by `NVIDIA_VISIBLE_DEVICES=<MIG-UUID>`.
 
 ## Slot Patch Contract
 
+`apply-slots` is the full-configuration entry point. It clears the target GPU
+and creates the exact physical placement requested by the planner:
+
+```bash
+fast-mig-node-agent -gpu-index 0 apply-slots \
+  0:4:4g,4:4:3g
+```
+
+This replaces the old `apply TEMPLATE` path. Template names are planner/UI
+labels only; hardware mutation must receive concrete `start:size:profile`
+slots so variants like `2+2+1+1+1` and `1+1+2+2+1` are distinguishable.
+
+On A100 40GB, `3g` and `7g` use hardware placement sizes larger than their
+logical slice counts:
+
+- `3g` is sent as size `4`;
+- `7g` is sent as size `8`.
+
 `patch-slots` executes a concrete slot rewrite:
 
 ```bash

@@ -25,7 +25,7 @@ spec:
         - operator: Exists
       containers:
         - name: agent
-          image: or-sim-fast-mig-node-agent:dev
+          image: or-sim-fast-mig-node-agent:apply-slots-20260523
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true

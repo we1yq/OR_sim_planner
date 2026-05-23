@@ -1275,7 +1275,8 @@ def _timeline_detail_lines(action: dict[str, Any], state: Any) -> list[str]:
     if action_type == "allocate_gpu":
         return [f"reserve {action.get('physical_gpu_id', '-')}", f"pending gpu{action.get('logical_gpu_id', action.get('gpu_id', '-'))}"]
     if action_type == "configure_full_template":
-        return [f"template {action.get('template', '-')}", "agent apply"]
+        create_spec = str(action.get("createSpec") or "-")
+        return [f"template {action.get('template', '-')}", f"apply-slots {create_spec}"[:64]]
     if action_type == "configure_partial_profile":
         return [f"template {action.get('template', '-')}", "agent patch-slots"]
     if action_type == "clear_template":

@@ -22,7 +22,7 @@ TEMPLATES = [
     "3+3",
     "3+2+1",
     "3+1+1+1",
-    "3+2+2",
+    "2+2+3",
     "3+2+1+1",
     "3+1+1+1+1",
     "2+2+2+1",
@@ -30,6 +30,23 @@ TEMPLATES = [
     "2+1+1+1+1+1",
     "1+1+1+1+1+1+1",
 ]
+
+TEMPLATE_SLOT_SPECS = {
+    "7": "0:8:7g",
+    "4+3": "0:4:4g,4:4:3g",
+    "4+2+1": "0:4:4g,4:2:2g,6:1:1g",
+    "4+1+1+1": "0:4:4g,4:1:1g,5:1:1g,6:1:1g",
+    "3+3": "0:4:3g,4:4:3g",
+    "3+2+1": "0:4:3g,4:2:2g,6:1:1g",
+    "3+1+1+1": "0:4:3g,4:1:1g,5:1:1g,6:1:1g",
+    "2+2+3": "0:2:2g,2:2:2g,4:4:3g",
+    "3+2+1+1": "0:2:2g,2:1:1g,3:1:1g,4:4:3g",
+    "3+1+1+1+1": "0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g",
+    "2+2+2+1": "0:2:2g,2:2:2g,4:2:2g,6:1:1g",
+    "2+2+1+1+1": "0:2:2g,2:1:1g,3:1:1g,4:2:2g,6:1:1g",
+    "2+1+1+1+1+1": "0:2:2g,2:1:1g,3:1:1g,4:1:1g,5:1:1g,6:1:1g",
+    "1+1+1+1+1+1+1": "0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:1:1g,5:1:1g,6:1:1g",
+}
 
 
 def main() -> int:
@@ -93,7 +110,8 @@ def apply_template_ready(args: argparse.Namespace, template: str, out_dir: Path)
     out_dir.mkdir(parents=True, exist_ok=True)
     start = time.monotonic()
     apply_wall_start = time.monotonic()
-    apply_result = agent_json(args, ["apply", template])
+    apply_result = agent_json(args, ["apply-slots", TEMPLATE_SLOT_SPECS[template]])
+    apply_result["template"] = template
     apply_wall = time.monotonic() - apply_wall_start
     write_json(out_dir / "apply.json", apply_result)
 

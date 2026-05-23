@@ -641,6 +641,7 @@ def _mig_label_smoke_status(
                 "type": "configure_full_template",
                 "physical_gpu_id": physical_gpu_id,
                 "template": target_template,
+                "createSpec": _agent_create_spec_from_instances(instances),
             },
             {"type": "place_target_layout", "gpu_id": 0, "physical_gpu_id": physical_gpu_id},
         ],
@@ -696,6 +697,22 @@ def _instances_from_template(template: str) -> list[dict]:
             }
         )
     return instances
+
+
+def _agent_create_spec_from_instances(instances: list[dict]) -> str:
+    parts = []
+    for inst in instances:
+        profile = str(inst.get("profile", ""))
+        if profile == "void":
+            continue
+        start = int(inst["start"])
+        size = int(inst["end"]) - start
+        if profile == "7g":
+            size = 8
+        elif profile == "3g":
+            size = 4
+        parts.append(f"{start}:{size}:{profile}")
+    return ",".join(parts)
 
 
 if __name__ == "__main__":

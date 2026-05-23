@@ -11,6 +11,7 @@ from .physical_ids import (
     get_physical_id,
     set_physical_id,
 )
+from .partial_reconfig import agent_slot_spec
 from .state import (
     ClusterState,
     GPUState,
@@ -79,6 +80,15 @@ def _workload_class_name(classes: dict[str, list[str]], workload: str | None) ->
         if workload in classes.get(class_name, []):
             return class_name
     return "unknown"
+
+
+def _gpu_create_spec(gpu: GPUState) -> str:
+    slots = [
+        (int(inst.start), int(inst.end), str(inst.profile))
+        for inst in gpu.instances
+        if str(inst.profile) != "void"
+    ]
+    return agent_slot_spec(slots)
 
 
 def _slot_token(gpu_id: int, slot: tuple[int, int, str]) -> str:
@@ -435,6 +445,7 @@ def simulate_transition_actions(
                 _reconfig_map(executed_state)[str(int(gpu_id))] = {
                     "physical_gpu_id": physical_id,
                     "template": action.get("template"),
+                    "createSpec": action.get("createSpec"),
                     "pendingLogicalGpuId": action.get("pendingLogicalGpuId", gpu_id),
                 }
             continue
@@ -903,6 +914,7 @@ def plan_full_action_plan(
                         logical_gpu_id=gpu_id,
                         pendingLogicalGpuId=gpu_id,
                         template=tgt_gpu.template_str(),
+                        createSpec=_gpu_create_spec(tgt_gpu),
                     ),
                     _action(
                         "bind_target_gpu",
@@ -1080,6 +1092,7 @@ def plan_full_action_plan(
                                 reconfigurationTarget=True,
                                 transitionMode="bridge",
                                 template=tgt_gpu.template_str(),
+                                createSpec=_gpu_create_spec(tgt_gpu),
                             ),
                         ]
                     )
@@ -1166,6 +1179,7 @@ def plan_full_action_plan(
                                 logical_gpu_id=gpu_id,
                                 pendingLogicalGpuId=gpu_id,
                                 template=tgt_gpu.template_str(),
+                                createSpec=_gpu_create_spec(tgt_gpu),
                             ),
                             _action(
                                 "bind_target_gpu",
