@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="430" viewBox="0 0 1220 430">
+<rect width="1220" height="430" fill="#F8FAFC"/>
+<text x="44" y="42" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700" fill="#172033">Ampere per-MIG UUID experiment timing v2</text>
+<text x="44" y="68" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#51606F">Time from ArrivalSnapshot. Total wall time: 13.076s. Executor-only time: 12.441s.</text>
+<rect x="80.0" y="115" width="46.91654718801651" height="24" rx="6" fill="#D7EAFB" stroke="#85929E"/>
+<text x="82.0" y="158" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="400" fill="#51606F">0.635s</text>
+<rect x="128.43180026986948" y="149" width="166.54366865926414" height="24" rx="6" fill="#FAD7A0" stroke="#85929E"/>
+<text x="134.43180026986948" y="166" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="700" fill="#172033">MIG apply</text>
+<text x="130.43180026986948" y="192" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="400" fill="#51606F">2.254s</text>
+<rect x="294.97679881140346" y="183" width="120.85046539485785" height="24" rx="6" fill="#D5F5E3" stroke="#85929E"/>
+<text x="300.97679881140346" y="200" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="700" fill="#172033">refresh CDI</text>
+<text x="296.97679881140346" y="226" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="400" fill="#51606F">1.636s</text>
+<rect x="415.8273380886096" y="217" width="85.1864953865446" height="24" rx="6" fill="#D6EAF8" stroke="#85929E"/>
+<text x="421.8273380886096" y="234" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="700" fill="#172033">resolve MIG UUIDs</text>
+<text x="417.8273380886096" y="260" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="400" fill="#51606F">1.153s</text>
+<rect x="501.01420288689593" y="251" width="186.3228598947715" height="24" rx="6" fill="#F9E79F" stroke="#85929E"/>
+<text x="507.01420288689593" y="268" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="700" fill="#172033">allocatable wait-all</text>
+<text x="503.01420288689593" y="294" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="400" fill="#51606F">2.522s</text>
+<rect x="717.8942109912213" y="285" width="2" height="24" rx="6" fill="#D2B4DE" stroke="#85929E"/>
+<text x="719.8942109912213" y="328" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="400" fill="#51606F">0.009s</text>
+<rect x="718.5468137739998" y="319" width="327.4238859074677" height="24" rx="6" fill="#AED6F1" stroke="#85929E"/>
+<text x="724.5468137739998" y="336" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="700" fill="#172033">runtime ready + CUDA verify</text>
+<text x="720.5468137739998" y="362" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="400" fill="#51606F">4.432s</text>
+<rect x="1045.9706996814675" y="353" width="2" height="24" rx="6" fill="#A9DFBF" stroke="#85929E"/>
+<text x="1047.9706996814675" y="396" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="400" fill="#51606F">0.002s</text>
+<line x1="80" y1="300" x2="1120" y2="300" stroke="#314151" stroke-width="2"/>
+<line x1="80.0" y1="293" x2="80.0" y2="307" stroke="#314151"/>
+<text x="73.0" y="327" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">0s</text>
+<line x1="227.7646966554171" y1="293" x2="227.7646966554171" y2="307" stroke="#314151"/>
+<text x="220.7646966554171" y="327" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">2s</text>
+<line x1="375.5293933108342" y1="293" x2="375.5293933108342" y2="307" stroke="#314151"/>
+<text x="368.5293933108342" y="327" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">4s</text>
+<line x1="523.2940899662514" y1="293" x2="523.2940899662514" y2="307" stroke="#314151"/>
+<text x="516.2940899662514" y="327" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">6s</text>
+<line x1="671.0587866216684" y1="293" x2="671.0587866216684" y2="307" stroke="#314151"/>
+<text x="664.0587866216684" y="327" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">8s</text>
+<line x1="818.8234832770856" y1="293" x2="818.8234832770856" y2="307" stroke="#314151"/>
+<text x="811.8234832770856" y="327" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">10s</text>
+<line x1="966.5881799325027" y1="293" x2="966.5881799325027" y2="307" stroke="#314151"/>
+<text x="959.5881799325027" y="327" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">12s</text>
+<line x1="1114.3528765879198" y1="293" x2="1114.3528765879198" y2="307" stroke="#314151"/>
+<text x="1107.3528765879198" y="327" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">14s</text>
+<circle cx="80.0" cy="300" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="126.91654718801651" cy="300" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="128.43180026986948" cy="300" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="294.9754689291336" cy="300" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="415.8272642062613" cy="300" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="501.01383347515423" cy="300" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="687.3370627816674" cy="300" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="718.5468137739998" cy="300" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="1045.9706996814675" cy="300" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="1046.1176516722912" cy="300" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<text x="44" y="375" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">Key change vs v1: per-MIG UUID resources are checked together; required stable polls reduced from 6 to 3.</text>
+<text x="44" y="398" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">Allocatable polls: 6 for 2 target UUID resources.</text>
+</svg>

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="560" viewBox="0 0 1160 560">
+  <defs>
+    <style>
+      .bg { fill: #f7f8fa; }
+      .panel { fill: #ffffff; stroke: #20242a; stroke-width: 1.5; rx: 8; }
+      .gpu { fill: #eef6ff; stroke: #2264a8; stroke-width: 1.5; rx: 8; }
+      .slot { fill: #e9f8ef; stroke: #27804f; stroke-width: 1.5; rx: 6; }
+      .runtime { fill: #fff4df; stroke: #9a6418; stroke-width: 1.5; rx: 6; }
+      .router { fill: #f0eefe; stroke: #6151b8; stroke-width: 1.5; rx: 8; }
+      .title { font: 700 22px sans-serif; fill: #16181c; }
+      .h { font: 700 16px sans-serif; fill: #16181c; }
+      .txt { font: 13px sans-serif; fill: #20242a; }
+      .small { font: 12px monospace; fill: #333840; }
+      .line { stroke: #555b65; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#555b65"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1160" height="560"/>
+  <text class="title" x="40" y="44">Ampere exact-slot v6 planned layout</text>
+
+  <rect class="panel" x="40" y="78" width="760" height="420"/>
+  <text class="h" x="68" y="112">node: ampere</text>
+  <text class="txt" x="68" y="136">2x NVIDIA A100-PCIE-40GB, both started empty, executor created one 1g MIG slot per GPU</text>
+
+  <rect class="gpu" x="80" y="172" width="300" height="250"/>
+  <text class="h" x="104" y="206">ampere-gpu0</text>
+  <text class="small" x="104" y="230">GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac</text>
+  <rect class="slot" x="104" y="262" width="240" height="70"/>
+  <text class="h" x="124" y="292">slot s4-5, profile 1g</text>
+  <text class="small" x="124" y="316">or-sim.io/ampere-gpu0-s4-5-1g</text>
+  <rect class="runtime" x="104" y="354" width="240" height="46"/>
+  <text class="h" x="124" y="383">llama-runtime :10681</text>
+
+  <rect class="gpu" x="460" y="172" width="300" height="250"/>
+  <text class="h" x="484" y="206">ampere-gpu1</text>
+  <text class="small" x="484" y="230">GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb</text>
+  <rect class="slot" x="484" y="262" width="240" height="70"/>
+  <text class="h" x="504" y="292">slot s4-5, profile 1g</text>
+  <text class="small" x="504" y="316">or-sim.io/ampere-gpu1-s4-5-1g</text>
+  <rect class="runtime" x="484" y="354" width="240" height="46"/>
+  <text class="h" x="504" y="383">gpt2-runtime :10682</text>
+
+  <rect class="router" x="860" y="196" width="240" height="164"/>
+  <text class="h" x="886" y="230">runtime-router</text>
+  <text class="txt" x="886" y="258">control-plane :10680</text>
+  <text class="small" x="886" y="294">llama -> ampere:10681</text>
+  <text class="small" x="886" y="320">gpt2  -> ampere:10682</text>
+
+  <path class="line" d="M 344 377 C 520 470, 790 420, 884 332"/>
+  <path class="line" d="M 724 377 C 805 390, 850 372, 884 334"/>
+</svg>

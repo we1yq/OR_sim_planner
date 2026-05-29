@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-model-runtime-prepull-NODE
+  namespace: or-sim
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: NODE
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: prepull
+          image: localhost:10690/migrant-model-runtime:go
+          imagePullPolicy: IfNotPresent
+          command:
+            - /model-runtime
+            - -h

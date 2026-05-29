@@ -1,0 +1,24 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-ampere-real-go-v1
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    migrant.io/experiment: ampere-real-go-v1
+spec:
+  source: experiment-arrival-rate
+  mode: static
+  epoch: "real-go-v1"
+  windowSeconds: 60
+  unit: requests_per_second
+  observedAt: "2026-05-28T00:00:00Z"
+  placement:
+    nodes:
+      - ampere
+  targetArrival:
+    llama: 0.77
+    gpt2: 0.20
+  requestCount:
+    llama: 46
+    gpt2: 12

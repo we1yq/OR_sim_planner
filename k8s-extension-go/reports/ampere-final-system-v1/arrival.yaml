@@ -1,0 +1,39 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"mig.or-sim.io/v1alpha1","kind":"ArrivalSnapshot","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"migrant-go","experiment.or-sim.io/name":"ampere-final-system-v1"},"name":"exp-ampere-final-system-v1","namespace":"or-sim"},"spec":{"calibrationOverlayRef":"physicalgpuregistry/default","currentAllocationRef":"physicalgpuregistry/default","epoch":"exp-ampere-final-system-v1","mode":"target","notes":["Ampere-only final-system experiment.","Planner must use Gurobi MILP, greedy target materialization, and effect-aware DAG.","Executor must execute the emitted action DAG and create exact-slot runtime Pods."],"placement":{"nodes":["ampere"]},"profileCatalogRef":"default","registeredSLOMs":{"gpt2":0.2,"llama":0.2},"source":"manual-experiment","targetArrival":{"gpt2":0.12,"llama":0.04},"triggerReason":"arrival-rate-change","unit":"requestsPerSecond","windowSeconds":60}}
+  creationTimestamp: "2026-05-28T10:20:25Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/name: migrant-go
+    experiment.or-sim.io/name: ampere-final-system-v1
+  name: exp-ampere-final-system-v1
+  namespace: or-sim
+  resourceVersion: "6178749"
+  uid: c96dfdf5-803f-44d1-b7c9-6a8cb6028e09
+spec:
+  calibrationOverlayRef: physicalgpuregistry/default
+  currentAllocationRef: physicalgpuregistry/default
+  epoch: exp-ampere-final-system-v1
+  mode: target
+  notes:
+  - Ampere-only final-system experiment.
+  - Planner must use Gurobi MILP, greedy target materialization, and effect-aware
+    DAG.
+  - Executor must execute the emitted action DAG and create exact-slot runtime Pods.
+  placement:
+    nodes:
+    - ampere
+  profileCatalogRef: default
+  registeredSLOMs:
+    gpt2: 0.2
+    llama: 0.2
+  source: manual-experiment
+  targetArrival:
+    gpt2: 0.12
+    llama: 0.04
+  triggerReason: arrival-rate-change
+  unit: requestsPerSecond
+  windowSeconds: 60

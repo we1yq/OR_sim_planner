@@ -1,0 +1,10 @@
+name: migrant-default
+dryRun: true
+gpuModel: NVIDIA A100 40GB
+migRulesRef: ../mig-rules/a100-40gb.yaml
+maxGpuCount: 9
+notes:
+  - The notebook MILP minimizes GPU count rather than using a fixed hard cap.
+  - The main simulation stages observed target GPU counts around 6, 9, 6, and 8.
+  - This mock policy uses 9 as the local simulation capacity ceiling.
+

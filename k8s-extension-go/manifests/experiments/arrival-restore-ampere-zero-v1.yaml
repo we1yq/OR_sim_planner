@@ -1,0 +1,31 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-restore-ampere-zero-v1
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    experiment.or-sim.io/name: restore-ampere-zero-v1
+spec:
+  epoch: exp-restore-ampere-zero-v1
+  source: manual-restore
+  mode: target
+  triggerReason: restore-ampere-to-available
+  currentAllocationRef: physicalgpuregistry/default
+  calibrationOverlayRef: physicalgpuregistry/default
+  profileCatalogRef: default
+  unit: requestsPerSecond
+  windowSeconds: 60
+  placement:
+    nodes:
+      - ampere
+  registeredSLOMs:
+    gpt2: 0.2
+    llama: 0.2
+    resnet50: 0.2
+  targetArrival:
+    gpt2: 0
+    llama: 0
+    resnet50: 0
+  notes:
+    - Formal all-zero arrival snapshot for restoring ampere GPUs to available state.

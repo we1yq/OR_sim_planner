@@ -1,0 +1,108 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: MigActionPlan
+metadata:
+  creationTimestamp: "2026-05-28T08:13:13Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/name: migrant-go
+    mig.or-sim.io/component: planner-controller
+  name: plan-exp-ampere-real-go-v1
+  namespace: or-sim
+  resourceVersion: "6144033"
+  uid: 49f3c8b1-3bfe-4318-8cf3-07fa4dadfbc8
+spec:
+  abstractActionPreview:
+    actions:
+    - batchSize: 1
+      gpu: ampere-gpu1
+      hostPort: 10682
+      model: gpt2
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu1-s0-1-1g
+      type: ensure_runtime
+    - batchSize: 1
+      gpu: ampere-gpu0
+      hostPort: 10681
+      model: llama
+      node: ampere
+      profile: 7g
+      slotResource: or-sim.io/ampere-gpu0-s0-8-7g
+      type: ensure_runtime
+    - type: sync_router_routes
+  actionCount: 3
+  executor: go-transition-executor
+  executorPreview:
+    arrivalSnapshotRef: exp-ampere-real-go-v1
+    desiredRuntimes:
+    - batchSize: 1
+      gpu: ampere-gpu1
+      hostPort: 10682
+      model: gpt2
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu1-s0-1-1g
+    - batchSize: 1
+      gpu: ampere-gpu0
+      hostPort: 10681
+      model: llama
+      node: ampere
+      profile: 7g
+      slotResource: or-sim.io/ampere-gpu0-s0-8-7g
+    targetArrival:
+      gpt2: 0.2
+      llama: 0.77
+  optimizerMetadata:
+    calibrationOverlay: null
+    candidateA100GPUs:
+    - gpu: ampere-gpu0
+      node: ampere
+    - gpu: ampere-gpu1
+      node: ampere
+    migRulesSource: embedded A100 40GB legal template catalog
+    objective: minimize active GPUs, then earlier candidate GPUs, then used placement
+      slices, then lower slot offsets, then larger SLO slack
+    planner: final-profile-layout-optimizer
+    profileSource: registered model profile catalog embedded in Go planner
+    selectedLayout:
+    - arrivalRate: 0.77
+      gpu: ampere-gpu0
+      model: llama
+      mu: 0.776891
+      node: ampere
+      profile: 7g
+      slotEnd: 8
+      slotResource: or-sim.io/ampere-gpu0-s0-8-7g
+      slotStart: 0
+      template: "7"
+    - arrivalRate: 0.2
+      gpu: ampere-gpu1
+      model: gpt2
+      mu: 1.131065
+      node: ampere
+      profile: 1g
+      slotEnd: 1
+      slotResource: or-sim.io/ampere-gpu1-s0-1-1g
+      slotStart: 0
+      template: 3+1+1+1+1
+  phaseGate: auto
+  podLifecyclePreview:
+    desiredRuntimes:
+    - batchSize: 1
+      gpu: ampere-gpu1
+      hostPort: 10682
+      model: gpt2
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu1-s0-1-1g
+    - batchSize: 1
+      gpu: ampere-gpu0
+      hostPort: 10681
+      model: llama
+      node: ampere
+      profile: 7g
+      slotResource: or-sim.io/ampere-gpu0-s0-8-7g
+  targetGpuCount: 2
+status:
+  message: planned by Go final optimization planner
+  phase: Planned

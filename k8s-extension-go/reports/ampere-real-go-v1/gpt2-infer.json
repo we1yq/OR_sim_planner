@@ -1,0 +1,1 @@
+{"batchSize":1,"input":{"max_tokens":8},"latencyMs":12.293,"model":"gpt2","output":{"text":"gpt2-runtime cuda-backed completion","tokens":8}}

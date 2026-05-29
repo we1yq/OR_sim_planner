@@ -110,6 +110,9 @@ spec:
                 validated:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+                transitionExecution:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
                 observedGeneration:
                   type: integer
       subresources:

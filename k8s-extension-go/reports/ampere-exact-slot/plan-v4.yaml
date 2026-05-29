@@ -1,0 +1,75 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: MigActionPlan
+metadata:
+  creationTimestamp: "2026-05-28T06:11:01Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/name: migrant-go
+    mig.or-sim.io/component: planner-controller
+  name: plan-exp-ampere-exact-slot-v4
+  namespace: or-sim
+  resourceVersion: "6109158"
+  uid: ba22546d-263a-49ff-8783-9ac0f1c26e55
+spec:
+  abstractActionPreview:
+    actions:
+    - batchSize: 2
+      gpu: ampere-gpu0
+      hostPort: 10681
+      model: llama
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu0-s4-5-1g
+      type: ensure_runtime
+    - batchSize: 4
+      gpu: ampere-gpu1
+      hostPort: 10682
+      model: gpt2
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu1-s4-5-1g
+      type: ensure_runtime
+    - type: sync_router_routes
+  actionCount: 3
+  executor: go-transition-executor
+  executorPreview:
+    arrivalSnapshotRef: exp-ampere-exact-slot-v4
+    desiredRuntimes:
+    - batchSize: 2
+      gpu: ampere-gpu0
+      hostPort: 10681
+      model: llama
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu0-s4-5-1g
+    - batchSize: 4
+      gpu: ampere-gpu1
+      hostPort: 10682
+      model: gpt2
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu1-s4-5-1g
+    targetArrival:
+      gpt2: 0.12
+      llama: 0.04
+  phaseGate: auto
+  podLifecyclePreview:
+    desiredRuntimes:
+    - batchSize: 2
+      gpu: ampere-gpu0
+      hostPort: 10681
+      model: llama
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu0-s4-5-1g
+    - batchSize: 4
+      gpu: ampere-gpu1
+      hostPort: 10682
+      model: gpt2
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu1-s4-5-1g
+  targetGpuCount: 3
+status:
+  message: planned by Go final planner
+  phase: Planned

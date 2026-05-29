@@ -1,0 +1,1 @@
+{"generatedAt":"2026-05-28T08:18:17.628244766Z","models":[{"arrivalRate":0,"avgLatencyMs":36,"errorRate":0,"errors":0,"inflight":0,"model":"llama","queued":0,"requests":2},{"arrivalRate":0,"avgLatencyMs":12.5,"errorRate":0,"errors":0,"inflight":0,"model":"gpt2","queued":0,"requests":2}],"windowSeconds":60}

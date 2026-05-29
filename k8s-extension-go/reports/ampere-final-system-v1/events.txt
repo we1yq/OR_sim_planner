@@ -1,0 +1,243 @@
+LAST SEEN   TYPE      REASON                     OBJECT                                                           MESSAGE
+42m         Normal    Scheduled                  pod/migrant-go-control-plane-build-or-sim-control-plane-zzp66    Successfully assigned or-sim/migrant-go-control-plane-build-or-sim-control-plane-zzp66 to or-sim-control-plane
+42m         Normal    Pulled                     pod/migrant-go-control-plane-build-or-sim-control-plane-zzp66    Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+42m         Normal    Created                    pod/migrant-go-control-plane-build-or-sim-control-plane-zzp66    Created container: kaniko
+42m         Normal    SuccessfulCreate           job/migrant-go-control-plane-build-or-sim-control-plane          Created pod: migrant-go-control-plane-build-or-sim-control-plane-zzp66
+42m         Normal    Pulled                     pod/migrant-go-planner-engine-build-or-sim-control-plane-zmj5b   Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+42m         Normal    Started                    pod/migrant-go-control-plane-build-or-sim-control-plane-zzp66    Started container kaniko
+42m         Normal    Scheduled                  pod/migrant-go-planner-engine-build-or-sim-control-plane-zmj5b   Successfully assigned or-sim/migrant-go-planner-engine-build-or-sim-control-plane-zmj5b to or-sim-control-plane
+42m         Normal    SuccessfulCreate           job/migrant-go-planner-engine-build-or-sim-control-plane         Created pod: migrant-go-planner-engine-build-or-sim-control-plane-zmj5b
+42m         Normal    Created                    pod/migrant-go-planner-engine-build-or-sim-control-plane-zmj5b   Created container: kaniko
+42m         Normal    Started                    pod/migrant-go-planner-engine-build-or-sim-control-plane-zmj5b   Started container kaniko
+42m         Normal    Completed                  job/migrant-go-planner-engine-build-or-sim-control-plane         Job completed
+41m         Normal    Completed                  job/migrant-go-control-plane-build-or-sim-control-plane          Job completed
+41m         Normal    ScalingReplicaSet          deployment/planner-controller                                    Scaled up replica set planner-controller-755d8ffc84 from 0 to 1
+41m         Normal    Scheduled                  pod/transition-executor-7bcf6cbd6c-697jd                         Successfully assigned or-sim/transition-executor-7bcf6cbd6c-697jd to or-sim-control-plane
+41m         Normal    Scheduled                  pod/planner-controller-755d8ffc84-2fzbq                          Successfully assigned or-sim/planner-controller-755d8ffc84-2fzbq to or-sim-control-plane
+41m         Normal    SuccessfulCreate           replicaset/transition-executor-7bcf6cbd6c                        Created pod: transition-executor-7bcf6cbd6c-697jd
+41m         Normal    ScalingReplicaSet          deployment/transition-executor                                   Scaled up replica set transition-executor-7bcf6cbd6c from 0 to 1
+41m         Normal    SuccessfulCreate           replicaset/planner-controller-755d8ffc84                         Created pod: planner-controller-755d8ffc84-2fzbq
+41m         Normal    Pulling                    pod/transition-executor-7bcf6cbd6c-697jd                         Pulling image "localhost:10690/migrant-control-plane:go"
+41m         Normal    Killing                    pod/transition-executor-6f4fdbb8ff-rpjh4                         Stopping container controller
+41m         Normal    Pulling                    pod/planner-controller-755d8ffc84-2fzbq                          Pulling image "localhost:10690/migrant-control-plane:go"
+41m         Normal    Pulled                     pod/planner-controller-755d8ffc84-2fzbq                          Successfully pulled image "localhost:10690/migrant-control-plane:go" in 259ms (259ms including waiting). Image size: 21903045 bytes.
+41m         Normal    Created                    pod/planner-controller-755d8ffc84-2fzbq                          Created container: controller
+41m         Normal    SuccessfulDelete           replicaset/planner-controller-6fdd976879                         Deleted pod: planner-controller-6fdd976879-6psql
+41m         Normal    Started                    pod/planner-controller-755d8ffc84-2fzbq                          Started container controller
+41m         Normal    ScalingReplicaSet          deployment/planner-controller                                    Scaled down replica set planner-controller-6fdd976879 from 1 to 0
+41m         Normal    SuccessfulDelete           replicaset/transition-executor-6f4fdbb8ff                        Deleted pod: transition-executor-6f4fdbb8ff-rpjh4
+41m         Normal    Pulled                     pod/transition-executor-7bcf6cbd6c-697jd                         Successfully pulled image "localhost:10690/migrant-control-plane:go" in 259ms (259ms including waiting). Image size: 21903045 bytes.
+41m         Normal    Created                    pod/transition-executor-7bcf6cbd6c-697jd                         Created container: controller
+41m         Normal    ScalingReplicaSet          deployment/transition-executor                                   Scaled down replica set transition-executor-6f4fdbb8ff from 1 to 0
+41m         Normal    Started                    pod/transition-executor-7bcf6cbd6c-697jd                         Started container controller
+41m         Normal    Killing                    pod/planner-controller-6fdd976879-6psql                          Stopping container controller
+41m         Normal    ScalingReplicaSet          deployment/planner-engine                                        Scaled up replica set planner-engine-855796ff8b from 0 to 1
+41m         Normal    Scheduled                  pod/planner-engine-855796ff8b-59jkg                              Successfully assigned or-sim/planner-engine-855796ff8b-59jkg to or-sim-control-plane
+41m         Normal    Pulling                    pod/planner-engine-855796ff8b-59jkg                              Pulling image "localhost:10690/migrant-planner-engine:go"
+41m         Normal    SuccessfulCreate           replicaset/planner-engine-855796ff8b                             Created pod: planner-engine-855796ff8b-59jkg
+41m         Normal    Pulled                     pod/planner-engine-855796ff8b-59jkg                              Successfully pulled image "localhost:10690/migrant-planner-engine:go" in 3.183s (3.183s including waiting). Image size: 116521097 bytes.
+41m         Normal    Started                    pod/planner-engine-855796ff8b-59jkg                              Started container planner-engine
+41m         Normal    Created                    pod/planner-engine-855796ff8b-59jkg                              Created container: planner-engine
+40m         Normal    Killing                    pod/llama-runtime-f595b4d67-n2c4c                                Stopping container runtime
+40m         Normal    Killing                    pod/gpt2-runtime-67bdbbdf58-65m2l                                Stopping container runtime
+34m         Normal    Scheduled                  pod/migrant-go-planner-engine-build-or-sim-control-plane-pcxqb   Successfully assigned or-sim/migrant-go-planner-engine-build-or-sim-control-plane-pcxqb to or-sim-control-plane
+34m         Normal    SuccessfulCreate           job/migrant-go-planner-engine-build-or-sim-control-plane         Created pod: migrant-go-planner-engine-build-or-sim-control-plane-pcxqb
+34m         Normal    Created                    pod/migrant-go-planner-engine-build-or-sim-control-plane-pcxqb   Created container: kaniko
+34m         Normal    Pulled                     pod/migrant-go-planner-engine-build-or-sim-control-plane-pcxqb   Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+34m         Normal    Started                    pod/migrant-go-planner-engine-build-or-sim-control-plane-pcxqb   Started container kaniko
+34m         Normal    Completed                  job/migrant-go-planner-engine-build-or-sim-control-plane         Job completed
+33m         Normal    SuccessfulDelete           replicaset/planner-engine-855796ff8b                             Deleted pod: planner-engine-855796ff8b-59jkg
+33m         Normal    Killing                    pod/planner-engine-855796ff8b-59jkg                              Stopping container planner-engine
+33m         Normal    ScalingReplicaSet          deployment/planner-engine                                        Scaled down replica set planner-engine-855796ff8b from 1 to 0
+33m         Normal    Pulling                    pod/transition-executor-5948ff6545-xds75                         Pulling image "localhost:10690/migrant-control-plane:go"
+33m         Normal    Started                    pod/transition-executor-5948ff6545-xds75                         Started container controller
+33m         Normal    Scheduled                  pod/transition-executor-5948ff6545-xds75                         Successfully assigned or-sim/transition-executor-5948ff6545-xds75 to or-sim-control-plane
+33m         Normal    ScalingReplicaSet          deployment/transition-executor                                   Scaled up replica set transition-executor-5948ff6545 from 0 to 1
+33m         Normal    Pulled                     pod/transition-executor-5948ff6545-xds75                         Successfully pulled image "localhost:10690/migrant-control-plane:go" in 23ms (23ms including waiting). Image size: 21903045 bytes.
+33m         Normal    Created                    pod/transition-executor-5948ff6545-xds75                         Created container: controller
+33m         Normal    SuccessfulCreate           replicaset/transition-executor-5948ff6545                        Created pod: transition-executor-5948ff6545-xds75
+33m         Normal    SuccessfulDelete           replicaset/transition-executor-7bcf6cbd6c                        Deleted pod: transition-executor-7bcf6cbd6c-697jd
+33m         Normal    Killing                    pod/transition-executor-7bcf6cbd6c-697jd                         Stopping container controller
+33m         Normal    ScalingReplicaSet          deployment/transition-executor                                   Scaled down replica set transition-executor-7bcf6cbd6c from 1 to 0
+32m         Normal    SuccessfulCreate           replicaset/planner-engine-85994dd8dc                             Created pod: planner-engine-85994dd8dc-fqzdt
+32m         Normal    Scheduled                  pod/planner-engine-85994dd8dc-fqzdt                              Successfully assigned or-sim/planner-engine-85994dd8dc-fqzdt to or-sim-control-plane
+32m         Normal    Pulling                    pod/planner-engine-85994dd8dc-fqzdt                              Pulling image "localhost:10690/migrant-planner-engine:go"
+32m         Normal    ScalingReplicaSet          deployment/planner-engine                                        Scaled up replica set planner-engine-85994dd8dc from 0 to 1
+32m         Normal    Created                    pod/planner-engine-85994dd8dc-fqzdt                              Created container: planner-engine
+32m         Normal    Pulled                     pod/planner-engine-85994dd8dc-fqzdt                              Successfully pulled image "localhost:10690/migrant-planner-engine:go" in 2.05s (2.05s including waiting). Image size: 116522313 bytes.
+32m         Normal    Started                    pod/planner-engine-85994dd8dc-fqzdt                              Started container planner-engine
+31m         Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-5pkwn                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-5pkwn to ampere
+31m         Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-5pkwn
+31m         Normal    ScalingReplicaSet          deployment/gpt2-runtime                                          Scaled up replica set gpt2-runtime-78cd7b4b56 from 0 to 1
+31m         Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-zd5tm                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-zd5tm to ampere
+31m         Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-zd5tm
+31m         Normal    ScalingReplicaSet          deployment/llama-runtime                                         Scaled up replica set llama-runtime-fc6f5dd9 from 0 to 1
+31m         Normal    Pulled                     pod/gpt2-runtime-78cd7b4b56-zd5tm                                Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+31m         Normal    Created                    pod/gpt2-runtime-78cd7b4b56-zd5tm                                Created container: runtime
+31m         Normal    Started                    pod/gpt2-runtime-78cd7b4b56-zd5tm                                Started container runtime
+30m         Normal    Created                    pod/llama-runtime-fc6f5dd9-5pkwn                                 Created container: runtime
+30m         Normal    Pulled                     pod/llama-runtime-fc6f5dd9-5pkwn                                 Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+30m         Normal    Started                    pod/llama-runtime-fc6f5dd9-5pkwn                                 Started container runtime
+29m         Normal    SuccessfulCreate           job/migrant-go-planner-engine-build-or-sim-control-plane         Created pod: migrant-go-planner-engine-build-or-sim-control-plane-lp9rg
+29m         Normal    Scheduled                  pod/migrant-go-planner-engine-build-or-sim-control-plane-lp9rg   Successfully assigned or-sim/migrant-go-planner-engine-build-or-sim-control-plane-lp9rg to or-sim-control-plane
+29m         Normal    Pulled                     pod/migrant-go-planner-engine-build-or-sim-control-plane-lp9rg   Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+29m         Normal    Created                    pod/migrant-go-planner-engine-build-or-sim-control-plane-lp9rg   Created container: kaniko
+29m         Normal    Started                    pod/migrant-go-planner-engine-build-or-sim-control-plane-lp9rg   Started container kaniko
+29m         Normal    Killing                    pod/planner-engine-85994dd8dc-fqzdt                              Stopping container planner-engine
+29m         Normal    ScalingReplicaSet          deployment/planner-engine                                        Scaled down replica set planner-engine-85994dd8dc from 1 to 0
+29m         Normal    Completed                  job/migrant-go-planner-engine-build-or-sim-control-plane         Job completed
+29m         Normal    SuccessfulDelete           replicaset/planner-engine-85994dd8dc                             Deleted pod: planner-engine-85994dd8dc-fqzdt
+28m         Normal    SuccessfulCreate           replicaset/planner-engine-5c6d799b5c                             Created pod: planner-engine-5c6d799b5c-fg5jj
+28m         Normal    Scheduled                  pod/planner-engine-5c6d799b5c-fg5jj                              Successfully assigned or-sim/planner-engine-5c6d799b5c-fg5jj to or-sim-control-plane
+28m         Normal    ScalingReplicaSet          deployment/planner-engine                                        Scaled up replica set planner-engine-5c6d799b5c from 0 to 1
+28m         Normal    Pulling                    pod/planner-engine-5c6d799b5c-fg5jj                              Pulling image "localhost:10690/migrant-planner-engine:go"
+28m         Warning   Unhealthy                  pod/planner-engine-85994dd8dc-fqzdt                              Readiness probe failed: Get "http://10.42.0.96:8080/healthz": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+28m         Normal    Pulled                     pod/planner-engine-5c6d799b5c-fg5jj                              Successfully pulled image "localhost:10690/migrant-planner-engine:go" in 2.1s (2.1s including waiting). Image size: 116520176 bytes.
+28m         Normal    Created                    pod/planner-engine-5c6d799b5c-fg5jj                              Created container: planner-engine
+28m         Normal    Started                    pod/planner-engine-5c6d799b5c-fg5jj                              Started container planner-engine
+28m         Normal    Killing                    pod/gpt2-runtime-78cd7b4b56-zd5tm                                Stopping container runtime
+28m         Normal    Killing                    pod/llama-runtime-fc6f5dd9-5pkwn                                 Stopping container runtime
+28m         Warning   Unhealthy                  pod/gpt2-runtime-78cd7b4b56-zd5tm                                Readiness probe failed: Get "http://115.145.135.205:10682/healthz": dial tcp 115.145.135.205:10682: connect: connection refused
+28m         Normal    ScalingReplicaSet          deployment/gpt2-runtime                                          Scaled up replica set gpt2-runtime-78cd7b4b56 from 0 to 1
+28m         Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-5vd5k
+28m         Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-5vd5k                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-5vd5k to ampere
+28m         Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-bln9h
+28m         Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-bln9h                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-bln9h to ampere
+28m         Normal    ScalingReplicaSet          deployment/llama-runtime                                         Scaled up replica set llama-runtime-fc6f5dd9 from 0 to 1
+27m         Normal    Started                    pod/gpt2-runtime-78cd7b4b56-5vd5k                                Started container runtime
+27m         Normal    Created                    pod/gpt2-runtime-78cd7b4b56-5vd5k                                Created container: runtime
+27m         Normal    Pulled                     pod/gpt2-runtime-78cd7b4b56-5vd5k                                Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+27m         Normal    Pulled                     pod/llama-runtime-fc6f5dd9-bln9h                                 Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+27m         Normal    Created                    pod/llama-runtime-fc6f5dd9-bln9h                                 Created container: runtime
+27m         Normal    Started                    pod/llama-runtime-fc6f5dd9-bln9h                                 Started container runtime
+9m25s       Normal    SuccessfulCreate           job/migrant-go-control-plane-build-or-sim-control-plane          Created pod: migrant-go-control-plane-build-or-sim-control-plane-sv5zx
+9m25s       Normal    Scheduled                  pod/migrant-go-control-plane-build-or-sim-control-plane-sv5zx    Successfully assigned or-sim/migrant-go-control-plane-build-or-sim-control-plane-sv5zx to or-sim-control-plane
+9m24s       Normal    Pulled                     pod/migrant-go-control-plane-build-or-sim-control-plane-sv5zx    Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+9m24s       Normal    Created                    pod/migrant-go-control-plane-build-or-sim-control-plane-sv5zx    Created container: kaniko
+9m24s       Normal    Started                    pod/migrant-go-control-plane-build-or-sim-control-plane-sv5zx    Started container kaniko
+8m18s       Normal    SuccessfulCreate           replicaset/transition-executor-7c5cb78949                        Created pod: transition-executor-7c5cb78949-2dcdq
+8m18s       Normal    Scheduled                  pod/transition-executor-7c5cb78949-2dcdq                         Successfully assigned or-sim/transition-executor-7c5cb78949-2dcdq to or-sim-control-plane
+8m18s       Normal    Completed                  job/migrant-go-control-plane-build-or-sim-control-plane          Job completed
+8m18s       Normal    ScalingReplicaSet          deployment/transition-executor                                   Scaled up replica set transition-executor-7c5cb78949 from 0 to 1
+8m17s       Normal    Pulled                     pod/transition-executor-7c5cb78949-2dcdq                         Successfully pulled image "localhost:10690/migrant-control-plane:go" in 245ms (245ms including waiting). Image size: 21914065 bytes.
+8m17s       Normal    Started                    pod/transition-executor-7c5cb78949-2dcdq                         Started container controller
+8m17s       Normal    Created                    pod/transition-executor-7c5cb78949-2dcdq                         Created container: controller
+8m17s       Normal    ScalingReplicaSet          deployment/transition-executor                                   Scaled down replica set transition-executor-5948ff6545 from 1 to 0
+8m17s       Normal    Pulling                    pod/transition-executor-7c5cb78949-2dcdq                         Pulling image "localhost:10690/migrant-control-plane:go"
+8m17s       Normal    SuccessfulDelete           replicaset/transition-executor-5948ff6545                        Deleted pod: transition-executor-5948ff6545-xds75
+8m17s       Normal    Killing                    pod/transition-executor-5948ff6545-xds75                         Stopping container controller
+7m51s       Normal    Killing                    pod/llama-runtime-fc6f5dd9-bln9h                                 Stopping container runtime
+7m51s       Normal    Killing                    pod/gpt2-runtime-78cd7b4b56-5vd5k                                Stopping container runtime
+7m24s       Warning   UnexpectedAdmissionError   pod/gpt2-runtime-78cd7b4b56-fqcwg                                Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s0-1-1g 0xc08e9a6100 {14014679571616784422 109669337540154 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m24s       Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-s2s8k
+7m24s       Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-4tbfr                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-4tbfr to ampere
+7m24s       Warning   UnexpectedAdmissionError   pod/gpt2-runtime-78cd7b4b56-4tbfr                                Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s0-1-1g 0xc08e9a6100 {14014679571616784422 109669337540154 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m24s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-mjfx8                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-mjfx8 to ampere
+7m24s       Normal    ScalingReplicaSet          deployment/llama-runtime                                         Scaled up replica set llama-runtime-fc6f5dd9 from 0 to 1
+7m24s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-mjfx8                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc10eeb1db0 {14014679571631467578 109669352223257 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m24s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-s2pc8                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-s2pc8 to ampere
+7m24s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-s2pc8                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc10eeb1db0 {14014679571631467578 109669352223257 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m24s       Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-4tbfr
+7m24s       Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-sx8sv
+7m24s       Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-fqcwg
+7m24s       Warning   UnexpectedAdmissionError   pod/gpt2-runtime-78cd7b4b56-sx8sv                                Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s0-1-1g 0xc08e9a6100 {14014679571616784422 109669337540154 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m24s       Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-sx8sv                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-sx8sv to ampere
+7m24s       Warning   UnexpectedAdmissionError   pod/gpt2-runtime-78cd7b4b56-s2s8k                                Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s0-1-1g 0xc08e9a6100 {14014679571616784422 109669337540154 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m24s       Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-jn24t                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-jn24t to ampere
+7m24s       Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-jn24t
+7m24s       Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-s2s8k                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-s2s8k to ampere
+7m24s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-zx8xk                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-zx8xk to ampere
+7m24s       Normal    ScalingReplicaSet          deployment/gpt2-runtime                                          Scaled up replica set gpt2-runtime-78cd7b4b56 from 0 to 1
+7m24s       Warning   UnexpectedAdmissionError   pod/gpt2-runtime-78cd7b4b56-jn24t                                Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s0-1-1g 0xc08e9a6100 {14014679571616784422 109669337540154 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m24s       Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-57dgw
+7m24s       Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-mjfx8
+7m24s       Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-s2pc8
+7m24s       Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-zx8xk
+7m24s       Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-fqcwg                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-fqcwg to ampere
+7m24s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-zx8xk                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc10eeb1db0 {14014679571631467578 109669352223257 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m24s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-vw2gp                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc10eeb1db0 {14014679571631467578 109669352223257 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m24s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-vw2gp                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-vw2gp to ampere
+7m24s       Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-vw2gp
+7m24s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-57dgw                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc10eeb1db0 {14014679571631467578 109669352223257 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m24s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-57dgw                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-57dgw to ampere
+7m23s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-vcp8r                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc062679560 {14014679572523478656 109670244234393 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m23s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-sr265                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc062679560 {14014679572523478656 109670244234393 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m23s       Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-vcp8r
+7m23s       Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-sr265
+7m23s       Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-xcndg
+7m23s       Warning   UnexpectedAdmissionError   pod/gpt2-runtime-78cd7b4b56-dlck9                                Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s0-1-1g 0xc107904f28 {14014679572488811860 109670209567592 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m23s       Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-4wcx4
+7m23s       Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-5cdrn
+7m23s       Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-57pv8
+7m23s       Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-dlck9
+7m23s       Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-dlck9                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-dlck9 to ampere
+7m23s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-vcp8r                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-vcp8r to ampere
+7m23s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-sr265                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-sr265 to ampere
+7m23s       Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-4wcx4                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-4wcx4 to ampere
+7m23s       Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-57pv8                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-57pv8 to ampere
+7m23s       Warning   UnexpectedAdmissionError   pod/gpt2-runtime-78cd7b4b56-5cdrn                                Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s0-1-1g 0xc107904f28 {14014679572488811860 109670209567592 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m23s       Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-5cdrn                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-5cdrn to ampere
+7m23s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-xcndg                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc062679560 {14014679572523478656 109670244234393 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m23s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-xcndg                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-xcndg to ampere
+7m23s       Warning   UnexpectedAdmissionError   pod/gpt2-runtime-78cd7b4b56-57pv8                                Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s0-1-1g 0xc107904f28 {14014679572488811860 109670209567592 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+7m22s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-z84rk                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-z84rk to ampere
+7m22s       Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-z84rk
+6m47s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-62mzh                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc0582a4028 {14014679610306745379 109705372795419 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+6m47s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-cnhcv                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-cnhcv to ampere
+6m47s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-wmpwh                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc0582a4028 {14014679610306745379 109705372795419 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+6m47s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-xsr8w                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-xsr8w to ampere
+6m47s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-xsr8w                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc0582a4028 {14014679610306745379 109705372795419 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+6m47s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-z84rk                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc0582a4028 {14014679610306745379 109705372795419 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+6m47s       Normal    Created                    pod/gpt2-runtime-78cd7b4b56-4wcx4                                Created container: runtime
+6m47s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-cnhcv                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc0582a4028 {14014679610306745379 109705372795419 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+6m47s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-h4kpz                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc0582a4028 {14014679610306745379 109705372795419 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+6m47s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-mjpkf                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-mjpkf to ampere
+6m47s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-62mzh                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-62mzh to ampere
+6m47s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-l9jh8                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc0582a4028 {14014679610306745379 109705372795419 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+6m47s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-l9jh8                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-l9jh8 to ampere
+6m47s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-7ngzj                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-7ngzj to ampere
+6m47s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-wmpwh                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-wmpwh to ampere
+6m47s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-mjpkf                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc0582a4028 {14014679610306745379 109705372795419 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+6m47s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-kp949                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-kp949 to ampere
+6m47s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-tbgzz                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc0582a4028 {14014679610306745379 109705372795419 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+6m47s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-tbgzz                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-tbgzz to ampere
+6m47s       Warning   UnexpectedAdmissionError   pod/llama-runtime-fc6f5dd9-7ngzj                                 Allocate failed due to endpoint &{{0 0} or-sim.io/ampere-gpu0-s4-8-3g 0xc0582a4028 {14014679610306745379 109705372795419 0x4ffd6e0} <nil>} has been stopped, which is unexpected
+6m47s       Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                (combined from similar events): Created pod: llama-runtime-fc6f5dd9-kp949
+6m47s       Normal    Started                    pod/gpt2-runtime-78cd7b4b56-4wcx4                                Started container runtime
+6m47s       Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-h4kpz                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-h4kpz to ampere
+6m47s       Normal    Pulled                     pod/gpt2-runtime-78cd7b4b56-4wcx4                                Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+6m13s       Normal    Created                    pod/llama-runtime-fc6f5dd9-kp949                                 Created container: runtime
+6m13s       Normal    Pulled                     pod/llama-runtime-fc6f5dd9-kp949                                 Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+6m12s       Normal    Started                    pod/llama-runtime-fc6f5dd9-kp949                                 Started container runtime
+4m24s       Normal    SuccessfulCreate           job/migrant-go-control-plane-build-or-sim-control-plane          Created pod: migrant-go-control-plane-build-or-sim-control-plane-j7g55
+4m24s       Normal    Scheduled                  pod/migrant-go-control-plane-build-or-sim-control-plane-j7g55    Successfully assigned or-sim/migrant-go-control-plane-build-or-sim-control-plane-j7g55 to or-sim-control-plane
+4m24s       Normal    Pulled                     pod/migrant-go-control-plane-build-or-sim-control-plane-j7g55    Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+4m24s       Normal    Started                    pod/migrant-go-control-plane-build-or-sim-control-plane-j7g55    Started container kaniko
+4m24s       Normal    Created                    pod/migrant-go-control-plane-build-or-sim-control-plane-j7g55    Created container: kaniko
+3m17s       Normal    Completed                  job/migrant-go-control-plane-build-or-sim-control-plane          Job completed
+3m17s       Normal    Scheduled                  pod/transition-executor-6db7c6897-4fbfd                          Successfully assigned or-sim/transition-executor-6db7c6897-4fbfd to or-sim-control-plane
+3m17s       Normal    SuccessfulCreate           replicaset/transition-executor-6db7c6897                         Created pod: transition-executor-6db7c6897-4fbfd
+3m17s       Normal    ScalingReplicaSet          deployment/transition-executor                                   Scaled up replica set transition-executor-6db7c6897 from 0 to 1
+3m16s       Normal    Pulled                     pod/transition-executor-6db7c6897-4fbfd                          Successfully pulled image "localhost:10690/migrant-control-plane:go" in 250ms (250ms including waiting). Image size: 21911427 bytes.
+3m16s       Normal    ScalingReplicaSet          deployment/transition-executor                                   Scaled down replica set transition-executor-7c5cb78949 from 1 to 0
+3m16s       Normal    SuccessfulDelete           replicaset/transition-executor-7c5cb78949                        Deleted pod: transition-executor-7c5cb78949-2dcdq
+3m16s       Normal    Pulling                    pod/transition-executor-6db7c6897-4fbfd                          Pulling image "localhost:10690/migrant-control-plane:go"
+3m16s       Normal    Killing                    pod/transition-executor-7c5cb78949-2dcdq                         Stopping container controller
+3m16s       Normal    Started                    pod/transition-executor-6db7c6897-4fbfd                          Started container controller
+3m16s       Normal    Created                    pod/transition-executor-6db7c6897-4fbfd                          Created container: controller
+2m24s       Normal    Killing                    pod/llama-runtime-fc6f5dd9-kp949                                 Stopping container runtime
+2m24s       Warning   Unhealthy                  pod/gpt2-runtime-78cd7b4b56-4wcx4                                Readiness probe failed: Get "http://115.145.135.205:10682/healthz": dial tcp 115.145.135.205:10682: connect: connection refused
+2m24s       Normal    Killing                    pod/gpt2-runtime-78cd7b4b56-4wcx4                                Stopping container runtime
+2m24s       Warning   Unhealthy                  pod/llama-runtime-fc6f5dd9-kp949                                 Readiness probe failed: Get "http://115.145.135.205:10681/healthz": dial tcp 115.145.135.205:10681: connect: connection refused
+99s         Normal    Scheduled                  pod/llama-runtime-fc6f5dd9-cv2l5                                 Successfully assigned or-sim/llama-runtime-fc6f5dd9-cv2l5 to ampere
+99s         Normal    ScalingReplicaSet          deployment/llama-runtime                                         Scaled up replica set llama-runtime-fc6f5dd9 from 0 to 1
+99s         Normal    SuccessfulCreate           replicaset/llama-runtime-fc6f5dd9                                Created pod: llama-runtime-fc6f5dd9-cv2l5
+99s         Normal    Scheduled                  pod/gpt2-runtime-78cd7b4b56-hfs2z                                Successfully assigned or-sim/gpt2-runtime-78cd7b4b56-hfs2z to ampere
+99s         Normal    ScalingReplicaSet          deployment/gpt2-runtime                                          Scaled up replica set gpt2-runtime-78cd7b4b56 from 0 to 1
+99s         Normal    SuccessfulCreate           replicaset/gpt2-runtime-78cd7b4b56                               Created pod: gpt2-runtime-78cd7b4b56-hfs2z
+64s         Normal    Pulled                     pod/gpt2-runtime-78cd7b4b56-hfs2z                                Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+64s         Normal    Created                    pod/gpt2-runtime-78cd7b4b56-hfs2z                                Created container: runtime
+64s         Normal    Started                    pod/gpt2-runtime-78cd7b4b56-hfs2z                                Started container runtime
+30s         Normal    Created                    pod/llama-runtime-fc6f5dd9-cv2l5                                 Created container: runtime
+30s         Normal    Pulled                     pod/llama-runtime-fc6f5dd9-cv2l5                                 Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+30s         Normal    Started                    pod/llama-runtime-fc6f5dd9-cv2l5                                 Started container runtime

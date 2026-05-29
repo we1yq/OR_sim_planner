@@ -1,0 +1,1728 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: MigActionPlan
+metadata:
+  creationTimestamp: "2026-05-29T05:15:13Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/name: migrant-go
+    mig.or-sim.io/component: planner-controller
+  name: plan-exp-ampere-per-mig-uuid-v2
+  namespace: or-sim
+  resourceVersion: "6515267"
+  uid: 2308c4c3-6b8a-4ca1-bbf0-4fffdc057d13
+spec:
+  abstractActions:
+  - abstractAction: Allocate GPU
+    abstractRoot: CREATE_gpu1
+    actionKey: 0000:CREATE_gpu1:allocate_gpu
+    gpu_id: 1
+    logical_gpu_id: 1
+    pendingLogicalGpuId: 1
+    physical_gpu_id: ampere-gpu0
+    physicalGpuEffect:
+      physicalGpuId: ampere-gpu0
+      type: acquire
+    transitionMode: create_target_gpu
+    type: allocate_gpu
+  - abstractAction: Configure Template
+    abstractRoot: CREATE_gpu1
+    actionKey: 0001:CREATE_gpu1:configure_full_template
+    createSpec: 0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g
+    gpu_id: 1
+    logical_gpu_id: 1
+    migEffect:
+      template: 1+1+1+1+3
+      type: create_mig_slot
+    pendingLogicalGpuId: 1
+    physical_gpu_id: ampere-gpu0
+    template: 1+1+1+1+3
+    transitionMode: create_target_gpu
+    type: configure_full_template
+  - abstractAction: Bind GPU
+    abstractRoot: CREATE_gpu1
+    actionKey: 0002:CREATE_gpu1:bind_target_gpu
+    activeLogicalGpuId: 1
+    clearsPendingLogicalGpuId: true
+    gpu_id: 1
+    logical_gpu_id: 1
+    physical_gpu_id: ampere-gpu0
+    transitionMode: create_target_gpu
+    type: bind_target_gpu
+  - abstractAction: Register MIG devices
+    abstractRoot: CREATE_gpu1
+    actionKey: 0003:CREATE_gpu1:register_mig_devices
+    gpu_id: 1
+    physical_gpu_id: ampere-gpu0
+    transitionMode: create_target_gpu
+    type: register_mig_devices
+  - abstractAction: Deploy Pods
+    abstractRoot: CREATE_gpu1
+    actionKey: 0004:CREATE_gpu1:deploy_target_workloads
+    gpu_id: 1
+    physical_gpu_id: ampere-gpu0
+    transitionMode: create_target_gpu
+    type: deploy_target_workloads
+  - abstractAction: Activate Route
+    abstractRoot: CREATE_gpu1
+    actionKey: 0005:CREATE_gpu1:activate_serving_route
+    gpu_id: 1
+    physical_gpu_id: ampere-gpu0
+    producesCapacity:
+    - mu: 1.131065
+      slot:
+      - 0
+      - 1
+      - 1g
+      workload: gpt2
+    - mu: 0.740961
+      slot:
+      - 4
+      - 7
+      - 3g
+      workload: llama
+    routeEffect:
+      type: activate_route
+    transitionMode: create_target_gpu
+    type: activate_serving_route
+  actionCount: 6
+  actionDag:
+    actionCount: 6
+    criticalPathLength: 6
+    edgeCount: 5
+    name: epoch-exp-ampere-per-mig-uuid-v2-final
+    nodeCount: 6
+    nodes:
+    - action:
+        abstractAction: Allocate GPU
+        abstractRoot: CREATE_gpu1
+        actionKey: 0000:CREATE_gpu1:allocate_gpu
+        gpu_id: 1
+        logical_gpu_id: 1
+        pendingLogicalGpuId: 1
+        physical_gpu_id: ampere-gpu0
+        physicalGpuEffect:
+          physicalGpuId: ampere-gpu0
+          type: acquire
+        transitionMode: create_target_gpu
+        type: allocate_gpu
+      dependsOn: []
+      id: a0000_allocate_gpu_CREATE-gpu1
+      index: 0
+      operationClass: mig-geometry
+      phase: 0
+      resources:
+      - physical:ampere-gpu0
+      rootId: CREATE_gpu1
+    - action:
+        abstractAction: Configure Template
+        abstractRoot: CREATE_gpu1
+        actionKey: 0001:CREATE_gpu1:configure_full_template
+        createSpec: 0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g
+        gpu_id: 1
+        logical_gpu_id: 1
+        migEffect:
+          template: 1+1+1+1+3
+          type: create_mig_slot
+        pendingLogicalGpuId: 1
+        physical_gpu_id: ampere-gpu0
+        template: 1+1+1+1+3
+        transitionMode: create_target_gpu
+        type: configure_full_template
+      dependsOn:
+      - a0000_allocate_gpu_CREATE-gpu1
+      id: a0001_configure_full_template_CREATE-gpu1
+      index: 1
+      operationClass: mig-geometry
+      phase: 1
+      resources:
+      - physical:ampere-gpu0
+      rootId: CREATE_gpu1
+    - action:
+        abstractAction: Bind GPU
+        abstractRoot: CREATE_gpu1
+        actionKey: 0002:CREATE_gpu1:bind_target_gpu
+        activeLogicalGpuId: 1
+        clearsPendingLogicalGpuId: true
+        gpu_id: 1
+        logical_gpu_id: 1
+        physical_gpu_id: ampere-gpu0
+        transitionMode: create_target_gpu
+        type: bind_target_gpu
+      dependsOn:
+      - a0001_configure_full_template_CREATE-gpu1
+      id: a0002_bind_target_gpu_CREATE-gpu1
+      index: 2
+      operationClass: binding-state
+      phase: 2
+      resources:
+      - logical-binding:1
+      - physical:ampere-gpu0
+      rootId: CREATE_gpu1
+    - action:
+        abstractAction: Register MIG devices
+        abstractRoot: CREATE_gpu1
+        actionKey: 0003:CREATE_gpu1:register_mig_devices
+        gpu_id: 1
+        physical_gpu_id: ampere-gpu0
+        transitionMode: create_target_gpu
+        type: register_mig_devices
+      dependsOn:
+      - a0002_bind_target_gpu_CREATE-gpu1
+      id: a0003_register_mig_devices_CREATE-gpu1
+      index: 3
+      operationClass: mig-geometry
+      phase: 3
+      resources:
+      - mig-devices:1:ampere-gpu0
+      - physical:ampere-gpu0
+      rootId: CREATE_gpu1
+    - action:
+        abstractAction: Deploy Pods
+        abstractRoot: CREATE_gpu1
+        actionKey: 0004:CREATE_gpu1:deploy_target_workloads
+        gpu_id: 1
+        physical_gpu_id: ampere-gpu0
+        transitionMode: create_target_gpu
+        type: deploy_target_workloads
+      dependsOn:
+      - a0003_register_mig_devices_CREATE-gpu1
+      id: a0004_deploy_target_workloads_CREATE-gpu1
+      index: 4
+      operationClass: pod-lifecycle
+      phase: 4
+      resources:
+      - physical:ampere-gpu0
+      rootId: CREATE_gpu1
+    - action:
+        abstractAction: Activate Route
+        abstractRoot: CREATE_gpu1
+        actionKey: 0005:CREATE_gpu1:activate_serving_route
+        gpu_id: 1
+        physical_gpu_id: ampere-gpu0
+        producesCapacity:
+        - mu: 1.131065
+          slot:
+          - 0
+          - 1
+          - 1g
+          workload: gpt2
+        - mu: 0.740961
+          slot:
+          - 4
+          - 7
+          - 3g
+          workload: llama
+        routeEffect:
+          type: activate_route
+        transitionMode: create_target_gpu
+        type: activate_serving_route
+      dependsOn:
+      - a0004_deploy_target_workloads_CREATE-gpu1
+      id: a0005_activate_serving_route_CREATE-gpu1
+      index: 5
+      operationClass: router-drain
+      phase: 5
+      resources:
+      - physical:ampere-gpu0
+      rootId: CREATE_gpu1
+    phaseCount: 6
+    phases:
+    - actionCountsByType:
+        allocate_gpu: 1
+      name: phase-00
+      nodeCount: 1
+      nodeIds:
+      - a0000_allocate_gpu_CREATE-gpu1
+      operationClasses:
+        mig-geometry: 1
+      phase: 0
+      rootIds:
+      - CREATE_gpu1
+    - actionCountsByType:
+        configure_full_template: 1
+      name: phase-01
+      nodeCount: 1
+      nodeIds:
+      - a0001_configure_full_template_CREATE-gpu1
+      operationClasses:
+        mig-geometry: 1
+      phase: 1
+      rootIds:
+      - CREATE_gpu1
+    - actionCountsByType:
+        bind_target_gpu: 1
+      name: phase-02
+      nodeCount: 1
+      nodeIds:
+      - a0002_bind_target_gpu_CREATE-gpu1
+      operationClasses:
+        binding-state: 1
+      phase: 2
+      rootIds:
+      - CREATE_gpu1
+    - actionCountsByType:
+        register_mig_devices: 1
+      name: phase-03
+      nodeCount: 1
+      nodeIds:
+      - a0003_register_mig_devices_CREATE-gpu1
+      operationClasses:
+        mig-geometry: 1
+      phase: 3
+      rootIds:
+      - CREATE_gpu1
+    - actionCountsByType:
+        deploy_target_workloads: 1
+      name: phase-04
+      nodeCount: 1
+      nodeIds:
+      - a0004_deploy_target_workloads_CREATE-gpu1
+      operationClasses:
+        pod-lifecycle: 1
+      phase: 4
+      rootIds:
+      - CREATE_gpu1
+    - actionCountsByType:
+        activate_serving_route: 1
+      name: phase-05
+      nodeCount: 1
+      nodeIds:
+      - a0005_activate_serving_route_CREATE-gpu1
+      operationClasses:
+        router-drain: 1
+      phase: 5
+      rootIds:
+      - CREATE_gpu1
+    representation: migrant.phased-action-dag/v1
+    roots:
+    - nodeIds:
+      - a0000_allocate_gpu_CREATE-gpu1
+      - a0001_configure_full_template_CREATE-gpu1
+      - a0002_bind_target_gpu_CREATE-gpu1
+      - a0003_register_mig_devices_CREATE-gpu1
+      - a0004_deploy_target_workloads_CREATE-gpu1
+      - a0005_activate_serving_route_CREATE-gpu1
+      phaseSpan:
+        first: 0
+        last: 5
+      planItem:
+        blocked_by: null
+        createSpec: 0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g
+        current_phase: final_dag
+        gpu_id: 1
+        id: CREATE_gpu1
+        physical_gpu_id: ampere-gpu0
+        status: ready
+        template: 1+1+1+1+3
+        type: create_target_gpu
+      rootId: CREATE_gpu1
+  currentAllocationRef: physicalgpuregistries/default
+  executor: go-transition-executor
+  phaseGate: auto
+  plannerMetadata:
+    metrics:
+      actionCount: 6
+      elapsedSec: 0.0012352876365184784
+      feasibleOptionBuildElapsedSec: 0.06801116466522217
+      finalActiveGpu: 1
+      gpuCount: 1
+      iterationCount: 1
+      milpElapsedSec: 0.04152393341064453
+      peakActiveGpu: 1
+      sourceActiveGpu: 0
+      targetBuildElapsedSec: 0.0014073848724365234
+    pipeline: source -> feasible-options -> milp -> target-build -> effect_aware_dag
+      -> canonical-next-state
+    planner: original-gurobi-milp-greedy-repair-effect-aware-dag
+    plannerEngineElapsedSec: 0.12207970023155212
+    planningTrace:
+      canonicalization:
+        canonicalGpuCount: 1
+        canonicalPhysicalIds:
+          "0": ampere-gpu0
+        freePhysicalGpuPool:
+        - ampere-gpu1
+        note: Planner-engine canonicalization predicts the post-action state. The
+          transition-executor validates the actual post-action GPU/MIG state after
+          hardware execution.
+      currentStateFeasibility:
+        a100ValidLayout: true
+        capacityByWorkload:
+          gpt2: 0
+          llama: 0
+          resnet50: 0
+          vgg16: 0
+          vit_base: 0
+        feasible: false
+        gpuModel: A100
+        phase: ReconfigurationRequired
+        reasons:
+        - llama capacity 0 < target 0.04
+        - gpt2 capacity 0 < target 0.12
+        recommendedAction: plan
+        safetyFactor: 1
+        targetByWorkload:
+          gpt2: 0.12
+          llama: 0.04
+          resnet50: 0
+          vgg16: 0
+          vit_base: 0
+        workloads:
+        - currentCapacity: 0
+          requiredWithSafetyFactor: 0.04
+          satisfied: false
+          targetArrival: 0.04
+          workload: llama
+        - currentCapacity: 0
+          requiredWithSafetyFactor: 0.12
+          satisfied: false
+          targetArrival: 0.12
+          workload: gpt2
+        - currentCapacity: 0
+          requiredWithSafetyFactor: 0
+          satisfied: true
+          targetArrival: 0
+          workload: vgg16
+        - currentCapacity: 0
+          requiredWithSafetyFactor: 0
+          satisfied: true
+          targetArrival: 0
+          workload: resnet50
+        - currentCapacity: 0
+          requiredWithSafetyFactor: 0
+          satisfied: true
+          targetArrival: 0
+          workload: vit_base
+      feasibleOptions:
+        byProfile:
+        - optionCount: 11
+          profile: 1g
+        - optionCount: 14
+          profile: 2g
+        - optionCount: 18
+          profile: 3g
+        - optionCount: 18
+          profile: 4g
+        - optionCount: 20
+          profile: 7g
+        byWorkload:
+        - batches:
+          - 1
+          maxMu: 1.161905
+          optionCount: 5
+          profiles:
+          - 1g
+          - 2g
+          - 3g
+          - 4g
+          - 7g
+          workload: gpt2
+        - batches:
+          - 1
+          maxMu: 0.776891
+          optionCount: 3
+          profiles:
+          - 3g
+          - 4g
+          - 7g
+          workload: llama
+        - batches:
+          - 4
+          - 8
+          - 16
+          - 32
+          - 64
+          - 128
+          maxMu: 2867.974583
+          optionCount: 23
+          profiles:
+          - 1g
+          - 2g
+          - 3g
+          - 4g
+          - 7g
+          workload: resnet50
+        - batches:
+          - 4
+          - 8
+          - 16
+          - 32
+          - 64
+          maxMu: 1701.593649
+          optionCount: 18
+          profiles:
+          - 1g
+          - 2g
+          - 3g
+          - 4g
+          - 7g
+          workload: vgg16
+        - batches:
+          - 1
+          - 2
+          - 4
+          - 8
+          - 16
+          - 32
+          - 64
+          maxMu: 2676.491621
+          optionCount: 32
+          profiles:
+          - 1g
+          - 2g
+          - 3g
+          - 4g
+          - 7g
+          workload: vit_base
+        elapsedSec: 0.06801116466522217
+        optionCount: 81
+      inputs:
+        sourceGpuCount: 2
+        sourcePhysicalIds:
+          "0": ampere-gpu0
+          "1": ampere-gpu1
+        sourceStateRef: /app/mock/gpu-states/migrant-empty-9-a100.yaml
+        targetStateRef: target0
+        workloadCount: 5
+        workloads:
+        - delta: 0.04
+          name: llama
+          profileCatalogConfigMap: null
+          profileCatalogRef: /app/mock/profile-catalogs/llama.yaml
+          sourceArrival: 0
+          targetArrival: 0.04
+          workloadRef: /app/manifests/examples/workloadrequests/llama.yaml
+        - delta: 0.12
+          name: gpt2
+          profileCatalogConfigMap: null
+          profileCatalogRef: /app/mock/profile-catalogs/gpt2.yaml
+          sourceArrival: 0
+          targetArrival: 0.12
+          workloadRef: /app/manifests/examples/workloadrequests/gpt2.yaml
+        - delta: 0
+          name: vgg16
+          profileCatalogConfigMap: null
+          profileCatalogRef: /app/mock/profile-catalogs/vgg16.yaml
+          sourceArrival: 0
+          targetArrival: 0
+          workloadRef: /app/manifests/examples/workloadrequests/vgg16.yaml
+        - delta: 0
+          name: resnet50
+          profileCatalogConfigMap: null
+          profileCatalogRef: /app/mock/profile-catalogs/resnet50.yaml
+          sourceArrival: 0
+          targetArrival: 0
+          workloadRef: /app/manifests/examples/workloadrequests/resnet50.yaml
+        - delta: 0
+          name: vit_base
+          profileCatalogConfigMap: null
+          profileCatalogRef: /app/mock/profile-catalogs/vit_base.yaml
+          sourceArrival: 0
+          targetArrival: 0
+          workloadRef: /app/manifests/examples/workloadrequests/vit_base.yaml
+      milp:
+        KTotal:
+          1g: 4
+          2g: 0
+          3g: 1
+          4g: 0
+          7g: 0
+        allocSummary:
+        - arrival: 0.04
+          instanceCount: 1
+          instances:
+          - batch: 1
+            count: 1
+            mu: 0.740961
+            profile: 3g
+          provided: 0.740961
+          slack: 0.700961
+          workload: llama
+        - arrival: 0.12
+          instanceCount: 1
+          instances:
+          - batch: 1
+            count: 1
+            mu: 1.131065
+            profile: 1g
+          provided: 1.131065
+          slack: 1.0110649999999999
+          workload: gpt2
+        - arrival: 0
+          instanceCount: 0
+          instances: []
+          provided: 0
+          slack: 0
+          workload: vgg16
+        - arrival: 0
+          instanceCount: 0
+          instances: []
+          provided: 0
+          slack: 0
+          workload: resnet50
+        - arrival: 0
+          instanceCount: 0
+          instances: []
+          provided: 0
+          slack: 0
+          workload: vit_base
+        chosenTemplates:
+        - 3+1+1+1+1
+        elapsedSec: 0.04152393341064453
+        feasible: true
+        gpuCount: 1
+        method: MILP-Gurobi(batch)
+        objectiveGpuCount: 1
+        status: OPTIMAL
+        totalElasticSlack: 0
+        totalInstances: 2
+        totalRemainingSlots: 3
+        totalSlack: 1.7120259999999998
+        usedProfileTypes: 2
+      pipeline: source -> feasible-options -> milp -> target-build -> effect_aware_dag
+        -> canonical-next-state
+      scenario: epoch-exp-ampere-per-mig-uuid-v2
+      targetBuild:
+        elapsedSec: 0.0014073848724365234
+        method: greedy
+        orderedPhysicalTemplates:
+        - 1+1+1+1+3
+        physicalTemplateCount: 1
+        preservation:
+          collocatePairs: 0
+          exact: 0
+          mixedGpuCount: 1
+          sameGpu: 0
+          scoreTuple:
+          - 0
+          - 0
+          - -2
+          - 0
+          - -1
+          - 0
+          - 0
+          - 0
+          upgrade: 0
+        targetGpuCount: 1
+        targetPhysicalIds: {}
+      transition:
+        actionCount: 6
+        actionCountsByType:
+          activate_serving_route: 1
+          allocate_gpu: 1
+          bind_target_gpu: 1
+          configure_full_template: 1
+          deploy_target_workloads: 1
+          register_mig_devices: 1
+        candidateDecisions:
+        - candidates:
+          - actionTypes:
+            - allocate_gpu
+            - configure_full_template
+            - bind_target_gpu
+            - register_mig_devices
+            - deploy_target_workloads
+            - activate_serving_route
+            chosen: true
+            feasible: true
+            mode: create_gpu
+            rank: 0
+          chosenMode: create_gpu
+          gpuId: 1
+          type: create_gpu
+        elapsedSec: 0.0012352876365184784
+        executedPhysicalIds:
+          "1": ampere-gpu0
+        finalActiveGpu: 1
+        finalCoarseActions: []
+        finalPlanItems:
+        - blocked_by: null
+          createSpec: 0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g
+          current_phase: final_dag
+          gpu_id: 1
+          id: CREATE_gpu1
+          physical_gpu_id: ampere-gpu0
+          status: ready
+          template: 1+1+1+1+3
+          type: create_target_gpu
+        iterationCount: 1
+        iterations:
+        - actionCountsByType:
+            activate_serving_route: 1
+            allocate_gpu: 1
+            bind_target_gpu: 1
+            configure_full_template: 1
+            deploy_target_workloads: 1
+            register_mig_devices: 1
+          activeGpuAfter: 0
+          candidateActionCount: 6
+          candidateActionCountsByType:
+            activate_serving_route: 1
+            allocate_gpu: 1
+            bind_target_gpu: 1
+            configure_full_template: 1
+            deploy_target_workloads: 1
+            register_mig_devices: 1
+          candidateActions:
+          - abstractAction: Allocate GPU
+            abstractRoot: CREATE_gpu1
+            actionKey: 0000:CREATE_gpu1:allocate_gpu
+            gpu_id: 1
+            logical_gpu_id: 1
+            pendingLogicalGpuId: 1
+            physical_gpu_id: ampere-gpu0
+            physicalGpuEffect:
+              physicalGpuId: ampere-gpu0
+              type: acquire
+            transitionMode: create_target_gpu
+            type: allocate_gpu
+          - abstractAction: Configure Template
+            abstractRoot: CREATE_gpu1
+            actionKey: 0001:CREATE_gpu1:configure_full_template
+            createSpec: 0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g
+            gpu_id: 1
+            logical_gpu_id: 1
+            migEffect:
+              template: 1+1+1+1+3
+              type: create_mig_slot
+            pendingLogicalGpuId: 1
+            physical_gpu_id: ampere-gpu0
+            template: 1+1+1+1+3
+            transitionMode: create_target_gpu
+            type: configure_full_template
+          - abstractAction: Bind GPU
+            abstractRoot: CREATE_gpu1
+            actionKey: 0002:CREATE_gpu1:bind_target_gpu
+            activeLogicalGpuId: 1
+            clearsPendingLogicalGpuId: true
+            gpu_id: 1
+            logical_gpu_id: 1
+            physical_gpu_id: ampere-gpu0
+            transitionMode: create_target_gpu
+            type: bind_target_gpu
+          - abstractAction: Register MIG devices
+            abstractRoot: CREATE_gpu1
+            actionKey: 0003:CREATE_gpu1:register_mig_devices
+            gpu_id: 1
+            physical_gpu_id: ampere-gpu0
+            transitionMode: create_target_gpu
+            type: register_mig_devices
+          - abstractAction: Deploy Pods
+            abstractRoot: CREATE_gpu1
+            actionKey: 0004:CREATE_gpu1:deploy_target_workloads
+            gpu_id: 1
+            physical_gpu_id: ampere-gpu0
+            transitionMode: create_target_gpu
+            type: deploy_target_workloads
+          - abstractAction: Activate Route
+            abstractRoot: CREATE_gpu1
+            actionKey: 0005:CREATE_gpu1:activate_serving_route
+            gpu_id: 1
+            physical_gpu_id: ampere-gpu0
+            producesCapacity:
+            - mu: 1.131065
+              slot:
+              - 0
+              - 1
+              - 1g
+              workload: gpt2
+            - mu: 0.740961
+              slot:
+              - 4
+              - 7
+              - 3g
+              workload: llama
+            routeEffect:
+              type: activate_route
+            transitionMode: create_target_gpu
+            type: activate_serving_route
+          candidateDecisions:
+          - candidates:
+            - actionTypes:
+              - allocate_gpu
+              - configure_full_template
+              - bind_target_gpu
+              - register_mig_devices
+              - deploy_target_workloads
+              - activate_serving_route
+              chosen: true
+              feasible: true
+              mode: create_gpu
+              rank: 0
+            chosenMode: create_gpu
+            gpuId: 1
+            type: create_gpu
+          chosenActionCount: 6
+          chosenActions:
+          - abstractAction: Allocate GPU
+            abstractRoot: CREATE_gpu1
+            actionKey: 0000:CREATE_gpu1:allocate_gpu
+            gpu_id: 1
+            logical_gpu_id: 1
+            pendingLogicalGpuId: 1
+            physical_gpu_id: ampere-gpu0
+            physicalGpuEffect:
+              physicalGpuId: ampere-gpu0
+              type: acquire
+            transitionMode: create_target_gpu
+            type: allocate_gpu
+          - abstractAction: Configure Template
+            abstractRoot: CREATE_gpu1
+            actionKey: 0001:CREATE_gpu1:configure_full_template
+            createSpec: 0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g
+            gpu_id: 1
+            logical_gpu_id: 1
+            migEffect:
+              template: 1+1+1+1+3
+              type: create_mig_slot
+            pendingLogicalGpuId: 1
+            physical_gpu_id: ampere-gpu0
+            template: 1+1+1+1+3
+            transitionMode: create_target_gpu
+            type: configure_full_template
+          - abstractAction: Bind GPU
+            abstractRoot: CREATE_gpu1
+            actionKey: 0002:CREATE_gpu1:bind_target_gpu
+            activeLogicalGpuId: 1
+            clearsPendingLogicalGpuId: true
+            gpu_id: 1
+            logical_gpu_id: 1
+            physical_gpu_id: ampere-gpu0
+            transitionMode: create_target_gpu
+            type: bind_target_gpu
+          - abstractAction: Register MIG devices
+            abstractRoot: CREATE_gpu1
+            actionKey: 0003:CREATE_gpu1:register_mig_devices
+            gpu_id: 1
+            physical_gpu_id: ampere-gpu0
+            transitionMode: create_target_gpu
+            type: register_mig_devices
+          - abstractAction: Deploy Pods
+            abstractRoot: CREATE_gpu1
+            actionKey: 0004:CREATE_gpu1:deploy_target_workloads
+            gpu_id: 1
+            physical_gpu_id: ampere-gpu0
+            transitionMode: create_target_gpu
+            type: deploy_target_workloads
+          - abstractAction: Activate Route
+            abstractRoot: CREATE_gpu1
+            actionKey: 0005:CREATE_gpu1:activate_serving_route
+            gpu_id: 1
+            physical_gpu_id: ampere-gpu0
+            producesCapacity:
+            - mu: 1.131065
+              slot:
+              - 0
+              - 1
+              - 1g
+              workload: gpt2
+            - mu: 0.740961
+              slot:
+              - 4
+              - 7
+              - 3g
+              workload: llama
+            routeEffect:
+              type: activate_route
+            transitionMode: create_target_gpu
+            type: activate_serving_route
+          chosenRootCount: 0
+          chosenRoots: []
+          iterPeakActiveGpu: 0
+          iteration: 1
+          madeProgress: true
+          phasedActionPlan:
+            actionCount: 6
+            criticalPathLength: 6
+            edgeCount: 5
+            nodeCount: 6
+            phaseCount: 6
+            phases:
+            - actionCountsByType:
+                allocate_gpu: 1
+              nodeCount: 1
+              phase: 0
+              rootIds:
+              - CREATE_gpu1
+            - actionCountsByType:
+                configure_full_template: 1
+              nodeCount: 1
+              phase: 1
+              rootIds:
+              - CREATE_gpu1
+            - actionCountsByType:
+                bind_target_gpu: 1
+              nodeCount: 1
+              phase: 2
+              rootIds:
+              - CREATE_gpu1
+            - actionCountsByType:
+                register_mig_devices: 1
+              nodeCount: 1
+              phase: 3
+              rootIds:
+              - CREATE_gpu1
+            - actionCountsByType:
+                deploy_target_workloads: 1
+              nodeCount: 1
+              phase: 4
+              rootIds:
+              - CREATE_gpu1
+            - actionCountsByType:
+                activate_serving_route: 1
+              nodeCount: 1
+              phase: 5
+              rootIds:
+              - CREATE_gpu1
+            representation: migrant.phased-action-dag/v1
+          reachedTarget: true
+          stateAfter:
+            gpus:
+            - gpuId: 1
+              instances:
+              - batch: 1
+                end: 1
+                mu: 1.131065
+                preserved: false
+                profile: 1g
+                start: 0
+                workload: gpt2
+              - batch: null
+                end: 2
+                mu: 0
+                preserved: false
+                profile: 1g
+                start: 1
+                workload: null
+              - batch: null
+                end: 3
+                mu: 0
+                preserved: false
+                profile: 1g
+                start: 2
+                workload: null
+              - batch: null
+                end: 4
+                mu: 0
+                preserved: false
+                profile: 1g
+                start: 3
+                workload: null
+              - batch: 1
+                end: 7
+                mu: 0.740961
+                preserved: false
+                profile: 3g
+                start: 4
+                workload: llama
+              source: planned
+            metadata:
+              active_serving_routes:
+                "1":
+                  physical_gpu_id: ampere-gpu0
+                  status: active
+              deployed_target_workloads:
+                "1":
+                  physical_gpu_id: ampere-gpu0
+                  standby: false
+                  status: ready
+              free_physical_gpu_pool:
+              - ampere-gpu1
+              free_physical_gpu_pool_policy: lifo
+              next_physical_idx: 0
+              observed_mig_devices:
+                "1":
+                  physical_gpu_id: ampere-gpu0
+                  source: simulated-device-plugin
+              physical_id_map:
+                "1": ampere-gpu0
+              physicalGpuBindings:
+                ampere-gpu0:
+                  deviceIndex: 0
+                  nodeName: ampere
+                ampere-gpu1:
+                  deviceIndex: 1
+                  nodeName: ampere
+              source: go-cluster-state-manager
+              transition_draining_instances: {}
+              transition_reconfig_targets: {}
+              transition_runtime_instances:
+                1:0:1:1g:
+                  accepting_new: true
+                  inflight: 0
+                  queued: 0
+                  rerouted_to: null
+                1:4:7:3g:
+                  accepting_new: true
+                  inflight: 0
+                  queued: 0
+                  rerouted_to: null
+          stateBefore:
+            gpus:
+            - gpuId: 0
+              instances:
+              - batch: null
+                end: 7
+                mu: 0
+                preserved: false
+                profile: void
+                start: 0
+                workload: null
+              source: planned
+            - gpuId: 1
+              instances:
+              - batch: null
+                end: 7
+                mu: 0
+                preserved: false
+                profile: void
+                start: 0
+                workload: null
+              source: planned
+            metadata:
+              free_physical_gpu_pool:
+              - ampere-gpu0
+              - ampere-gpu1
+              free_physical_gpu_pool_policy: lifo
+              next_physical_idx: 0
+              physical_id_map:
+                "0": ampere-gpu0
+                "1": ampere-gpu1
+              physicalGpuBindings:
+                ampere-gpu0:
+                  deviceIndex: 0
+                  nodeName: ampere
+                ampere-gpu1:
+                  deviceIndex: 1
+                  nodeName: ampere
+              source: go-cluster-state-manager
+              transition_draining_instances: {}
+              transition_reconfig_targets: {}
+              transition_runtime_instances: {}
+        peakActiveGpu: 1
+        phasedActionPlan:
+          actionCount: 6
+          criticalPathLength: 6
+          edgeCount: 5
+          name: epoch-exp-ampere-per-mig-uuid-v2-final
+          nodeCount: 6
+          nodes:
+          - action:
+              abstractAction: Allocate GPU
+              abstractRoot: CREATE_gpu1
+              actionKey: 0000:CREATE_gpu1:allocate_gpu
+              gpu_id: 1
+              logical_gpu_id: 1
+              pendingLogicalGpuId: 1
+              physical_gpu_id: ampere-gpu0
+              physicalGpuEffect:
+                physicalGpuId: ampere-gpu0
+                type: acquire
+              transitionMode: create_target_gpu
+              type: allocate_gpu
+            dependsOn: []
+            id: a0000_allocate_gpu_CREATE-gpu1
+            index: 0
+            operationClass: mig-geometry
+            phase: 0
+            resources:
+            - physical:ampere-gpu0
+            rootId: CREATE_gpu1
+          - action:
+              abstractAction: Configure Template
+              abstractRoot: CREATE_gpu1
+              actionKey: 0001:CREATE_gpu1:configure_full_template
+              createSpec: 0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g
+              gpu_id: 1
+              logical_gpu_id: 1
+              migEffect:
+                template: 1+1+1+1+3
+                type: create_mig_slot
+              pendingLogicalGpuId: 1
+              physical_gpu_id: ampere-gpu0
+              template: 1+1+1+1+3
+              transitionMode: create_target_gpu
+              type: configure_full_template
+            dependsOn:
+            - a0000_allocate_gpu_CREATE-gpu1
+            id: a0001_configure_full_template_CREATE-gpu1
+            index: 1
+            operationClass: mig-geometry
+            phase: 1
+            resources:
+            - physical:ampere-gpu0
+            rootId: CREATE_gpu1
+          - action:
+              abstractAction: Bind GPU
+              abstractRoot: CREATE_gpu1
+              actionKey: 0002:CREATE_gpu1:bind_target_gpu
+              activeLogicalGpuId: 1
+              clearsPendingLogicalGpuId: true
+              gpu_id: 1
+              logical_gpu_id: 1
+              physical_gpu_id: ampere-gpu0
+              transitionMode: create_target_gpu
+              type: bind_target_gpu
+            dependsOn:
+            - a0001_configure_full_template_CREATE-gpu1
+            id: a0002_bind_target_gpu_CREATE-gpu1
+            index: 2
+            operationClass: binding-state
+            phase: 2
+            resources:
+            - logical-binding:1
+            - physical:ampere-gpu0
+            rootId: CREATE_gpu1
+          - action:
+              abstractAction: Register MIG devices
+              abstractRoot: CREATE_gpu1
+              actionKey: 0003:CREATE_gpu1:register_mig_devices
+              gpu_id: 1
+              physical_gpu_id: ampere-gpu0
+              transitionMode: create_target_gpu
+              type: register_mig_devices
+            dependsOn:
+            - a0002_bind_target_gpu_CREATE-gpu1
+            id: a0003_register_mig_devices_CREATE-gpu1
+            index: 3
+            operationClass: mig-geometry
+            phase: 3
+            resources:
+            - mig-devices:1:ampere-gpu0
+            - physical:ampere-gpu0
+            rootId: CREATE_gpu1
+          - action:
+              abstractAction: Deploy Pods
+              abstractRoot: CREATE_gpu1
+              actionKey: 0004:CREATE_gpu1:deploy_target_workloads
+              gpu_id: 1
+              physical_gpu_id: ampere-gpu0
+              transitionMode: create_target_gpu
+              type: deploy_target_workloads
+            dependsOn:
+            - a0003_register_mig_devices_CREATE-gpu1
+            id: a0004_deploy_target_workloads_CREATE-gpu1
+            index: 4
+            operationClass: pod-lifecycle
+            phase: 4
+            resources:
+            - physical:ampere-gpu0
+            rootId: CREATE_gpu1
+          - action:
+              abstractAction: Activate Route
+              abstractRoot: CREATE_gpu1
+              actionKey: 0005:CREATE_gpu1:activate_serving_route
+              gpu_id: 1
+              physical_gpu_id: ampere-gpu0
+              producesCapacity:
+              - mu: 1.131065
+                slot:
+                - 0
+                - 1
+                - 1g
+                workload: gpt2
+              - mu: 0.740961
+                slot:
+                - 4
+                - 7
+                - 3g
+                workload: llama
+              routeEffect:
+                type: activate_route
+              transitionMode: create_target_gpu
+              type: activate_serving_route
+            dependsOn:
+            - a0004_deploy_target_workloads_CREATE-gpu1
+            id: a0005_activate_serving_route_CREATE-gpu1
+            index: 5
+            operationClass: router-drain
+            phase: 5
+            resources:
+            - physical:ampere-gpu0
+            rootId: CREATE_gpu1
+          phaseCount: 6
+          phases:
+          - actionCountsByType:
+              allocate_gpu: 1
+            name: phase-00
+            nodeCount: 1
+            nodeIds:
+            - a0000_allocate_gpu_CREATE-gpu1
+            operationClasses:
+              mig-geometry: 1
+            phase: 0
+            rootIds:
+            - CREATE_gpu1
+          - actionCountsByType:
+              configure_full_template: 1
+            name: phase-01
+            nodeCount: 1
+            nodeIds:
+            - a0001_configure_full_template_CREATE-gpu1
+            operationClasses:
+              mig-geometry: 1
+            phase: 1
+            rootIds:
+            - CREATE_gpu1
+          - actionCountsByType:
+              bind_target_gpu: 1
+            name: phase-02
+            nodeCount: 1
+            nodeIds:
+            - a0002_bind_target_gpu_CREATE-gpu1
+            operationClasses:
+              binding-state: 1
+            phase: 2
+            rootIds:
+            - CREATE_gpu1
+          - actionCountsByType:
+              register_mig_devices: 1
+            name: phase-03
+            nodeCount: 1
+            nodeIds:
+            - a0003_register_mig_devices_CREATE-gpu1
+            operationClasses:
+              mig-geometry: 1
+            phase: 3
+            rootIds:
+            - CREATE_gpu1
+          - actionCountsByType:
+              deploy_target_workloads: 1
+            name: phase-04
+            nodeCount: 1
+            nodeIds:
+            - a0004_deploy_target_workloads_CREATE-gpu1
+            operationClasses:
+              pod-lifecycle: 1
+            phase: 4
+            rootIds:
+            - CREATE_gpu1
+          - actionCountsByType:
+              activate_serving_route: 1
+            name: phase-05
+            nodeCount: 1
+            nodeIds:
+            - a0005_activate_serving_route_CREATE-gpu1
+            operationClasses:
+              router-drain: 1
+            phase: 5
+            rootIds:
+            - CREATE_gpu1
+          representation: migrant.phased-action-dag/v1
+          roots:
+          - nodeIds:
+            - a0000_allocate_gpu_CREATE-gpu1
+            - a0001_configure_full_template_CREATE-gpu1
+            - a0002_bind_target_gpu_CREATE-gpu1
+            - a0003_register_mig_devices_CREATE-gpu1
+            - a0004_deploy_target_workloads_CREATE-gpu1
+            - a0005_activate_serving_route_CREATE-gpu1
+            phaseSpan:
+              first: 0
+              last: 5
+            planItem:
+              blocked_by: null
+              createSpec: 0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g
+              current_phase: final_dag
+              gpu_id: 1
+              id: CREATE_gpu1
+              physical_gpu_id: ampere-gpu0
+              status: ready
+              template: 1+1+1+1+3
+              type: create_target_gpu
+            rootId: CREATE_gpu1
+        phasedActionPlanSummary:
+          actionCount: 6
+          criticalPathLength: 6
+          edgeCount: 5
+          nodeCount: 6
+          phaseCount: 6
+          phases:
+          - actionCountsByType:
+              allocate_gpu: 1
+            nodeCount: 1
+            phase: 0
+            rootIds:
+            - CREATE_gpu1
+          - actionCountsByType:
+              configure_full_template: 1
+            nodeCount: 1
+            phase: 1
+            rootIds:
+            - CREATE_gpu1
+          - actionCountsByType:
+              bind_target_gpu: 1
+            nodeCount: 1
+            phase: 2
+            rootIds:
+            - CREATE_gpu1
+          - actionCountsByType:
+              register_mig_devices: 1
+            nodeCount: 1
+            phase: 3
+            rootIds:
+            - CREATE_gpu1
+          - actionCountsByType:
+              deploy_target_workloads: 1
+            nodeCount: 1
+            phase: 4
+            rootIds:
+            - CREATE_gpu1
+          - actionCountsByType:
+              activate_serving_route: 1
+            nodeCount: 1
+            phase: 5
+            rootIds:
+            - CREATE_gpu1
+          representation: migrant.phased-action-dag/v1
+        planner: effect_aware_dag
+        plannerModule: transition.effect_aware_dag
+        reachedTarget: true
+        runtimeAssumptions:
+          defaultInflight: 1
+          defaultQueued: 2
+          overrideExistingChangedSlots: false
+        sourceActiveGpu: 0
+        stageName: epoch-exp-ampere-per-mig-uuid-v2
+  planningInput:
+    calibrationOverlayRef: physicalgpuregistry/default
+    currentAllocationRef: physicalgpuregistry/default
+    epoch: exp-ampere-per-mig-uuid-v2
+    mode: target
+    observedAt: ""
+    placementNodes:
+    - ampere
+    profileCatalogRef: default
+    registeredSLOMs:
+      gpt2: 0.2
+      llama: 0.2
+    source: manual-experiment
+    targetArrival:
+      gpt2: 0.12
+      llama: 0.04
+    triggerReason: arrival-rate-change
+    unit: requestsPerSecond
+    windowSeconds: 60
+  summary:
+    arrivalSnapshotRef: exp-ampere-per-mig-uuid-v2
+    desiredRuntimes:
+    - batchSize: 1
+      gpu: ampere-gpu0
+      hostPort: 10682
+      model: gpt2
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu0-s0-1-1g
+    - batchSize: 1
+      gpu: ampere-gpu0
+      hostPort: 10681
+      model: llama
+      node: ampere
+      profile: 3g
+      slotResource: or-sim.io/ampere-gpu0-s4-8-3g
+    targetArrival:
+      gpt2: 0.12
+      llama: 0.04
+  targetAllocationPlan:
+    desiredRuntimes:
+    - batchSize: 1
+      gpu: ampere-gpu0
+      hostPort: 10682
+      model: gpt2
+      node: ampere
+      profile: 1g
+      slotResource: or-sim.io/ampere-gpu0-s0-1-1g
+    - batchSize: 1
+      gpu: ampere-gpu0
+      hostPort: 10681
+      model: llama
+      node: ampere
+      profile: 3g
+      slotResource: or-sim.io/ampere-gpu0-s4-8-3g
+    milp:
+      KTotal:
+        1g: 4
+        2g: 0
+        3g: 1
+        4g: 0
+        7g: 0
+      alloc:
+      - arrival: 0.04
+        instances:
+        - batch: 1
+          count: 1
+          mu: 0.740961
+          profile: 3g
+        provided: 0.740961
+        slack: 0.700961
+        workload: llama
+      - arrival: 0.12
+        instances:
+        - batch: 1
+          count: 1
+          mu: 1.131065
+          profile: 1g
+        provided: 1.131065
+        slack: 1.0110649999999999
+        workload: gpt2
+      - arrival: 0
+        instances: []
+        provided: 0
+        slack: 0
+        workload: vgg16
+      - arrival: 0
+        instances: []
+        provided: 0
+        slack: 0
+        workload: resnet50
+      - arrival: 0
+        instances: []
+        provided: 0
+        slack: 0
+        workload: vit_base
+      chosenTemplates:
+      - 3+1+1+1+1
+      gpuCount: 1
+      status: OPTIMAL
+    objective: Gurobi MILP target allocation followed by target materialization greedy
+      repair
+    planner: placement.milp_enhanced + target.preserve_greedy
+    targetState:
+      gpus:
+      - gpuId: 1
+        instances:
+        - batch: 1
+          end: 1
+          mu: 1.131065
+          preserved: false
+          profile: 1g
+          start: 0
+          workload: gpt2
+        - batch: null
+          end: 2
+          mu: 0
+          preserved: false
+          profile: 1g
+          start: 1
+          workload: null
+        - batch: null
+          end: 3
+          mu: 0
+          preserved: false
+          profile: 1g
+          start: 2
+          workload: null
+        - batch: null
+          end: 4
+          mu: 0
+          preserved: false
+          profile: 1g
+          start: 3
+          workload: null
+        - batch: 1
+          end: 7
+          mu: 0.740961
+          preserved: false
+          profile: 3g
+          start: 4
+          workload: llama
+        source: planned
+      metadata:
+        arrivals:
+          gpt2: 0.12
+          llama: 0.04
+          resnet50: 0
+          vgg16: 0
+          vit_base: 0
+        build_method: greedy
+        build_metrics:
+          collocate_pairs: 0
+          elapsed_time_sec: 0.0014073848724365234
+          exact_preserve: 0
+          layout_preserve_score:
+          - 0
+          - 0
+          - 0
+          - 0
+          mixed_gpu_count: 1
+          ordered_abstract_templates:
+          - 3+1+1+1+1
+          ordered_physical_templates:
+          - 1+1+1+1+3
+          same_gpu_preserve: 0
+          score_tuple:
+          - 0
+          - 0
+          - -2
+          - 0
+          - -1
+          - 0
+          - 0
+          - 0
+          spread: 2
+          template_match_count: 0
+          upgrade_preserve: 0
+        display_id_map:
+          "1": 0
+        free_physical_gpu_pool: []
+        free_physical_gpu_pool_policy: lifo
+        next_physical_idx: 0
+        physical_id_map: {}
+  targetGpuCount: 1
+  validationTargets:
+    targetAllocationPlan:
+      desiredRuntimes:
+      - batchSize: 1
+        gpu: ampere-gpu0
+        hostPort: 10682
+        model: gpt2
+        node: ampere
+        profile: 1g
+        slotResource: or-sim.io/ampere-gpu0-s0-1-1g
+      - batchSize: 1
+        gpu: ampere-gpu0
+        hostPort: 10681
+        model: llama
+        node: ampere
+        profile: 3g
+        slotResource: or-sim.io/ampere-gpu0-s4-8-3g
+      targetState:
+        gpus:
+        - gpuId: 1
+          instances:
+          - batch: 1
+            end: 1
+            mu: 1.131065
+            preserved: false
+            profile: 1g
+            start: 0
+            workload: gpt2
+          - batch: null
+            end: 2
+            mu: 0
+            preserved: false
+            profile: 1g
+            start: 1
+            workload: null
+          - batch: null
+            end: 3
+            mu: 0
+            preserved: false
+            profile: 1g
+            start: 2
+            workload: null
+          - batch: null
+            end: 4
+            mu: 0
+            preserved: false
+            profile: 1g
+            start: 3
+            workload: null
+          - batch: 1
+            end: 7
+            mu: 0.740961
+            preserved: false
+            profile: 3g
+            start: 4
+            workload: llama
+          source: planned
+        metadata:
+          arrivals:
+            gpt2: 0.12
+            llama: 0.04
+            resnet50: 0
+            vgg16: 0
+            vit_base: 0
+          build_method: greedy
+          build_metrics:
+            collocate_pairs: 0
+            elapsed_time_sec: 0.0014073848724365234
+            exact_preserve: 0
+            layout_preserve_score:
+            - 0
+            - 0
+            - 0
+            - 0
+            mixed_gpu_count: 1
+            ordered_abstract_templates:
+            - 3+1+1+1+1
+            ordered_physical_templates:
+            - 1+1+1+1+3
+            same_gpu_preserve: 0
+            score_tuple:
+            - 0
+            - 0
+            - -2
+            - 0
+            - -1
+            - 0
+            - 0
+            - 0
+            spread: 2
+            template_match_count: 0
+            upgrade_preserve: 0
+          display_id_map:
+            "1": 0
+          free_physical_gpu_pool: []
+          free_physical_gpu_pool_policy: lifo
+          next_physical_idx: 0
+          physical_id_map: {}
+status:
+  actionStatuses:
+  - durationSeconds: 2.695e-06
+    id: a0000_allocate_gpu_CREATE-gpu1
+    phase: 0
+    status: completed
+    type: allocate_gpu
+  - dependsOn:
+    - a0000_allocate_gpu_CREATE-gpu1
+    durationSeconds: 2.254177416
+    id: a0001_configure_full_template_CREATE-gpu1
+    phase: 1
+    status: completed
+    type: configure_full_template
+  - dependsOn:
+    - a0001_configure_full_template_CREATE-gpu1
+    durationSeconds: 3.527e-06
+    id: a0002_bind_target_gpu_CREATE-gpu1
+    phase: 2
+    status: completed
+    type: bind_target_gpu
+  - dependsOn:
+    - a0002_bind_target_gpu_CREATE-gpu1
+    durationSeconds: 5.310613765
+    id: a0003_register_mig_devices_CREATE-gpu1
+    phase: 3
+    status: completed
+    type: register_mig_devices
+  - dependsOn:
+    - a0003_register_mig_devices_CREATE-gpu1
+    durationSeconds: 0.422418809
+    id: a0004_deploy_target_workloads_CREATE-gpu1
+    phase: 4
+    status: completed
+    type: deploy_target_workloads
+  - dependsOn:
+    - a0004_deploy_target_workloads_CREATE-gpu1
+    durationSeconds: 4.43367472
+    id: a0005_activate_serving_route_CREATE-gpu1
+    phase: 5
+    status: completed
+    type: activate_serving_route
+  message: action DAG executed by Go transition executor
+  phase: Executed
+  transitionExecution:
+    cudaVerification:
+      gpt2:
+        deviceResource: or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+        expectedMigUUID: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+        gpu: ampere-gpu0
+        health:
+          cudaWorker: "true"
+          model: gpt2
+          nvidiaVisibleDevices: void
+          ok: true
+          orSimMIGUUID: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+          orSimPhysicalGpuID: ampere-gpu0
+          orSimSlot: 0-1-1g
+          orSimSlotResource: or-sim.io/ampere-gpu0-s0-1-1g
+        migUUID: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+        node: ampere
+        processes:
+        - 2528795 /cuda-spin                               76MiB
+        slotResource: or-sim.io/ampere-gpu0-s0-1-1g
+      llama:
+        deviceResource: or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+        expectedMigUUID: MIG-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+        gpu: ampere-gpu0
+        health:
+          cudaWorker: "true"
+          model: llama
+          nvidiaVisibleDevices: void
+          ok: true
+          orSimMIGUUID: MIG-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+          orSimPhysicalGpuID: ampere-gpu0
+          orSimSlot: 4-8-3g
+          orSimSlotResource: or-sim.io/ampere-gpu0-s4-8-3g
+        migUUID: MIG-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+        node: ampere
+        processes:
+        - 2528789 /cuda-spin                              176MiB
+        slotResource: or-sim.io/ampere-gpu0-s4-8-3g
+    durationsSeconds:
+      migApply: 2.25417437
+      refreshCDI: 1.635715424
+      resolveMIGUUIDs: 1.153001644
+      routeSync: 0.001985891
+      runtimeDeploymentCreate: 0.008833009
+      runtimeReadyAndCUDAVerify: 4.431692666
+      total: 12.441416443
+      uuidResourcePropagationAndStableWait: 2.521885958
+    metrics:
+      allocatableFinalStablePolls: 3
+      allocatableLastMissing: []
+      allocatablePollIntervalMs: 500
+      allocatablePolls: 6
+      allocatableStablePollsRequired: 3
+      allocatableTargets:
+      - ampere/or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+      - ampere/or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+      uuidResourceTargetCount: 2
+    runtimeReadiness:
+      gpt2:
+        containerReady: true
+        containerStartedAt: "2026-05-29T05:15:22Z"
+        containerStartedAtSinceDeploymentSeconds: 0.357247509
+        cudaProcessFoundAt: "2026-05-29T05:15:26.070694715Z"
+        cudaProcessFoundAtSinceDeploymentSeconds: 4.427942233
+        deviceResource: or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+        expectedMigUUID: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+        gpu: ampere-gpu0
+        healthReadyAt: "2026-05-29T05:15:24.076279528Z"
+        healthReadyAtSinceDeploymentSeconds: 2.433527046
+        hostPort: 10682
+        node: ampere
+        pod: gpt2-runtime-7d7dc5dc48-wvtx8
+        podCreatedAt: "2026-05-29T05:15:21Z"
+        podCreatedAtSinceDeploymentSeconds: -0.642752491
+        podScheduledAt: "2026-05-29T05:15:21Z"
+        podScheduledAtSinceDeploymentSeconds: -0.642752491
+        podStartTime: "2026-05-29T05:15:21Z"
+        podStartTimeSinceDeploymentSeconds: -0.642752491
+        slotResource: or-sim.io/ampere-gpu0-s0-1-1g
+      llama:
+        containerReady: true
+        containerStartedAt: "2026-05-29T05:15:22Z"
+        containerStartedAtSinceDeploymentSeconds: 0.357247509
+        cudaProcessFoundAt: "2026-05-29T05:15:26.074434989Z"
+        cudaProcessFoundAtSinceDeploymentSeconds: 4.431682497
+        deviceResource: or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+        expectedMigUUID: MIG-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+        gpu: ampere-gpu0
+        healthReadyAt: "2026-05-29T05:15:24.076213834Z"
+        healthReadyAtSinceDeploymentSeconds: 2.433461342
+        hostPort: 10681
+        node: ampere
+        pod: llama-runtime-c768cf9dc-gg54p
+        podCreatedAt: "2026-05-29T05:15:21Z"
+        podCreatedAtSinceDeploymentSeconds: -0.642752491
+        podScheduledAt: "2026-05-29T05:15:21Z"
+        podScheduledAtSinceDeploymentSeconds: -0.642752491
+        podStartTime: "2026-05-29T05:15:21Z"
+        podStartTimeSinceDeploymentSeconds: -0.642752491
+        slotResource: or-sim.io/ampere-gpu0-s4-8-3g
+    timestamps:
+      allocatableWaitFinishedAt: "2026-05-29T05:15:21.220327051Z"
+      allocatableWaitStartedAt: "2026-05-29T05:15:18.698441113Z"
+      cdiRefreshFinishedAt: "2026-05-29T05:15:17.545433518Z"
+      cdiRefreshStartedAt: "2026-05-29T05:15:15.909718094Z"
+      executorFinishedAt: "2026-05-29T05:15:26.076434325Z"
+      executorStartedAt: "2026-05-29T05:15:13.635017892Z"
+      migUUIDResolveFinishedAt: "2026-05-29T05:15:18.698436124Z"
+      migUUIDResolveStartedAt: "2026-05-29T05:15:17.545434479Z"
+      routeSyncedAt: "2026-05-29T05:15:26.076431049Z"
+      runtimeDeploymentCreateStartedAt: "2026-05-29T05:15:21.633919473Z"
+      runtimeDeploymentCreatedAt: "2026-05-29T05:15:21.642752491Z"
+      runtimeReadyAndCUDAVerifiedAt: "2026-05-29T05:15:26.074445158Z"
+      slotsApplyFinishedAt: "2026-05-29T05:15:15.909700962Z"
+      slotsApplyStartedAt: "2026-05-29T05:15:13.655526562Z"

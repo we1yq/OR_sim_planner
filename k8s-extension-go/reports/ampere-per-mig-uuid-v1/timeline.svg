@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="390" viewBox="0 0 1220 390">
+  <rect width="1220" height="390" fill="#F8FAFC"/>
+  <text x="44" y="42" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700" fill="#172033">Ampere per-MIG UUID experiment timing</text>
+  <text x="44" y="68" font-family="Inter,Arial,sans-serif" font-size="13" fill="#51606F">Time is measured from ArrivalSnapshot creation. Total wall time: 20.194s. Executor-only time: 19.192s.</text>
+
+  <!-- axis: x = 80 + seconds / 21 * 1040 -->
+  <line x1="80" y1="285" x2="1120" y2="285" stroke="#314151" stroke-width="2"/>
+  <line x1="80" y1="278" x2="80" y2="292" stroke="#314151"/>
+  <line x1="228.57" y1="278" x2="228.57" y2="292" stroke="#314151"/>
+  <line x1="377.14" y1="278" x2="377.14" y2="292" stroke="#314151"/>
+  <line x1="525.71" y1="278" x2="525.71" y2="292" stroke="#314151"/>
+  <line x1="674.29" y1="278" x2="674.29" y2="292" stroke="#314151"/>
+  <line x1="822.86" y1="278" x2="822.86" y2="292" stroke="#314151"/>
+  <line x1="971.43" y1="278" x2="971.43" y2="292" stroke="#314151"/>
+  <line x1="1120" y1="278" x2="1120" y2="292" stroke="#314151"/>
+  <text x="76" y="313" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">0s</text>
+  <text x="220" y="313" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">3s</text>
+  <text x="369" y="313" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">6s</text>
+  <text x="517" y="313" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">9s</text>
+  <text x="662" y="313" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">12s</text>
+  <text x="811" y="313" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">15s</text>
+  <text x="960" y="313" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">18s</text>
+  <text x="1108" y="313" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">21s</text>
+
+  <!-- segments -->
+  <rect x="80" y="118" width="49.62" height="34" rx="6" fill="#D7EAFB" stroke="#7FB3D5"/>
+  <rect x="131.15" y="118" width="137.88" height="34" rx="6" fill="#FAD7A0" stroke="#D68910"/>
+  <rect x="269.03" y="118" width="603.37" height="34" rx="6" fill="#F9E79F" stroke="#B7950B"/>
+  <rect x="872.40" y="118" width="0.50" height="34" rx="2" fill="#D5F5E3" stroke="#52BE80"/>
+  <rect x="872.90" y="118" width="206.95" height="34" rx="6" fill="#D6EAF8" stroke="#3498DB"/>
+  <rect x="1079.85" y="118" width="0.10" height="34" rx="2" fill="#D2B4DE" stroke="#8E44AD"/>
+
+  <text x="86" y="109" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#172033">wait executor</text>
+  <text x="86" y="171" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">1.002s</text>
+  <text x="141" y="109" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#172033">MIG apply</text>
+  <text x="141" y="171" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">2.783s</text>
+  <text x="410" y="109" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#172033">register MIG devices / CDI refresh / resource propagation</text>
+  <text x="525" y="171" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">~12.19s wall segment, action duration 11.168s</text>
+  <text x="882" y="109" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#172033">runtime deploy create</text>
+  <text x="882" y="171" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">0.010s</text>
+  <text x="930" y="205" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#172033">runtime ready + CUDA UUID verify</text>
+  <text x="966" y="225" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">4.174s</text>
+  <text x="1085" y="109" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#172033">route</text>
+  <text x="1085" y="171" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">0.002s</text>
+
+  <!-- event markers -->
+  <g fill="#172033" stroke="#FFFFFF" stroke-width="2">
+    <circle cx="80" cy="285" r="5"/>
+    <circle cx="129.62" cy="285" r="5"/>
+    <circle cx="131.15" cy="285" r="5"/>
+    <circle cx="269.03" cy="285" r="5"/>
+    <circle cx="872.40" cy="285" r="5"/>
+    <circle cx="872.90" cy="285" r="5"/>
+    <circle cx="1079.85" cy="285" r="5"/>
+    <circle cx="1079.95" cy="285" r="5"/>
+  </g>
+
+  <text x="44" y="338" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">0.000 ArrivalSnapshot + MigActionPlan</text>
+  <text x="110" y="357" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">1.002 executor started</text>
+  <text x="245" y="338" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">3.817 MIG apply finished</text>
+  <text x="845" y="338" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">16.008 runtime deploy started</text>
+  <text x="970" y="357" font-family="Inter,Arial,sans-serif" font-size="12" fill="#51606F">20.194 route synced / executor finished</text>
+</svg>

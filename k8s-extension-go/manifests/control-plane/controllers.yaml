@@ -1,0 +1,169 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cluster-state-manager
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go-control-plane
+    app.kubernetes.io/component: cluster-state-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: migrant-go-control-plane
+      app.kubernetes.io/component: cluster-state-manager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrant-go-control-plane
+        app.kubernetes.io/component: cluster-state-manager
+    spec:
+      serviceAccountName: migrant-go-control-plane
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      containers:
+        - name: controller
+          image: localhost:10690/migrant-control-plane:go
+          imagePullPolicy: Always
+          command: ["/cluster-state-manager"]
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: ROUTER_URL
+              value: http://runtime-router:8080
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: epoch-controller
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go-control-plane
+    app.kubernetes.io/component: epoch-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: migrant-go-control-plane
+      app.kubernetes.io/component: epoch-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrant-go-control-plane
+        app.kubernetes.io/component: epoch-controller
+    spec:
+      serviceAccountName: migrant-go-control-plane
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      containers:
+        - name: controller
+          image: localhost:10690/migrant-control-plane:go
+          imagePullPolicy: Always
+          command: ["/epoch-controller"]
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: ROUTER_URL
+              value: http://runtime-router:8080
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: planner-controller
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go-control-plane
+    app.kubernetes.io/component: planner-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: migrant-go-control-plane
+      app.kubernetes.io/component: planner-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrant-go-control-plane
+        app.kubernetes.io/component: planner-controller
+    spec:
+      serviceAccountName: migrant-go-control-plane
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      containers:
+        - name: controller
+          image: localhost:10690/migrant-control-plane:go
+          imagePullPolicy: Always
+          command: ["/planner-controller"]
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: PLANNER_ENGINE_URL
+              value: http://planner-engine:8080
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transition-executor
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go-control-plane
+    app.kubernetes.io/component: transition-executor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: migrant-go-control-plane
+      app.kubernetes.io/component: transition-executor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrant-go-control-plane
+        app.kubernetes.io/component: transition-executor
+    spec:
+      serviceAccountName: migrant-go-control-plane
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      containers:
+        - name: controller
+          image: localhost:10690/migrant-control-plane:go
+          imagePullPolicy: Always
+          command: ["/transition-executor"]
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: ROUTER_URL
+              value: http://runtime-router:8080
+            - name: MODEL_RUNTIME_IMAGE
+              value: localhost:10690/migrant-model-runtime:go
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080

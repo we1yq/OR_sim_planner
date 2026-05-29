@@ -25,18 +25,18 @@ spec:
         - operator: Exists
       containers:
         - name: agent
-          image: or-sim-fast-mig-node-agent:apply-slots-20260523
+          image: or-sim-fast-mig-node-agent:slot-device-plugin-20260527
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true
-          command:
-            - /bin/sh
-            - -c
           args:
-            - |
-              echo "fast-mig-node-agent ready on $(hostname)"
-              sleep infinity
+            - --slot-device-plugin
+            - --node-name=$(NODE_NAME)
           env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
             - name: NVIDIA_VISIBLE_DEVICES
               value: all
             - name: NVIDIA_DRIVER_CAPABILITIES
@@ -46,6 +46,10 @@ spec:
               mountPath: /dev
             - name: host-root
               mountPath: /host
+            - name: kubelet-device-plugins
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: cdi
+              mountPath: /var/run/cdi
       volumes:
         - name: dev
           hostPath:
@@ -55,3 +59,11 @@ spec:
           hostPath:
             path: /
             type: Directory
+        - name: kubelet-device-plugins
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+            type: Directory
+        - name: cdi
+          hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate

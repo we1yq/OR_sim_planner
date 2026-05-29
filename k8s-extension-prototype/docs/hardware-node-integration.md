@@ -146,6 +146,27 @@ The first multi-server allocator should draw from `availableQueue`, append the
 chosen physical IDs to the global active queue, then canonicalize the observed
 active set into logical `gpu_id` values for the next planning epoch.
 
+## Cluster State Manager Code Layout
+
+The code mirrors the system-design "cluster state manager" component under:
+
+```text
+controller/cluster_state_manager/
+```
+
+The old `controller/observe/` package is kept as a compatibility import layer.
+New code should import cluster-state-manager modules directly:
+
+```text
+cluster_state_manager.cluster_observer
+cluster_state_manager.physical_gpu_registry
+cluster_state_manager.physical_gpu_availability
+cluster_state_manager.observed_state_adapter
+```
+
+Conceptually, `ObservedClusterState` is a point-in-time snapshot, while
+`PhysicalGpuRegistry` is durable GPU identity and queue state.
+
 ## Registry Monitor
 
 `PhysicalGpuRegistry` is maintained by a small monitor loop, not by GPU
@@ -212,6 +233,111 @@ if any node has nvidia.com/mig.config.state=pending:
 
 After the config reaches `success` or `failed`, the next cycle may exec again to
 refresh MIG device UUIDs.
+
+## Physical GPU Availability Controller
+
+The availability controller acts on GPUs that the registry has classified as
+`transitioningQueue` because they are not yet safe to allocate. It is intended
+for two cases:
+
+```text
+requiredAction=clear_template_before_available
+dirty initial A100 state, including old MIG devices, missing state label, or
+MIG disabled/not yet converged to or-sim-empty
+```
+
+It uses GPU Operator as the default cleanup path. If a node is already labeled
+`or-sim-empty` but still has MIG devices, the controller first applies a
+generated empty config name to force a real MIG Manager reconcile, then returns
+the node to `or-sim-empty`. This avoids relying on a no-op label write.
+
+Run one pass:
+
+```bash
+KUBECONFIG=$HOME/.kube/or-sim-edge.yaml python3 k8s-extension-prototype/controller/main.py \
+  --namespace or-sim \
+  --ensure-transitioning-gpus-empty \
+  --confirm-real-mig-apply \
+  --wait-mig-success
+```
+
+Run continuously:
+
+```bash
+KUBECONFIG=$HOME/.kube/or-sim-edge.yaml python3 k8s-extension-prototype/controller/main.py \
+  --namespace or-sim \
+  --run-physical-gpu-availability-controller \
+  --confirm-real-mig-apply \
+  --wait-mig-success \
+  --poll-interval-s 30
+```
+
+For safety, the controller skips a node when an active physical GPU is present
+on the same node. Per-device cleanup for mixed active/dirty nodes must be
+coordinated with the transition executor.
+
+## Per-Device MIG Manager Configs
+
+Multi-GPU nodes such as `ampere` must not use `devices: all` for action-plan
+execution unless every A100 on the node is intentionally receiving the same
+layout. The MIG label executor now materializes action-plan target configs into
+`gpu-operator/or-sim-mig-parted-config` using per-device entries:
+
+```yaml
+mig-configs:
+  or-sim-<hash>:
+    - devices: [0]
+      mig-enabled: true
+      mig-devices:
+        4g.20gb: 1
+        3g.20gb: 1
+    - devices: [1]
+      mig-enabled: true
+      mig-devices: {}
+```
+
+The node label still points at one MIG Manager config name, but that config can
+describe different desired layouts for `ampere-gpu0` and `ampere-gpu1`.
+
+## Transition Executor
+
+The dry-run actuator remains a validation path. Real transition execution is
+handled by the Transition Executor, which steps a non-dryRun `MigActionPlan`
+through its full-plan action DAG and dispatches each ready action to the
+matching actuator:
+
+```text
+MIG geometry actions       -> GPU Operator actuator
+router/drain actions       -> Router/Drain actuator
+pod lifecycle actions      -> Kubernetes Pod actuator
+bookkeeping actions        -> status bookkeeping for now
+deferred actions           -> block real execution until explicitly resolved
+```
+
+Execute one ready action:
+
+```bash
+KUBECONFIG=$HOME/.kube/or-sim-edge.yaml python3 k8s-extension-prototype/controller/main.py \
+  --namespace or-sim \
+  --step-transition-action-plan <mig-action-plan-name> \
+  --confirm-real-execute
+```
+
+Run continuously:
+
+```bash
+KUBECONFIG=$HOME/.kube/or-sim-edge.yaml python3 k8s-extension-prototype/controller/main.py \
+  --namespace or-sim \
+  --run-transition-executor \
+  --confirm-real-execute \
+  --poll-interval-s 10
+```
+
+The first implementation is intentionally conservative: it dispatches one ready
+action per step, records per-action phases under
+`status.transitionExecution`, and observes postconditions after the plan
+finishes or blocks. Bookkeeping is not yet the final queue mutation logic; that
+should be connected to `PhysicalGpuRegistry` before unattended production use.
 
 ## Real Node Readiness Checklist
 

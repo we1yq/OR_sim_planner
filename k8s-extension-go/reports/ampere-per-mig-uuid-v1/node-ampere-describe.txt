@@ -1,0 +1,344 @@
+Name:               ampere
+Roles:              <none>
+Labels:             beta.kubernetes.io/arch=amd64
+                    beta.kubernetes.io/instance-type=rke2
+                    beta.kubernetes.io/os=linux
+                    feature.node.kubernetes.io/cpu-cpuid.ADX=true
+                    feature.node.kubernetes.io/cpu-cpuid.AESNI=true
+                    feature.node.kubernetes.io/cpu-cpuid.AMXFP8=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX2=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512BITALG=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512BW=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512CD=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512DQ=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512F=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512IFMA=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512VBMI=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512VBMI2=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512VL=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512VNNI=true
+                    feature.node.kubernetes.io/cpu-cpuid.AVX512VPOPCNTDQ=true
+                    feature.node.kubernetes.io/cpu-cpuid.CMPXCHG8=true
+                    feature.node.kubernetes.io/cpu-cpuid.FLUSH_L1D=true
+                    feature.node.kubernetes.io/cpu-cpuid.FMA3=true
+                    feature.node.kubernetes.io/cpu-cpuid.FSRM=true
+                    feature.node.kubernetes.io/cpu-cpuid.FXSR=true
+                    feature.node.kubernetes.io/cpu-cpuid.FXSROPT=true
+                    feature.node.kubernetes.io/cpu-cpuid.GFNI=true
+                    feature.node.kubernetes.io/cpu-cpuid.IA32_ARCH_CAP=true
+                    feature.node.kubernetes.io/cpu-cpuid.IBPB=true
+                    feature.node.kubernetes.io/cpu-cpuid.LAHF=true
+                    feature.node.kubernetes.io/cpu-cpuid.MD_CLEAR=true
+                    feature.node.kubernetes.io/cpu-cpuid.MOVBE=true
+                    feature.node.kubernetes.io/cpu-cpuid.OSXSAVE=true
+                    feature.node.kubernetes.io/cpu-cpuid.PCONFIG=true
+                    feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_CYCLES=true
+                    feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_INSTRUCTIONS=true
+                    feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_REFCYCLES=true
+                    feature.node.kubernetes.io/cpu-cpuid.PMU_FIXEDCOUNTER_TOPDOWN_SLOTS=true
+                    feature.node.kubernetes.io/cpu-cpuid.PSFD=true
+                    feature.node.kubernetes.io/cpu-cpuid.SHA=true
+                    feature.node.kubernetes.io/cpu-cpuid.SPEC_CTRL_SSBD=true
+                    feature.node.kubernetes.io/cpu-cpuid.STIBP=true
+                    feature.node.kubernetes.io/cpu-cpuid.SYSCALL=true
+                    feature.node.kubernetes.io/cpu-cpuid.SYSEE=true
+                    feature.node.kubernetes.io/cpu-cpuid.TME=true
+                    feature.node.kubernetes.io/cpu-cpuid.VAES=true
+                    feature.node.kubernetes.io/cpu-cpuid.VMX=true
+                    feature.node.kubernetes.io/cpu-cpuid.VPCLMULQDQ=true
+                    feature.node.kubernetes.io/cpu-cpuid.WBNOINVD=true
+                    feature.node.kubernetes.io/cpu-cpuid.X87=true
+                    feature.node.kubernetes.io/cpu-cpuid.XGETBV1=true
+                    feature.node.kubernetes.io/cpu-cpuid.XSAVE=true
+                    feature.node.kubernetes.io/cpu-cpuid.XSAVEC=true
+                    feature.node.kubernetes.io/cpu-cpuid.XSAVEOPT=true
+                    feature.node.kubernetes.io/cpu-cpuid.XSAVES=true
+                    feature.node.kubernetes.io/cpu-cstate.enabled=true
+                    feature.node.kubernetes.io/cpu-hardware_multithreading=true
+                    feature.node.kubernetes.io/cpu-model.family=6
+                    feature.node.kubernetes.io/cpu-model.id=106
+                    feature.node.kubernetes.io/cpu-model.vendor_id=Intel
+                    feature.node.kubernetes.io/kernel-config.NO_HZ=true
+                    feature.node.kubernetes.io/kernel-config.NO_HZ_IDLE=true
+                    feature.node.kubernetes.io/kernel-version.full=5.15.0-173-generic
+                    feature.node.kubernetes.io/kernel-version.major=5
+                    feature.node.kubernetes.io/kernel-version.minor=15
+                    feature.node.kubernetes.io/kernel-version.revision=0
+                    feature.node.kubernetes.io/memory-numa=true
+                    feature.node.kubernetes.io/memory-swap=true
+                    feature.node.kubernetes.io/pci-102b.present=true
+                    feature.node.kubernetes.io/pci-10de.present=true
+                    feature.node.kubernetes.io/pci-10de.sriov.capable=true
+                    feature.node.kubernetes.io/pci-14e4.present=true
+                    feature.node.kubernetes.io/pci-15b3.present=true
+                    feature.node.kubernetes.io/rdma.capable=true
+                    feature.node.kubernetes.io/storage-nonrotationaldisk=true
+                    feature.node.kubernetes.io/system-os_release.ID=ubuntu
+                    feature.node.kubernetes.io/system-os_release.VERSION_ID=22.04
+                    feature.node.kubernetes.io/system-os_release.VERSION_ID.major=22
+                    feature.node.kubernetes.io/system-os_release.VERSION_ID.minor=04
+                    kubernetes.io/arch=amd64
+                    kubernetes.io/hostname=ampere
+                    kubernetes.io/os=linux
+                    node.kubernetes.io/instance-type=rke2
+                    nvidia.com/cuda.driver-version.full=595.58.03
+                    nvidia.com/cuda.driver-version.major=595
+                    nvidia.com/cuda.driver-version.minor=58
+                    nvidia.com/cuda.driver-version.revision=03
+                    nvidia.com/cuda.driver.major=595
+                    nvidia.com/cuda.driver.minor=58
+                    nvidia.com/cuda.driver.rev=03
+                    nvidia.com/cuda.runtime-version.full=13.2
+                    nvidia.com/cuda.runtime-version.major=13
+                    nvidia.com/cuda.runtime-version.minor=2
+                    nvidia.com/cuda.runtime.major=13
+                    nvidia.com/cuda.runtime.minor=2
+                    nvidia.com/gfd.timestamp=1779947281
+                    nvidia.com/gpu.compute.major=8
+                    nvidia.com/gpu.compute.minor=0
+                    nvidia.com/gpu.count=2
+                    nvidia.com/gpu.deploy.container-toolkit=true
+                    nvidia.com/gpu.deploy.dcgm=true
+                    nvidia.com/gpu.deploy.dcgm-exporter=true
+                    nvidia.com/gpu.deploy.device-plugin=true
+                    nvidia.com/gpu.deploy.driver=true
+                    nvidia.com/gpu.deploy.gpu-feature-discovery=true
+                    nvidia.com/gpu.deploy.mig-manager=true
+                    nvidia.com/gpu.deploy.node-status-exporter=true
+                    nvidia.com/gpu.deploy.nvsm=true
+                    nvidia.com/gpu.deploy.operator-validator=true
+                    nvidia.com/gpu.family=ampere
+                    nvidia.com/gpu.machine=PowerEdge-R750xa
+                    nvidia.com/gpu.memory=40960
+                    nvidia.com/gpu.mode=compute
+                    nvidia.com/gpu.present=true
+                    nvidia.com/gpu.product=NVIDIA-A100-PCIE-40GB
+                    nvidia.com/gpu.replicas=0
+                    nvidia.com/gpu.sharing-strategy=none
+                    nvidia.com/mig-1g.5gb.count=4
+                    nvidia.com/mig-1g.5gb.engines.copy=1
+                    nvidia.com/mig-1g.5gb.engines.decoder=0
+                    nvidia.com/mig-1g.5gb.engines.encoder=0
+                    nvidia.com/mig-1g.5gb.engines.jpeg=0
+                    nvidia.com/mig-1g.5gb.engines.ofa=0
+                    nvidia.com/mig-1g.5gb.memory=4864
+                    nvidia.com/mig-1g.5gb.multiprocessors=14
+                    nvidia.com/mig-1g.5gb.product=NVIDIA-A100-PCIE-40GB-MIG-1g.5gb
+                    nvidia.com/mig-1g.5gb.replicas=1
+                    nvidia.com/mig-1g.5gb.sharing-strategy=none
+                    nvidia.com/mig-1g.5gb.slices.ci=1
+                    nvidia.com/mig-1g.5gb.slices.gi=1
+                    nvidia.com/mig-3g.20gb.count=1
+                    nvidia.com/mig-3g.20gb.engines.copy=3
+                    nvidia.com/mig-3g.20gb.engines.decoder=2
+                    nvidia.com/mig-3g.20gb.engines.encoder=0
+                    nvidia.com/mig-3g.20gb.engines.jpeg=0
+                    nvidia.com/mig-3g.20gb.engines.ofa=0
+                    nvidia.com/mig-3g.20gb.memory=20096
+                    nvidia.com/mig-3g.20gb.multiprocessors=42
+                    nvidia.com/mig-3g.20gb.product=NVIDIA-A100-PCIE-40GB-MIG-3g.20gb
+                    nvidia.com/mig-3g.20gb.replicas=1
+                    nvidia.com/mig-3g.20gb.sharing-strategy=none
+                    nvidia.com/mig-3g.20gb.slices.ci=3
+                    nvidia.com/mig-3g.20gb.slices.gi=3
+                    nvidia.com/mig.capable=true
+                    nvidia.com/mig.config=or-sim-2b2f64eb1d
+                    nvidia.com/mig.config.state=success
+                    nvidia.com/mig.strategy=mixed
+                    nvidia.com/mps.capable=false
+                    nvidia.com/vgpu.present=false
+Annotations:        alpha.kubernetes.io/provided-node-ip: 115.145.135.205
+                    flannel.alpha.coreos.com/backend-data: {"VNI":1,"VtepMAC":"26:1c:70:ca:16:c5"}
+                    flannel.alpha.coreos.com/backend-type: vxlan
+                    flannel.alpha.coreos.com/kube-subnet-manager: true
+                    flannel.alpha.coreos.com/public-ip: 115.145.135.205
+                    nfd.node.kubernetes.io/feature-labels:
+                      cpu-cpuid.ADX,cpu-cpuid.AESNI,cpu-cpuid.AMXFP8,cpu-cpuid.AVX,cpu-cpuid.AVX2,cpu-cpuid.AVX512BITALG,cpu-cpuid.AVX512BW,cpu-cpuid.AVX512CD,c...
+                    node.alpha.kubernetes.io/ttl: 0
+                    rke2.io/hostname: ampere
+                    rke2.io/internal-ip: 115.145.135.205
+                    rke2.io/node-args: ["agent","--server","https://115.145.179.144:9345","--token","********","--node-name","ampere"]
+                    rke2.io/node-config-hash: Y2HOV5XFKUON5KFNRRN222447SBC43PPBMOADR242IVWA3HTPACA====
+                    rke2.io/node-env: {}
+                    volumes.kubernetes.io/controller-managed-attach-detach: true
+CreationTimestamp:  Wed, 27 May 2026 13:08:20 +0900
+Taints:             <none>
+Unschedulable:      false
+Lease:
+  HolderIdentity:  ampere
+  AcquireTime:     <unset>
+  RenewTime:       Fri, 29 May 2026 13:04:29 +0900
+Conditions:
+  Type                 Status  LastHeartbeatTime                 LastTransitionTime                Reason                       Message
+  ----                 ------  -----------------                 ------------------                ------                       -------
+  NetworkUnavailable   False   Wed, 27 May 2026 13:08:49 +0900   Wed, 27 May 2026 13:08:49 +0900   FlannelIsUp                  Flannel is running on this node
+  MemoryPressure       False   Fri, 29 May 2026 13:04:12 +0900   Wed, 27 May 2026 13:08:20 +0900   KubeletHasSufficientMemory   kubelet has sufficient memory available
+  DiskPressure         False   Fri, 29 May 2026 13:04:12 +0900   Wed, 27 May 2026 13:08:20 +0900   KubeletHasNoDiskPressure     kubelet has no disk pressure
+  PIDPressure          False   Fri, 29 May 2026 13:04:12 +0900   Wed, 27 May 2026 13:08:20 +0900   KubeletHasSufficientPID      kubelet has sufficient PID available
+  Ready                True    Fri, 29 May 2026 13:04:12 +0900   Wed, 27 May 2026 13:08:20 +0900   KubeletReady                 kubelet is posting ready status
+Addresses:
+  InternalIP:  115.145.135.205
+  Hostname:    ampere
+Capacity:
+  cpu:                                                 112
+  ephemeral-storage:                                   590488616Ki
+  hugepages-1Gi:                                       0
+  hugepages-2Mi:                                       0
+  memory:                                              131414396Ki
+  nvidia.com/gpu:                                      0
+  nvidia.com/mig-1g.5gb:                               2
+  or-sim.io/ampere-gpu0-s0-1-1g:                       0
+  or-sim.io/ampere-gpu0-s0-2-2g:                       0
+  or-sim.io/ampere-gpu0-s0-4-3g:                       0
+  or-sim.io/ampere-gpu0-s0-4-4g:                       0
+  or-sim.io/ampere-gpu0-s0-8-7g:                       0
+  or-sim.io/ampere-gpu0-s1-2-1g:                       0
+  or-sim.io/ampere-gpu0-s2-3-1g:                       0
+  or-sim.io/ampere-gpu0-s2-4-2g:                       0
+  or-sim.io/ampere-gpu0-s3-4-1g:                       0
+  or-sim.io/ampere-gpu0-s4-5-1g:                       0
+  or-sim.io/ampere-gpu0-s4-6-2g:                       0
+  or-sim.io/ampere-gpu0-s4-8-3g:                       0
+  or-sim.io/ampere-gpu0-s5-6-1g:                       0
+  or-sim.io/ampere-gpu0-s6-7-1g:                       0
+  or-sim.io/ampere-gpu1-s0-1-1g:                       0
+  or-sim.io/ampere-gpu1-s0-2-2g:                       0
+  or-sim.io/ampere-gpu1-s0-4-3g:                       0
+  or-sim.io/ampere-gpu1-s0-4-4g:                       0
+  or-sim.io/ampere-gpu1-s0-8-7g:                       0
+  or-sim.io/ampere-gpu1-s1-2-1g:                       0
+  or-sim.io/ampere-gpu1-s2-3-1g:                       0
+  or-sim.io/ampere-gpu1-s2-4-2g:                       0
+  or-sim.io/ampere-gpu1-s3-4-1g:                       0
+  or-sim.io/ampere-gpu1-s4-5-1g:                       0
+  or-sim.io/ampere-gpu1-s4-6-2g:                       0
+  or-sim.io/ampere-gpu1-s4-8-3g:                       0
+  or-sim.io/ampere-gpu1-s5-6-1g:                       0
+  or-sim.io/ampere-gpu1-s6-7-1g:                       0
+  or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038:  1
+  or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf:  1
+  or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac:  1
+  or-sim.io/mig-b9b3726d-644e-5e01-8b71-c590c23f7be3:  1
+  or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05:  1
+  pods:                                                110
+Allocatable:
+  cpu:                                                 112
+  ephemeral-storage:                                   574427325195
+  hugepages-1Gi:                                       0
+  hugepages-2Mi:                                       0
+  memory:                                              131414396Ki
+  nvidia.com/gpu:                                      0
+  nvidia.com/mig-1g.5gb:                               2
+  or-sim.io/ampere-gpu0-s0-1-1g:                       0
+  or-sim.io/ampere-gpu0-s0-2-2g:                       0
+  or-sim.io/ampere-gpu0-s0-4-3g:                       0
+  or-sim.io/ampere-gpu0-s0-4-4g:                       0
+  or-sim.io/ampere-gpu0-s0-8-7g:                       0
+  or-sim.io/ampere-gpu0-s1-2-1g:                       0
+  or-sim.io/ampere-gpu0-s2-3-1g:                       0
+  or-sim.io/ampere-gpu0-s2-4-2g:                       0
+  or-sim.io/ampere-gpu0-s3-4-1g:                       0
+  or-sim.io/ampere-gpu0-s4-5-1g:                       0
+  or-sim.io/ampere-gpu0-s4-6-2g:                       0
+  or-sim.io/ampere-gpu0-s4-8-3g:                       0
+  or-sim.io/ampere-gpu0-s5-6-1g:                       0
+  or-sim.io/ampere-gpu0-s6-7-1g:                       0
+  or-sim.io/ampere-gpu1-s0-1-1g:                       0
+  or-sim.io/ampere-gpu1-s0-2-2g:                       0
+  or-sim.io/ampere-gpu1-s0-4-3g:                       0
+  or-sim.io/ampere-gpu1-s0-4-4g:                       0
+  or-sim.io/ampere-gpu1-s0-8-7g:                       0
+  or-sim.io/ampere-gpu1-s1-2-1g:                       0
+  or-sim.io/ampere-gpu1-s2-3-1g:                       0
+  or-sim.io/ampere-gpu1-s2-4-2g:                       0
+  or-sim.io/ampere-gpu1-s3-4-1g:                       0
+  or-sim.io/ampere-gpu1-s4-5-1g:                       0
+  or-sim.io/ampere-gpu1-s4-6-2g:                       0
+  or-sim.io/ampere-gpu1-s4-8-3g:                       0
+  or-sim.io/ampere-gpu1-s5-6-1g:                       0
+  or-sim.io/ampere-gpu1-s6-7-1g:                       0
+  or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038:  1
+  or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf:  1
+  or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac:  1
+  or-sim.io/mig-b9b3726d-644e-5e01-8b71-c590c23f7be3:  1
+  or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05:  1
+  pods:                                                110
+System Info:
+  Machine ID:                 a68d76ca0a7641d795e9c53dd1a2a625
+  System UUID:                4c4c4544-0056-5210-804b-c3c04f4a4a33
+  Boot ID:                    05139c9b-a5c9-4f0e-a8f0-2189416326a4
+  Kernel Version:             5.15.0-173-generic
+  OS Image:                   Ubuntu 22.04.4 LTS
+  Operating System:           linux
+  Architecture:               amd64
+  Container Runtime Version:  containerd://2.0.5-k3s2
+  Kubelet Version:            v1.32.7+rke2r1
+  Kube-Proxy Version:         v1.32.7+rke2r1
+PodCIDR:                      10.42.2.0/24
+PodCIDRs:                     10.42.2.0/24
+ProviderID:                   rke2://ampere
+Non-terminated Pods:          (16 in total)
+  Namespace                   Name                                                     CPU Requests  CPU Limits  Memory Requests  Memory Limits  Age
+  ---------                   ----                                                     ------------  ----------  ---------------  -------------  ---
+  gpu-operator                gpu-feature-discovery-gzgx9                              0 (0%)        0 (0%)      0 (0%)           0 (0%)         46h
+  gpu-operator                gpu-operator-node-feature-discovery-worker-btrrb         5m (0%)       0 (0%)      64Mi (0%)        512Mi (0%)     47h
+  gpu-operator                nvidia-container-toolkit-daemonset-b65kw                 0 (0%)        0 (0%)      0 (0%)           0 (0%)         47h
+  gpu-operator                nvidia-dcgm-exporter-s5xdk                               0 (0%)        0 (0%)      0 (0%)           0 (0%)         46h
+  gpu-operator                nvidia-device-plugin-daemonset-s2k59                     0 (0%)        0 (0%)      0 (0%)           0 (0%)         46h
+  gpu-operator                nvidia-mig-manager-lshnp                                 0 (0%)        0 (0%)      0 (0%)           0 (0%)         47h
+  gpu-operator                nvidia-operator-validator-l2znk                          0 (0%)        0 (0%)      0 (0%)           0 (0%)         46h
+  kube-system                 kube-proxy-ampere                                        250m (0%)     0 (0%)      128Mi (0%)       0 (0%)         47h
+  kube-system                 rke2-canal-gt9nw                                         250m (0%)     0 (0%)      0 (0%)           0 (0%)         47h
+  kube-system                 rke2-coredns-rke2-coredns-autoscaler-85f9844585-r562t    25m (0%)      100m (0%)   16Mi (0%)        64Mi (0%)      42h
+  kube-system                 rke2-ingress-nginx-controller-64nzc                      100m (0%)     0 (0%)      90Mi (0%)        0 (0%)         47h
+  or-sim                      gpt2-runtime-7d7dc5dc48-wqrpk                            0 (0%)        0 (0%)      0 (0%)           0 (0%)         5m27s
+  or-sim                      llama-runtime-c768cf9dc-2vdrp                            0 (0%)        0 (0%)      0 (0%)           0 (0%)         5m27s
+  or-sim                      mig-node-agent-jhc97                                     0 (0%)        0 (0%)      0 (0%)           0 (0%)         12m
+  or-sim                      migrant-local-registry-xsstz                             0 (0%)        0 (0%)      0 (0%)           0 (0%)         41h
+  or-sim                      slot-device-plugin-dczzd                                 0 (0%)        0 (0%)      0 (0%)           0 (0%)         12m
+Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource                                            Requests    Limits
+  --------                                            --------    ------
+  cpu                                                 630m (0%)   100m (0%)
+  memory                                              298Mi (0%)  576Mi (0%)
+  ephemeral-storage                                   0 (0%)      0 (0%)
+  hugepages-1Gi                                       0 (0%)      0 (0%)
+  hugepages-2Mi                                       0 (0%)      0 (0%)
+  nvidia.com/gpu                                      0           0
+  nvidia.com/mig-1g.5gb                               0           0
+  or-sim.io/ampere-gpu0-s0-1-1g                       0           0
+  or-sim.io/ampere-gpu0-s0-2-2g                       0           0
+  or-sim.io/ampere-gpu0-s0-4-3g                       0           0
+  or-sim.io/ampere-gpu0-s0-4-4g                       0           0
+  or-sim.io/ampere-gpu0-s0-8-7g                       0           0
+  or-sim.io/ampere-gpu0-s1-2-1g                       0           0
+  or-sim.io/ampere-gpu0-s2-3-1g                       0           0
+  or-sim.io/ampere-gpu0-s2-4-2g                       0           0
+  or-sim.io/ampere-gpu0-s3-4-1g                       0           0
+  or-sim.io/ampere-gpu0-s4-5-1g                       0           0
+  or-sim.io/ampere-gpu0-s4-6-2g                       0           0
+  or-sim.io/ampere-gpu0-s4-8-3g                       0           0
+  or-sim.io/ampere-gpu0-s5-6-1g                       0           0
+  or-sim.io/ampere-gpu0-s6-7-1g                       0           0
+  or-sim.io/ampere-gpu1-s0-1-1g                       0           0
+  or-sim.io/ampere-gpu1-s0-2-2g                       0           0
+  or-sim.io/ampere-gpu1-s0-4-3g                       0           0
+  or-sim.io/ampere-gpu1-s0-4-4g                       0           0
+  or-sim.io/ampere-gpu1-s0-8-7g                       0           0
+  or-sim.io/ampere-gpu1-s1-2-1g                       0           0
+  or-sim.io/ampere-gpu1-s2-3-1g                       0           0
+  or-sim.io/ampere-gpu1-s2-4-2g                       0           0
+  or-sim.io/ampere-gpu1-s3-4-1g                       0           0
+  or-sim.io/ampere-gpu1-s4-5-1g                       0           0
+  or-sim.io/ampere-gpu1-s4-6-2g                       0           0
+  or-sim.io/ampere-gpu1-s4-8-3g                       0           0
+  or-sim.io/ampere-gpu1-s5-6-1g                       0           0
+  or-sim.io/ampere-gpu1-s6-7-1g                       0           0
+  or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038  0           0
+  or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf  0           0
+  or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac  1           1
+  or-sim.io/mig-b9b3726d-644e-5e01-8b71-c590c23f7be3  0           0
+  or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05  1           1
+Events:                                               <none>

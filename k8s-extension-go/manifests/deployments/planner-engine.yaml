@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: planner-engine
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-planner-engine
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: migrant-planner-engine
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrant-planner-engine
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      containers:
+        - name: planner-engine
+          image: localhost:10690/migrant-planner-engine:go
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 1
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: planner-engine
+  namespace: or-sim
+spec:
+  selector:
+    app.kubernetes.io/name: migrant-planner-engine
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

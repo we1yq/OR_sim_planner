@@ -1,33 +1,16 @@
 from __future__ import annotations
 
 import argparse
-from typing import Any
+import sys
+from pathlib import Path
 
 import yaml
 
+CONTROLLER_ROOT = Path(__file__).resolve().parents[1] / "controller"
+if str(CONTROLLER_ROOT) not in sys.path:
+    sys.path.insert(0, str(CONTROLLER_ROOT))
 
-PROFILE_TO_GPU_OPERATOR = {
-    "1g": "1g.5gb",
-    "2g": "2g.10gb",
-    "3g": "3g.20gb",
-    "4g": "4g.20gb",
-    "7g": "7g.40gb",
-}
-
-MIGRANT_TEMPLATE_CONFIGS = {
-    "or-sim-empty": [],
-    "or-sim-4-3": ["4g", "3g"],
-    "or-sim-4-2-1": ["4g", "2g", "1g"],
-    "or-sim-4-1-1-1": ["4g", "1g", "1g", "1g"],
-    "or-sim-3-2-1": ["3g", "2g", "1g"],
-    "or-sim-3-1-1-1": ["3g", "1g", "1g", "1g"],
-    "or-sim-2-2-3": ["2g", "2g", "3g"],
-    "or-sim-3-2-1-1": ["3g", "2g", "1g", "1g"],
-    "or-sim-3-1-1-1-1": ["3g", "1g", "1g", "1g", "1g"],
-    "or-sim-2-2-2-1": ["2g", "2g", "2g", "1g"],
-    "or-sim-2-2-1-1-1": ["2g", "2g", "1g", "1g", "1g"],
-    "or-sim-2-1-1-1-1-1": ["2g", "1g", "1g", "1g", "1g", "1g"],
-}
+from executors.mig_config_manager import install_static_migrant_configs
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,13 +39,7 @@ def main() -> int:
     if not raw_config:
         raise SystemExit(f"{args.namespace}/{args.source_configmap} has no data.config.yaml")
     cfg = yaml.safe_load(raw_config)
-    mig_configs = cfg.setdefault("mig-configs", {})
-    changed = []
-    for name, profiles in MIGRANT_TEMPLATE_CONFIGS.items():
-        desired = _config_for_profiles(profiles)
-        if mig_configs.get(name) != desired:
-            mig_configs[name] = desired
-            changed.append(name)
+    changed = install_static_migrant_configs(cfg)
     data["config.yaml"] = yaml.safe_dump(cfg, sort_keys=False)
     target_manifest = {
         "apiVersion": "v1",
@@ -104,21 +81,5 @@ def main() -> int:
         end="",
     )
     return 0
-
-
-def _config_for_profiles(profiles: list[str]) -> list[dict[str, Any]]:
-    counts: dict[str, int] = {}
-    for profile in profiles:
-        gpu_operator_profile = PROFILE_TO_GPU_OPERATOR[profile]
-        counts[gpu_operator_profile] = counts.get(gpu_operator_profile, 0) + 1
-    return [
-        {
-            "devices": "all",
-            "mig-enabled": True,
-            "mig-devices": counts,
-        }
-    ]
-
-
 if __name__ == "__main__":
     raise SystemExit(main())

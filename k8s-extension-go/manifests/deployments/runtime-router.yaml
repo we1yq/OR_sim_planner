@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runtime-router
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-runtime-router
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: migrant-runtime-router
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrant-runtime-router
+    spec:
+      serviceAccountName: migrant-go-control-plane
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: router
+          image: localhost:10690/migrant-runtime-router:go
+          imagePullPolicy: Always
+          args:
+            - --addr=:10680
+          ports:
+            - containerPort: 10680
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 10680
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runtime-router
+  namespace: or-sim
+spec:
+  selector:
+    app.kubernetes.io/name: migrant-runtime-router
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 10680

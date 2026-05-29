@@ -25,8 +25,9 @@ real GPU or MIG operations.
 - `crds/autoapprovalpolicy-crd.yaml`: policy gate for automatically approving
   safe dry-run action plans.
 - `controller/*.yaml`: service account, namespaced RBAC, optional observer
-  read-only ClusterRole, optional GPU Operator exec RBAC, and Deployments for
-  the dry-run controller loops and physical GPU registry monitor.
+  read-only ClusterRole, optional GPU Operator exec RBAC, Deployments for the
+  controller loops and physical GPU registry monitor, and the node-local slot
+  device plugin DaemonSet.
 - `examples/workloadrequests/*.yaml`: workload requests generated from the
   simulation workload specs.
 - `examples/profile-catalogs/kustomization.yaml`: profile catalog ConfigMaps
@@ -109,3 +110,44 @@ kubectl get physicalgpuregistry -n or-sim default -o yaml
 The monitor skips GPU Operator exec while any node has
 `nvidia.com/mig.config.state=pending`; it reuses cached GPU UUID bindings and
 waits for a success/failed state before refreshing MIG device UUIDs.
+
+## Converge Dirty GPUs To Available
+
+The physical GPU availability controller is currently run from the management
+host. It watches `PhysicalGpuRegistry/default` and uses GPU Operator to clean
+dirty `transitioningQueue` A100s back to `or-sim-empty/success`:
+
+```bash
+KUBECONFIG=$HOME/.kube/or-sim-edge.yaml \
+  python3 k8s-extension-prototype/controller/main.py \
+  --namespace or-sim \
+  --run-physical-gpu-availability-controller \
+  --confirm-real-mig-apply \
+  --wait-mig-success
+```
+
+The controller skips nodes with active peer GPUs to avoid clearing a serving GPU
+while cleaning another GPU on the same multi-GPU node.
+
+## Deploy The Exact Slot Device Plugin
+
+Build the node agent image and deploy it on MIG-capable nodes:
+
+```bash
+docker build -f k8s-extension-prototype/Dockerfile.fast-mig-node-agent \
+  -t or-sim-fast-mig-node-agent:slot-device-plugin-20260527 \
+  k8s-extension-prototype
+
+kubectl apply -f k8s-extension-prototype/manifests/controller/fast-mig-node-agent-daemonset.yaml
+```
+
+The agent registers one kubelet extended resource per observed logical MIG slot,
+for example:
+
+```text
+or-sim.io/ampere-gpu0-s4-5-1g
+```
+
+Workload Pods request this exact resource instead of a generic
+`nvidia.com/mig-*` resource. The plugin resolves the stable slot to the current
+MIG UUID and injects the NVIDIA CDI device for that UUID during `Allocate`.

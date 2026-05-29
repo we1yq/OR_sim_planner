@@ -1,0 +1,12 @@
+capacity
+or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038 1
+or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf 1
+or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac 1
+or-sim.io/mig-b9b3726d-644e-5e01-8b71-c590c23f7be3 1
+or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05 1
+allocatable
+or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038 1
+or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf 1
+or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac 1
+or-sim.io/mig-b9b3726d-644e-5e01-8b71-c590c23f7be3 1
+or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05 1

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import hashlib
 import re
 from typing import Any
+
+from executors.mig_config_manager import dynamic_config_name
 
 
 GPU_OPERATOR_MIG_CONFIG_LABEL = "nvidia.com/mig.config"
@@ -502,6 +503,7 @@ def _action_brief(action: dict[str, Any]) -> dict[str, Any]:
         "target_physical_gpu_id",
         "target_slot",
         "queue_transfer_id",
+        "routerQueueRedispatch",
         "targetMu",
         "workloadRequiredMu",
         "workloadProvidedAfterSourceRemoval",
@@ -585,15 +587,7 @@ def _target_instances(raw_gpu: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _mig_config_name(node_name: str, targets: list[dict[str, Any]]) -> str:
-    builtin = _builtin_gpu_operator_config_name(targets)
-    if builtin is not None:
-        return builtin
-    fingerprint = "|".join(
-        f"{target.get('deviceIndex')}={target.get('targetTemplate')}"
-        for target in sorted(targets, key=lambda item: int(item.get("deviceIndex", 0)))
-    )
-    digest = hashlib.sha1(f"{node_name}|{fingerprint}".encode("utf-8")).hexdigest()[:10]
-    return _label_value(f"or-sim-{digest}")
+    return _label_value(dynamic_config_name(node_name=node_name, targets=targets))
 
 
 def _builtin_gpu_operator_config_name(targets: list[dict[str, Any]]) -> str | None:

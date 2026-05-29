@@ -1,0 +1,105 @@
+LAST SEEN   TYPE     REASON              OBJECT                                                          MESSAGE
+18m         Normal   Scheduled           pod/migrant-go-control-plane-build-or-sim-control-plane-2r6md   Successfully assigned or-sim/migrant-go-control-plane-build-or-sim-control-plane-2r6md to or-sim-control-plane
+18m         Normal   SuccessfulCreate    job/migrant-go-control-plane-build-or-sim-control-plane         Created pod: migrant-go-control-plane-build-or-sim-control-plane-2r6md
+18m         Normal   Created             pod/migrant-go-control-plane-build-or-sim-control-plane-2r6md   Created container: kaniko
+18m         Normal   Pulled              pod/migrant-go-control-plane-build-or-sim-control-plane-2r6md   Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+18m         Normal   Started             pod/migrant-go-control-plane-build-or-sim-control-plane-2r6md   Started container kaniko
+18m         Normal   SuccessfulCreate    job/migrant-go-image-build-ampere                               Created pod: migrant-go-image-build-ampere-s74pm
+18m         Normal   Scheduled           pod/migrant-go-image-build-ampere-s74pm                         Successfully assigned or-sim/migrant-go-image-build-ampere-s74pm to ampere
+18m         Normal   Pulled              pod/migrant-go-image-build-ampere-s74pm                         Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+18m         Normal   Started             pod/migrant-go-image-build-ampere-s74pm                         Started container kaniko
+18m         Normal   Created             pod/migrant-go-image-build-ampere-s74pm                         Created container: kaniko
+17m         Normal   Completed           job/migrant-go-control-plane-build-or-sim-control-plane         Job completed
+12m         Normal   Completed           job/migrant-go-image-build-ampere                               Job completed
+12m         Normal   SuccessfulCreate    replicaset/cluster-state-manager-76d4d4787b                     Created pod: cluster-state-manager-76d4d4787b-jhzgl
+12m         Normal   Scheduled           pod/transition-executor-c68f577c8-hpd4r                         Successfully assigned or-sim/transition-executor-c68f577c8-hpd4r to or-sim-control-plane
+12m         Normal   SuccessfulCreate    replicaset/transition-executor-c68f577c8                        Created pod: transition-executor-c68f577c8-hpd4r
+12m         Normal   ScalingReplicaSet   deployment/transition-executor                                  Scaled up replica set transition-executor-c68f577c8 from 0 to 1
+12m         Normal   ScalingReplicaSet   deployment/cluster-state-manager                                Scaled up replica set cluster-state-manager-76d4d4787b from 0 to 1
+12m         Normal   Scheduled           pod/planner-controller-84748c7899-w7tsf                         Successfully assigned or-sim/planner-controller-84748c7899-w7tsf to or-sim-control-plane
+12m         Normal   SuccessfulCreate    replicaset/planner-controller-84748c7899                        Created pod: planner-controller-84748c7899-w7tsf
+12m         Normal   ScalingReplicaSet   deployment/planner-controller                                   Scaled up replica set planner-controller-84748c7899 from 0 to 1
+12m         Normal   Scheduled           pod/cluster-state-manager-76d4d4787b-jhzgl                      Successfully assigned or-sim/cluster-state-manager-76d4d4787b-jhzgl to or-sim-control-plane
+12m         Normal   ScalingReplicaSet   deployment/planner-controller                                   Scaled down replica set planner-controller-5797f88bb7 from 1 to 0
+12m         Normal   SuccessfulDelete    replicaset/cluster-state-manager-7d4d789bbd                     Deleted pod: cluster-state-manager-7d4d789bbd-p4865
+12m         Normal   Killing             pod/transition-executor-78588d6bcd-pvq6p                        Stopping container controller
+12m         Normal   SuccessfulDelete    replicaset/transition-executor-78588d6bcd                       Deleted pod: transition-executor-78588d6bcd-pvq6p
+12m         Normal   Started             pod/planner-controller-84748c7899-w7tsf                         Started container controller
+12m         Normal   Created             pod/planner-controller-84748c7899-w7tsf                         Created container: controller
+12m         Normal   Pulled              pod/planner-controller-84748c7899-w7tsf                         Successfully pulled image "localhost:10690/migrant-control-plane:go" in 251ms (251ms including waiting). Image size: 21952514 bytes.
+12m         Normal   Pulling             pod/planner-controller-84748c7899-w7tsf                         Pulling image "localhost:10690/migrant-control-plane:go"
+12m         Normal   ScalingReplicaSet   deployment/cluster-state-manager                                Scaled down replica set cluster-state-manager-7d4d789bbd from 1 to 0
+12m         Normal   SuccessfulDelete    replicaset/planner-controller-5797f88bb7                        Deleted pod: planner-controller-5797f88bb7-pjqwc
+12m         Normal   Killing             pod/planner-controller-5797f88bb7-pjqwc                         Stopping container controller
+12m         Normal   Pulling             pod/cluster-state-manager-76d4d4787b-jhzgl                      Pulling image "localhost:10690/migrant-control-plane:go"
+12m         Normal   Pulled              pod/cluster-state-manager-76d4d4787b-jhzgl                      Successfully pulled image "localhost:10690/migrant-control-plane:go" in 254ms (254ms including waiting). Image size: 21952514 bytes.
+12m         Normal   Created             pod/cluster-state-manager-76d4d4787b-jhzgl                      Created container: controller
+12m         Normal   Killing             pod/cluster-state-manager-7d4d789bbd-p4865                      Stopping container controller
+12m         Normal   Pulling             pod/transition-executor-c68f577c8-hpd4r                         Pulling image "localhost:10690/migrant-control-plane:go"
+12m         Normal   Pulled              pod/transition-executor-c68f577c8-hpd4r                         Successfully pulled image "localhost:10690/migrant-control-plane:go" in 245ms (245ms including waiting). Image size: 21952514 bytes.
+12m         Normal   Started             pod/cluster-state-manager-76d4d4787b-jhzgl                      Started container controller
+12m         Normal   Created             pod/transition-executor-c68f577c8-hpd4r                         Created container: controller
+12m         Normal   Started             pod/transition-executor-c68f577c8-hpd4r                         Started container controller
+12m         Normal   ScalingReplicaSet   deployment/transition-executor                                  Scaled down replica set transition-executor-78588d6bcd from 1 to 0
+11m         Normal   SuccessfulCreate    daemonset/mig-node-agent                                        Created pod: mig-node-agent-jhc97
+11m         Normal   Killing             pod/slot-device-plugin-277xw                                    Stopping container plugin
+11m         Normal   Scheduled           pod/mig-node-agent-jhc97                                        Successfully assigned or-sim/mig-node-agent-jhc97 to ampere
+11m         Normal   Killing             pod/mig-node-agent-cd4xj                                        Stopping container agent
+11m         Normal   Scheduled           pod/slot-device-plugin-dczzd                                    Successfully assigned or-sim/slot-device-plugin-dczzd to ampere
+11m         Normal   Pulling             pod/slot-device-plugin-dczzd                                    Pulling image "localhost:10690/migrant-node-agent:go"
+11m         Normal   SuccessfulCreate    daemonset/slot-device-plugin                                    Created pod: slot-device-plugin-dczzd
+11m         Normal   Pulling             pod/mig-node-agent-jhc97                                        Pulling image "localhost:10690/migrant-node-agent:go"
+11m         Normal   Started             pod/mig-node-agent-jhc97                                        Started container agent
+11m         Normal   Created             pod/mig-node-agent-jhc97                                        Created container: agent
+11m         Normal   Pulled              pod/mig-node-agent-jhc97                                        Successfully pulled image "localhost:10690/migrant-node-agent:go" in 270ms (270ms including waiting). Image size: 137571518 bytes.
+11m         Normal   Started             pod/slot-device-plugin-dczzd                                    Started container plugin
+11m         Normal   Created             pod/slot-device-plugin-dczzd                                    Created container: plugin
+11m         Normal   Pulled              pod/slot-device-plugin-dczzd                                    Successfully pulled image "localhost:10690/migrant-node-agent:go" in 217ms (217ms including waiting). Image size: 137571518 bytes.
+7m39s       Normal   Pulled              pod/migrant-go-control-plane-build-or-sim-control-plane-7z5xd   Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+7m39s       Normal   Scheduled           pod/migrant-go-control-plane-build-or-sim-control-plane-7z5xd   Successfully assigned or-sim/migrant-go-control-plane-build-or-sim-control-plane-7z5xd to or-sim-control-plane
+7m39s       Normal   SuccessfulCreate    job/migrant-go-control-plane-build-or-sim-control-plane         Created pod: migrant-go-control-plane-build-or-sim-control-plane-7z5xd
+7m39s       Normal   Started             pod/migrant-go-control-plane-build-or-sim-control-plane-7z5xd   Started container kaniko
+7m39s       Normal   Created             pod/migrant-go-control-plane-build-or-sim-control-plane-7z5xd   Created container: kaniko
+6m31s       Normal   Completed           job/migrant-go-control-plane-build-or-sim-control-plane         Job completed
+6m22s       Normal   SuccessfulCreate    replicaset/transition-executor-64d9d48cd9                       Created pod: transition-executor-64d9d48cd9-rq8wb
+6m22s       Normal   Scheduled           pod/transition-executor-64d9d48cd9-rq8wb                        Successfully assigned or-sim/transition-executor-64d9d48cd9-rq8wb to or-sim-control-plane
+6m22s       Normal   SuccessfulCreate    replicaset/planner-controller-57f668c5f4                        Created pod: planner-controller-57f668c5f4-vxrrl
+6m22s       Normal   ScalingReplicaSet   deployment/cluster-state-manager                                Scaled up replica set cluster-state-manager-77c8547787 from 0 to 1
+6m22s       Normal   ScalingReplicaSet   deployment/transition-executor                                  Scaled up replica set transition-executor-64d9d48cd9 from 0 to 1
+6m22s       Normal   Started             pod/cluster-state-manager-77c8547787-8c5c8                      Started container controller
+6m22s       Normal   Started             pod/transition-executor-64d9d48cd9-rq8wb                        Started container controller
+6m22s       Normal   Created             pod/transition-executor-64d9d48cd9-rq8wb                        Created container: controller
+6m22s       Normal   Pulled              pod/transition-executor-64d9d48cd9-rq8wb                        Successfully pulled image "localhost:10690/migrant-control-plane:go" in 268ms (268ms including waiting). Image size: 21945288 bytes.
+6m22s       Normal   Scheduled           pod/cluster-state-manager-77c8547787-8c5c8                      Successfully assigned or-sim/cluster-state-manager-77c8547787-8c5c8 to or-sim-control-plane
+6m22s       Normal   Pulling             pod/transition-executor-64d9d48cd9-rq8wb                        Pulling image "localhost:10690/migrant-control-plane:go"
+6m22s       Normal   Started             pod/planner-controller-57f668c5f4-vxrrl                         Started container controller
+6m22s       Normal   SuccessfulCreate    replicaset/cluster-state-manager-77c8547787                     Created pod: cluster-state-manager-77c8547787-8c5c8
+6m22s       Normal   ScalingReplicaSet   deployment/planner-controller                                   Scaled up replica set planner-controller-57f668c5f4 from 0 to 1
+6m22s       Normal   Created             pod/cluster-state-manager-77c8547787-8c5c8                      Created container: controller
+6m22s       Normal   Pulling             pod/cluster-state-manager-77c8547787-8c5c8                      Pulling image "localhost:10690/migrant-control-plane:go"
+6m22s       Normal   Pulled              pod/cluster-state-manager-77c8547787-8c5c8                      Successfully pulled image "localhost:10690/migrant-control-plane:go" in 258ms (258ms including waiting). Image size: 21945288 bytes.
+6m22s       Normal   Created             pod/planner-controller-57f668c5f4-vxrrl                         Created container: controller
+6m22s       Normal   Pulled              pod/planner-controller-57f668c5f4-vxrrl                         Successfully pulled image "localhost:10690/migrant-control-plane:go" in 270ms (270ms including waiting). Image size: 21945288 bytes.
+6m22s       Normal   Pulling             pod/planner-controller-57f668c5f4-vxrrl                         Pulling image "localhost:10690/migrant-control-plane:go"
+6m22s       Normal   Scheduled           pod/planner-controller-57f668c5f4-vxrrl                         Successfully assigned or-sim/planner-controller-57f668c5f4-vxrrl to or-sim-control-plane
+6m21s       Normal   ScalingReplicaSet   deployment/planner-controller                                   Scaled down replica set planner-controller-84748c7899 from 1 to 0
+6m21s       Normal   Killing             pod/transition-executor-c68f577c8-hpd4r                         Stopping container controller
+6m21s       Normal   SuccessfulDelete    replicaset/planner-controller-84748c7899                        Deleted pod: planner-controller-84748c7899-w7tsf
+6m21s       Normal   Killing             pod/planner-controller-84748c7899-w7tsf                         Stopping container controller
+6m21s       Normal   SuccessfulDelete    replicaset/transition-executor-c68f577c8                        Deleted pod: transition-executor-c68f577c8-hpd4r
+6m21s       Normal   SuccessfulDelete    replicaset/cluster-state-manager-76d4d4787b                     Deleted pod: cluster-state-manager-76d4d4787b-jhzgl
+6m21s       Normal   Killing             pod/cluster-state-manager-76d4d4787b-jhzgl                      Stopping container controller
+6m21s       Normal   ScalingReplicaSet   deployment/cluster-state-manager                                Scaled down replica set cluster-state-manager-76d4d4787b from 1 to 0
+6m21s       Normal   ScalingReplicaSet   deployment/transition-executor                                  Scaled down replica set transition-executor-c68f577c8 from 1 to 0
+4m53s       Normal   Started             pod/gpt2-runtime-7d7dc5dc48-wqrpk                               Started container runtime
+4m53s       Normal   ScalingReplicaSet   deployment/llama-runtime                                        Scaled up replica set llama-runtime-c768cf9dc from 0 to 1
+4m53s       Normal   SuccessfulCreate    replicaset/llama-runtime-c768cf9dc                              Created pod: llama-runtime-c768cf9dc-2vdrp
+4m53s       Normal   Scheduled           pod/gpt2-runtime-7d7dc5dc48-wqrpk                               Successfully assigned or-sim/gpt2-runtime-7d7dc5dc48-wqrpk to ampere
+4m53s       Normal   Pulled              pod/gpt2-runtime-7d7dc5dc48-wqrpk                               Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+4m53s       Normal   Created             pod/gpt2-runtime-7d7dc5dc48-wqrpk                               Created container: runtime
+4m53s       Normal   SuccessfulCreate    replicaset/gpt2-runtime-7d7dc5dc48                              Created pod: gpt2-runtime-7d7dc5dc48-wqrpk
+4m53s       Normal   ScalingReplicaSet   deployment/gpt2-runtime                                         Scaled up replica set gpt2-runtime-7d7dc5dc48 from 0 to 1
+4m53s       Normal   Scheduled           pod/llama-runtime-c768cf9dc-2vdrp                               Successfully assigned or-sim/llama-runtime-c768cf9dc-2vdrp to ampere
+4m53s       Normal   Pulled              pod/llama-runtime-c768cf9dc-2vdrp                               Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+4m53s       Normal   Created             pod/llama-runtime-c768cf9dc-2vdrp                               Created container: runtime
+4m53s       Normal   Started             pod/llama-runtime-c768cf9dc-2vdrp                               Started container runtime

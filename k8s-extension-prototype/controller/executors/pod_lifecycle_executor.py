@@ -8,6 +8,7 @@ from kubernetes import client, config, watch
 from kubernetes.config.config_exception import ConfigException
 
 from api.k8s_api import KubernetesClient, PythonKubernetesClient
+from cluster_state_manager.slot_resources import slot_resource_name_from_row
 from observe.observed_layout import (
     expected_placement_from_row,
     find_logical_slot,
@@ -182,11 +183,13 @@ def _create_or_reuse_workload_pod(
     expected_placement = expected_placement_from_row(row)
     placement_attempts = []
     reservations: list[dict[str, Any]] = []
-    direct_mig_uuid = _expected_mig_uuid_from_registry(
+    expected_mig_uuid = _expected_mig_uuid_from_registry(
         client_=client_,
         namespace=namespace,
         row=row,
     )
+    exact_slot_resource = slot_resource_name_from_row(row)
+    requested_resource = exact_slot_resource or mig_resource
 
     _apply_batch_configmap(core, namespace, configmap_name, batch_size, action_plan_name)
     max_attempts = int(row.get("placementRetryLimit") or (3 if expected_placement else 1))
@@ -196,18 +199,20 @@ def _create_or_reuse_workload_pod(
     placement_verification: dict[str, Any] = {}
     for attempt in range(1, max_attempts + 1):
         _cleanup_slot_reservations(core=core, namespace=namespace, reservations=reservations, timeout_s=timeout_s)
-        reservations = _prepare_slot_reservations(
-            core=core,
-            client_=client_,
-            namespace=namespace,
-            action_plan_name=action_plan_name,
-            owner_pod_name=pod_name,
-            row=row,
-            node_name=node_name,
-            mig_resource=mig_resource,
-            image=image,
-            timeout_s=timeout_s,
-        )
+        reservations = []
+        if exact_slot_resource is None:
+            reservations = _prepare_slot_reservations(
+                core=core,
+                client_=client_,
+                namespace=namespace,
+                action_plan_name=action_plan_name,
+                owner_pod_name=pod_name,
+                row=row,
+                node_name=node_name,
+                mig_resource=mig_resource,
+                image=image,
+                timeout_s=timeout_s,
+            )
         try:
             existing = core.read_namespaced_pod(pod_name, namespace)
             pod_uid = str(existing.metadata.uid)
@@ -223,9 +228,8 @@ def _create_or_reuse_workload_pod(
                     action_plan_name=action_plan_name,
                     workload=workload,
                     node_name=node_name,
-                    mig_resource=mig_resource,
+                    mig_resource=requested_resource,
                     image=image,
-                    mig_device_uuid=direct_mig_uuid,
                 ),
             )
             pod_uid = _wait_for_pod_ready(core, namespace, pod_name, timeout_s)
@@ -265,8 +269,10 @@ def _create_or_reuse_workload_pod(
         "podName": pod_name,
         "configMapName": configmap_name,
         "nodeName": node_name,
-        "requestedMigResource": mig_resource,
-        "directMigDeviceUuid": direct_mig_uuid,
+        "requestedMigResource": requested_resource,
+        "fallbackMigResource": mig_resource,
+        "exactSlotResource": exact_slot_resource,
+        "expectedMigDeviceUuid": expected_mig_uuid,
         "batchSize": batch_size,
         "podUid": pod_uid,
         "reused": reused,
@@ -388,22 +394,12 @@ def _workload_pod_manifest(
     node_name: str,
     mig_resource: str,
     image: str,
-    mig_device_uuid: str | None = None,
 ) -> dict[str, Any]:
     env = [
         {"name": "NVIDIA_DRIVER_CAPABILITIES", "value": "compute,utility"},
     ]
     resources = {"limits": {mig_resource: 1}}
     annotations = _placement_annotations(action_plan_name=action_plan_name)
-    if mig_device_uuid:
-        annotations["nvidia.cdi.k8s.io/container.worker"] = (
-            f"management.nvidia.com/gpu={mig_device_uuid}"
-        )
-        annotations["mig.or-sim.io/direct-cdi-device"] = (
-            f"management.nvidia.com/gpu={mig_device_uuid}"
-        )
-        env.append({"name": "NVIDIA_VISIBLE_DEVICES", "value": "all"})
-        resources = {}
     manifest = {
         "apiVersion": "v1",
         "kind": "Pod",
@@ -448,8 +444,6 @@ def _workload_pod_manifest(
             "volumes": [{"name": "batch-config", "configMap": {"name": configmap_name}}],
         },
     }
-    if mig_device_uuid:
-        manifest["spec"]["runtimeClassName"] = "nvidia"
     return manifest
 
 
@@ -521,7 +515,7 @@ def _verify_expected_placement(
     expected_uuid = str(expected_slot.get("migDeviceUuid") or "")
     output = _pod_nvidia_smi_l(core=core, namespace=namespace, pod_name=pod_name)
     actual_uuids = parse_mig_uuids_from_nvidia_smi_l(output)
-    success = bool(expected_uuid and expected_uuid in actual_uuids)
+    success = bool(expected_uuid and actual_uuids == [expected_uuid])
     annotations = {
         "mig.or-sim.io/placement-verified": "true" if success else "false",
         "mig.or-sim.io/expected-physical-gpu-id": str(expected_slot.get("physicalGpuId") or ""),
@@ -549,7 +543,7 @@ def _verify_expected_placement(
         "message": (
             "Pod is bound to the expected logical slot's current MIG UUID."
             if success
-            else "Pod is not bound to the expected logical slot's current MIG UUID."
+            else "Pod did not expose exactly the expected logical slot MIG UUID."
         ),
     }
 
@@ -584,12 +578,14 @@ def _prepare_slot_reservations(
     if expected_slot is None:
         return []
 
+    expected_start = int(expected_slot.get("slotStart") or 0)
     peer_slots = [
         dict(slot)
         for slot in logical_slots
         if str(slot.get("physicalGpuId") or "") == str(expected_slot.get("physicalGpuId") or "")
         and str(slot.get("gpuOperatorProfile") or "") == str(expected_slot.get("gpuOperatorProfile") or "")
         and str(slot.get("migDeviceUuid") or "") != str(expected_slot.get("migDeviceUuid") or "")
+        and int(slot.get("slotStart") or 0) < expected_start
     ]
     reservations = []
     for idx, peer in enumerate(peer_slots):

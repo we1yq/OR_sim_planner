@@ -2,17 +2,24 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"sort"
+	"sync"
 	"strings"
 	"syscall"
 	"time"
+
+	"google.golang.org/grpc"
+	deviceplugin "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
 type result struct {
@@ -96,10 +103,28 @@ func main() {
 	var gpuIndex string
 	var jsonOut bool
 	var lockPath string
+	var slotDevicePlugin bool
+	var nodeName string
+	var pluginDir string
+	var scanInterval time.Duration
 	flag.StringVar(&gpuIndex, "gpu-index", "0", "A100 GPU index to mutate")
 	flag.BoolVar(&jsonOut, "json", false, "emit JSON result")
 	flag.StringVar(&lockPath, "lock-file", "/tmp/or-sim-fast-mig-node-agent.lock", "host-local lock file")
+	flag.BoolVar(&slotDevicePlugin, "slot-device-plugin", false, "run the or-sim exact MIG slot kubelet device plugin")
+	flag.StringVar(&nodeName, "node-name", os.Getenv("NODE_NAME"), "Kubernetes node name used in or-sim slot resource names")
+	flag.StringVar(&pluginDir, "device-plugin-dir", deviceplugin.DevicePluginPath, "kubelet device plugin directory")
+	flag.DurationVar(&scanInterval, "slot-scan-interval", 5*time.Second, "MIG slot device plugin rescan interval")
 	flag.Parse()
+
+	if slotDevicePlugin {
+		if nodeName == "" {
+			fail(jsonOut, result{Success: false, Message: "--node-name or NODE_NAME is required for --slot-device-plugin"}, 2)
+		}
+		if err := runSlotDevicePlugin(nodeName, pluginDir, scanInterval); err != nil {
+			fail(jsonOut, result{Success: false, Message: err.Error()}, 1)
+		}
+		return
+	}
 
 	if flag.NArg() < 1 {
 		fail(jsonOut, result{Success: false, Message: "missing command"}, 2)
@@ -940,4 +965,277 @@ func printResult(jsonOut bool, res result) {
 func fail(jsonOut bool, res result, code int) {
 	printResult(jsonOut, res)
 	os.Exit(code)
+}
+
+const (
+	orSimResourceDomain = "or-sim.io"
+	nvidiaMIGCDIPrefix  = "k8s.device-plugin.nvidia.com/gpu="
+)
+
+type slotDevice struct {
+	ResourceName  string
+	SocketName    string
+	PhysicalGPUID string
+	GPUIndex      string
+	SlotStart     int
+	SlotEnd       int
+	Profile       string
+	MIGUUID       string
+}
+
+type slotDevicePluginServer struct {
+	deviceplugin.UnimplementedDevicePluginServer
+	mu     sync.RWMutex
+	device slotDevice
+}
+
+func runSlotDevicePlugin(nodeName, pluginDir string, scanInterval time.Duration) error {
+	manager := map[string]*slotResourceServer{}
+	ticker := time.NewTicker(scanInterval)
+	defer ticker.Stop()
+	for {
+		slots, err := discoverSlotDevices(nodeName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "or-sim slot device discovery failed: %v\n", err)
+		} else {
+			seen := map[string]slotDevice{}
+			for _, slot := range slots {
+				seen[slot.ResourceName] = slot
+				server, ok := manager[slot.ResourceName]
+				if !ok {
+					server = newSlotResourceServer(pluginDir, slot)
+					if err := server.start(); err != nil {
+						return err
+					}
+					manager[slot.ResourceName] = server
+				}
+				server.update(slot)
+				if err := server.register(); err != nil {
+					fmt.Fprintf(os.Stderr, "or-sim slot device plugin register %s failed: %v\n", slot.ResourceName, err)
+				}
+			}
+			for resourceName, server := range manager {
+				if _, ok := seen[resourceName]; ok {
+					continue
+				}
+				server.stop()
+				delete(manager, resourceName)
+			}
+		}
+		<-ticker.C
+	}
+}
+
+type slotResourceServer struct {
+	pluginDir string
+	socket    string
+	grpc     *grpc.Server
+	service  *slotDevicePluginServer
+}
+
+func newSlotResourceServer(pluginDir string, device slotDevice) *slotResourceServer {
+	return &slotResourceServer{
+		pluginDir: pluginDir,
+		socket:    filepath.Join(pluginDir, device.SocketName),
+		service:   &slotDevicePluginServer{device: device},
+	}
+}
+
+func (s *slotResourceServer) start() error {
+	if err := os.MkdirAll(s.pluginDir, 0755); err != nil {
+		return err
+	}
+	_ = os.Remove(s.socket)
+	listener, err := net.Listen("unix", s.socket)
+	if err != nil {
+		return err
+	}
+	s.grpc = grpc.NewServer()
+	deviceplugin.RegisterDevicePluginServer(s.grpc, s.service)
+	go func() {
+		if err := s.grpc.Serve(listener); err != nil {
+			fmt.Fprintf(os.Stderr, "or-sim slot device plugin grpc stopped: %v\n", err)
+		}
+	}()
+	if err := waitForSocket(s.socket, 5*time.Second); err != nil {
+		return err
+	}
+	return s.register()
+}
+
+func (s *slotResourceServer) register() error {
+	return registerSlotResource(s.pluginDir, s.service.current().ResourceName, filepath.Base(s.socket))
+}
+
+func (s *slotResourceServer) update(device slotDevice) {
+	s.service.set(device)
+}
+
+func (s *slotResourceServer) stop() {
+	if s.grpc != nil {
+		s.grpc.Stop()
+	}
+	_ = os.Remove(s.socket)
+}
+
+func (s *slotDevicePluginServer) set(device slotDevice) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.device = device
+}
+
+func (s *slotDevicePluginServer) current() slotDevice {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.device
+}
+
+func (s *slotDevicePluginServer) GetDevicePluginOptions(context.Context, *deviceplugin.Empty) (*deviceplugin.DevicePluginOptions, error) {
+	return &deviceplugin.DevicePluginOptions{}, nil
+}
+
+func (s *slotDevicePluginServer) ListAndWatch(_ *deviceplugin.Empty, stream deviceplugin.DevicePlugin_ListAndWatchServer) error {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		device := s.current()
+		resp := &deviceplugin.ListAndWatchResponse{
+			Devices: []*deviceplugin.Device{{
+				ID:     device.MIGUUID,
+				Health: deviceplugin.Healthy,
+			}},
+		}
+		if err := stream.Send(resp); err != nil {
+			return err
+		}
+		<-ticker.C
+	}
+}
+
+func (s *slotDevicePluginServer) Allocate(_ context.Context, req *deviceplugin.AllocateRequest) (*deviceplugin.AllocateResponse, error) {
+	device := s.current()
+	responses := make([]*deviceplugin.ContainerAllocateResponse, 0, len(req.ContainerRequests))
+	for _, containerReq := range req.ContainerRequests {
+		if len(containerReq.DevicesIDs) != 1 || containerReq.DevicesIDs[0] != device.MIGUUID {
+			return nil, fmt.Errorf("or-sim slot %s expected allocation for %s, got %v", device.ResourceName, device.MIGUUID, containerReq.DevicesIDs)
+		}
+		responses = append(responses, &deviceplugin.ContainerAllocateResponse{
+			CDIDevices: []*deviceplugin.CDIDevice{{Name: nvidiaMIGCDIPrefix + device.MIGUUID}},
+			Envs: map[string]string{
+				"OR_SIM_PHYSICAL_GPU_ID": device.PhysicalGPUID,
+				"OR_SIM_SLOT":            fmt.Sprintf("%d-%d-%s", device.SlotStart, device.SlotEnd, device.Profile),
+				"OR_SIM_MIG_UUID":        device.MIGUUID,
+			},
+		})
+	}
+	return &deviceplugin.AllocateResponse{ContainerResponses: responses}, nil
+}
+
+func (s *slotDevicePluginServer) PreStartContainer(context.Context, *deviceplugin.PreStartContainerRequest) (*deviceplugin.PreStartContainerResponse, error) {
+	return &deviceplugin.PreStartContainerResponse{}, nil
+}
+
+func (s *slotDevicePluginServer) GetPreferredAllocation(context.Context, *deviceplugin.PreferredAllocationRequest) (*deviceplugin.PreferredAllocationResponse, error) {
+	return &deviceplugin.PreferredAllocationResponse{}, nil
+}
+
+func registerSlotResource(pluginDir, resourceName, endpoint string) error {
+	conn, err := grpc.Dial(
+		"unix://"+filepath.Join(pluginDir, "kubelet.sock"),
+		grpc.WithInsecure(),
+		grpc.WithBlock(),
+		grpc.WithTimeout(5*time.Second),
+	)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	client := deviceplugin.NewRegistrationClient(conn)
+	_, err = client.Register(context.Background(), &deviceplugin.RegisterRequest{
+		Version:      deviceplugin.Version,
+		Endpoint:     endpoint,
+		ResourceName: resourceName,
+	})
+	return err
+}
+
+func discoverSlotDevices(nodeName string) ([]slotDevice, error) {
+	smi, err := run("nvidia-smi", "-L")
+	if err != nil {
+		return nil, err
+	}
+	gpuUUIDs := parseGPUUUIDs(smi)
+	slots := []slotDevice{}
+	for gpuIndex := range gpuUUIDs {
+		instances, _, err := listGPUInstances(gpuIndex)
+		if err != nil {
+			return nil, err
+		}
+		for _, slot := range migSlotsFromObservation(smi, instances, gpuIndex) {
+			if slot.MIGDeviceUUID == "" {
+				continue
+			}
+			physicalID := fmt.Sprintf("%s-gpu%s", nodeName, gpuIndex)
+			resourceName := slotResourceName(physicalID, slot.SlotStart, slot.SlotEnd, slot.Profile)
+			slots = append(slots, slotDevice{
+				ResourceName:  resourceName,
+				SocketName:    socketNameForResource(resourceName),
+				PhysicalGPUID: physicalID,
+				GPUIndex:      gpuIndex,
+				SlotStart:     slot.SlotStart,
+				SlotEnd:       slot.SlotEnd,
+				Profile:       slot.Profile,
+				MIGUUID:       slot.MIGDeviceUUID,
+			})
+		}
+	}
+	sort.Slice(slots, func(i, j int) bool { return slots[i].ResourceName < slots[j].ResourceName })
+	return slots, nil
+}
+
+func parseGPUUUIDs(smi string) map[string]string {
+	re := regexp.MustCompile(`^GPU ([0-9]+): .* \(UUID: ([^)]+)\)$`)
+	out := map[string]string{}
+	for _, line := range strings.Split(smi, "\n") {
+		match := re.FindStringSubmatch(strings.TrimSpace(line))
+		if len(match) == 3 {
+			out[match[1]] = match[2]
+		}
+	}
+	return out
+}
+
+func slotResourceName(physicalGPUID string, start, end int, profile string) string {
+	return fmt.Sprintf("%s/%s-s%d-%d-%s", orSimResourceDomain, resourceToken(physicalGPUID), start, end, resourceToken(profile))
+}
+
+func resourceToken(value string) string {
+	value = strings.ToLower(value)
+	re := regexp.MustCompile(`[^a-z0-9.-]+`)
+	value = re.ReplaceAllString(value, "-")
+	value = strings.Trim(value, ".-")
+	if len(value) > 63 {
+		value = strings.Trim(value[:63], ".-")
+	}
+	if value == "" {
+		return "slot"
+	}
+	return value
+}
+
+func socketNameForResource(resourceName string) string {
+	name := strings.ReplaceAll(resourceName, "/", "-")
+	name = strings.ReplaceAll(name, ".", "-")
+	return resourceToken(name) + ".sock"
+}
+
+func waitForSocket(path string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("timed out waiting for socket %s", path)
 }

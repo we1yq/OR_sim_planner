@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="260" viewBox="0 0 980 260">
+<rect width="980" height="260" fill="#f8fafc"/>
+<text x="40" y="36" font-family="Arial" font-size="22" font-weight="700" fill="#111827">Ampere final layout</text>
+<text x="40" y="66" font-family="Arial" font-size="14" fill="#374151">Planned abstraction: 1g + 1g + 1g + 1g + 3g; executor-facing resource uses NVIDIA placement end for 3g: s4-8-3g.</text>
+<text x="40" y="150" font-family="Arial" font-size="16" fill="#111827">ampere-gpu0</text>
+<rect x="80.0" y="110" width="100.0" height="64" fill="#60a5fa" stroke="#111827"/>
+<text x="88.0" y="148" font-family="Arial" font-size="14" fill="#111827">1g gpt2</text>
+<rect x="180.0" y="110" width="100.0" height="64" fill="#d1d5db" stroke="#111827"/>
+<text x="188.0" y="148" font-family="Arial" font-size="14" fill="#111827">1g idle</text>
+<rect x="280.0" y="110" width="100.0" height="64" fill="#d1d5db" stroke="#111827"/>
+<text x="288.0" y="148" font-family="Arial" font-size="14" fill="#111827">1g idle</text>
+<rect x="380.0" y="110" width="100.0" height="64" fill="#d1d5db" stroke="#111827"/>
+<text x="388.0" y="148" font-family="Arial" font-size="14" fill="#111827">1g idle</text>
+<rect x="480.0" y="110" width="300.0" height="64" fill="#34d399" stroke="#111827"/>
+<text x="488.0" y="148" font-family="Arial" font-size="14" fill="#111827">3g llama</text>
+<text x="76.0" y="196" font-family="Arial" font-size="12" fill="#6b7280">0</text>
+<text x="176.0" y="196" font-family="Arial" font-size="12" fill="#6b7280">1</text>
+<text x="276.0" y="196" font-family="Arial" font-size="12" fill="#6b7280">2</text>
+<text x="376.0" y="196" font-family="Arial" font-size="12" fill="#6b7280">3</text>
+<text x="476.0" y="196" font-family="Arial" font-size="12" fill="#6b7280">4</text>
+<text x="576.0" y="196" font-family="Arial" font-size="12" fill="#6b7280">5</text>
+<text x="676.0" y="196" font-family="Arial" font-size="12" fill="#6b7280">6</text>
+<text x="776.0" y="196" font-family="Arial" font-size="12" fill="#6b7280">7</text>
+<text x="80" y="214" font-family="Arial" font-size="13" fill="#374151">Exact resources: gpt2 or-sim.io/ampere-gpu0-s0-1-1g; llama or-sim.io/ampere-gpu0-s4-8-3g</text>
+<text x="40" y="238" font-family="Arial" font-size="14" fill="#111827">ampere-gpu1: available empty</text>
+</svg>

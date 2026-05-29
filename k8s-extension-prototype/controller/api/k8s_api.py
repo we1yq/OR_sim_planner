@@ -285,17 +285,20 @@ class PythonKubernetesClient:
             if status.get("phase") not in {None, "Running"}:
                 continue
             _, container_name, source = candidate
-            output = stream(
-                self.core.connect_get_namespaced_pod_exec,
-                pod_name,
-                namespace,
-                container=container_name,
-                command=["nvidia-smi", "-L"],
-                stderr=True,
-                stdin=False,
-                stdout=True,
-                tty=False,
-            )
+            try:
+                output = stream(
+                    self.core.connect_get_namespaced_pod_exec,
+                    pod_name,
+                    namespace,
+                    container=container_name,
+                    command=["nvidia-smi", "-L"],
+                    stderr=True,
+                    stdin=False,
+                    stdout=True,
+                    tty=False,
+                )
+            except Exception:
+                continue
             try:
                 lgi_output = stream(
                     self.core.connect_get_namespaced_pod_exec,

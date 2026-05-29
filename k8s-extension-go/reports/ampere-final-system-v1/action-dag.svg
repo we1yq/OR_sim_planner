@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="626" viewBox="0 0 1120 626">
+<rect width="1120" height="100%" fill="#f8fafc"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#64748b"/></marker></defs>
+<text x="40" y="36" font-family="Arial" font-size="22" font-weight="700" fill="#111827">Effect-aware action DAG</text>
+<rect x="90" y="78" width="900" height="56" rx="6" fill="#ffffff" stroke="#334155"/>
+<text x="112" y="102" font-family="Arial" font-size="15" font-weight="700" fill="#111827">phase 0: allocate_gpu</text>
+<text x="112" y="122" font-family="Arial" font-size="13" fill="#475569">a0000_allocate_gpu_CREATE-gpu1  duration=0.000s</text>
+<rect x="90" y="164" width="900" height="56" rx="6" fill="#ffffff" stroke="#334155"/>
+<text x="112" y="188" font-family="Arial" font-size="15" font-weight="700" fill="#111827">phase 1: configure_full_template</text>
+<text x="112" y="208" font-family="Arial" font-size="13" fill="#475569">a0001_configure_full_template_CREATE-gpu1  duration=2.244s</text>
+<line x1="540" y1="134" x2="540" y2="164" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="90" y="250" width="900" height="56" rx="6" fill="#ffffff" stroke="#334155"/>
+<text x="112" y="274" font-family="Arial" font-size="15" font-weight="700" fill="#111827">phase 2: bind_target_gpu</text>
+<text x="112" y="294" font-family="Arial" font-size="13" fill="#475569">a0002_bind_target_gpu_CREATE-gpu1  duration=0.000s</text>
+<line x1="540" y1="220" x2="540" y2="250" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="90" y="336" width="900" height="56" rx="6" fill="#ffffff" stroke="#334155"/>
+<text x="112" y="360" font-family="Arial" font-size="15" font-weight="700" fill="#111827">phase 3: register_mig_devices</text>
+<text x="112" y="380" font-family="Arial" font-size="13" fill="#475569">a0003_register_mig_devices_CREATE-gpu1  duration=1.543s</text>
+<line x1="540" y1="306" x2="540" y2="336" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="90" y="422" width="900" height="56" rx="6" fill="#ffffff" stroke="#334155"/>
+<text x="112" y="446" font-family="Arial" font-size="15" font-weight="700" fill="#111827">phase 4: deploy_target_workloads</text>
+<text x="112" y="466" font-family="Arial" font-size="13" fill="#475569">a0004_deploy_target_workloads_CREATE-gpu1  duration=0.008s</text>
+<line x1="540" y1="392" x2="540" y2="422" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="90" y="508" width="900" height="56" rx="6" fill="#ffffff" stroke="#334155"/>
+<text x="112" y="532" font-family="Arial" font-size="15" font-weight="700" fill="#111827">phase 5: activate_serving_route</text>
+<text x="112" y="552" font-family="Arial" font-size="13" fill="#475569">a0005_activate_serving_route_CREATE-gpu1  duration=64.567s</text>
+<line x1="540" y1="478" x2="540" y2="508" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+</svg>

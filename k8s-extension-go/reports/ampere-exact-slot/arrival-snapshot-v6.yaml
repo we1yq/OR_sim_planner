@@ -1,0 +1,16 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-ampere-exact-slot-v6
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    mig.or-sim.io/experiment: ampere-exact-slot
+spec:
+  source: experiment-arrival-rate
+  epoch: "105"
+  windowSeconds: 60
+  unit: requests_per_second
+  targetArrival:
+    llama: 0.04
+    gpt2: 0.12

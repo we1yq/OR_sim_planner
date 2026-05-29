@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: migrant-local-registry
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-local-registry
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: migrant-local-registry
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrant-local-registry
+    spec:
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: registry
+          image: registry:2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REGISTRY_HTTP_ADDR
+              value: 127.0.0.1:10690
+          ports:
+            - name: registry
+              containerPort: 10690
+          readinessProbe:
+            httpGet:
+              host: 127.0.0.1
+              path: /v2/
+              port: 10690
+          volumeMounts:
+            - name: registry-storage
+              mountPath: /var/lib/registry
+      volumes:
+        - name: registry-storage
+          emptyDir: {}

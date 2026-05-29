@@ -1,0 +1,768 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "11"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/component":"cluster-state-manager","app.kubernetes.io/name":"migrant-go-control-plane"},"name":"cluster-state-manager","namespace":"or-sim"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/component":"cluster-state-manager","app.kubernetes.io/name":"migrant-go-control-plane"}},"template":{"metadata":{"labels":{"app.kubernetes.io/component":"cluster-state-manager","app.kubernetes.io/name":"migrant-go-control-plane"}},"spec":{"containers":[{"command":["/cluster-state-manager"],"env":[{"name":"NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"ROUTER_URL","value":"http://runtime-router:8080"}],"image":"localhost:10690/migrant-control-plane:go","imagePullPolicy":"Always","name":"controller","ports":[{"containerPort":8080}],"readinessProbe":{"httpGet":{"path":"/healthz","port":8080}}}],"nodeSelector":{"kubernetes.io/hostname":"or-sim-control-plane"},"serviceAccountName":"migrant-go-control-plane"}}}}
+    creationTimestamp: "2026-05-27T10:21:46Z"
+    generation: 11
+    labels:
+      app.kubernetes.io/component: cluster-state-manager
+      app.kubernetes.io/name: migrant-go-control-plane
+    name: cluster-state-manager
+    namespace: or-sim
+    resourceVersion: "6494633"
+    uid: ab6ce57f-ab89-417d-a03c-f16346576e86
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: cluster-state-manager
+        app.kubernetes.io/name: migrant-go-control-plane
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2026-05-29T12:57:42+09:00"
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: cluster-state-manager
+          app.kubernetes.io/name: migrant-go-control-plane
+      spec:
+        containers:
+        - command:
+          - /cluster-state-manager
+          env:
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: ROUTER_URL
+            value: http://runtime-router:8080
+          image: localhost:10690/migrant-control-plane:go
+          imagePullPolicy: Always
+          name: controller
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: or-sim-control-plane
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: migrant-go-control-plane
+        serviceAccountName: migrant-go-control-plane
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-05-27T10:21:47Z"
+      lastUpdateTime: "2026-05-27T10:21:47Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-27T10:21:46Z"
+      lastUpdateTime: "2026-05-29T03:57:44Z"
+      message: ReplicaSet "cluster-state-manager-77c8547787" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 11
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "5"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/component":"epoch-controller","app.kubernetes.io/name":"migrant-go-control-plane"},"name":"epoch-controller","namespace":"or-sim"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/component":"epoch-controller","app.kubernetes.io/name":"migrant-go-control-plane"}},"template":{"metadata":{"labels":{"app.kubernetes.io/component":"epoch-controller","app.kubernetes.io/name":"migrant-go-control-plane"}},"spec":{"containers":[{"command":["/epoch-controller"],"env":[{"name":"NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"ROUTER_URL","value":"http://runtime-router:8080"}],"image":"localhost:10690/migrant-control-plane:go","imagePullPolicy":"Always","name":"controller","ports":[{"containerPort":8080}],"readinessProbe":{"httpGet":{"path":"/healthz","port":8080}}}],"nodeSelector":{"kubernetes.io/hostname":"or-sim-control-plane"},"serviceAccountName":"migrant-go-control-plane"}}}}
+    creationTimestamp: "2026-05-27T10:21:46Z"
+    generation: 5
+    labels:
+      app.kubernetes.io/component: epoch-controller
+      app.kubernetes.io/name: migrant-go-control-plane
+    name: epoch-controller
+    namespace: or-sim
+    resourceVersion: "6142532"
+    uid: 04a58e46-46b1-45bd-88ce-bf4cd35ffc76
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: epoch-controller
+        app.kubernetes.io/name: migrant-go-control-plane
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2026-05-28T17:07:53+09:00"
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: epoch-controller
+          app.kubernetes.io/name: migrant-go-control-plane
+      spec:
+        containers:
+        - command:
+          - /epoch-controller
+          env:
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: ROUTER_URL
+            value: http://runtime-router:8080
+          image: localhost:10690/migrant-control-plane:go
+          imagePullPolicy: Always
+          name: controller
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: or-sim-control-plane
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: migrant-go-control-plane
+        serviceAccountName: migrant-go-control-plane
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-05-27T10:21:47Z"
+      lastUpdateTime: "2026-05-27T10:21:47Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-27T10:21:46Z"
+      lastUpdateTime: "2026-05-28T08:07:54Z"
+      message: ReplicaSet "epoch-controller-6f7d4fbbf6" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 5
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    creationTimestamp: "2026-05-29T05:35:05Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: migrant-model-runtime
+      migrant.io/gpu: ampere-gpu0
+      migrant.io/model: gpt2
+      migrant.io/profile: 1g
+    name: gpt2-runtime
+    namespace: or-sim
+    resourceVersion: "6520672"
+    uid: 3d993a5b-d821-4cce-92ad-55080699ecd9
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: migrant-model-runtime
+        migrant.io/model: gpt2
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        annotations:
+          migrant.io/binding-layer: kubelet-device-plugin-allocate
+          migrant.io/binding-mechanism: per-mig-uuid-resource
+          migrant.io/device-resource: or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+          migrant.io/expected-mig-uuid: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+          migrant.io/long-term-identity: logical-slot
+          migrant.io/slot-resource: or-sim.io/ampere-gpu0-s0-1-1g
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/name: migrant-model-runtime
+          migrant.io/gpu: ampere-gpu0
+          migrant.io/model: gpt2
+          migrant.io/profile: 1g
+      spec:
+        containers:
+        - args:
+          - --addr=:10682
+          env:
+          - name: MODEL_NAME
+            value: gpt2
+          - name: BATCH_SIZE
+            value: "1"
+          - name: OR_SIM_GPU
+            value: ampere-gpu0
+          - name: OR_SIM_PROFILE
+            value: 1g
+          - name: OR_SIM_SLOT_RESOURCE
+            value: or-sim.io/ampere-gpu0-s0-1-1g
+          - name: OR_SIM_DEVICE_RESOURCE
+            value: or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+          - name: OR_SIM_EXPECTED_MIG_UUID
+            value: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+          image: localhost:10690/migrant-model-runtime:go
+          imagePullPolicy: IfNotPresent
+          name: runtime
+          ports:
+          - containerPort: 10682
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 10682
+              scheme: HTTP
+            periodSeconds: 1
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac: "1"
+            requests:
+              or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac: "1"
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: true
+        nodeSelector:
+          kubernetes.io/hostname: ampere
+        restartPolicy: Always
+        runtimeClassName: nvidia
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        tolerations:
+        - operator: Exists
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-05-29T05:35:06Z"
+      lastUpdateTime: "2026-05-29T05:35:06Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-29T05:35:05Z"
+      lastUpdateTime: "2026-05-29T05:35:06Z"
+      message: ReplicaSet "gpt2-runtime-7d7dc5dc48" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    creationTimestamp: "2026-05-29T05:35:05Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: migrant-model-runtime
+      migrant.io/gpu: ampere-gpu0
+      migrant.io/model: llama
+      migrant.io/profile: 3g
+    name: llama-runtime
+    namespace: or-sim
+    resourceVersion: "6520677"
+    uid: e0a74086-aba4-4066-aa24-5d957d7f8948
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: migrant-model-runtime
+        migrant.io/model: llama
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        annotations:
+          migrant.io/binding-layer: kubelet-device-plugin-allocate
+          migrant.io/binding-mechanism: per-mig-uuid-resource
+          migrant.io/device-resource: or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+          migrant.io/expected-mig-uuid: MIG-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+          migrant.io/long-term-identity: logical-slot
+          migrant.io/slot-resource: or-sim.io/ampere-gpu0-s4-8-3g
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/name: migrant-model-runtime
+          migrant.io/gpu: ampere-gpu0
+          migrant.io/model: llama
+          migrant.io/profile: 3g
+      spec:
+        containers:
+        - args:
+          - --addr=:10681
+          env:
+          - name: MODEL_NAME
+            value: llama
+          - name: BATCH_SIZE
+            value: "1"
+          - name: OR_SIM_GPU
+            value: ampere-gpu0
+          - name: OR_SIM_PROFILE
+            value: 3g
+          - name: OR_SIM_SLOT_RESOURCE
+            value: or-sim.io/ampere-gpu0-s4-8-3g
+          - name: OR_SIM_DEVICE_RESOURCE
+            value: or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+          - name: OR_SIM_EXPECTED_MIG_UUID
+            value: MIG-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+          image: localhost:10690/migrant-model-runtime:go
+          imagePullPolicy: IfNotPresent
+          name: runtime
+          ports:
+          - containerPort: 10681
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 10681
+              scheme: HTTP
+            periodSeconds: 1
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05: "1"
+            requests:
+              or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05: "1"
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: true
+        nodeSelector:
+          kubernetes.io/hostname: ampere
+        restartPolicy: Always
+        runtimeClassName: nvidia
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        tolerations:
+        - operator: Exists
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-05-29T05:35:06Z"
+      lastUpdateTime: "2026-05-29T05:35:06Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-29T05:35:05Z"
+      lastUpdateTime: "2026-05-29T05:35:06Z"
+      message: ReplicaSet "llama-runtime-c768cf9dc" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "14"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/component":"planner-controller","app.kubernetes.io/name":"migrant-go-control-plane"},"name":"planner-controller","namespace":"or-sim"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/component":"planner-controller","app.kubernetes.io/name":"migrant-go-control-plane"}},"template":{"metadata":{"labels":{"app.kubernetes.io/component":"planner-controller","app.kubernetes.io/name":"migrant-go-control-plane"}},"spec":{"containers":[{"command":["/planner-controller"],"env":[{"name":"NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"PLANNER_ENGINE_URL","value":"http://planner-engine:8080"}],"image":"localhost:10690/migrant-control-plane:go","imagePullPolicy":"Always","name":"controller","ports":[{"containerPort":8080}],"readinessProbe":{"httpGet":{"path":"/healthz","port":8080}}}],"nodeSelector":{"kubernetes.io/hostname":"or-sim-control-plane"},"serviceAccountName":"migrant-go-control-plane"}}}}
+    creationTimestamp: "2026-05-27T10:21:46Z"
+    generation: 14
+    labels:
+      app.kubernetes.io/component: planner-controller
+      app.kubernetes.io/name: migrant-go-control-plane
+    name: planner-controller
+    namespace: or-sim
+    resourceVersion: "6494620"
+    uid: 30eb3455-d64b-43df-983c-511d843d4a88
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: planner-controller
+        app.kubernetes.io/name: migrant-go-control-plane
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2026-05-29T12:57:42+09:00"
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: planner-controller
+          app.kubernetes.io/name: migrant-go-control-plane
+      spec:
+        containers:
+        - command:
+          - /planner-controller
+          env:
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: PLANNER_ENGINE_URL
+            value: http://planner-engine:8080
+          image: localhost:10690/migrant-control-plane:go
+          imagePullPolicy: Always
+          name: controller
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: or-sim-control-plane
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: migrant-go-control-plane
+        serviceAccountName: migrant-go-control-plane
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-05-27T10:21:47Z"
+      lastUpdateTime: "2026-05-27T10:21:47Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-27T10:21:46Z"
+      lastUpdateTime: "2026-05-29T03:57:44Z"
+      message: ReplicaSet "planner-controller-57f668c5f4" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 14
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "4"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"migrant-planner-engine"},"name":"planner-engine","namespace":"or-sim"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"migrant-planner-engine"}},"strategy":{"type":"Recreate"},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"migrant-planner-engine"}},"spec":{"containers":[{"image":"localhost:10690/migrant-planner-engine:go","imagePullPolicy":"Always","name":"planner-engine","ports":[{"containerPort":8080}],"readinessProbe":{"failureThreshold":3,"httpGet":{"path":"/healthz","port":8080},"periodSeconds":1}}],"nodeSelector":{"kubernetes.io/hostname":"or-sim-control-plane"}}}}}
+    creationTimestamp: "2026-05-28T10:07:12Z"
+    generation: 4
+    labels:
+      app.kubernetes.io/name: migrant-planner-engine
+    name: planner-engine
+    namespace: or-sim
+    resourceVersion: "6233469"
+    uid: b749677f-b03a-4393-b805-7449b5fb5d2c
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: migrant-planner-engine
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2026-05-28T20:27:17+09:00"
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/name: migrant-planner-engine
+      spec:
+        containers:
+        - image: localhost:10690/migrant-planner-engine:go
+          imagePullPolicy: Always
+          name: planner-engine
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 1
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: or-sim-control-plane
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-05-28T11:27:51Z"
+      lastUpdateTime: "2026-05-28T11:27:51Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-28T10:07:12Z"
+      lastUpdateTime: "2026-05-28T11:27:51Z"
+      message: ReplicaSet "planner-engine-6df7fb59" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 4
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "9"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"migrant-runtime-router"},"name":"runtime-router","namespace":"or-sim"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"migrant-runtime-router"}},"strategy":{"type":"Recreate"},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"migrant-runtime-router"}},"spec":{"containers":[{"args":["--addr=:10680"],"image":"localhost:10690/migrant-runtime-router:go","imagePullPolicy":"Always","name":"router","ports":[{"containerPort":10680}],"readinessProbe":{"httpGet":{"path":"/healthz","port":10680}}}],"dnsPolicy":"ClusterFirstWithHostNet","hostNetwork":true,"nodeSelector":{"kubernetes.io/hostname":"or-sim-control-plane"}}}}}
+    creationTimestamp: "2026-05-27T07:24:09Z"
+    generation: 11
+    labels:
+      app.kubernetes.io/name: migrant-runtime-router
+    name: runtime-router
+    namespace: or-sim
+    resourceVersion: "6142504"
+    uid: 883283a6-41f9-4f8f-a024-7d70ae2faa20
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: migrant-runtime-router
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2026-05-28T17:07:53+09:00"
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/name: migrant-runtime-router
+      spec:
+        containers:
+        - args:
+          - --addr=:10680
+          image: localhost:10690/migrant-runtime-router:go
+          imagePullPolicy: Always
+          name: router
+          ports:
+          - containerPort: 10680
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 10680
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: true
+        nodeSelector:
+          kubernetes.io/hostname: or-sim-control-plane
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-05-28T08:07:54Z"
+      lastUpdateTime: "2026-05-28T08:07:54Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-27T07:24:09Z"
+      lastUpdateTime: "2026-05-28T08:07:54Z"
+      message: ReplicaSet "runtime-router-6d74878757" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 11
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "25"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/component":"transition-executor","app.kubernetes.io/name":"migrant-go-control-plane"},"name":"transition-executor","namespace":"or-sim"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/component":"transition-executor","app.kubernetes.io/name":"migrant-go-control-plane"}},"template":{"metadata":{"labels":{"app.kubernetes.io/component":"transition-executor","app.kubernetes.io/name":"migrant-go-control-plane"}},"spec":{"containers":[{"command":["/transition-executor"],"env":[{"name":"NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"ROUTER_URL","value":"http://runtime-router:8080"},{"name":"MODEL_RUNTIME_IMAGE","value":"localhost:10690/migrant-model-runtime:go"}],"image":"localhost:10690/migrant-control-plane:go","imagePullPolicy":"Always","name":"controller","ports":[{"containerPort":8080}],"readinessProbe":{"httpGet":{"path":"/healthz","port":8080}}}],"nodeSelector":{"kubernetes.io/hostname":"or-sim-control-plane"},"serviceAccountName":"migrant-go-control-plane"}}}}
+    creationTimestamp: "2026-05-27T10:21:46Z"
+    generation: 25
+    labels:
+      app.kubernetes.io/component: transition-executor
+      app.kubernetes.io/name: migrant-go-control-plane
+    name: transition-executor
+    namespace: or-sim
+    resourceVersion: "6520051"
+    uid: 1a2dc666-cbe2-489a-96b7-03c5184e1fc5
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: transition-executor
+        app.kubernetes.io/name: migrant-go-control-plane
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2026-05-29T14:33:02+09:00"
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: transition-executor
+          app.kubernetes.io/name: migrant-go-control-plane
+      spec:
+        containers:
+        - command:
+          - /transition-executor
+          env:
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: ROUTER_URL
+            value: http://runtime-router:8080
+          - name: MODEL_RUNTIME_IMAGE
+            value: localhost:10690/migrant-model-runtime:go
+          image: localhost:10690/migrant-control-plane:go
+          imagePullPolicy: Always
+          name: controller
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: or-sim-control-plane
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: migrant-go-control-plane
+        serviceAccountName: migrant-go-control-plane
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-05-27T10:21:47Z"
+      lastUpdateTime: "2026-05-27T10:21:47Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-27T10:21:46Z"
+      lastUpdateTime: "2026-05-29T05:33:04Z"
+      message: ReplicaSet "transition-executor-7996fb64df" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 25
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+kind: List
+metadata:
+  resourceVersion: ""

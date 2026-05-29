@@ -1,0 +1,1 @@
+{"batchSize":1,"input":{"prompt":"hello"},"latencyMs":12.335,"model":"gpt2","output":{"text":"gpt2-runtime cuda-backed completion","tokens":null}}

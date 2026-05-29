@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-go-planner-engine-build-NODE
+  namespace: or-sim
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: NODE
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context-planner-engine
+              tar -xzf /input/context.tar.gz -C /workspace/context-planner-engine
+              /kaniko/executor \
+                --context=/workspace/context-planner-engine \
+                --dockerfile=/workspace/context-planner-engine/Dockerfile.planner-engine \
+                --destination=localhost:10690/migrant-planner-engine:go \
+                --insecure \
+                --skip-tls-verify
+          volumeMounts:
+            - name: build-context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: build-context
+          configMap:
+            name: migrant-go-build-context

@@ -1,0 +1,394 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: PhysicalGpuRegistry
+metadata:
+  creationTimestamp: "2026-05-11T11:37:47Z"
+  generation: 2
+  labels:
+    app.kubernetes.io/name: migrant-go
+  name: default
+  namespace: or-sim
+  resourceVersion: "6515353"
+  uid: 51756c1d-825a-44aa-a0a3-f7bfb94185ed
+spec:
+  policy:
+    allocationOrder: first-observed
+    emptyMigConfig: or-sim-empty
+    gpuProductAllowlist:
+    - NVIDIA A100
+    requireEmptyBeforeAvailable: true
+    requireMigConfigStateSuccessBeforeAvailable: true
+    source: cluster-state-manager
+status:
+  activeQueue:
+  - ampere-gpu0
+  availableQueue:
+  - ampere-gpu1
+  - rtx1-worker-gpu0
+  bindings:
+    ampere-gpu0:
+      availabilityReason: runtime_pod_running
+      availableEligible: false
+      bindingSource: gpu-operator-mig-manager-nvidia-smi
+      cleanliness: active
+      confidence: gpu-operator-nvidia-smi
+      currentMigConfig: or-sim-2b2f64eb1d
+      currentMigConfigState: success
+      deviceIndex: 0
+      gpuIndex: 0
+      gpuUUID: GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac
+      gpuUuid: GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac
+      logicalMigSlots:
+      - end: 1
+        profile: 1g
+        source: fast-mig-node-agent-provisional
+        start: 0
+        uuid: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+      - end: 2
+        profile: 1g
+        source: fast-mig-node-agent-provisional
+        start: 1
+        uuid: MIG-b9b3726d-644e-5e01-8b71-c590c23f7be3
+      - end: 3
+        profile: 1g
+        source: fast-mig-node-agent-provisional
+        start: 2
+        uuid: MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf
+      - end: 4
+        profile: 1g
+        source: fast-mig-node-agent-provisional
+        start: 3
+        uuid: MIG-74220c29-c0f9-5684-97c7-557424996038
+      - end: 8
+        profile: 3g
+        source: fast-mig-node-agent-provisional
+        start: 4
+        uuid: MIG-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+      migCapable: true
+      migConfig: or-sim-2b2f64eb1d
+      migConfigState: success
+      migDevices:
+      - end: 1
+        profile: 1g
+        source: fast-mig-node-agent-provisional
+        start: 0
+        uuid: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+      - end: 2
+        profile: 1g
+        source: fast-mig-node-agent-provisional
+        start: 1
+        uuid: MIG-b9b3726d-644e-5e01-8b71-c590c23f7be3
+      - end: 3
+        profile: 1g
+        source: fast-mig-node-agent-provisional
+        start: 2
+        uuid: MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf
+      - end: 4
+        profile: 1g
+        source: fast-mig-node-agent-provisional
+        start: 3
+        uuid: MIG-74220c29-c0f9-5684-97c7-557424996038
+      - end: 8
+        profile: 3g
+        source: fast-mig-node-agent-provisional
+        start: 4
+        uuid: MIG-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+      migDevicesFresh: true
+      node: ampere
+      nodeName: ampere
+      physicalGpuId: ampere-gpu0
+      product: NVIDIA A100-PCIE-40GB
+      requiredAction: ""
+      runtimeBindings:
+      - batchSize: 1
+        deviceResource: or-sim.io/mig-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+        expectedMigUuid: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+        model: gpt2
+        phase: Running
+        pod: gpt2-runtime-7d7dc5dc48-wvtx8
+        slotResource: or-sim.io/ampere-gpu0-s0-1-1g
+      - batchSize: 1
+        deviceResource: or-sim.io/mig-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+        expectedMigUuid: MIG-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+        model: llama
+        phase: Running
+        pod: llama-runtime-c768cf9dc-gg54p
+        slotResource: or-sim.io/ampere-gpu0-s4-8-3g
+      slotMapVerification: observed
+      state: active
+    ampere-gpu1:
+      availabilityReason: empty
+      availableEligible: false
+      bindingSource: gpu-operator-mig-manager-nvidia-smi
+      cleanliness: empty
+      confidence: gpu-operator-nvidia-smi
+      currentMigConfig: or-sim-2b2f64eb1d
+      currentMigConfigState: success
+      deviceIndex: 1
+      gpuIndex: 1
+      gpuUUID: GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb
+      gpuUuid: GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb
+      logicalMigSlots: []
+      migCapable: true
+      migConfig: or-sim-2b2f64eb1d
+      migConfigState: success
+      migDevices: []
+      migDevicesFresh: true
+      node: ampere
+      nodeName: ampere
+      physicalGpuId: ampere-gpu1
+      product: NVIDIA A100-PCIE-40GB
+      requiredAction: ""
+      runtimeBindings: []
+      slotMapVerification: observed
+      state: available
+    or-sim-control-plane-gpu0:
+      availabilityReason: observed
+      cleanliness: unknown
+      gpuIndex: 0
+      migCapable: false
+      migConfig: ""
+      migConfigState: ""
+      node: or-sim-control-plane
+      product: ""
+    rtx1-worker-gpu0:
+      availabilityReason: empty
+      availableEligible: true
+      bindingSource: gpu-operator-mig-manager-nvidia-smi
+      cleanliness: empty
+      confidence: gpu-operator-nvidia-smi
+      currentMigConfig: or-sim-empty
+      currentMigConfigState: success
+      deviceIndex: 0
+      gpuIndex: 0
+      gpuUUID: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f
+      gpuUuid: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f
+      lastAgentResult:
+        command: clear
+        gpuIndex: "0"
+        observedAt: "2026-05-18T08:14:09.133222+00:00"
+      logicalMigSlots: []
+      migCapable: true
+      migConfig: or-sim-empty
+      migConfigState: success
+      migDevices: []
+      migDevicesFresh: true
+      migReadiness:
+        cdiRefreshed: true
+        directUuidUsable: true
+        lastCdiRefresh:
+          command: refresh-cdi
+          gpuIndex: "0"
+          message: refreshed /host/var/run/cdi/management.nvidia.com-gpu.yaml
+          observedAt: "2026-05-18T08:14:07.789847+00:00"
+          seconds: 0.625368923
+        message: CDI refreshed; direct CDI annotation pod binding is allowed.
+        observedAt: "2026-05-18T08:14:07.789847+00:00"
+        phase: cdi-ready
+        slotMapVerification: provisional
+        source: fast-mig-node-agent
+      node: rtx1-worker
+      nodeName: rtx1-worker
+      physicalGpuId: rtx1-worker-gpu0
+      product: NVIDIA A100-PCIE-40GB
+      requiredAction: ""
+      runtimeBindings: []
+      slotMapSource: fast-mig-node-agent
+      slotMapVerification: provisional
+      state: available
+    rtx1-worker-gpu1:
+      availabilityReason: observed
+      cleanliness: configured
+      gpuIndex: 1
+      migCapable: true
+      migConfig: or-sim-empty
+      migConfigState: success
+      node: rtx1-worker
+      product: NVIDIA-TITAN-RTX
+  discoveredA100:
+  - ampere-gpu0
+  - ampere-gpu1
+  - rtx1-worker-gpu0
+  ignoredGpuDevices:
+  - bindingSource: gpu-operator-device-plugin-nvidia-smi
+    confidence: gpu-operator-nvidia-smi
+    deviceIndex: 1
+    gpuUuid: GPU-21058121-c040-c847-712d-da7a5cf48e4b
+    migCapable: false
+    migDevices: []
+    nodeName: rtx1-worker
+    physicalGpuId: rtx1-worker-gpu1
+    product: NVIDIA TITAN RTX
+    reason: non-A100 GPU ignored by OR-SIM MIG planner
+  - bindingSource: gpu-operator-device-plugin-nvidia-smi
+    confidence: gpu-operator-nvidia-smi
+    deviceIndex: 2
+    gpuUuid: GPU-edc7db6f-0fec-bc09-9cbe-5a8d2598a62e
+    migCapable: false
+    migDevices: []
+    nodeName: rtx1-worker
+    physicalGpuId: rtx1-worker-gpu2
+    product: NVIDIA TITAN RTX
+    reason: non-A100 GPU ignored by OR-SIM MIG planner
+  - bindingSource: gpu-operator-device-plugin-nvidia-smi
+    confidence: gpu-operator-nvidia-smi
+    deviceIndex: 3
+    gpuUuid: GPU-1e09b62e-bae8-23dd-a55d-03b34ee00182
+    migCapable: false
+    migDevices: []
+    nodeName: rtx1-worker
+    physicalGpuId: rtx1-worker-gpu3
+    product: NVIDIA GeForce RTX 3090
+    reason: non-A100 GPU ignored by OR-SIM MIG planner
+  missingActivePhysicalGpuIds: []
+  notes:
+  - activeQueue is planner-owned and preserved from the previous registry status.
+  - availableQueue contains only observed A100 GPUs with no MIG devices, or-sim-empty=success,
+    and not active.
+  - transitioningQueue contains observed A100 GPUs that must be cleaned or reconfigured
+    before availability.
+  - During nvidia.com/mig.config.state=pending, GPU Operator exec inventory is skipped
+    and stable GPU UUID bindings are reused from the previous registry.
+  observedAt: "2026-05-29T05:15:45.027289851Z"
+  observedClusterState: cluster-observed-state
+  phase: Observed
+  policy:
+    allocationOrder: first-observed
+    emptyMigConfig: or-sim-empty
+    gpuProductAllowlist:
+    - NVIDIA A100
+    requireEmptyBeforeAvailable: true
+    requireMigConfigStateSuccessBeforeAvailable: true
+  profileCalibrationOverlay:
+    available: true
+    error: 'Get "http://runtime-router:8080/metrics/profile-observations": dial tcp
+      10.43.20.194:8080: connect: connection refused'
+    generatedAt: "2026-05-29T05:15:43.922141292Z"
+    observations:
+    - arrivalRate: 0
+      avgLatencyMs: 40
+      confidence: low
+      endpoint: http://115.145.135.205:10681
+      errorRate: 0
+      errors: 0
+      inflight: 0
+      model: llama
+      queued: 0
+      requests: 3
+      runtime.avgLatencyMs: 0
+      runtime.batchSize: 1
+      runtime.errors: 0
+      runtime.migUuid: MIG-f61eae53-d4d7-5315-a0c1-03a5baa8fb05
+      runtime.requests: 0
+      runtime.slotResource: or-sim.io/ampere-gpu0-s4-8-3g
+      runtimeMetricsAvailable: true
+      sampleCount: 3
+    - arrivalRate: 0
+      avgLatencyMs: 12
+      confidence: low
+      endpoint: http://115.145.135.205:10682
+      errorRate: 0
+      errors: 0
+      inflight: 0
+      model: gpt2
+      queued: 0
+      requests: 3
+      runtime.avgLatencyMs: 0
+      runtime.batchSize: 1
+      runtime.errors: 0
+      runtime.migUuid: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac
+      runtime.requests: 0
+      runtime.slotResource: or-sim.io/ampere-gpu0-s0-1-1g
+      runtimeMetricsAvailable: true
+      sampleCount: 3
+  provisionalAgentSlotMaps:
+    rtx1-worker-gpu0:
+      observedAt: "2026-05-18T08:14:06.650173+00:00"
+      physicalGpuId: rtx1-worker-gpu0
+      slots:
+      - bindingSource: fast-mig-node-agent-result
+        confidence: provisional-agent-returned-slot-map
+        deviceIndex: 0
+        gpuInstanceId: "3"
+        gpuOperatorProfile: 2g.10gb
+        gpuUuid: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f
+        migConfig: or-sim-empty
+        migConfigState: success
+        migDeviceUuid: MIG-a26ad80d-ce97-5ca7-ae94-ecc0bca3216c
+        nodeName: rtx1-worker
+        physicalGpuId: rtx1-worker-gpu0
+        profile: 2g
+        profileId: "14"
+        slot:
+        - 0
+        - 2
+        - 2g
+        slotEnd: 2
+        slotStart: 0
+        verification: provisional
+      - bindingSource: fast-mig-node-agent-result
+        confidence: provisional-agent-returned-slot-map
+        deviceIndex: 0
+        gpuInstanceId: "4"
+        gpuOperatorProfile: 2g.10gb
+        gpuUuid: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f
+        migConfig: or-sim-empty
+        migConfigState: success
+        migDeviceUuid: MIG-1b16ed63-7256-5f46-87ae-9e9383caad89
+        nodeName: rtx1-worker
+        physicalGpuId: rtx1-worker-gpu0
+        profile: 2g
+        profileId: "14"
+        slot:
+        - 2
+        - 4
+        - 2g
+        slotEnd: 4
+        slotStart: 2
+        verification: provisional
+      - bindingSource: fast-mig-node-agent-result
+        confidence: provisional-agent-returned-slot-map
+        deviceIndex: 0
+        gpuInstanceId: "5"
+        gpuOperatorProfile: 2g.10gb
+        gpuUuid: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f
+        migConfig: or-sim-empty
+        migConfigState: success
+        migDeviceUuid: MIG-9dfe80fc-a004-5c74-8207-1962eb091eb0
+        nodeName: rtx1-worker
+        physicalGpuId: rtx1-worker-gpu0
+        profile: 2g
+        profileId: "14"
+        slot:
+        - 4
+        - 6
+        - 2g
+        slotEnd: 6
+        slotStart: 4
+        verification: provisional
+      - bindingSource: fast-mig-node-agent-result
+        confidence: provisional-agent-returned-slot-map
+        deviceIndex: 0
+        gpuInstanceId: "13"
+        gpuOperatorProfile: 1g.5gb
+        gpuUuid: GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f
+        migConfig: or-sim-empty
+        migConfigState: success
+        migDeviceUuid: MIG-69f910f0-0ccb-5543-ab33-723314002047
+        nodeName: rtx1-worker
+        physicalGpuId: rtx1-worker-gpu0
+        profile: 1g
+        profileId: "19"
+        slot:
+        - 6
+        - 7
+        - 1g
+        slotEnd: 7
+        slotStart: 6
+        verification: provisional
+      source: fast-mig-node-agent
+      verification: provisional
+  queueCounts:
+    active: 1
+    available: 2
+    transitioning: 0
+  transitioningQueue: []

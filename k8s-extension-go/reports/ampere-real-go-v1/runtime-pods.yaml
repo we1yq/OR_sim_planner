@@ -1,0 +1,305 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    annotations:
+      migrant.io/slot-resource: or-sim.io/ampere-gpu1-s0-1-1g
+    creationTimestamp: "2026-05-28T08:14:13Z"
+    generateName: gpt2-runtime-67bdbbdf58-
+    labels:
+      app.kubernetes.io/name: migrant-model-runtime
+      migrant.io/gpu: ampere-gpu1
+      migrant.io/model: gpt2
+      migrant.io/profile: 1g
+      pod-template-hash: 67bdbbdf58
+    name: gpt2-runtime-67bdbbdf58-65m2l
+    namespace: or-sim
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ReplicaSet
+      name: gpt2-runtime-67bdbbdf58
+      uid: bb4dfb79-ad06-496f-a80a-d82e139b00ee
+    resourceVersion: "6144563"
+    uid: 09bf1572-28ca-430b-a2b7-c23e6671b680
+  spec:
+    containers:
+    - args:
+      - --addr=:10682
+      env:
+      - name: MODEL_NAME
+        value: gpt2
+      - name: BATCH_SIZE
+        value: "1"
+      - name: OR_SIM_GPU
+        value: ampere-gpu1
+      - name: OR_SIM_PROFILE
+        value: 1g
+      - name: OR_SIM_SLOT_RESOURCE
+        value: or-sim.io/ampere-gpu1-s0-1-1g
+      image: localhost:10690/migrant-model-runtime:go
+      imagePullPolicy: Always
+      name: runtime
+      ports:
+      - containerPort: 10682
+        hostPort: 10682
+        protocol: TCP
+      readinessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /healthz
+          port: 10682
+          scheme: HTTP
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 1
+      resources:
+        limits:
+          or-sim.io/ampere-gpu1-s0-1-1g: "1"
+        requests:
+          or-sim.io/ampere-gpu1-s0-1-1g: "1"
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+      volumeMounts:
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-mqlpt
+        readOnly: true
+    dnsPolicy: ClusterFirstWithHostNet
+    enableServiceLinks: true
+    hostNetwork: true
+    nodeName: ampere
+    nodeSelector:
+      kubernetes.io/hostname: ampere
+    preemptionPolicy: PreemptLowerPriority
+    priority: 0
+    restartPolicy: Always
+    runtimeClassName: nvidia
+    schedulerName: default-scheduler
+    securityContext: {}
+    serviceAccount: default
+    serviceAccountName: default
+    terminationGracePeriodSeconds: 30
+    tolerations:
+    - operator: Exists
+    volumes:
+    - name: kube-api-access-mqlpt
+      projected:
+        defaultMode: 420
+        sources:
+        - serviceAccountToken:
+            expirationSeconds: 3607
+            path: token
+        - configMap:
+            items:
+            - key: ca.crt
+              path: ca.crt
+            name: kube-root-ca.crt
+        - downwardAPI:
+            items:
+            - fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+              path: namespace
+  status:
+    conditions:
+    - lastProbeTime: null
+      lastTransitionTime: "2026-05-28T08:15:04Z"
+      status: "True"
+      type: PodReadyToStartContainers
+    - lastProbeTime: null
+      lastTransitionTime: "2026-05-28T08:14:37Z"
+      status: "True"
+      type: Initialized
+    - lastProbeTime: null
+      lastTransitionTime: "2026-05-28T08:15:04Z"
+      status: "True"
+      type: Ready
+    - lastProbeTime: null
+      lastTransitionTime: "2026-05-28T08:15:04Z"
+      status: "True"
+      type: ContainersReady
+    - lastProbeTime: null
+      lastTransitionTime: "2026-05-28T08:14:13Z"
+      status: "True"
+      type: PodScheduled
+    containerStatuses:
+    - containerID: containerd://2b4c48b2f75a33aa31c1bd84023d14cf7ac4e53752ae4831de67f82916780766
+      image: localhost:10690/migrant-model-runtime:go
+      imageID: localhost:10690/migrant-model-runtime@sha256:ee138340fd7486ef1826b7e75ecfd68607b6706ee297c2f2455fbfc3b10c28c4
+      lastState: {}
+      name: runtime
+      ready: true
+      restartCount: 0
+      started: true
+      state:
+        running:
+          startedAt: "2026-05-28T08:15:01Z"
+      volumeMounts:
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-mqlpt
+        readOnly: true
+        recursiveReadOnly: Disabled
+    hostIP: 115.145.135.205
+    hostIPs:
+    - ip: 115.145.135.205
+    phase: Running
+    podIP: 115.145.135.205
+    podIPs:
+    - ip: 115.145.135.205
+    qosClass: BestEffort
+    startTime: "2026-05-28T08:14:37Z"
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    annotations:
+      migrant.io/slot-resource: or-sim.io/ampere-gpu0-s0-8-7g
+    creationTimestamp: "2026-05-28T08:14:13Z"
+    generateName: llama-runtime-f595b4d67-
+    labels:
+      app.kubernetes.io/name: migrant-model-runtime
+      migrant.io/gpu: ampere-gpu0
+      migrant.io/model: llama
+      migrant.io/profile: 7g
+      pod-template-hash: f595b4d67
+    name: llama-runtime-f595b4d67-n2c4c
+    namespace: or-sim
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ReplicaSet
+      name: llama-runtime-f595b4d67
+      uid: 972b93be-407a-4de1-8742-4c60462092ae
+    resourceVersion: "6144619"
+    uid: 5c17d3e6-35f8-44c7-a08f-303615675e62
+  spec:
+    containers:
+    - args:
+      - --addr=:10681
+      env:
+      - name: MODEL_NAME
+        value: llama
+      - name: BATCH_SIZE
+        value: "1"
+      - name: OR_SIM_GPU
+        value: ampere-gpu0
+      - name: OR_SIM_PROFILE
+        value: 7g
+      - name: OR_SIM_SLOT_RESOURCE
+        value: or-sim.io/ampere-gpu0-s0-8-7g
+      image: localhost:10690/migrant-model-runtime:go
+      imagePullPolicy: Always
+      name: runtime
+      ports:
+      - containerPort: 10681
+        hostPort: 10681
+        protocol: TCP
+      readinessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /healthz
+          port: 10681
+          scheme: HTTP
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 1
+      resources:
+        limits:
+          or-sim.io/ampere-gpu0-s0-8-7g: "1"
+        requests:
+          or-sim.io/ampere-gpu0-s0-8-7g: "1"
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+      volumeMounts:
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-f4lj5
+        readOnly: true
+    dnsPolicy: ClusterFirstWithHostNet
+    enableServiceLinks: true
+    hostNetwork: true
+    nodeName: ampere
+    nodeSelector:
+      kubernetes.io/hostname: ampere
+    preemptionPolicy: PreemptLowerPriority
+    priority: 0
+    restartPolicy: Always
+    runtimeClassName: nvidia
+    schedulerName: default-scheduler
+    securityContext: {}
+    serviceAccount: default
+    serviceAccountName: default
+    terminationGracePeriodSeconds: 30
+    tolerations:
+    - operator: Exists
+    volumes:
+    - name: kube-api-access-f4lj5
+      projected:
+        defaultMode: 420
+        sources:
+        - serviceAccountToken:
+            expirationSeconds: 3607
+            path: token
+        - configMap:
+            items:
+            - key: ca.crt
+              path: ca.crt
+            name: kube-root-ca.crt
+        - downwardAPI:
+            items:
+            - fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+              path: namespace
+  status:
+    conditions:
+    - lastProbeTime: null
+      lastTransitionTime: "2026-05-28T08:15:05Z"
+      status: "True"
+      type: PodReadyToStartContainers
+    - lastProbeTime: null
+      lastTransitionTime: "2026-05-28T08:15:04Z"
+      status: "True"
+      type: Initialized
+    - lastProbeTime: null
+      lastTransitionTime: "2026-05-28T08:15:15Z"
+      status: "True"
+      type: Ready
+    - lastProbeTime: null
+      lastTransitionTime: "2026-05-28T08:15:15Z"
+      status: "True"
+      type: ContainersReady
+    - lastProbeTime: null
+      lastTransitionTime: "2026-05-28T08:14:13Z"
+      status: "True"
+      type: PodScheduled
+    containerStatuses:
+    - containerID: containerd://d0390acc3bf4adac652bda3d04f7e25772b1d5f0ff61c7e0c729c99b7229421d
+      image: localhost:10690/migrant-model-runtime:go
+      imageID: localhost:10690/migrant-model-runtime@sha256:ee138340fd7486ef1826b7e75ecfd68607b6706ee297c2f2455fbfc3b10c28c4
+      lastState: {}
+      name: runtime
+      ready: true
+      restartCount: 0
+      started: true
+      state:
+        running:
+          startedAt: "2026-05-28T08:15:05Z"
+      volumeMounts:
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-f4lj5
+        readOnly: true
+        recursiveReadOnly: Disabled
+    hostIP: 115.145.135.205
+    hostIPs:
+    - ip: 115.145.135.205
+    phase: Running
+    podIP: 115.145.135.205
+    podIPs:
+    - ip: 115.145.135.205
+    qosClass: BestEffort
+    startTime: "2026-05-28T08:15:04Z"
+kind: List
+metadata:
+  resourceVersion: ""

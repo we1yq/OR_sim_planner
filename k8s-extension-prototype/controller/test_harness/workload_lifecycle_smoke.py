@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from api.k8s_api import KubernetesClient, PythonKubernetesClient
+from cluster_state_manager.slot_resources import slot_resource_name
 from executors.pod_lifecycle_executor import DEFAULT_MIG_RESOURCE
 
 
@@ -11,6 +12,8 @@ def create_workload_lifecycle_smoke_action_plan(
     name: str,
     namespace: str = "or-sim",
     node_name: str = "rtx1-worker",
+    physical_gpu_id: str = "rtx1-worker-gpu0",
+    slot: list[Any] | None = None,
     mig_resource: str = DEFAULT_MIG_RESOURCE,
     workload: str = "smoke",
     initial_batch_size: str = "4",
@@ -18,7 +21,8 @@ def create_workload_lifecycle_smoke_action_plan(
     client_: KubernetesClient | None = None,
 ) -> dict[str, Any]:
     client_ = client_ or PythonKubernetesClient()
-    slot = _slot_from_mig_resource(mig_resource)
+    slot = slot or _slot_from_mig_resource(mig_resource)
+    exact_slot_resource = slot_resource_name(physical_gpu_id, slot)
     preview = {
         "previewOnly": True,
         "adapter": "pod-lifecycle",
@@ -32,8 +36,9 @@ def create_workload_lifecycle_smoke_action_plan(
             {
                 "type": "place_instance",
                 "gpu_id": 0,
-                "physical_gpu_id": "rtx1-worker-gpu0",
+                "physical_gpu_id": physical_gpu_id,
                 "slot": slot,
+                "exactSlotResource": exact_slot_resource,
                 "workload": workload,
                 "batch": str(initial_batch_size),
                 "podAction": "create-or-reuse",
@@ -45,8 +50,9 @@ def create_workload_lifecycle_smoke_action_plan(
             {
                 "type": "update_batch",
                 "gpu_id": 0,
-                "physical_gpu_id": "rtx1-worker-gpu0",
+                "physical_gpu_id": physical_gpu_id,
                 "slot": slot,
+                "exactSlotResource": exact_slot_resource,
                 "workload": workload,
                 "old_batch": str(initial_batch_size),
                 "new_batch": str(updated_batch_size),
@@ -85,6 +91,7 @@ def create_workload_lifecycle_smoke_action_plan(
                 "executor": "pod-lifecycle",
                 "nodeName": node_name,
                 "migResource": mig_resource,
+                "exactSlotResource": exact_slot_resource,
             },
             "notes": [
                 "Synthetic dry-run action plan used to exercise the Pod lifecycle adapter.",
@@ -107,7 +114,10 @@ def create_workload_lifecycle_smoke_action_plan(
         "name": name,
         "namespace": namespace,
         "nodeName": node_name,
+        "physicalGpuId": physical_gpu_id,
+        "slot": slot,
         "migResource": mig_resource,
+        "exactSlotResource": exact_slot_resource,
         "podLifecyclePreview": preview,
         "status": status,
     }
@@ -118,3 +128,12 @@ def _slot_from_mig_resource(mig_resource: str) -> list[Any]:
     profile = match.group(1) if match else "3g"
     size = int(profile.removesuffix("g"))
     return [0, size, profile]
+
+
+def parse_slot(value: str | None) -> list[Any] | None:
+    if not value:
+        return None
+    parts = [part.strip() for part in str(value).split(",")]
+    if len(parts) != 3:
+        raise ValueError("--workload-smoke-slot must look like start,end,profile; e.g. 4,5,1g")
+    return [int(parts[0]), int(parts[1]), parts[2]]

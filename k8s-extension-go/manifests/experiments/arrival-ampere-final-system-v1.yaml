@@ -1,0 +1,31 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-ampere-final-system-v1
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    experiment.or-sim.io/name: ampere-final-system-v1
+spec:
+  source: manual-experiment
+  mode: target
+  epoch: exp-ampere-final-system-v1
+  triggerReason: arrival-rate-change
+  windowSeconds: 60
+  unit: requestsPerSecond
+  placement:
+    nodes:
+      - ampere
+  profileCatalogRef: default
+  calibrationOverlayRef: physicalgpuregistry/default
+  currentAllocationRef: physicalgpuregistry/default
+  targetArrival:
+    gpt2: 0.12
+    llama: 0.04
+  registeredSLOMs:
+    gpt2: 0.2
+    llama: 0.2
+  notes:
+    - Ampere-only final-system experiment.
+    - Planner must use Gurobi MILP, greedy target materialization, and effect-aware DAG.
+    - Executor must execute the emitted action DAG and create exact-slot runtime Pods.

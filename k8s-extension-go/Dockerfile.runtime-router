@@ -1,0 +1,12 @@
+FROM golang:1.23 AS build
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/runtime-router ./cmd/runtime-router
+COPY internal/kube ./internal/kube
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/runtime-router ./cmd/runtime-router
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/runtime-router /runtime-router
+ENTRYPOINT ["/runtime-router"]

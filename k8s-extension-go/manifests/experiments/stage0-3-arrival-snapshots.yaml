@@ -1,0 +1,105 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-stage0
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    migrant.io/experiment: stage0-3-three-a100
+spec:
+  source: experiment-stage
+  mode: static
+  epoch: "0"
+  windowSeconds: 60
+  unit: requests_per_second
+  observedAt: "2026-05-27T00:00:00Z"
+  placement:
+    nodes:
+      - ampere
+  targetArrival:
+    llama: 0.05
+    gpt2: 0.20
+    resnet50: 0.30
+  requestCount:
+    llama: 3
+    gpt2: 12
+    resnet50: 18
+---
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-stage1
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    migrant.io/experiment: stage0-3-three-a100
+spec:
+  source: experiment-stage
+  mode: static
+  epoch: "1"
+  windowSeconds: 60
+  unit: requests_per_second
+  observedAt: "2026-05-27T00:01:00Z"
+  placement:
+    nodes:
+      - ampere
+  targetArrival:
+    llama: 0.08
+    gpt2: 0.30
+    resnet50: 0.45
+  requestCount:
+    llama: 5
+    gpt2: 18
+    resnet50: 27
+---
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-stage2
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    migrant.io/experiment: stage0-3-three-a100
+spec:
+  source: experiment-stage
+  mode: static
+  epoch: "2"
+  windowSeconds: 60
+  unit: requests_per_second
+  observedAt: "2026-05-27T00:02:00Z"
+  placement:
+    nodes:
+      - ampere
+  targetArrival:
+    llama: 0.04
+    gpt2: 0.16
+  requestCount:
+    llama: 3
+    gpt2: 10
+---
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-stage3
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    migrant.io/experiment: stage0-3-three-a100
+spec:
+  source: experiment-stage
+  mode: static
+  epoch: "3"
+  windowSeconds: 60
+  unit: requests_per_second
+  observedAt: "2026-05-27T00:03:00Z"
+  placement:
+    nodes:
+      - ampere
+  targetArrival:
+    llama: 0.07
+    gpt2: 0.25
+    resnet50: 0.35
+  requestCount:
+    llama: 5
+    gpt2: 15
+    resnet50: 21

@@ -1,0 +1,18 @@
+NAME                                                         READY   STATUS      RESTARTS   AGE     IP                NODE                   NOMINATED NODE   READINESS GATES
+cluster-state-manager-9dfd96597-j4jdc                        1/1     Running     0          105m    10.42.0.87        or-sim-control-plane   <none>           <none>
+epoch-controller-6f7d4fbbf6-r9ncc                            1/1     Running     0          160m    10.42.0.85        or-sim-control-plane   <none>           <none>
+gpt2-runtime-78cd7b4b56-hfs2z                                1/1     Running     0          99s     115.145.135.205   ampere                 <none>           <none>
+llama-runtime-fc6f5dd9-cv2l5                                 1/1     Running     0          99s     115.145.135.205   ampere                 <none>           <none>
+mig-node-agent-lmpmc                                         1/1     Running     0          95m     115.145.179.130   rtx1-worker            <none>           <none>
+mig-node-agent-mvdln                                         1/1     Running     0          95m     115.145.135.205   ampere                 <none>           <none>
+migrant-go-control-plane-build-or-sim-control-plane-j7g55    0/1     Completed   0          4m24s   115.145.179.144   or-sim-control-plane   <none>           <none>
+migrant-go-planner-engine-build-or-sim-control-plane-lp9rg   0/1     Completed   0          29m     115.145.179.144   or-sim-control-plane   <none>           <none>
+migrant-local-registry-d8tg8                                 1/1     Running     0          24h     115.145.179.130   rtx1-worker            <none>           <none>
+migrant-local-registry-snxjl                                 1/1     Running     0          24h     115.145.179.144   or-sim-control-plane   <none>           <none>
+migrant-local-registry-xsstz                                 1/1     Running     0          24h     115.145.135.205   ampere                 <none>           <none>
+planner-controller-755d8ffc84-2fzbq                          1/1     Running     0          41m     10.42.0.92        or-sim-control-plane   <none>           <none>
+planner-engine-5c6d799b5c-fg5jj                              1/1     Running     0          28m     10.42.0.97        or-sim-control-plane   <none>           <none>
+runtime-router-6d74878757-kdzxd                              1/1     Running     0          160m    115.145.179.144   or-sim-control-plane   <none>           <none>
+slot-device-plugin-jltgg                                     1/1     Running     0          95m     10.42.1.234       rtx1-worker            <none>           <none>
+slot-device-plugin-kqd6g                                     1/1     Running     0          95m     10.42.2.72        ampere                 <none>           <none>
+transition-executor-6db7c6897-4fbfd                          1/1     Running     0          3m17s   10.42.0.99        or-sim-control-plane   <none>           <none>

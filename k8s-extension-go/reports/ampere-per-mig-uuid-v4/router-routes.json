@@ -1,0 +1,1 @@
+{"routes":[{"model":"gpt2","endpoint":"http://115.145.135.205:10682"},{"model":"llama","endpoint":"http://115.145.135.205:10681"}]}

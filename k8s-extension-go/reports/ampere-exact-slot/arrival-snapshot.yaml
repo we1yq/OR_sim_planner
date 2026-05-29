@@ -1,0 +1,23 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"mig.or-sim.io/v1alpha1","kind":"ArrivalSnapshot","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"migrant-go","mig.or-sim.io/experiment":"ampere-exact-slot"},"name":"exp-ampere-exact-slot","namespace":"or-sim"},"spec":{"epoch":"100","source":"experiment-arrival-rate","targetArrival":{"gpt2":0.12,"llama":0.04},"unit":"requests_per_second","windowSeconds":60}}
+  creationTimestamp: "2026-05-28T05:45:26Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/name: migrant-go
+    mig.or-sim.io/experiment: ampere-exact-slot
+  name: exp-ampere-exact-slot
+  namespace: or-sim
+  resourceVersion: "6096560"
+  uid: 11cfb370-bb77-469b-bc68-2d4e867db856
+spec:
+  epoch: "100"
+  source: experiment-arrival-rate
+  targetArrival:
+    gpt2: 0.12
+    llama: 0.04
+  unit: requests_per_second
+  windowSeconds: 60

@@ -1,0 +1,1 @@
+{"batchSize":1,"input":{"max_tokens":8},"latencyMs":39.32,"model":"llama","output":{"text":"llama-runtime cuda-backed completion","tokens":8}}

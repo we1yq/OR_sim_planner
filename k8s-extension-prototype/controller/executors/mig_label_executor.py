@@ -6,15 +6,17 @@ from typing import Any
 import yaml
 
 from api.k8s_api import KubernetesClient, PythonKubernetesClient
+from executors.mig_config_manager import (
+    GPU_OPERATOR_CLUSTERPOLICY,
+    GPU_OPERATOR_NAMESPACE,
+    OR_SIM_MIG_CONFIGMAP,
+    EMPTY_MIG_CONFIG,
+    ensure_gpu_operator_configs_from_preview,
+)
 
 
 MIG_CONFIG_LABEL = "nvidia.com/mig.config"
 MIG_CONFIG_STATE_LABEL = "nvidia.com/mig.config.state"
-GPU_OPERATOR_NAMESPACE = "gpu-operator"
-GPU_OPERATOR_CLUSTERPOLICY = "cluster-policy"
-OR_SIM_MIG_CONFIGMAP = "or-sim-mig-parted-config"
-
-
 class MigLabelApplyError(RuntimeError):
     pass
 
@@ -55,6 +57,10 @@ def apply_mig_labels_from_action_plan(
     if not would_patch:
         raise MigLabelApplyError("executorPreview.wouldPatchNodeLabels is empty.")
 
+    config_sync = ensure_gpu_operator_configs_from_preview(
+        client=client,
+        mig_manager_target_configs=list(executor_preview.get("migManagerTargetConfigs", [])),
+    )
     patches = []
     preflight = _validate_gpu_operator_mig_configs(
         client=client,
@@ -68,6 +74,15 @@ def apply_mig_labels_from_action_plan(
             )
         target_config = str(label_map[MIG_CONFIG_LABEL])
         before = _node_mig_summary(client.get_node(str(node_name)))
+        recovery = None
+        if before.get("migConfig") == target_config and before.get("migConfigState") == "failed":
+            recovery = _recover_failed_same_target(
+                client=client,
+                node_name=str(node_name),
+                target_config=target_config,
+                timeout_s=timeout_s,
+                poll_interval_s=poll_interval_s,
+            )
         client.patch_node_labels(
             name=str(node_name),
             labels={MIG_CONFIG_LABEL: target_config},
@@ -90,6 +105,7 @@ def apply_mig_labels_from_action_plan(
                 "nodeName": str(node_name),
                 "targetMigConfig": target_config,
                 "before": before,
+                **({"recovery": recovery} if recovery is not None else {}),
                 "afterPatch": after_patch,
                 "observed": observed,
             }
@@ -103,6 +119,7 @@ def apply_mig_labels_from_action_plan(
         "confirmedRealMigApply": True,
         "allowedPreviewInstructions": bool(allow_preview_instructions),
         "waitedForSuccess": bool(wait),
+        "gpuOperatorConfigSync": config_sync,
         "gpuOperatorPreflight": preflight,
         "patches": patches,
     }
@@ -240,11 +257,51 @@ def _wait_for_mig_success(
             and last.get("migConfigState") == "success"
         ):
             return last
+        if (
+            last.get("migConfig") == target_config
+            and last.get("migConfigState") == "failed"
+        ):
+            raise MigLabelApplyError(
+                f"{node_name} {MIG_CONFIG_LABEL}={target_config} reached state failed. "
+                f"Last observed: {last}"
+            )
         time.sleep(poll_interval_s)
     raise MigLabelApplyError(
         f"Timed out waiting for {node_name} {MIG_CONFIG_LABEL}={target_config} "
         f"to reach state success. Last observed: {last}"
     )
+
+
+def _recover_failed_same_target(
+    client: KubernetesClient,
+    node_name: str,
+    target_config: str,
+    timeout_s: float,
+    poll_interval_s: float,
+) -> dict[str, Any]:
+    if target_config == EMPTY_MIG_CONFIG:
+        return {
+            "phase": "Skipped",
+            "message": f"{target_config} is already the recovery config.",
+        }
+    client.patch_node_labels(
+        name=node_name,
+        labels={MIG_CONFIG_LABEL: EMPTY_MIG_CONFIG},
+        remove_labels=[MIG_CONFIG_STATE_LABEL],
+    )
+    observed = _wait_for_mig_success(
+        client=client,
+        node_name=node_name,
+        target_config=EMPTY_MIG_CONFIG,
+        timeout_s=timeout_s,
+        poll_interval_s=poll_interval_s,
+    )
+    return {
+        "phase": "RecoveredToEmpty",
+        "recoveryMigConfig": EMPTY_MIG_CONFIG,
+        "targetMigConfig": target_config,
+        "observed": observed,
+    }
 
 
 def _node_mig_summary(node: dict[str, Any]) -> dict[str, Any]:

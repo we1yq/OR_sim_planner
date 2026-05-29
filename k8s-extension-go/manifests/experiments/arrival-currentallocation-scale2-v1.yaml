@@ -1,0 +1,32 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-currentallocation-scale2-v1
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    experiment.or-sim.io/name: currentallocation-scale2-v1
+spec:
+  source: manual-experiment
+  mode: target
+  epoch: exp-currentallocation-scale2-v1
+  triggerReason: arrival-rate-scale-up-from-current-allocation
+  windowSeconds: 60
+  unit: requestsPerSecond
+  placement:
+    nodes:
+      - ampere
+  profileCatalogRef: default
+  calibrationOverlayRef: physicalgpuregistry/default
+  currentAllocationRef: physicalgpuregistry/default
+  targetArrival:
+    gpt2: 1.0
+    llama: 0.5
+    resnet50: 1200.0
+  registeredSLOMs:
+    gpt2: 0.2
+    llama: 0.2
+    resnet50: 0.2
+  notes:
+    - Tests planning from the normalized currentAllocation instead of an empty source.
+    - Expected target uses ampere-gpu0 for existing gpt2/llama and ampere-gpu1 for added resnet50 capacity.

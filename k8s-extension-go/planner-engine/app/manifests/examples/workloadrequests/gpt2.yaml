@@ -1,0 +1,16 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: WorkloadRequest
+metadata:
+  name: gpt2
+  namespace: or-sim
+spec:
+  model: gpt2
+  family: llm
+  arrivalRate: 20
+  allowedBatches:
+    - 1
+  priority: normal
+  slo:
+    ttftMs: 20
+    tpotMs: 15
+

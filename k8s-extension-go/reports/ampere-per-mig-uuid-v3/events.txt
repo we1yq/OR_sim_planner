@@ -1,0 +1,88 @@
+LAST SEEN   TYPE      REASON              OBJECT                                                          MESSAGE
+24m         Normal    SuccessfulCreate    job/migrant-go-control-plane-build-or-sim-control-plane         Created pod: migrant-go-control-plane-build-or-sim-control-plane-fgd5d
+24m         Normal    Scheduled           pod/migrant-go-control-plane-build-or-sim-control-plane-fgd5d   Successfully assigned or-sim/migrant-go-control-plane-build-or-sim-control-plane-fgd5d to or-sim-control-plane
+24m         Normal    Started             pod/migrant-go-control-plane-build-or-sim-control-plane-fgd5d   Started container kaniko
+24m         Normal    Created             pod/migrant-go-control-plane-build-or-sim-control-plane-fgd5d   Created container: kaniko
+24m         Normal    Pulled              pod/migrant-go-control-plane-build-or-sim-control-plane-fgd5d   Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+23m         Normal    Completed           job/migrant-go-control-plane-build-or-sim-control-plane         Job completed
+23m         Normal    Pulling             pod/transition-executor-86dfcd96f6-9blz6                        Pulling image "localhost:10690/migrant-control-plane:go"
+23m         Normal    ScalingReplicaSet   deployment/transition-executor                                  Scaled up replica set transition-executor-86dfcd96f6 from 0 to 1
+23m         Normal    SuccessfulCreate    replicaset/transition-executor-86dfcd96f6                       Created pod: transition-executor-86dfcd96f6-9blz6
+23m         Normal    Scheduled           pod/transition-executor-86dfcd96f6-9blz6                        Successfully assigned or-sim/transition-executor-86dfcd96f6-9blz6 to or-sim-control-plane
+23m         Normal    Pulled              pod/transition-executor-86dfcd96f6-9blz6                        Successfully pulled image "localhost:10690/migrant-control-plane:go" in 237ms (237ms including waiting). Image size: 21951110 bytes.
+23m         Normal    SuccessfulDelete    replicaset/transition-executor-64d9d48cd9                       Deleted pod: transition-executor-64d9d48cd9-rq8wb
+23m         Normal    ScalingReplicaSet   deployment/transition-executor                                  Scaled down replica set transition-executor-64d9d48cd9 from 1 to 0
+23m         Normal    Killing             pod/transition-executor-64d9d48cd9-rq8wb                        Stopping container controller
+23m         Normal    Created             pod/transition-executor-86dfcd96f6-9blz6                        Created container: controller
+23m         Normal    Started             pod/transition-executor-86dfcd96f6-9blz6                        Started container controller
+23m         Normal    Killing             pod/llama-runtime-c768cf9dc-2vdrp                               Stopping container runtime
+23m         Normal    Killing             pod/gpt2-runtime-7d7dc5dc48-wqrpk                               Stopping container runtime
+21m         Normal    SuccessfulCreate    replicaset/llama-runtime-c768cf9dc                              Created pod: llama-runtime-c768cf9dc-gg54p
+21m         Normal    ScalingReplicaSet   deployment/gpt2-runtime                                         Scaled up replica set gpt2-runtime-7d7dc5dc48 from 0 to 1
+21m         Normal    Scheduled           pod/llama-runtime-c768cf9dc-gg54p                               Successfully assigned or-sim/llama-runtime-c768cf9dc-gg54p to ampere
+21m         Normal    Scheduled           pod/gpt2-runtime-7d7dc5dc48-wvtx8                               Successfully assigned or-sim/gpt2-runtime-7d7dc5dc48-wvtx8 to ampere
+21m         Normal    SuccessfulCreate    replicaset/gpt2-runtime-7d7dc5dc48                              Created pod: gpt2-runtime-7d7dc5dc48-wvtx8
+21m         Normal    ScalingReplicaSet   deployment/llama-runtime                                        Scaled up replica set llama-runtime-c768cf9dc from 0 to 1
+21m         Normal    Pulled              pod/gpt2-runtime-7d7dc5dc48-wvtx8                               Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+21m         Normal    Started             pod/gpt2-runtime-7d7dc5dc48-wvtx8                               Started container runtime
+21m         Normal    Pulled              pod/llama-runtime-c768cf9dc-gg54p                               Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+21m         Normal    Started             pod/llama-runtime-c768cf9dc-gg54p                               Started container runtime
+21m         Normal    Created             pod/llama-runtime-c768cf9dc-gg54p                               Created container: runtime
+21m         Normal    Created             pod/gpt2-runtime-7d7dc5dc48-wvtx8                               Created container: runtime
+10m         Normal    SuccessfulCreate    job/migrant-go-node-agent-build-ampere                          Created pod: migrant-go-node-agent-build-ampere-jtxh2
+10m         Normal    Scheduled           pod/migrant-go-node-agent-build-ampere-jtxh2                    Successfully assigned or-sim/migrant-go-node-agent-build-ampere-jtxh2 to ampere
+10m         Normal    Started             pod/migrant-go-node-agent-build-ampere-jtxh2                    Started container kaniko
+10m         Normal    Created             pod/migrant-go-node-agent-build-ampere-jtxh2                    Created container: kaniko
+10m         Normal    Pulled              pod/migrant-go-node-agent-build-ampere-jtxh2                    Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+9m45s       Normal    Completed           job/migrant-go-node-agent-build-ampere                          Job completed
+8m20s       Normal    SuccessfulCreate    job/migrant-go-node-agent-build-ampere                          Created pod: migrant-go-node-agent-build-ampere-cgrr6
+8m20s       Normal    Scheduled           pod/migrant-go-node-agent-build-ampere-cgrr6                    Successfully assigned or-sim/migrant-go-node-agent-build-ampere-cgrr6 to ampere
+8m19s       Normal    Started             pod/migrant-go-node-agent-build-ampere-cgrr6                    Started container kaniko
+8m19s       Normal    Created             pod/migrant-go-node-agent-build-ampere-cgrr6                    Created container: kaniko
+8m19s       Normal    Pulled              pod/migrant-go-node-agent-build-ampere-cgrr6                    Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+7m17s       Normal    Completed           job/migrant-go-node-agent-build-ampere                          Job completed
+7m          Normal    Scheduled           pod/mig-node-agent-xmmpd                                        Successfully assigned or-sim/mig-node-agent-xmmpd to ampere
+7m          Normal    SuccessfulCreate    daemonset/mig-node-agent                                        Created pod: mig-node-agent-xmmpd
+7m          Normal    SuccessfulCreate    daemonset/slot-device-plugin                                    Created pod: slot-device-plugin-25926
+7m          Normal    Killing             pod/slot-device-plugin-dczzd                                    Stopping container plugin
+7m          Normal    Killing             pod/mig-node-agent-jhc97                                        Stopping container agent
+7m          Normal    Scheduled           pod/slot-device-plugin-25926                                    Successfully assigned or-sim/slot-device-plugin-25926 to ampere
+6m59s       Normal    Created             pod/slot-device-plugin-25926                                    Created container: plugin
+6m59s       Normal    Pulling             pod/slot-device-plugin-25926                                    Pulling image "localhost:10690/migrant-node-agent:go"
+6m59s       Normal    Started             pod/slot-device-plugin-25926                                    Started container plugin
+6m59s       Normal    Pulled              pod/slot-device-plugin-25926                                    Successfully pulled image "localhost:10690/migrant-node-agent:go" in 146ms (146ms including waiting). Image size: 137906995 bytes.
+6m59s       Normal    Pulling             pod/mig-node-agent-xmmpd                                        Pulling image "localhost:10690/migrant-node-agent:go"
+6m59s       Normal    Pulled              pod/mig-node-agent-xmmpd                                        Successfully pulled image "localhost:10690/migrant-node-agent:go" in 280ms (280ms including waiting). Image size: 137906995 bytes.
+6m59s       Normal    Created             pod/mig-node-agent-xmmpd                                        Created container: agent
+6m59s       Normal    Started             pod/mig-node-agent-xmmpd                                        Started container agent
+4m52s       Normal    Pulled              pod/migrant-go-control-plane-build-or-sim-control-plane-k2pp5   Container image "gcr.io/kaniko-project/executor:debug" already present on machine
+4m52s       Normal    Created             pod/migrant-go-control-plane-build-or-sim-control-plane-k2pp5   Created container: kaniko
+4m52s       Normal    Scheduled           pod/migrant-go-control-plane-build-or-sim-control-plane-k2pp5   Successfully assigned or-sim/migrant-go-control-plane-build-or-sim-control-plane-k2pp5 to or-sim-control-plane
+4m52s       Normal    SuccessfulCreate    job/migrant-go-control-plane-build-or-sim-control-plane         Created pod: migrant-go-control-plane-build-or-sim-control-plane-k2pp5
+4m51s       Normal    Started             pod/migrant-go-control-plane-build-or-sim-control-plane-k2pp5   Started container kaniko
+3m44s       Normal    Completed           job/migrant-go-control-plane-build-or-sim-control-plane         Job completed
+3m36s       Normal    ScalingReplicaSet   deployment/transition-executor                                  Scaled up replica set transition-executor-7996fb64df from 0 to 1
+3m36s       Normal    Scheduled           pod/transition-executor-7996fb64df-m9jmd                        Successfully assigned or-sim/transition-executor-7996fb64df-m9jmd to or-sim-control-plane
+3m36s       Normal    SuccessfulCreate    replicaset/transition-executor-7996fb64df                       Created pod: transition-executor-7996fb64df-m9jmd
+3m35s       Normal    Pulling             pod/transition-executor-7996fb64df-m9jmd                        Pulling image "localhost:10690/migrant-control-plane:go"
+3m35s       Normal    Pulled              pod/transition-executor-7996fb64df-m9jmd                        Successfully pulled image "localhost:10690/migrant-control-plane:go" in 249ms (249ms including waiting). Image size: 21949747 bytes.
+3m35s       Normal    Created             pod/transition-executor-7996fb64df-m9jmd                        Created container: controller
+3m35s       Normal    Started             pod/transition-executor-7996fb64df-m9jmd                        Started container controller
+3m34s       Normal    SuccessfulDelete    replicaset/transition-executor-86dfcd96f6                       Deleted pod: transition-executor-86dfcd96f6-9blz6
+3m34s       Normal    Killing             pod/transition-executor-86dfcd96f6-9blz6                        Stopping container controller
+3m34s       Normal    ScalingReplicaSet   deployment/transition-executor                                  Scaled down replica set transition-executor-86dfcd96f6 from 1 to 0
+3m19s       Warning   Unhealthy           pod/gpt2-runtime-7d7dc5dc48-wvtx8                               Readiness probe failed: Get "http://115.145.135.205:10682/healthz": dial tcp 115.145.135.205:10682: connect: connection refused
+3m19s       Normal    Killing             pod/llama-runtime-c768cf9dc-gg54p                               Stopping container runtime
+3m19s       Normal    Killing             pod/gpt2-runtime-7d7dc5dc48-wvtx8                               Stopping container runtime
+93s         Normal    Created             pod/llama-runtime-c768cf9dc-6cqkf                               Created container: runtime
+93s         Normal    ScalingReplicaSet   deployment/gpt2-runtime                                         Scaled up replica set gpt2-runtime-7d7dc5dc48 from 0 to 1
+93s         Normal    SuccessfulCreate    replicaset/gpt2-runtime-7d7dc5dc48                              Created pod: gpt2-runtime-7d7dc5dc48-vg2bp
+93s         Normal    Scheduled           pod/llama-runtime-c768cf9dc-6cqkf                               Successfully assigned or-sim/llama-runtime-c768cf9dc-6cqkf to ampere
+93s         Normal    Pulled              pod/llama-runtime-c768cf9dc-6cqkf                               Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+93s         Normal    Started             pod/llama-runtime-c768cf9dc-6cqkf                               Started container runtime
+93s         Normal    Started             pod/gpt2-runtime-7d7dc5dc48-vg2bp                               Started container runtime
+93s         Normal    Scheduled           pod/gpt2-runtime-7d7dc5dc48-vg2bp                               Successfully assigned or-sim/gpt2-runtime-7d7dc5dc48-vg2bp to ampere
+93s         Normal    Created             pod/gpt2-runtime-7d7dc5dc48-vg2bp                               Created container: runtime
+93s         Normal    Pulled              pod/gpt2-runtime-7d7dc5dc48-vg2bp                               Container image "localhost:10690/migrant-model-runtime:go" already present on machine
+93s         Normal    SuccessfulCreate    replicaset/llama-runtime-c768cf9dc                              Created pod: llama-runtime-c768cf9dc-6cqkf
+93s         Normal    ScalingReplicaSet   deployment/llama-runtime                                        Scaled up replica set llama-runtime-c768cf9dc from 0 to 1

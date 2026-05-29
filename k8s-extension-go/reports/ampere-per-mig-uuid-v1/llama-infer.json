@@ -1,0 +1,1 @@
+{"batchSize":1,"input":{"prompt":"hello"},"latencyMs":47.356,"model":"llama","output":{"text":"llama-runtime cuda-backed completion","tokens":null}}

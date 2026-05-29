@@ -17,7 +17,10 @@ from planning.executor_preview import (
     build_traffic_and_drain_preview,
 )
 from planning.k8s_adapter import plan_scenario_as_migplan_status
-from executors.mig_label_executor import MigLabelApplyError, apply_mig_labels_from_action_plan
+from executors.mig_label_executor import apply_mig_labels_from_action_plan
+from cluster_state_manager.physical_gpu_availability import ensure_transitioning_gpus_empty
+from cluster_state_manager.slot_resources import slot_resource_name
+from executors.pod_lifecycle_executor import _workload_pod_manifest
 from executors.router_drain_executor import apply_router_drain_from_action_plan
 from models import PlanningScenario, ScenarioWorkloadDemand
 from planning.reconciler import (
@@ -39,6 +42,9 @@ from observe.physical_gpu_registry import (
     mark_physical_gpu_pending,
     mark_physical_gpu_released,
 )
+from test_harness.real_transition_smoke import create_real_transition_smoke_action_plan
+from test_harness.workload_lifecycle_smoke import create_workload_lifecycle_smoke_action_plan
+from transition_executor.executor import TransitionExecutorError, step_transition_action_plan
 
 
 class FakeKubernetesClient:
@@ -123,6 +129,8 @@ class FakeKubernetesClient:
 
     def patch_migactionplan_status(self, name: str, namespace: str, status: dict[str, Any]) -> None:
         self.statuses[(namespace, name)] = status
+        if (namespace, name) in self.migactionplans:
+            self.migactionplans[(namespace, name)]["status"] = status
 
     def patch_workloadrouteplan_status(self, name: str, namespace: str, status: dict[str, Any]) -> None:
         self.workloadrouteplan_statuses[(namespace, name)] = status
@@ -340,6 +348,54 @@ def test_physical_gpu_registry_preserves_logical_ids_from_previous_status() -> N
     assert "activeLogicalGpuId" not in registry["status"]["bindings"]["B"]
 
 
+def test_physical_gpu_registry_treats_clean_dynamic_per_device_config_as_available() -> None:
+    observed = {
+        "metadata": {"name": "cluster-observed-state"},
+        "spec": {
+            "observedState": {
+                "physicalGpuBindings": {
+                    "ampere-gpu0": {
+                        "physicalGpuId": "ampere-gpu0",
+                        "gpuUuid": "GPU-A0",
+                        "nodeName": "ampere",
+                        "deviceIndex": 0,
+                        "product": "NVIDIA A100-PCIE-40GB",
+                        "migCapable": True,
+                        "migDevices": [{"migDeviceUuid": "MIG-A0"}],
+                        "migDevicesFresh": True,
+                        "migConfig": "or-sim-dynamic",
+                        "migConfigState": "success",
+                    },
+                    "ampere-gpu1": {
+                        "physicalGpuId": "ampere-gpu1",
+                        "gpuUuid": "GPU-A1",
+                        "nodeName": "ampere",
+                        "deviceIndex": 1,
+                        "product": "NVIDIA A100-PCIE-40GB",
+                        "migCapable": True,
+                        "migDevices": [],
+                        "migDevicesFresh": True,
+                        "migConfig": "or-sim-dynamic",
+                        "migConfigState": "success",
+                    },
+                },
+                "ignoredGpuDevices": [],
+            }
+        },
+    }
+
+    registry = build_physical_gpu_registry(
+        namespace="or-sim",
+        name="default",
+        observed_cluster_state=observed,
+        previous_registry={"status": {"activeQueue": ["ampere-gpu0"]}},
+    )
+
+    assert registry["status"]["activeQueue"] == ["ampere-gpu0"]
+    assert registry["status"]["availableQueue"] == ["ampere-gpu1"]
+    assert registry["status"]["bindings"]["ampere-gpu1"]["availabilityReason"] == "per_device_empty_config_success"
+
+
 def test_router_drain_annotation_queue_runtime_moves_queued_requests() -> None:
     client = FakeKubernetesClient()
     client.pods = [
@@ -536,7 +592,8 @@ def test_build_gpu_operator_executor_preview_with_node_bindings() -> None:
     assert preview["gpuTargets"][0]["deviceIndex"] == 2
     assert preview["gpuTargets"][0]["targetTemplate"] == "3g+3g"
     assert "gpu-node-0" in preview["wouldPatchNodeLabels"]
-    assert preview["wouldPatchNodeLabels"]["gpu-node-0"]["nvidia.com/mig.config"] == "all-3g.20gb"
+    assert preview["wouldPatchNodeLabels"]["gpu-node-0"]["nvidia.com/mig.config"].startswith("or-sim-")
+    assert preview["migManagerTargetConfigs"][0]["gpus"][0]["deviceIndex"] == 2
 
 
 def test_build_action_rule_previews() -> None:
@@ -1352,23 +1409,255 @@ def test_mig_label_executor_preflights_migrant_configmap() -> None:
     assert "nvidia.com/mig.config.state" not in client.get_node("rtx1")["metadata"]["labels"]
 
 
-def test_mig_label_executor_blocks_missing_gpu_operator_config() -> None:
-    client = _fake_mig_label_client(target_configs=["all-2g.10gb"])
+def test_mig_label_executor_installs_per_device_target_config() -> None:
+    client = _fake_mig_label_client(target_configs=[])
+    client.nodes[0]["metadata"]["name"] = "ampere"
+    client.migactionplans[("or-sim", "apply-4-3")]["spec"]["executorPreview"]["migManagerTargetConfigs"] = [
+        {
+            "nodeName": "ampere",
+            "configName": "or-sim-ampere-target",
+            "gpus": [
+                {"deviceIndex": 0, "physicalGpuId": "ampere-gpu0", "targetTemplate": "4g+3g"},
+                {"deviceIndex": 1, "physicalGpuId": "ampere-gpu1", "targetTemplate": ""},
+            ],
+        }
+    ]
+    client.migactionplans[("or-sim", "apply-4-3")]["spec"]["executorPreview"]["wouldPatchNodeLabels"] = {
+        "ampere": {"nvidia.com/mig.config": "or-sim-ampere-target"}
+    }
+
+    apply_mig_labels_from_action_plan(
+        name="apply-4-3",
+        namespace="or-sim",
+        confirm_real_mig_apply=True,
+        allow_preview_instructions=True,
+        wait=False,
+        client=client,
+    )
+
+    raw_config = client.get_configmap("or-sim-mig-parted-config", "gpu-operator")["data"]["config.yaml"]
+    config = yaml.safe_load(raw_config)["mig-configs"]["or-sim-ampere-target"]
+    assert config == [
+        {"devices": [0], "mig-enabled": True, "mig-devices": {"4g.20gb": 1, "3g.20gb": 1}},
+        {"devices": [1], "mig-enabled": True, "mig-devices": {}},
+    ]
+
+
+def test_availability_controller_forces_dirty_empty_label_change() -> None:
+    client = _fake_mig_label_client(target_configs=[])
+    client.nodes[0]["metadata"]["labels"] = {
+        "nvidia.com/mig.config": "or-sim-empty",
+        "nvidia.com/mig.config.state": "success",
+    }
+    client.physicalgpuregistries[("or-sim", "default")] = {
+        "metadata": {"name": "default", "namespace": "or-sim"},
+        "status": {
+            "activeQueue": [],
+            "availableQueue": [],
+            "transitioningQueue": ["rtx1-gpu0"],
+            "bindings": {
+                "rtx1-gpu0": {
+                    "physicalGpuId": "rtx1-gpu0",
+                    "nodeName": "rtx1",
+                    "deviceIndex": 0,
+                    "state": "transitioning",
+                    "availableEligible": False,
+                    "availabilityReason": "mig_devices_present",
+                    "requiredAction": "clear_template_before_available",
+                }
+            },
+        },
+    }
+
+    summary = ensure_transitioning_gpus_empty(
+        namespace="or-sim",
+        registry_name="default",
+        confirm_real_mig_apply=True,
+        wait=False,
+        client=client,
+    )
+
+    assert summary["phase"] == "EnsuredEmpty"
+    action = summary["actions"][0]
+    assert action["forceEmptyConfig"].startswith("or-sim-empty-")
+    raw_config = client.get_configmap("or-sim-mig-parted-config", "gpu-operator")["data"]["config.yaml"]
+    assert action["forceEmptyConfig"] in yaml.safe_load(raw_config)["mig-configs"]
+    assert client.get_node("rtx1")["metadata"]["labels"]["nvidia.com/mig.config"] == "or-sim-empty"
+    assert "nvidia.com/mig.config.state" not in client.get_node("rtx1")["metadata"]["labels"]
+
+
+def test_transition_executor_requires_real_execute_confirmation() -> None:
+    client = _fake_transition_executor_client()
 
     try:
-        apply_mig_labels_from_action_plan(
-            name="apply-4-3",
+        step_transition_action_plan(
+            name="real-plan",
             namespace="or-sim",
-            confirm_real_mig_apply=True,
-            allow_preview_instructions=True,
-            wait=False,
+            confirm_real_execute=False,
             client=client,
         )
-    except MigLabelApplyError as exc:
-        assert "Target MIG configs missing" in str(exc)
-        assert "or-sim-4-3" in str(exc)
+    except TransitionExecutorError as exc:
+        assert "confirm_real_execute" in str(exc)
     else:
-        raise AssertionError("expected missing MIG config preflight failure")
+        raise AssertionError("expected TransitionExecutorError")
+
+
+def test_transition_executor_steps_ready_actions_by_dependency() -> None:
+    client = _fake_transition_executor_client()
+
+    first = step_transition_action_plan(
+        name="real-plan",
+        namespace="or-sim",
+        confirm_real_execute=True,
+        client=client,
+    )
+    first_status = client.statuses[("or-sim", "real-plan")]
+    assert first["phase"] == "ExecutingRealPlan"
+    assert first["dispatched"][0]["actionId"] == "clear-binding"
+    assert first_status["transitionExecution"]["actions"]["clear-binding"]["phase"] == "Completed"
+    assert first_status["transitionExecution"]["actions"]["return-gpu"]["phase"] == "Pending"
+
+    second = step_transition_action_plan(
+        name="real-plan",
+        namespace="or-sim",
+        confirm_real_execute=True,
+        client=client,
+    )
+    second_status = client.statuses[("or-sim", "real-plan")]
+    assert second["phase"] == "SucceededRealPlan"
+    assert second["dispatched"][0]["actionId"] == "return-gpu"
+    assert second_status["transitionExecution"]["actions"]["return-gpu"]["phase"] == "Completed"
+    assert second_status["transitionExecution"]["observedPostconditionsRef"] == "real-plan-observed-state"
+    registry_status = client.physicalgpuregistries[("or-sim", "default")]["status"]
+    assert registry_status["activeQueue"] == []
+    assert registry_status["availableQueue"] == ["rtx1-gpu0"]
+    assert registry_status["transitioningQueue"] == []
+
+
+def test_transition_executor_keeps_gpu_active_after_activation() -> None:
+    client = _fake_transition_executor_client(
+        actions=[
+            {"actionKey": "bind-gpu", "type": "bind_target_gpu", "gpu_id": 7, "physical_gpu_id": "rtx1-gpu0"},
+            {
+                "actionKey": "activate-route",
+                "type": "activate_serving_route",
+                "gpu_id": 7,
+                "physical_gpu_id": "rtx1-gpu0",
+                "dependsOnActionKeys": ["bind-gpu"],
+            },
+        ]
+    )
+
+    step_transition_action_plan(
+        name="real-plan",
+        namespace="or-sim",
+        confirm_real_execute=True,
+        client=client,
+    )
+    summary = step_transition_action_plan(
+        name="real-plan",
+        namespace="or-sim",
+        confirm_real_execute=True,
+        client=client,
+    )
+
+    registry_status = client.physicalgpuregistries[("or-sim", "default")]["status"]
+    assert summary["phase"] == "SucceededRealPlan"
+    assert registry_status["activeQueue"] == ["rtx1-gpu0"]
+    assert registry_status["availableQueue"] == []
+    assert registry_status["transitioningQueue"] == []
+    assert registry_status["bindings"]["rtx1-gpu0"]["activeLogicalGpuId"] == 7
+
+
+def test_create_real_transition_smoke_action_plan() -> None:
+    client = FakeKubernetesClient()
+
+    summary = create_real_transition_smoke_action_plan(
+        name="real-smoke",
+        namespace="or-sim",
+        node_name="ampere",
+        physical_gpu_id="ampere-gpu1",
+        device_index=1,
+        logical_gpu_id=3,
+        target_template="2g+1g",
+        client_=client,
+    )
+
+    action_plan = client.migactionplans[("or-sim", "real-smoke")]
+    full_plan = client.configmaps[("or-sim", "real-smoke-full-plan")]
+    preview = action_plan["spec"]["executorPreview"]
+    target_config = preview["migManagerTargetConfigs"][0]
+    parsed_full_plan = yaml.safe_load(full_plan["data"]["status.yaml"])
+    assert summary["migConfigName"].startswith("or-sim-")
+    assert action_plan["spec"]["dryRun"] is False
+    assert action_plan["status"]["phase"] == "ApprovedForRealExecution"
+    assert parsed_full_plan["actions"][0]["type"] == "bind_target_gpu"
+    assert target_config["gpus"][0]["deviceIndex"] == 1
+    assert target_config["gpus"][0]["physicalGpuId"] == "ampere-gpu1"
+
+
+def test_workload_lifecycle_smoke_targets_exact_physical_slot() -> None:
+    client = FakeKubernetesClient()
+
+    create_workload_lifecycle_smoke_action_plan(
+        name="pod-smoke",
+        namespace="or-sim",
+        node_name="ampere",
+        physical_gpu_id="ampere-gpu0",
+        slot=[4, 5, "1g"],
+        mig_resource="nvidia.com/mig-1g.5gb",
+        client_=client,
+    )
+
+    plan = client.migactionplans[("or-sim", "pod-smoke")]
+    row = plan["spec"]["podLifecyclePreview"]["createOrReuse"][0]
+    assert row["physical_gpu_id"] == "ampere-gpu0"
+    assert row["slot"] == [4, 5, "1g"]
+    assert row["exactSlotResource"] == "or-sim.io/ampere-gpu0-s4-5-1g"
+    assert plan["spec"]["executorPreview"]["nodeName"] == "ampere"
+    assert plan["spec"]["executorPreview"]["exactSlotResource"] == "or-sim.io/ampere-gpu0-s4-5-1g"
+
+
+def test_slot_resource_name_is_stable_for_physical_gpu_and_slot() -> None:
+    assert slot_resource_name("ampere-gpu0", [4, 5, "1g"]) == "or-sim.io/ampere-gpu0-s4-5-1g"
+    assert slot_resource_name("rtx1-worker-gpu0", [0, 4, "3g"]) == (
+        "or-sim.io/rtx1-worker-gpu0-s0-4-3g"
+    )
+
+
+def test_workload_pod_manifest_requests_exact_slot_resource() -> None:
+    manifest = _workload_pod_manifest(
+        pod_name="uuid-smoke",
+        configmap_name="uuid-smoke-config",
+        action_plan_name="pod-smoke",
+        workload="smoke",
+        node_name="ampere",
+        mig_resource="or-sim.io/ampere-gpu0-s4-5-1g",
+        image="nvidia/cuda:12.4.1-base-ubuntu22.04",
+    )
+
+    container = manifest["spec"]["containers"][0]
+    assert manifest["spec"]["nodeSelector"] == {"kubernetes.io/hostname": "ampere"}
+    assert container["resources"] == {
+        "limits": {"or-sim.io/ampere-gpu0-s4-5-1g": 1}
+    }
+    assert "runtimeClassName" not in manifest["spec"]
+
+
+def test_mig_label_executor_installs_missing_static_gpu_operator_config() -> None:
+    client = _fake_mig_label_client(target_configs=["all-2g.10gb"])
+
+    summary = apply_mig_labels_from_action_plan(
+        name="apply-4-3",
+        namespace="or-sim",
+        confirm_real_mig_apply=True,
+        allow_preview_instructions=True,
+        wait=False,
+        client=client,
+    )
+
+    assert "or-sim-4-3" in summary["gpuOperatorConfigSync"]["changed"]
+    assert summary["gpuOperatorPreflight"]["missingTargetConfigs"] == []
 
 
 def _valid_executor_preview() -> dict[str, Any]:
@@ -1439,6 +1728,62 @@ def _fake_mig_label_client(target_configs: list[str]) -> FakeKubernetesClient:
                     }
                 },
             },
+        },
+    }
+    return client
+
+
+def _fake_transition_executor_client(actions: list[dict[str, Any]] | None = None) -> FakeKubernetesClient:
+    client = FakeKubernetesClient()
+    actions = actions or [
+        {"actionKey": "clear-binding", "type": "clear_gpu_binding", "gpu_id": 0, "physical_gpu_id": "rtx1-gpu0"},
+        {
+            "actionKey": "return-gpu",
+            "type": "return_gpu",
+            "gpu_id": 0,
+            "physical_gpu_id": "rtx1-gpu0",
+            "dependsOnActionKeys": ["clear-binding"],
+        },
+    ]
+    client.configmaps[("or-sim", "real-plan-full")] = {
+        "metadata": {"name": "real-plan-full", "namespace": "or-sim"},
+        "data": {
+            "status.yaml": yaml.safe_dump(
+                {
+                    "phase": "ReachedTarget",
+                    "actions": actions,
+                },
+                sort_keys=False,
+            )
+        },
+    }
+    client.migactionplans[("or-sim", "real-plan")] = {
+        "metadata": {"name": "real-plan", "namespace": "or-sim", "generation": 1},
+        "spec": {
+            "dryRun": False,
+            "fullPlanConfigMap": "real-plan-full",
+        },
+        "status": {"phase": "ApprovedForRealExecution"},
+    }
+    client.physicalgpuregistries[("or-sim", "default")] = {
+        "metadata": {"name": "default", "namespace": "or-sim"},
+        "status": {
+            "discoveredA100": ["rtx1-gpu0"],
+            "activeQueue": ["rtx1-gpu0"],
+            "availableQueue": [],
+            "transitioningQueue": [],
+            "bindings": {
+                "rtx1-gpu0": {
+                    "physicalGpuId": "rtx1-gpu0",
+                    "nodeName": "rtx1",
+                    "deviceIndex": 0,
+                    "state": "active",
+                    "availableEligible": True,
+                    "activeLogicalGpuId": "0",
+                }
+            },
+            "ignoredGpuDevices": [],
+            "missingActivePhysicalGpuIds": [],
         },
     }
     return client

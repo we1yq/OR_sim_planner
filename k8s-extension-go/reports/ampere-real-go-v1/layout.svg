@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="360" viewBox="0 0 980 360">
+<rect width="100%" height="100%" fill="#fbfbf8"/>
+<text x="40" y="42" font-family="Arial" font-size="24" font-weight="700" fill="#222">ampere-real-go-v1 planned layout</text>
+<text x="40" y="120" font-family="Arial" font-size="18" font-weight="700" fill="#333">ampere-gpu0</text>
+<rect x="190" y="86" width="700" height="72" rx="6" fill="#efefea" stroke="#333"/>
+<line x1="277.5" y1="86" x2="277.5" y2="158" stroke="#ffffff" stroke-width="2"/>
+<line x1="365.0" y1="86" x2="365.0" y2="158" stroke="#ffffff" stroke-width="2"/>
+<line x1="452.5" y1="86" x2="452.5" y2="158" stroke="#ffffff" stroke-width="2"/>
+<line x1="540.0" y1="86" x2="540.0" y2="158" stroke="#ffffff" stroke-width="2"/>
+<line x1="627.5" y1="86" x2="627.5" y2="158" stroke="#ffffff" stroke-width="2"/>
+<line x1="715.0" y1="86" x2="715.0" y2="158" stroke="#ffffff" stroke-width="2"/>
+<line x1="802.5" y1="86" x2="802.5" y2="158" stroke="#ffffff" stroke-width="2"/>
+<rect x="193.0" y="91" width="694.0" height="62" rx="5" fill="#2f6f6d"/>
+<text x="204.0" y="118" font-family="Arial" font-size="16" font-weight="700" fill="white">llama / 7g</text>
+<text x="204.0" y="140" font-family="Arial" font-size="12" fill="white">0-8 10681</text>
+<text x="194.0" y="178" font-family="Arial" font-size="11" fill="#777">0</text>
+<text x="281.5" y="178" font-family="Arial" font-size="11" fill="#777">1</text>
+<text x="369.0" y="178" font-family="Arial" font-size="11" fill="#777">2</text>
+<text x="456.5" y="178" font-family="Arial" font-size="11" fill="#777">3</text>
+<text x="544.0" y="178" font-family="Arial" font-size="11" fill="#777">4</text>
+<text x="631.5" y="178" font-family="Arial" font-size="11" fill="#777">5</text>
+<text x="719.0" y="178" font-family="Arial" font-size="11" fill="#777">6</text>
+<text x="806.5" y="178" font-family="Arial" font-size="11" fill="#777">7</text>
+<text x="40" y="240" font-family="Arial" font-size="18" font-weight="700" fill="#333">ampere-gpu1</text>
+<rect x="190" y="206" width="700" height="72" rx="6" fill="#efefea" stroke="#333"/>
+<line x1="277.5" y1="206" x2="277.5" y2="278" stroke="#ffffff" stroke-width="2"/>
+<line x1="365.0" y1="206" x2="365.0" y2="278" stroke="#ffffff" stroke-width="2"/>
+<line x1="452.5" y1="206" x2="452.5" y2="278" stroke="#ffffff" stroke-width="2"/>
+<line x1="540.0" y1="206" x2="540.0" y2="278" stroke="#ffffff" stroke-width="2"/>
+<line x1="627.5" y1="206" x2="627.5" y2="278" stroke="#ffffff" stroke-width="2"/>
+<line x1="715.0" y1="206" x2="715.0" y2="278" stroke="#ffffff" stroke-width="2"/>
+<line x1="802.5" y1="206" x2="802.5" y2="278" stroke="#ffffff" stroke-width="2"/>
+<rect x="193.0" y="211" width="81.5" height="62" rx="5" fill="#d08b35"/>
+<text x="204.0" y="238" font-family="Arial" font-size="16" font-weight="700" fill="white">gpt2 / 1g</text>
+<text x="204.0" y="260" font-family="Arial" font-size="12" fill="white">0-1 10682</text>
+<text x="194.0" y="298" font-family="Arial" font-size="11" fill="#777">0</text>
+<text x="281.5" y="298" font-family="Arial" font-size="11" fill="#777">1</text>
+<text x="369.0" y="298" font-family="Arial" font-size="11" fill="#777">2</text>
+<text x="456.5" y="298" font-family="Arial" font-size="11" fill="#777">3</text>
+<text x="544.0" y="298" font-family="Arial" font-size="11" fill="#777">4</text>
+<text x="631.5" y="298" font-family="Arial" font-size="11" fill="#777">5</text>
+<text x="719.0" y="298" font-family="Arial" font-size="11" fill="#777">6</text>
+<text x="806.5" y="298" font-family="Arial" font-size="11" fill="#777">7</text>
+</svg>

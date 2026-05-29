@@ -1,0 +1,20 @@
+FROM golang:1.23 AS build
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/model-runtime ./cmd/model-runtime
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/model-runtime ./cmd/model-runtime
+
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS cuda-build
+WORKDIR /src
+COPY --from=build /src/cmd/model-runtime/cuda_spin.cu .
+RUN mkdir -p /out && nvcc -O2 -std=c++17 -o /out/cuda-spin cuda_spin.cu
+
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+RUN useradd -u 65532 -m nonroot
+COPY --from=build /out/model-runtime /model-runtime
+COPY --from=cuda-build /out/cuda-spin /cuda-spin
+USER 65532:65532
+ENV ENABLE_CUDA_SPIN=true
+ENTRYPOINT ["/model-runtime"]

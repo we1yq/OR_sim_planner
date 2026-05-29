@@ -1,0 +1,19 @@
+FROM golang:1.23 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY internal ./internal
+COPY cmd/epoch-controller ./cmd/epoch-controller
+COPY cmd/cluster-state-manager ./cmd/cluster-state-manager
+COPY cmd/planner-controller ./cmd/planner-controller
+COPY cmd/transition-executor ./cmd/transition-executor
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/epoch-controller ./cmd/epoch-controller
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/cluster-state-manager ./cmd/cluster-state-manager
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/planner-controller ./cmd/planner-controller
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/transition-executor ./cmd/transition-executor
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/epoch-controller /epoch-controller
+COPY --from=build /out/cluster-state-manager /cluster-state-manager
+COPY --from=build /out/planner-controller /planner-controller
+COPY --from=build /out/transition-executor /transition-executor

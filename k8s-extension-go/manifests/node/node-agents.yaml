@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: mig-node-agent
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-mig-node-agent
+    app.kubernetes.io/component: mig-node-agent
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: migrant-mig-node-agent
+      app.kubernetes.io/component: mig-node-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrant-mig-node-agent
+        app.kubernetes.io/component: mig-node-agent
+    spec:
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        nvidia.com/mig.capable: "true"
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: agent
+          image: localhost:10690/migrant-node-agent:go
+          imagePullPolicy: Always
+          args:
+            - --http-api
+            - --addr=:10684
+          securityContext:
+            privileged: true
+          env:
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: compute,utility
+          ports:
+            - name: actuator
+              containerPort: 10684
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 10684
+          volumeMounts:
+            - name: dev
+              mountPath: /dev
+            - name: host-root
+              mountPath: /host
+            - name: cdi
+              mountPath: /var/run/cdi
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+        - name: cdi
+          hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: slot-device-plugin
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-slot-device-plugin
+    app.kubernetes.io/component: slot-device-plugin
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: migrant-slot-device-plugin
+      app.kubernetes.io/component: slot-device-plugin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrant-slot-device-plugin
+        app.kubernetes.io/component: slot-device-plugin
+    spec:
+      hostPID: true
+      nodeSelector:
+        nvidia.com/mig.capable: "true"
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: plugin
+          image: localhost:10690/migrant-node-agent:go
+          imagePullPolicy: Always
+          args:
+            - --slot-device-plugin
+            - --node-name=$(NODE_NAME)
+          securityContext:
+            privileged: true
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: compute,utility
+          volumeMounts:
+            - name: dev
+              mountPath: /dev
+            - name: host-root
+              mountPath: /host
+            - name: kubelet-device-plugins
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: cdi
+              mountPath: /var/run/cdi
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+        - name: kubelet-device-plugins
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+            type: Directory
+        - name: cdi
+          hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate

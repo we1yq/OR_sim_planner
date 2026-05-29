@@ -179,6 +179,7 @@ def _stop_accepting_new(
                     "mig.or-sim.io/queued": "0",
                     "mig.or-sim.io/router-backlog-target": target_pod or target_endpoint or str(action.get("to") or ""),
                     "mig.or-sim.io/last-dispatched-backlog": str(queued_moved),
+                    "mig.or-sim.io/last-rerouted-queued": str(queued_moved),
                 },
             )
         if target_pod:
@@ -188,6 +189,7 @@ def _stop_accepting_new(
                 pod_name=target_pod,
                 annotations={
                     "mig.or-sim.io/dispatched-backlog": str(queued_moved),
+                    "mig.or-sim.io/accepted-queued": str(queued_moved),
                     "mig.or-sim.io/router-backlog-source": source_pod,
                 },
             )
@@ -206,6 +208,7 @@ def _stop_accepting_new(
             "supportsRouterBacklogDispatch": mode in {"http", "annotation"},
             "sourceQueueAfter": 0 if mode in {"http", "annotation"} else queued_requested,
             "routerBacklogDispatched": queued_moved if mode in {"http", "annotation"} else 0,
+            "targetAcceptedQueued": queued_moved if mode in {"http", "annotation"} else 0,
         },
         "mode": mode,
         "response": response,

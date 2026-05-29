@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="470" viewBox="0 0 1220 470">
+<rect width="1220" height="470" fill="#F8FAFC"/>
+<text x="44" y="42" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700" fill="#172033">Ampere per-MIG UUID v2 timing timeline</text>
+<text x="44" y="68" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#51606F">Time is measured from ArrivalSnapshot creation. Total wall time: 13.076s.</text>
+<rect x="80.00" y="112" width="46.92" height="28" rx="6" fill="#D7EAFB" stroke="#85929E"/>
+<text x="44" y="131" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#172033">planner/executor pickup</text>
+<text x="132.91673770957658" y="131" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">0.635s</text>
+<rect x="128.47" y="146" width="166.54" height="28" rx="6" fill="#FAD7A0" stroke="#85929E"/>
+<text x="44" y="165" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#172033">MIG apply</text>
+<text x="136.46831486217675" y="165" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#172033">2.254s</text>
+<rect x="295.00" y="180" width="120.80" height="28" rx="6" fill="#D5F5E3" stroke="#85929E"/>
+<text x="44" y="199" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#172033">CDI refresh</text>
+<text x="303.00426257459503" y="199" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#172033">1.635s</text>
+<rect x="415.81" y="214" width="85.19" height="28" rx="6" fill="#D6EAF8" stroke="#85929E"/>
+<text x="44" y="233" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#172033">resolve MIG UUIDs</text>
+<text x="506.99460073884626" y="233" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">1.153s</text>
+<rect x="500.99" y="248" width="186.34" height="28" rx="6" fill="#F9E79F" stroke="#85929E"/>
+<text x="44" y="267" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#172033">UUID resource wait-all</text>
+<text x="508.99460073884626" y="267" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#172033">2.522s</text>
+<rect x="717.92" y="282" width="2.00" height="28" rx="6" fill="#D2B4DE" stroke="#85929E"/>
+<text x="44" y="301" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#172033">runtime deploy create</text>
+<text x="725.919863597613" y="301" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">0.009s</text>
+<rect x="718.58" y="316" width="327.38" height="28" rx="6" fill="#AED6F1" stroke="#85929E"/>
+<text x="44" y="335" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#172033">runtime ready + CUDA verify</text>
+<text x="726.5848252344416" y="335" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#172033">4.431s</text>
+<rect x="1045.97" y="350" width="2.00" height="28" rx="6" fill="#A9DFBF" stroke="#85929E"/>
+<text x="44" y="369" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#172033">route sync</text>
+<text x="1053.9676044330777" y="369" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">0.002s</text>
+<line x1="80" y1="330" x2="1120" y2="330" stroke="#314151" stroke-width="2"/>
+<line x1="80.00" y1="323" x2="80.00" y2="337" stroke="#314151"/>
+<text x="72.0" y="357" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">0s</text>
+<line x1="227.77" y1="323" x2="227.77" y2="337" stroke="#314151"/>
+<text x="219.76925262858768" y="357" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">2s</text>
+<line x1="375.54" y1="323" x2="375.54" y2="337" stroke="#314151"/>
+<text x="367.53850525717536" y="357" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">4s</text>
+<line x1="523.31" y1="323" x2="523.31" y2="337" stroke="#314151"/>
+<text x="515.3077578857631" y="357" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">6s</text>
+<line x1="671.08" y1="323" x2="671.08" y2="337" stroke="#314151"/>
+<text x="663.0770105143507" y="357" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">8s</text>
+<line x1="818.85" y1="323" x2="818.85" y2="337" stroke="#314151"/>
+<text x="810.8462631429384" y="357" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">10s</text>
+<line x1="966.62" y1="323" x2="966.62" y2="337" stroke="#314151"/>
+<text x="958.615515771526" y="357" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">12s</text>
+<line x1="1114.38" y1="323" x2="1114.38" y2="337" stroke="#314151"/>
+<text x="1106.3847684001137" y="357" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">14s</text>
+<circle cx="80.00" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="80.00" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="126.92" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="128.47" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="295.00" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="295.00" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="415.81" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="415.81" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="500.99" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="500.99" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="687.33" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="717.92" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="1045.97" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="1046.12" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="1046.12" cy="330" r="4" fill="#172033" stroke="#FFFFFF" stroke-width="2"/>
+<text x="44" y="382" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">0.000s  ArrivalSnapshot created</text>
+<text x="44" y="418" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">0.635s  executor started</text>
+<text x="44" y="454" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">2.910s  MIG apply finished</text>
+<text x="44" y="490" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">4.545s  CDI refresh finished</text>
+<text x="610" y="382" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">5.698s  MIG UUID resolve finished</text>
+<text x="610" y="418" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">8.220s  UUID resource allocatable wait finished</text>
+<text x="610" y="454" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">8.643s  runtime deployments created</text>
+<text x="610" y="472" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">13.074s  runtime ready and CUDA UUID verified</text>
+<text x="610" y="508" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#51606F">13.076s  executor finished</text>
+</svg>

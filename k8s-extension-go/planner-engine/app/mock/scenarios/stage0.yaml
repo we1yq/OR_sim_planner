@@ -1,0 +1,32 @@
+name: stage0
+description: Default planner-engine fixture for the deployed three-model system.
+policyRef: ../policies/migrant-default.yaml
+migRulesRef: ../mig-rules/a100-40gb.yaml
+sourceStateRef: ../gpu-states/migrant-empty-9-a100.yaml
+targetStateRef: target0
+workloadOrder:
+  - llama
+  - gpt2
+  - resnet50
+workloadRefs:
+  llama: ../../manifests/examples/workloadrequests/llama.yaml
+  gpt2: ../../manifests/examples/workloadrequests/gpt2.yaml
+  resnet50: ../../manifests/examples/workloadrequests/resnet50.yaml
+profileCatalogRefs:
+  llama: ../profile-catalogs/llama.yaml
+  gpt2: ../profile-catalogs/gpt2.yaml
+  resnet50: ../profile-catalogs/resnet50.yaml
+sourceArrival:
+  llama: 0
+  gpt2: 0
+  resnet50: 0
+targetArrival:
+  llama: 3
+  gpt2: 20
+  resnet50: 300
+transition:
+  from: source0
+  to: target0
+  kind: bootstrap
+  notes:
+    - Pure create path from the default empty source.

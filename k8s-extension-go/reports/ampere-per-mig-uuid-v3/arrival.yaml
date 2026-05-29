@@ -1,0 +1,38 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"mig.or-sim.io/v1alpha1","kind":"ArrivalSnapshot","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"migrant-go","experiment.or-sim.io/name":"ampere-per-mig-uuid-v3"},"name":"exp-ampere-per-mig-uuid-v3","namespace":"or-sim"},"spec":{"calibrationOverlayRef":"physicalgpuregistry/default","currentAllocationRef":"physicalgpuregistry/default","epoch":"exp-ampere-per-mig-uuid-v3","mode":"target","notes":["Ampere-only final binding experiment with active device-plugin refresh.","Node-agent returns MIG slots, expected per-MIG UUID resources, and device-plugin refresh status."],"placement":{"nodes":["ampere"]},"profileCatalogRef":"default","registeredSLOMs":{"gpt2":0.2,"llama":0.2},"source":"manual-experiment","targetArrival":{"gpt2":0.12,"llama":0.04},"triggerReason":"arrival-rate-change","unit":"requestsPerSecond","windowSeconds":60}}
+  creationTimestamp: "2026-05-29T05:34:49Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/name: migrant-go
+    experiment.or-sim.io/name: ampere-per-mig-uuid-v3
+  name: exp-ampere-per-mig-uuid-v3
+  namespace: or-sim
+  resourceVersion: "6520551"
+  uid: 9a4201ad-08a1-47c5-ad36-ce4ddaf80236
+spec:
+  calibrationOverlayRef: physicalgpuregistry/default
+  currentAllocationRef: physicalgpuregistry/default
+  epoch: exp-ampere-per-mig-uuid-v3
+  mode: target
+  notes:
+  - Ampere-only final binding experiment with active device-plugin refresh.
+  - Node-agent returns MIG slots, expected per-MIG UUID resources, and device-plugin
+    refresh status.
+  placement:
+    nodes:
+    - ampere
+  profileCatalogRef: default
+  registeredSLOMs:
+    gpt2: 0.2
+    llama: 0.2
+  source: manual-experiment
+  targetArrival:
+    gpt2: 0.12
+    llama: 0.04
+  triggerReason: arrival-rate-change
+  unit: requestsPerSecond
+  windowSeconds: 60

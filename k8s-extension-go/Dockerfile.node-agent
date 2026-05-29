@@ -1,0 +1,11 @@
+FROM golang:1.23 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/mig-node-agent ./cmd/mig-node-agent
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/mig-node-agent ./cmd/mig-node-agent
+
+FROM nvcr.io/nvidia/k8s/dcgm-exporter:3.3.9-3.6.1-ubuntu22.04
+COPY --from=build /out/mig-node-agent /usr/local/bin/mig-node-agent
+ENTRYPOINT ["/usr/local/bin/mig-node-agent"]
+CMD ["list"]

@@ -19,6 +19,10 @@ from observe.physical_gpu_registry import (
     run_physical_gpu_registry_monitor_loop,
     sync_physical_gpu_registry,
 )
+from cluster_state_manager.physical_gpu_availability import (
+    ensure_transitioning_gpus_empty,
+    run_physical_gpu_availability_controller_loop,
+)
 from planning.reconciler import reconcile_migplan_once, run_controller_loop, run_watch_controller_loop
 from planning.reconciler import upsert_migactionplan
 from scenario_loader import load_planning_scenario, scenario_summary_dict
@@ -26,7 +30,13 @@ from state_adapter import gpu_state_from_mock_yaml
 from executors.pod_lifecycle_executor import apply_pod_lifecycle_from_action_plan
 from executors.router_drain_executor import apply_router_drain_from_action_plan
 from test_harness.router_drain_smoke import create_router_drain_smoke_action_plan
-from test_harness.workload_lifecycle_smoke import create_workload_lifecycle_smoke_action_plan
+from test_harness.real_transition_smoke import create_real_transition_smoke_action_plan
+from test_harness.workload_lifecycle_smoke import create_workload_lifecycle_smoke_action_plan, parse_slot
+from transition_executor.executor import (
+    observe_postconditions_for_action_plan,
+    run_transition_executor_loop,
+    step_transition_action_plan,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -105,6 +115,24 @@ def parse_args() -> argparse.Namespace:
         help="Run a dry-run MigActionPlan actuator loop that validates approved plans without hardware changes.",
     )
     parser.add_argument(
+        "--step-transition-action-plan",
+        help="Execute one ready action from a non-dryRun MigActionPlan through the Transition Executor.",
+    )
+    parser.add_argument(
+        "--run-transition-executor",
+        action="store_true",
+        help="Run the Transition Executor loop for approved non-dryRun MigActionPlans.",
+    )
+    parser.add_argument(
+        "--observe-action-plan-postconditions",
+        help="Observe cluster postconditions for a MigActionPlan and write an ObservedClusterState.",
+    )
+    parser.add_argument(
+        "--confirm-real-execute",
+        action="store_true",
+        help="Required with Transition Executor commands because they dispatch real actuators.",
+    )
+    parser.add_argument(
         "--observe-cluster-state",
         action="store_true",
         help="Read Kubernetes Nodes/Pods and print an ObservedClusterState smoke object.",
@@ -128,6 +156,16 @@ def parse_args() -> argparse.Namespace:
         "--run-physical-gpu-registry-monitor",
         action="store_true",
         help="Run a polling monitor that continuously syncs PhysicalGpuRegistry.",
+    )
+    parser.add_argument(
+        "--ensure-transitioning-gpus-empty",
+        action="store_true",
+        help="Use GPU Operator to converge dirty transitioning A100s to or-sim-empty/success once.",
+    )
+    parser.add_argument(
+        "--run-physical-gpu-availability-controller",
+        action="store_true",
+        help="Continuously converge dirty transitioning A100s to or-sim-empty/success.",
     )
     parser.add_argument(
         "--registry-name",
@@ -216,6 +254,10 @@ def parse_args() -> argparse.Namespace:
         help="Create a controlled MigActionPlan that reroutes one workload from source to target.",
     )
     parser.add_argument(
+        "--create-real-transition-smoke-action-plan",
+        help="Create a non-dryRun MigActionPlan for a controlled real Transition Executor smoke test.",
+    )
+    parser.add_argument(
         "--apply-router-drain-from-action-plan",
         help="Apply a MigActionPlan trafficAndDrainPreview through the Router/Drain executor.",
     )
@@ -236,6 +278,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--router-smoke-source-endpoint", default="http://router-workload-a:8080")
     parser.add_argument("--router-smoke-target-pod", default="router-workload-b")
     parser.add_argument("--router-smoke-target-endpoint", default="http://router-workload-b:8080")
+    parser.add_argument("--real-smoke-node", default="ampere")
+    parser.add_argument("--real-smoke-physical-gpu-id", default="ampere-gpu0")
+    parser.add_argument("--real-smoke-device-index", type=int, default=0)
+    parser.add_argument("--real-smoke-logical-gpu-id", type=int, default=0)
+    parser.add_argument("--real-smoke-target-template", default="1g+1g")
     parser.add_argument(
         "--confirm-real-pod-apply",
         action="store_true",
@@ -245,6 +292,15 @@ def parse_args() -> argparse.Namespace:
         "--workload-smoke-node",
         default="rtx1-worker",
         help="Node name for workload lifecycle smoke plans.",
+    )
+    parser.add_argument(
+        "--workload-smoke-physical-gpu-id",
+        default="rtx1-worker-gpu0",
+        help="PhysicalGpuId whose MIG UUID should be used for workload lifecycle smoke Pods.",
+    )
+    parser.add_argument(
+        "--workload-smoke-slot",
+        help="Expected logical slot as start,end,profile; for example 4,5,1g.",
     )
     parser.add_argument(
         "--workload-smoke-mig-resource",
@@ -348,6 +404,35 @@ def main() -> int:
         print(dump_yaml(summary), end="")
         return 0
 
+    if args.step_transition_action_plan:
+        summary = step_transition_action_plan(
+            name=args.step_transition_action_plan,
+            namespace=args.namespace,
+            confirm_real_execute=args.confirm_real_execute,
+            allow_preview_instructions=args.allow_preview_instructions,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.run_transition_executor:
+        summary = run_transition_executor_loop(
+            namespace=args.namespace,
+            poll_interval_s=args.poll_interval_s,
+            max_cycles=args.controller_max_cycles,
+            confirm_real_execute=args.confirm_real_execute,
+            allow_preview_instructions=args.allow_preview_instructions,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.observe_action_plan_postconditions:
+        observed_name = observe_postconditions_for_action_plan(
+            name=args.observe_action_plan_postconditions,
+            namespace=args.namespace,
+        )
+        print(dump_yaml({"observedPostconditionsRef": observed_name}), end="")
+        return 0
+
     if args.observe_cluster_state:
         observed = observe_cluster_state_once(
             namespace=args.namespace,
@@ -374,6 +459,30 @@ def main() -> int:
             observed_state_name=args.observed_state_name,
             poll_interval_s=args.poll_interval_s,
             max_cycles=args.controller_max_cycles,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.ensure_transitioning_gpus_empty:
+        summary = ensure_transitioning_gpus_empty(
+            namespace=args.namespace,
+            registry_name=args.registry_name,
+            confirm_real_mig_apply=args.confirm_real_mig_apply,
+            wait=args.wait_mig_success,
+            timeout_s=args.mig_apply_timeout_s,
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.run_physical_gpu_availability_controller:
+        summary = run_physical_gpu_availability_controller_loop(
+            namespace=args.namespace,
+            registry_name=args.registry_name,
+            poll_interval_s=args.poll_interval_s,
+            max_cycles=args.controller_max_cycles,
+            confirm_real_mig_apply=args.confirm_real_mig_apply,
+            wait=args.wait_mig_success,
+            timeout_s=args.mig_apply_timeout_s,
         )
         print(dump_yaml(summary), end="")
         return 0
@@ -480,6 +589,8 @@ def main() -> int:
             name=args.create_workload_lifecycle_smoke_action_plan,
             namespace=args.namespace,
             node_name=args.workload_smoke_node,
+            physical_gpu_id=args.workload_smoke_physical_gpu_id,
+            slot=parse_slot(args.workload_smoke_slot),
             mig_resource=args.workload_smoke_mig_resource,
             workload=args.workload_smoke_name,
             initial_batch_size=args.workload_smoke_initial_batch_size,
@@ -513,6 +624,19 @@ def main() -> int:
             target_pod=args.router_smoke_target_pod,
             target_endpoint=args.router_smoke_target_endpoint,
             router_endpoint=args.router_endpoint or "http://or-sim-smoke-router:8080",
+        )
+        print(dump_yaml(summary), end="")
+        return 0
+
+    if args.create_real_transition_smoke_action_plan:
+        summary = create_real_transition_smoke_action_plan(
+            name=args.create_real_transition_smoke_action_plan,
+            namespace=args.namespace,
+            node_name=args.real_smoke_node,
+            physical_gpu_id=args.real_smoke_physical_gpu_id,
+            device_index=args.real_smoke_device_index,
+            logical_gpu_id=args.real_smoke_logical_gpu_id,
+            target_template=args.real_smoke_target_template,
         )
         print(dump_yaml(summary), end="")
         return 0

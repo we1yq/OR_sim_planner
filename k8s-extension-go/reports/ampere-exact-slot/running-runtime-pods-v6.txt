@@ -1,0 +1,2 @@
+gpt2-runtime-65479b5db9-nxkfr	gpt2	ampere	or-sim.io/ampere-gpu1-s4-5-1g
+llama-runtime-f999ddfcb-dsnpx	llama	ampere	or-sim.io/ampere-gpu0-s4-5-1g

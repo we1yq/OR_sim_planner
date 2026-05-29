@@ -1,0 +1,39 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"mig.or-sim.io/v1alpha1","kind":"ArrivalSnapshot","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"migrant-go","experiment.or-sim.io/name":"ampere-per-mig-uuid-v1"},"name":"exp-ampere-per-mig-uuid-v1","namespace":"or-sim"},"spec":{"calibrationOverlayRef":"physicalgpuregistry/default","currentAllocationRef":"physicalgpuregistry/default","epoch":"exp-ampere-per-mig-uuid-v1","mode":"target","notes":["Ampere-only final binding experiment.","Planner uses Gurobi MILP, greedy target materialization, and effect-aware DAG.","Executor executes the emitted action DAG and resolves logical slots to per-MIG UUID Kubernetes resources."],"placement":{"nodes":["ampere"]},"profileCatalogRef":"default","registeredSLOMs":{"gpt2":0.2,"llama":0.2},"source":"manual-experiment","targetArrival":{"gpt2":0.12,"llama":0.04},"triggerReason":"arrival-rate-change","unit":"requestsPerSecond","windowSeconds":60}}
+  creationTimestamp: "2026-05-29T03:58:56Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/name: migrant-go
+    experiment.or-sim.io/name: ampere-per-mig-uuid-v1
+  name: exp-ampere-per-mig-uuid-v1
+  namespace: or-sim
+  resourceVersion: "6494968"
+  uid: 6a3222e7-08e7-4d5b-b24b-07dc71522561
+spec:
+  calibrationOverlayRef: physicalgpuregistry/default
+  currentAllocationRef: physicalgpuregistry/default
+  epoch: exp-ampere-per-mig-uuid-v1
+  mode: target
+  notes:
+  - Ampere-only final binding experiment.
+  - Planner uses Gurobi MILP, greedy target materialization, and effect-aware DAG.
+  - Executor executes the emitted action DAG and resolves logical slots to per-MIG
+    UUID Kubernetes resources.
+  placement:
+    nodes:
+    - ampere
+  profileCatalogRef: default
+  registeredSLOMs:
+    gpt2: 0.2
+    llama: 0.2
+  source: manual-experiment
+  targetArrival:
+    gpt2: 0.12
+    llama: 0.04
+  triggerReason: arrival-rate-change
+  unit: requestsPerSecond
+  windowSeconds: 60

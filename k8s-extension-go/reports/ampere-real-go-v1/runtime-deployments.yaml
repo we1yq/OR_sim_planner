@@ -1,0 +1,207 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    creationTimestamp: "2026-05-28T08:14:13Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: migrant-model-runtime
+      migrant.io/model: llama
+    name: llama-runtime
+    namespace: or-sim
+    resourceVersion: "6144623"
+    uid: 7d41e1a6-918d-4eb5-8cb6-8f3bb6bc6128
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: migrant-model-runtime
+        migrant.io/model: llama
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        annotations:
+          migrant.io/slot-resource: or-sim.io/ampere-gpu0-s0-8-7g
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/name: migrant-model-runtime
+          migrant.io/gpu: ampere-gpu0
+          migrant.io/model: llama
+          migrant.io/profile: 7g
+      spec:
+        containers:
+        - args:
+          - --addr=:10681
+          env:
+          - name: MODEL_NAME
+            value: llama
+          - name: BATCH_SIZE
+            value: "1"
+          - name: OR_SIM_GPU
+            value: ampere-gpu0
+          - name: OR_SIM_PROFILE
+            value: 7g
+          - name: OR_SIM_SLOT_RESOURCE
+            value: or-sim.io/ampere-gpu0-s0-8-7g
+          image: localhost:10690/migrant-model-runtime:go
+          imagePullPolicy: Always
+          name: runtime
+          ports:
+          - containerPort: 10681
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 10681
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              or-sim.io/ampere-gpu0-s0-8-7g: "1"
+            requests:
+              or-sim.io/ampere-gpu0-s0-8-7g: "1"
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: true
+        nodeSelector:
+          kubernetes.io/hostname: ampere
+        restartPolicy: Always
+        runtimeClassName: nvidia
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        tolerations:
+        - operator: Exists
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-05-28T08:15:15Z"
+      lastUpdateTime: "2026-05-28T08:15:15Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-28T08:14:13Z"
+      lastUpdateTime: "2026-05-28T08:15:15Z"
+      message: ReplicaSet "llama-runtime-f595b4d67" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    creationTimestamp: "2026-05-28T08:14:13Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: migrant-model-runtime
+      migrant.io/model: gpt2
+    name: gpt2-runtime
+    namespace: or-sim
+    resourceVersion: "6144567"
+    uid: 7930c91c-445f-4c7d-9f6a-9028bcc62035
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: migrant-model-runtime
+        migrant.io/model: gpt2
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        annotations:
+          migrant.io/slot-resource: or-sim.io/ampere-gpu1-s0-1-1g
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/name: migrant-model-runtime
+          migrant.io/gpu: ampere-gpu1
+          migrant.io/model: gpt2
+          migrant.io/profile: 1g
+      spec:
+        containers:
+        - args:
+          - --addr=:10682
+          env:
+          - name: MODEL_NAME
+            value: gpt2
+          - name: BATCH_SIZE
+            value: "1"
+          - name: OR_SIM_GPU
+            value: ampere-gpu1
+          - name: OR_SIM_PROFILE
+            value: 1g
+          - name: OR_SIM_SLOT_RESOURCE
+            value: or-sim.io/ampere-gpu1-s0-1-1g
+          image: localhost:10690/migrant-model-runtime:go
+          imagePullPolicy: Always
+          name: runtime
+          ports:
+          - containerPort: 10682
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 10682
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              or-sim.io/ampere-gpu1-s0-1-1g: "1"
+            requests:
+              or-sim.io/ampere-gpu1-s0-1-1g: "1"
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: true
+        nodeSelector:
+          kubernetes.io/hostname: ampere
+        restartPolicy: Always
+        runtimeClassName: nvidia
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        tolerations:
+        - operator: Exists
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-05-28T08:15:04Z"
+      lastUpdateTime: "2026-05-28T08:15:04Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-05-28T08:14:13Z"
+      lastUpdateTime: "2026-05-28T08:15:04Z"
+      message: ReplicaSet "gpt2-runtime-67bdbbdf58" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+kind: List
+metadata:
+  resourceVersion: ""
