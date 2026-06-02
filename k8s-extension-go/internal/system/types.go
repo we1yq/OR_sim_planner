@@ -24,15 +24,18 @@ type StageSpec struct {
 }
 
 type ModelRuntimeSpec struct {
-	Model           string `json:"model"`
-	BatchSize       int    `json:"batchSize"`
-	Node            string `json:"node"`
-	HostPort        int    `json:"hostPort"`
-	Profile         string `json:"profile"`
-	GPU             string `json:"gpu"`
-	SlotResource    string `json:"slotResource,omitempty"`
-	DeviceResource  string `json:"deviceResource,omitempty"`
-	ExpectedMIGUUID string `json:"expectedMigUuid,omitempty"`
+	Model           string  `json:"model"`
+	RuntimeID       string  `json:"runtimeId,omitempty"`
+	BatchSize       int     `json:"batchSize"`
+	Node            string  `json:"node"`
+	HostPort        int     `json:"hostPort"`
+	Profile         string  `json:"profile"`
+	GPU             string  `json:"gpu"`
+	SlotResource    string  `json:"slotResource,omitempty"`
+	DeviceResource  string  `json:"deviceResource,omitempty"`
+	ExpectedMIGUUID string  `json:"expectedMigUuid,omitempty"`
+	Weight          float64 `json:"weight,omitempty"`
+	Capacity        float64 `json:"capacity,omitempty"`
 }
 
 func DefaultStages() []StageSpec {

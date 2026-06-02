@@ -10,12 +10,18 @@ executable Go code and a Kubernetes deployment path in this tree.
 Deployments:
 
 - `epoch-controller`: observes runtime-router demand metrics and creates
-  `ArrivalSnapshot` objects when registered epoch triggers fire.
+  `ArrivalSnapshot` objects when registered epoch triggers fire. It also acts as
+  the reconciler for registry-reported repair work: when
+  `PhysicalGpuRegistry.status.health.repairRequired=true`, it creates a repair
+  `MigActionPlan` instead of invoking the optimization planner.
 - `cluster-state-manager`: observes Kubernetes node/GPU labels and publishes the
-  `PhysicalGpuRegistry` status used by the Go control plane.
+  `PhysicalGpuRegistry` status used by the Go control plane. It classifies
+  GPU health and writes `status.health.requiredActions`; it does not execute
+  those actions itself.
 - `planner-controller`: turns an `ArrivalSnapshot` and the current
   `PhysicalGpuRegistry` into a planner request, calls `planner-engine`, and
-  emits `MigActionPlan` objects.
+  emits `MigActionPlan` objects. If registry health is not stable, it waits for
+  the repair path before starting demand-driven optimization.
 - `planner-engine`: runs the original planner pipeline in this tree:
   Gurobi MILP target allocation, target materialization/greedy repair, transition
   action extraction, and effect-aware action DAG generation.
@@ -32,8 +38,12 @@ DaemonSets:
 System-created workload Pods:
 
 - `model-runtime`: serving Pods created by `transition-executor`. The runtime
-  exposes HTTP inference endpoints and starts a CUDA worker so Kubernetes
-  placement can be verified with real GPU processes.
+  exposes HTTP inference endpoints. It supports two modes:
+  `RUNTIME_MODE=synthetic` for fast control-plane smoke tests and
+  `RUNTIME_MODE=torchvision` for real CUDA image-model inference with official
+  torchvision `DEFAULT` weights cached in the image. In both modes, the runtime
+  reports the assigned MIG UUID and can be verified through Kubernetes
+  per-MIG-UUID resource allocation.
 
 ## Runtime Network Layout
 
@@ -50,6 +60,29 @@ runtime-router Service
 Model runtime Pods are not manually pre-created. They are serving workloads that
 the transition executor will create from an action plan, place onto GPU worker
 nodes, and register with the router.
+
+The router stores route groups, not a single backend per model:
+
+```text
+model
+  --> runtime endpoint 0
+  --> runtime endpoint 1
+  --> ...
+```
+
+Each endpoint has a `runtimeId`, endpoint URL, profile, batch size, physical GPU,
+MIG UUID resource, capacity, and weight. Planner/executor decide the route group;
+the router only chooses among endpoints already admitted by the current plan.
+
+Request selection uses planner-constrained weighted least-inflight:
+
+```text
+score(endpoint) = endpointInflight / endpointWeight
+choose the active, acceptingNew, non-draining endpoint with the lowest score
+```
+
+This lets multiple runtime Pods for the same model share traffic according to
+their planned capacity while still reacting to instantaneous queue pressure.
 
 The current three-GPU cluster includes `ampere`, whose inbound firewall only
 allows ports `10600-10800`. Runtime Pods placed on ampere must therefore either
@@ -90,6 +123,20 @@ client request
   --> /metrics/demand and /metrics/profile-observations
 ```
 
+Torchvision runtime observations separate runtime-internal CUDA inference time
+from router-visible end-to-end latency:
+
+```text
+model-runtime /metrics
+  --> runtimeLatencyMs / runtimeThroughput
+  --> runtime-router /metrics/profile-observations
+  --> planner-controller runtimeProfileCorrection
+```
+
+The planner uses runtime-internal metrics for profile correction. Router
+endpoint latency and network overhead remain visible for experiment reporting,
+but they are not mixed into the model profile correction.
+
 ## Reconfiguration Path
 
 ```text
@@ -100,6 +147,40 @@ runtime-router demand metrics + cluster-state-manager state
   --> ActionPlan DAG
   --> transition-executor
 ```
+
+State repair uses the same executable plan boundary, but bypasses the
+optimization planner:
+
+```text
+node-agent / pods / runtime-router
+  --> cluster-state-manager
+  --> PhysicalGpuRegistry.status.health.requiredActions
+  --> epoch-controller
+  --> repair MigActionPlan
+  --> transition-executor
+```
+
+For example, `clear_template_before_available` becomes an action DAG containing
+`clear_template --> return_gpu`. The repair plan remains stored as a
+`MigActionPlan`, with action results recorded in `status.actionStatuses`.
+
+Scheduled or forecast-driven experiments use the same `ArrivalSnapshot` boundary.
+The predictor is outside this system boundary; for experiments, a trace/stage
+driver writes the predictor-equivalent request-rate windows into the
+`arrival-trace-schedule` ConfigMap:
+
+```text
+trace / stage / external predictor output
+  --> ConfigMap arrival-trace-schedule
+  --> epoch-controller
+  --> scheduled ArrivalSnapshot
+  --> planner-controller
+```
+
+Each due stage creates exactly one `ArrivalSnapshot`, so replayed traces are
+auditable in the Kubernetes API rather than being passed as hidden controller
+state. See `manifests/experiments/arrival-trace-schedule-example.yaml` for the
+experiment input shape.
 
 Actuator calls:
 
@@ -129,15 +210,40 @@ resync fallback:
 ArrivalSnapshot / PhysicalGpuRegistry watch
   --> planner-controller
 
+PhysicalGpuRegistry health watch
+  --> epoch-controller repair reconciler
+
 MigActionPlan watch
   --> transition-executor
 
 Node / Pod watch
   --> cluster-state-manager
+
+ConfigMap arrival-trace-schedule watch
+  --> epoch-controller scheduled trace reconciler
 ```
 
 The epoch-controller samples runtime-router HTTP metrics because demand is not a
 Kubernetes object event.
+
+## Runtime Profile Correction
+
+The profile catalog supplied at model registration remains the source of truth.
+During serving, `cluster-state-manager` records runtime observations in
+`PhysicalGpuRegistry.status.profileCalibrationOverlay` for compatibility with
+older manifests. The planner-controller forwards those observations to
+planner-engine as `runtimeProfileCorrection`.
+
+The correction is conservative:
+
+```text
+effective throughput mu = min(original profile mu, observed mu)
+effective latency       = max(original profile latency, observed latency)
+```
+
+This means runtime data can make a profile less optimistic, but it cannot improve
+or overwrite the original offline profile. The planner trace records whether any
+correction was available and how many profile options were affected.
 
 ## Execution Timing And Verification
 
@@ -179,4 +285,7 @@ runtime error rate > 0
 
 runtime queued requests > 0
   --> open an epoch, subject to minIntervalSeconds
+
+scheduled trace stage due
+  --> open an epoch from arrival-trace-schedule
 ```

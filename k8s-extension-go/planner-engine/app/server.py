@@ -20,11 +20,7 @@ from migrant_core.state import ClusterState, GPUState, MigInstance  # noqa: E402
 from migrant_core.physical_ids import ensure_state_metadata  # noqa: E402
 
 
-HOST_PORTS = {
-    "llama": 10681,
-    "gpt2": 10682,
-    "resnet50": 10683,
-}
+HOST_PORT_BASE = 10681
 
 ABSTRACT_PROFILE_SIZE = {"7g": 7, "4g": 4, "3g": 3, "2g": 2, "1g": 1}
 PLACEMENT_PROFILE_SIZE = {"7g": 8, "4g": 4, "3g": 4, "2g": 2, "1g": 1}
@@ -73,6 +69,7 @@ def plan(payload: dict[str, Any]) -> dict[str, Any]:
     planned = plan_scenario_as_migplan_status(
         scenario=scenario,
         source_state_override=current,
+        runtime_profile_correction=dict(payload.get("runtimeProfileCorrection") or {}),
         max_iters=int(payload.get("maxIters") or 20),
         milp_time_limit_s=payload.get("milpTimeLimitSeconds"),
         verbose=bool(payload.get("verbose", False)),
@@ -348,15 +345,20 @@ def desired_runtimes_from_target_state(target_state: dict[str, Any]) -> list[dic
                 continue
             start, end = int(inst["start"]), int(inst["end"])
             model = str(workload)
+            runtime_id = runtime_id_for(model, physical_id, start, end, profile)
+            mu = float(inst.get("mu") or 0.0)
             runtimes.append(
                 {
                     "model": model,
+                    "runtimeId": runtime_id,
                     "batchSize": int(inst.get("batch") or 1),
                     "node": node,
-                    "hostPort": int(HOST_PORTS.get(model, 10680 + len(runtimes) + 1)),
+                    "hostPort": int(HOST_PORT_BASE + len(runtimes)),
                     "profile": profile,
                     "gpu": physical_id,
                     "slotResource": exact_slot_resource(physical_id, start, end, profile),
+                    "capacity": mu,
+                    "weight": mu if mu > 0 else float(ABSTRACT_PROFILE_SIZE.get(profile, 1)),
                 }
             )
     runtimes.sort(key=lambda row: row["model"])
@@ -379,20 +381,30 @@ def desired_runtimes_from_actions(actions: list[dict[str, Any]], target_state: d
                 continue
             start, end, profile = int(slot[0]), int(slot[1]), str(slot[2])
             model = str(workload)
+            runtime_id = runtime_id_for(model, physical_id, start, end, profile)
+            mu = float(record.get("mu") or 0.0)
             by_key[(model, physical_id, start, end, profile)] = {
                 "model": model,
+                "runtimeId": runtime_id,
                 "batchSize": int(record.get("batch") or 1),
                 "node": node,
-                "hostPort": int(HOST_PORTS.get(model, 10680 + len(by_key) + 1)),
+                "hostPort": int(HOST_PORT_BASE + len(by_key)),
                 "profile": profile,
                 "gpu": physical_id,
                 "slotResource": exact_slot_resource(physical_id, start, end, profile),
+                "capacity": mu,
+                "weight": mu if mu > 0 else float(ABSTRACT_PROFILE_SIZE.get(profile, 1)),
             }
     if by_key:
         out = list(by_key.values())
         out.sort(key=lambda row: row["model"])
         return out
     return desired_runtimes_from_target_state(target_state)
+
+
+def runtime_id_for(model: str, physical_id: str, start: int, end: int, profile: str) -> str:
+    raw = f"{model}-{physical_id}-s{start}-{end}-{profile}"
+    return re.sub(r"[^a-z0-9-]+", "-", raw.lower()).strip("-")
 
 
 def normalize_action_dag(action_dag: Any, actions: list[dict[str, Any]]) -> dict[str, Any]:

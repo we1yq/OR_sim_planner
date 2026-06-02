@@ -14,7 +14,11 @@ for root in (CONTROLLER_ROOT, PROJECT_ROOT):
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-from feasible_options import feasible_options_for_request, profile_catalog_from_yaml
+from feasible_options import (
+    apply_runtime_profile_correction,
+    feasible_options_for_request,
+    profile_catalog_from_yaml,
+)
 from io_utils import load_yaml
 from models import PlanningScenario, ProfileOption
 from state_adapter import gpu_state_from_mock_yaml, workload_request_from_k8s_object
@@ -43,6 +47,7 @@ def plan_scenario_as_migplan_status(
     scenario: PlanningScenario,
     source_state_override: ClusterState | None = None,
     profile_catalogs_by_workload: dict[str, list[ProfileOption]] | None = None,
+    runtime_profile_correction: dict[str, Any] | None = None,
     max_iters: int = 20,
     milp_time_limit_s: float | None = None,
     verbose: bool = False,
@@ -61,19 +66,25 @@ def plan_scenario_as_migplan_status(
         source_state=source_state,
         safety_factor=float(scenario.transition.get("currentStateSafetyFactor", 1.0)),
     )
-    if current_feasibility["feasible"] and not bool(scenario.transition.get("forceReplan", False)):
+    if (
+        current_feasibility["feasible"]
+        and not _zero_arrival_requires_cleanup(scenario, source_state)
+        and not bool(scenario.transition.get("forceReplan", False))
+    ):
         canonical_next = canonicalize_state_for_next_round(source_state)
         return _status_from_current_state_noop(
             scenario=scenario,
             source_state=source_state,
             canonical_next=canonical_next,
             current_feasibility=current_feasibility,
+            runtime_profile_correction=runtime_profile_correction,
         )
 
     feasible_start = time.perf_counter()
     feasible_option_df = build_feasible_option_dataframe(
         scenario,
         profile_catalogs_by_workload=profile_catalogs_by_workload,
+        runtime_profile_correction=runtime_profile_correction,
     )
     feasible_elapsed_sec = time.perf_counter() - feasible_start
     milp_res = _call_planner(
@@ -123,6 +134,7 @@ def plan_scenario_as_migplan_status(
         transition_res=transition_res,
         canonical_next=canonical_next,
         current_feasibility=current_feasibility,
+        runtime_profile_correction=runtime_profile_correction,
     )
 
 
@@ -158,6 +170,7 @@ def plan_scenario_chain_as_migplan_statuses(
 def build_feasible_option_dataframe(
     scenario: PlanningScenario,
     profile_catalogs_by_workload: dict[str, list[ProfileOption]] | None = None,
+    runtime_profile_correction: dict[str, Any] | None = None,
 ) -> Any:
     try:
         import pandas as pd
@@ -180,6 +193,10 @@ def build_feasible_option_dataframe(
                     "or profileCatalogRefs"
                 )
             catalog = profile_catalog_from_yaml(load_yaml(workload.profile_catalog_ref))
+        catalog, correction_summary = apply_runtime_profile_correction(
+            catalog,
+            runtime_profile_correction,
+        )
         options = feasible_options_for_request(request, catalog)
         if not options:
             raise ValueError(f"No feasible profile options for workload {workload.name}")
@@ -194,6 +211,8 @@ def build_feasible_option_dataframe(
                 "mu": float(option.mu),
             }
             row.update(option.metrics)
+            if correction_summary.get("appliedCount", 0) > 0:
+                row["_runtimeProfileCorrection"] = correction_summary
             rows.append(row)
             opt_idx += 1
     return pd.DataFrame(rows)
@@ -284,6 +303,7 @@ def _migplan_status_from_results(
     transition_res: dict[str, Any],
     canonical_next: ClusterState,
     current_feasibility: dict[str, Any],
+    runtime_profile_correction: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     actions = [_to_yamlable(action) for action in transition_res.get("executed_actions", [])]
     metrics = {
@@ -311,6 +331,7 @@ def _migplan_status_from_results(
         canonical_next=canonical_next,
         actions=actions,
         current_feasibility=current_feasibility,
+        runtime_profile_correction=runtime_profile_correction,
     )
     reached = bool(transition_res.get("reached_target", False))
     return {
@@ -354,6 +375,7 @@ def _status_from_current_state_noop(
     source_state: ClusterState,
     canonical_next: ClusterState,
     current_feasibility: dict[str, Any],
+    runtime_profile_correction: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     state = cluster_state_to_dict(source_state)
     canonical = cluster_state_to_dict(canonical_next)
@@ -412,6 +434,7 @@ def _status_from_current_state_noop(
                     "sourcePhysicalIds": _physical_id_map(source_state),
                 },
                 "currentStateFeasibility": current_feasibility,
+                "runtimeProfileCorrection": _runtime_profile_correction_summary(runtime_profile_correction),
                 "noOpDecision": {
                     "recommendedAction": "no-op",
                     "reason": "current observed A100 state satisfies target arrival",
@@ -469,6 +492,18 @@ def _status_from_infeasible_milp(scenario: PlanningScenario, milp_res: dict[str,
     }
 
 
+def _zero_arrival_requires_cleanup(
+    scenario: PlanningScenario,
+    source_state: ClusterState,
+) -> bool:
+    if any(float(workload.target_arrival) > 0.0 for workload in scenario.workloads):
+        return False
+    for gpu in source_state.real_gpus():
+        if gpu.instances:
+            return True
+    return False
+
+
 def _planning_trace(
     scenario: PlanningScenario,
     source_state: ClusterState,
@@ -480,6 +515,7 @@ def _planning_trace(
     canonical_next: ClusterState,
     actions: list[dict[str, Any]],
     current_feasibility: dict[str, Any],
+    runtime_profile_correction: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     build_metrics = dict(target_state.metadata.get("build_metrics", {}))
     return {
@@ -512,6 +548,7 @@ def _planning_trace(
             feasible_option_df=feasible_option_df,
             elapsed_sec=feasible_elapsed_sec,
         ),
+        "runtimeProfileCorrection": _runtime_profile_correction_summary(runtime_profile_correction),
         "currentStateFeasibility": current_feasibility,
         "milp": {
             "method": milp_res.get("method"),
@@ -603,11 +640,33 @@ def _feasible_option_summary(feasible_option_df: Any, elapsed_sec: float) -> dic
     for profile in sorted({str(row.get("profile")) for row in rows}):
         profile_rows = [row for row in rows if str(row.get("profile")) == profile]
         by_profile.append({"profile": profile, "optionCount": len(profile_rows)})
+    corrections = []
+    for row in rows:
+        raw = row.get("_runtimeProfileCorrection")
+        if isinstance(raw, dict) and raw.get("appliedCount", 0) > 0:
+            corrections.append(raw)
     return {
         "elapsedSec": float(elapsed_sec),
         "optionCount": len(rows),
         "byWorkload": by_workload,
         "byProfile": by_profile,
+        "runtimeProfileCorrectionApplied": max(
+            [int(item.get("appliedCount", 0) or 0) for item in corrections] or [0]
+        ),
+    }
+
+
+def _runtime_profile_correction_summary(correction: dict[str, Any] | None) -> dict[str, Any]:
+    if not correction:
+        return {"available": False, "observationCount": 0}
+    observations = list(correction.get("observations") or [])
+    return {
+        "available": bool(correction.get("available", bool(observations))),
+        "policy": correction.get("policy"),
+        "muPolicy": correction.get("muPolicy"),
+        "latencyPolicy": correction.get("latencyPolicy"),
+        "observationCount": len(observations),
+        "models": sorted({str(row.get("model")) for row in observations if isinstance(row, dict) and row.get("model")}),
     }
 
 

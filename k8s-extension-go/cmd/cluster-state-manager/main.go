@@ -233,6 +233,7 @@ func reconcile(client *kube.Client, router string) error {
 		}
 	}
 	currentAllocation := buildCurrentAllocation(bindings, activeQueue, availableQueue)
+	health := buildRegistryHealth(bindings, activeQueue, availableQueue, transitioningQueue)
 	body := map[string]any{
 		"apiVersion": "mig.or-sim.io/v1alpha1",
 		"kind":       "PhysicalGpuRegistry",
@@ -264,9 +265,85 @@ func reconcile(client *kube.Client, router string) error {
 		"routingState":              routingState,
 		"logicalBindingLedger":      logicalLedger,
 		"currentAllocation":         currentAllocation,
+		"health":                    health,
 		"observedAt":                time.Now().Format(time.RFC3339Nano),
 	}
 	return replaceRegistryStatus(client, namePath, status)
+}
+
+func buildRegistryHealth(bindings map[string]any, activeQueue, availableQueue, transitioningQueue []string) map[string]any {
+	reasons := []string{}
+	requiredActions := []map[string]any{}
+	stable := len(transitioningQueue) == 0
+
+	ids := make([]string, 0, len(bindings))
+	for id := range bindings {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		binding := asMap(bindings[id])
+		state := asString(binding["state"])
+		cleanliness := asString(binding["cleanliness"])
+		requiredAction := asString(binding["requiredAction"])
+		migConfig := asString(binding["migConfig"])
+		migConfigState := asString(binding["migConfigState"])
+		migDevices := asSlice(binding["migDevices"])
+		runtimes := asSlice(binding["runtimeBindings"])
+
+		if state == "transitioning" || cleanliness == "dirty" {
+			stable = false
+			reasons = append(reasons, id+" is not stable: state="+state+", cleanliness="+cleanliness+", reason="+asString(binding["availabilityReason"]))
+		}
+		if requiredAction == "clear_template_before_available" {
+			requiredActions = append(requiredActions, map[string]any{
+				"type":          "clear_template_before_available",
+				"physicalGpuId": id,
+				"node":          binding["node"],
+				"gpuIndex":      binding["gpuIndex"],
+				"reason":        asString(binding["availabilityReason"]),
+			})
+		}
+		if state == "available" {
+			if cleanliness != "empty" || len(migDevices) != 0 || migConfig != "or-sim-empty" || migConfigState != "success" {
+				stable = false
+				reasons = append(reasons, id+" is marked available but is not empty/or-sim-empty/success")
+			}
+		}
+		if state == "active" {
+			if len(runtimes) == 0 {
+				stable = false
+				reasons = append(reasons, id+" is marked active but has no runtime bindings")
+			}
+			if binding["activeLogicalGpuId"] == nil || asString(binding["activeLogicalGpuId"]) == "" {
+				stable = false
+				reasons = append(reasons, id+" is marked active but has no active logical GPU id")
+			}
+			for _, rawRuntime := range runtimes {
+				runtime := asMap(rawRuntime)
+				if len(asMap(runtime["route"])) == 0 {
+					stable = false
+					reasons = append(reasons, id+" runtime "+asString(runtime["model"])+" has no active route snapshot")
+				}
+				if asString(runtime["expectedMigUuid"]) == "" {
+					stable = false
+					reasons = append(reasons, id+" runtime "+asString(runtime["model"])+" has no expected MIG UUID")
+				}
+			}
+		}
+	}
+	return map[string]any{
+		"stable":          stable,
+		"repairRequired":  len(requiredActions) > 0,
+		"reasons":         reasons,
+		"requiredActions": requiredActions,
+		"queueCounts": map[string]any{
+			"active":        len(activeQueue),
+			"available":     len(availableQueue),
+			"transitioning": len(transitioningQueue),
+		},
+		"observedAt": time.Now().Format(time.RFC3339Nano),
+	}
 }
 
 func replaceRegistryStatus(client *kube.Client, namePath string, status map[string]any) error {
@@ -417,15 +494,15 @@ func buildCurrentAllocation(bindings map[string]any, activeQueue, availableQueue
 		gpus[physicalID] = gpu
 	}
 	return map[string]any{
-		"format":              "migrant.current-allocation/v1",
-		"source":              "cluster-state-manager",
-		"canonicalizedAt":     time.Now().Format(time.RFC3339Nano),
-		"logicalGpuCount":     len(logicalGpus),
-		"logicalGpus":         logicalGpus,
-		"gpus":                gpus,
+		"format":          "migrant.current-allocation/v1",
+		"source":          "cluster-state-manager",
+		"canonicalizedAt": time.Now().Format(time.RFC3339Nano),
+		"logicalGpuCount": len(logicalGpus),
+		"logicalGpus":     logicalGpus,
+		"gpus":            gpus,
 		"metadata": map[string]any{
-			"physical_id_map":               physicalIDMap,
-			"logical_id_map":                logicalIDMap,
+			"physical_id_map":                 physicalIDMap,
+			"logical_id_map":                  logicalIDMap,
 			"canonical_observed_physical_map": canonicalObservedMap,
 		},
 		"freePhysicalGpuPool": availableQueue,
@@ -463,20 +540,20 @@ func copyMap(in map[string]any) map[string]any {
 	return out
 }
 
-func routesByModel(routingState map[string]any) map[string]map[string]any {
-	out := map[string]map[string]any{}
+func routesByModel(routingState map[string]any) map[string][]map[string]any {
+	out := map[string][]map[string]any{}
 	for _, rawRoute := range asSlice(routingState["routes"]) {
 		route := asMap(rawRoute)
 		model := asString(route["model"])
 		if model == "" {
 			continue
 		}
-		out[model] = route
+		out[model] = append(out[model], route)
 	}
 	return out
 }
 
-func observeRuntimeBindings(client *kube.Client, routes map[string]map[string]any) (map[string][]runtimeBinding, error) {
+func observeRuntimeBindings(client *kube.Client, routes map[string][]map[string]any) (map[string][]runtimeBinding, error) {
 	var pods map[string]any
 	if _, err := client.Get(kube.Pods(client.Namespace()), &pods); err != nil {
 		return nil, err
@@ -496,27 +573,31 @@ func observeRuntimeBindings(client *kube.Client, routes map[string]map[string]an
 			continue
 		}
 		model := asString(labels["migrant.io/model"])
+		slotResource := asString(asMap(meta["annotations"])["migrant.io/slot-resource"])
+		expectedMIGUUID := asString(asMap(meta["annotations"])["migrant.io/expected-mig-uuid"])
 		out[gpuID] = append(out[gpuID], runtimeBinding{
 			Model:           model,
 			BatchSize:       runtimeBatchSize(spec),
 			Pod:             asString(meta["name"]),
 			Phase:           asString(status["phase"]),
-			SlotResource:    asString(asMap(meta["annotations"])["migrant.io/slot-resource"]),
+			SlotResource:    slotResource,
 			DeviceResource:  asString(asMap(meta["annotations"])["migrant.io/device-resource"]),
-			ExpectedMIGUUID: asString(asMap(meta["annotations"])["migrant.io/expected-mig-uuid"]),
-			Route:           routeSummaryForBinding(routes[model]),
+			ExpectedMIGUUID: expectedMIGUUID,
+			Route:           routeSummaryForBinding(routes[model], slotResource, expectedMIGUUID),
 		})
 	}
 	return out, nil
 }
 
-func routeSummaryForBinding(route map[string]any) map[string]any {
+func routeSummaryForBinding(routes []map[string]any, slotResource, expectedMIGUUID string) map[string]any {
+	route := matchingRoute(routes, slotResource, expectedMIGUUID)
 	if len(route) == 0 {
 		return nil
 	}
 	keys := []string{
-		"endpoint", "active", "acceptingNew", "arrivalRate", "requests", "errors", "errorRate",
-		"inflight", "queued", "avgLatencyMs", "runtimeMetricsAvailable", "runtime.batchSize",
+		"runtimeId", "endpoint", "weight", "capacity", "profile", "batchSize", "gpu", "slotResource", "deviceResource", "expectedMigUuid",
+		"active", "acceptingNew", "draining", "arrivalRate", "requests", "errors", "errorRate",
+		"inflight", "queued", "avgLatencyMs", "endpointRequests", "endpointInflight", "endpointAvgLatencyMs", "runtimeMetricsAvailable", "runtime.batchSize",
 		"runtime.migUuid", "runtime.slotResource", "runtime.avgLatencyMs", "runtime.requests", "runtime.errors",
 	}
 	out := map[string]any{}
@@ -526,6 +607,27 @@ func routeSummaryForBinding(route map[string]any) map[string]any {
 		}
 	}
 	return out
+}
+
+func matchingRoute(routes []map[string]any, slotResource, expectedMIGUUID string) map[string]any {
+	if len(routes) == 0 {
+		return nil
+	}
+	for _, route := range routes {
+		if expectedMIGUUID != "" && asString(route["expectedMigUuid"]) == expectedMIGUUID {
+			return route
+		}
+		if expectedMIGUUID != "" && asString(route["runtime.migUuid"]) == expectedMIGUUID {
+			return route
+		}
+		if slotResource != "" && asString(route["slotResource"]) == slotResource {
+			return route
+		}
+		if slotResource != "" && asString(route["runtime.slotResource"]) == slotResource {
+			return route
+		}
+	}
+	return routes[0]
 }
 
 func runtimeBatchSize(podSpec map[string]any) int {

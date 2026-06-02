@@ -22,6 +22,23 @@ type route struct {
 	Endpoint string `json:"endpoint"`
 }
 
+type routeEndpoint struct {
+	Model           string  `json:"model"`
+	RuntimeID       string  `json:"runtimeId"`
+	Endpoint        string  `json:"endpoint"`
+	Weight          float64 `json:"weight,omitempty"`
+	Capacity        float64 `json:"capacity,omitempty"`
+	Profile         string  `json:"profile,omitempty"`
+	BatchSize       int     `json:"batchSize,omitempty"`
+	GPU             string  `json:"gpu,omitempty"`
+	SlotResource    string  `json:"slotResource,omitempty"`
+	DeviceResource  string  `json:"deviceResource,omitempty"`
+	ExpectedMIGUUID string  `json:"expectedMigUuid,omitempty"`
+	Active          bool    `json:"active"`
+	AcceptingNew    bool    `json:"acceptingNew"`
+	Draining        bool    `json:"draining,omitempty"`
+}
+
 type modelMetrics struct {
 	mu           sync.Mutex
 	Arrivals     []time.Time
@@ -32,13 +49,14 @@ type modelMetrics struct {
 }
 
 type routerState struct {
-	mu      sync.RWMutex
-	routes  map[string]string
-	metrics map[string]*modelMetrics
-	window  time.Duration
-	http    *http.Client
-	kube    *kube.Client
-	store   string
+	mu              sync.RWMutex
+	routes          map[string][]routeEndpoint
+	metrics         map[string]*modelMetrics
+	endpointMetrics map[string]*modelMetrics
+	window          time.Duration
+	http            *http.Client
+	kube            *kube.Client
+	store           string
 }
 
 func main() {
@@ -61,16 +79,17 @@ func main() {
 		log.Printf("runtime-router route persistence disabled: %v", err)
 	}
 	routes := initialRoutes()
-	for model, endpoint := range loadStoredRoutes(kubeClient, ns, store) {
-		routes[model] = endpoint
+	for model, endpoints := range loadStoredRoutes(kubeClient, ns, store) {
+		routes[model] = upsertEndpoints(routes[model], endpoints...)
 	}
 	state := &routerState{
-		routes:  routes,
-		metrics: map[string]*modelMetrics{},
-		window:  window,
-		http:    &http.Client{Timeout: 30 * time.Second},
-		kube:    kubeClient,
-		store:   store,
+		routes:          routes,
+		metrics:         map[string]*modelMetrics{},
+		endpointMetrics: map[string]*modelMetrics{},
+		window:          window,
+		http:            &http.Client{Timeout: 30 * time.Second},
+		kube:            kubeClient,
+		store:           store,
 	}
 	if len(routes) > 0 {
 		if err := state.persistRoutes(routes); err != nil {
@@ -103,11 +122,12 @@ func (s *routerState) handleInfer(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing model"})
 		return
 	}
-	endpoint, ok := s.routeFor(model)
+	selected, ok := s.routeFor(model)
 	if !ok {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "unknown model", "model": model})
 		return
 	}
+	endpoint := strings.TrimRight(selected.Endpoint, "/")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -115,12 +135,15 @@ func (s *routerState) handleInfer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	metrics := s.metricsFor(model)
+	endpointMetrics := s.metricsForEndpoint(selected.RuntimeID)
 	started := time.Now()
 	metrics.begin(started)
+	endpointMetrics.begin(started)
 	status := http.StatusBadGateway
 	var responseBody []byte
 	defer func() {
 		metrics.finish(time.Since(started), status >= 500)
+		endpointMetrics.finish(time.Since(started), status >= 500)
 	}()
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, endpoint+"/infer", bytes.NewReader(body))
@@ -166,13 +189,13 @@ func (s *routerState) handleRoutes(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.mu.RLock()
 		defer s.mu.RUnlock()
-		routes := make([]route, 0, len(s.routes))
-		for model, endpoint := range s.routes {
-			routes = append(routes, route{Model: model, Endpoint: endpoint})
+		routes := make([]routeEndpoint, 0)
+		for _, endpoints := range s.routes {
+			routes = append(routes, endpoints...)
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"routes": routes})
 	case http.MethodPut, http.MethodPost:
-		var input route
+		var input routeEndpoint
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
@@ -181,8 +204,9 @@ func (s *routerState) handleRoutes(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "model and endpoint are required"})
 			return
 		}
+		input = normalizeEndpoint(input)
 		s.mu.Lock()
-		s.routes[input.Model] = strings.TrimRight(input.Endpoint, "/")
+		s.routes[input.Model] = upsertEndpoints(s.routes[input.Model], input)
 		routes := s.copyRoutesLocked()
 		s.mu.Unlock()
 		if err := s.persistRoutes(routes); err != nil {
@@ -196,15 +220,23 @@ func (s *routerState) handleRoutes(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "model query parameter is required"})
 			return
 		}
+		runtimeID := strings.TrimSpace(r.URL.Query().Get("runtimeId"))
 		s.mu.Lock()
-		delete(s.routes, model)
+		if runtimeID == "" {
+			delete(s.routes, model)
+		} else {
+			s.routes[model] = deleteEndpoint(s.routes[model], runtimeID)
+			if len(s.routes[model]) == 0 {
+				delete(s.routes, model)
+			}
+		}
 		routes := s.copyRoutesLocked()
 		s.mu.Unlock()
 		if err := s.persistRoutes(routes); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"model": model, "deleted": true})
+		writeJSON(w, http.StatusOK, map[string]any{"model": model, "runtimeId": runtimeID, "deleted": true})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "GET, PUT, POST, or DELETE required"})
 	}
@@ -212,10 +244,11 @@ func (s *routerState) handleRoutes(w http.ResponseWriter, r *http.Request) {
 
 func (s *routerState) routeSnapshot(now time.Time) []map[string]any {
 	metricsByModel := s.snapshotMetrics(now)
+	metricsByEndpoint := s.snapshotEndpointMetrics(now)
 	s.mu.RLock()
-	routes := make(map[string]string, len(s.routes))
-	for model, endpoint := range s.routes {
-		routes[model] = endpoint
+	routes := make(map[string][]routeEndpoint, len(s.routes))
+	for model, endpoints := range s.routes {
+		routes[model] = append([]routeEndpoint(nil), endpoints...)
 	}
 	s.mu.RUnlock()
 
@@ -227,28 +260,50 @@ func (s *routerState) routeSnapshot(now time.Time) []map[string]any {
 
 	out := make([]map[string]any, 0, len(models))
 	for _, model := range models {
-		endpoint := strings.TrimRight(routes[model], "/")
-		row := metricsRow(model, metricsByModel[model], s.window)
-		row["endpoint"] = endpoint
-		row["active"] = true
-		row["acceptingNew"] = true
-		for key, value := range s.runtimeMetrics(endpoint) {
-			row[key] = value
+		endpoints := append([]routeEndpoint(nil), routes[model]...)
+		sort.Slice(endpoints, func(i, j int) bool { return endpoints[i].RuntimeID < endpoints[j].RuntimeID })
+		for _, endpoint := range endpoints {
+			row := metricsRow(model, metricsByModel[model], s.window)
+			endpointMetrics := metricsByEndpoint[endpoint.RuntimeID]
+			row["runtimeId"] = endpoint.RuntimeID
+			row["endpoint"] = strings.TrimRight(endpoint.Endpoint, "/")
+			row["weight"] = effectiveWeight(endpoint)
+			row["capacity"] = endpoint.Capacity
+			row["profile"] = endpoint.Profile
+			row["batchSize"] = endpoint.BatchSize
+			row["gpu"] = endpoint.GPU
+			row["slotResource"] = endpoint.SlotResource
+			row["deviceResource"] = endpoint.DeviceResource
+			row["expectedMigUuid"] = endpoint.ExpectedMIGUUID
+			row["active"] = endpoint.Active
+			row["acceptingNew"] = endpoint.AcceptingNew
+			row["draining"] = endpoint.Draining
+			row["endpointRequests"] = endpointMetrics.Requests
+			row["endpointInflight"] = endpointMetrics.Inflight
+			row["endpointAvgLatencyMs"] = round(avgLatency(endpointMetrics), 3)
+			for key, value := range s.runtimeMetrics(endpoint.Endpoint) {
+				row[key] = value
+			}
+			if endpointLatency := asFloat(row["endpointAvgLatencyMs"]); endpointLatency > 0 {
+				if runtimeLatency := asFloat(row["runtime.runtimeLatencyMs"]); runtimeLatency > 0 {
+					row["networkOverheadMs"] = round(math.Max(0, endpointLatency-runtimeLatency), 3)
+				}
+			}
+			out = append(out, row)
 		}
-		out = append(out, row)
 	}
 	return out
 }
 
-func (s *routerState) copyRoutesLocked() map[string]string {
-	out := make(map[string]string, len(s.routes))
-	for model, endpoint := range s.routes {
-		out[model] = endpoint
+func (s *routerState) copyRoutesLocked() map[string][]routeEndpoint {
+	out := make(map[string][]routeEndpoint, len(s.routes))
+	for model, endpoints := range s.routes {
+		out[model] = append([]routeEndpoint(nil), endpoints...)
 	}
 	return out
 }
 
-func (s *routerState) persistRoutes(routes map[string]string) error {
+func (s *routerState) persistRoutes(routes map[string][]routeEndpoint) error {
 	if s.kube == nil {
 		return nil
 	}
@@ -297,8 +352,14 @@ func (s *routerState) handleProfileObservations(w http.ResponseWriter, _ *http.R
 		row["sampleCount"] = metrics.Requests
 		row["confidence"] = confidence(metrics.Requests)
 		if endpoint, ok := s.routeFor(model); ok {
-			row["endpoint"] = endpoint
-			for key, value := range s.runtimeMetrics(endpoint) {
+			row["runtimeId"] = endpoint.RuntimeID
+			row["endpoint"] = endpoint.Endpoint
+			row["profile"] = endpoint.Profile
+			row["batchSize"] = endpoint.BatchSize
+			row["slotResource"] = endpoint.SlotResource
+			row["deviceResource"] = endpoint.DeviceResource
+			row["expectedMigUuid"] = endpoint.ExpectedMIGUUID
+			for key, value := range s.runtimeMetrics(endpoint.Endpoint) {
 				row[key] = value
 			}
 		}
@@ -322,7 +383,12 @@ func (s *routerState) runtimeMetrics(endpoint string) map[string]any {
 		return map[string]any{"runtimeMetricsAvailable": false, "runtimeMetricsError": err.Error()}
 	}
 	out := map[string]any{"runtimeMetricsAvailable": true}
-	for _, key := range []string{"batchSize", "migUuid", "slotResource", "avgLatencyMs", "requests", "errors"} {
+	for _, key := range []string{
+		"model", "runtimeId", "runtimeMode", "torchvisionModel", "weightsMode", "device", "imageSize",
+		"batchSize", "migUuid", "slotResource", "deviceResource", "expectedMigUuid",
+		"avgLatencyMs", "runtimeLatencyMs", "runtimeThroughput", "lastRuntimeLatencyMs",
+		"requests", "errors", "loaded", "loadError",
+	} {
 		if value, ok := payload[key]; ok {
 			out["runtime."+key] = value
 		}
@@ -330,11 +396,37 @@ func (s *routerState) runtimeMetrics(endpoint string) map[string]any {
 	return out
 }
 
-func (s *routerState) routeFor(model string) (string, bool) {
+func (s *routerState) routeFor(model string) (routeEndpoint, bool) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	endpoint, ok := s.routes[model]
-	return strings.TrimRight(endpoint, "/"), ok
+	endpoints := append([]routeEndpoint(nil), s.routes[model]...)
+	s.mu.RUnlock()
+	if len(endpoints) == 0 {
+		return routeEndpoint{}, false
+	}
+	var best routeEndpoint
+	bestScore := math.Inf(1)
+	found := false
+	for _, endpoint := range endpoints {
+		if !endpoint.Active || !endpoint.AcceptingNew || endpoint.Draining {
+			continue
+		}
+		metrics := s.metricsForEndpoint(endpoint.RuntimeID).snapshot(time.Now(), s.window)
+		score := float64(metrics.Inflight) / effectiveWeight(endpoint)
+		if !found || score < bestScore || (score == bestScore && endpoint.RuntimeID < best.RuntimeID) {
+			best = endpoint
+			bestScore = score
+			found = true
+		}
+	}
+	if found {
+		return best, true
+	}
+	for _, endpoint := range endpoints {
+		if endpoint.Active && !endpoint.Draining {
+			return endpoint, true
+		}
+	}
+	return routeEndpoint{}, false
 }
 
 func (s *routerState) metricsFor(model string) *modelMetrics {
@@ -344,6 +436,18 @@ func (s *routerState) metricsFor(model string) *modelMetrics {
 		s.metrics[model] = &modelMetrics{}
 	}
 	return s.metrics[model]
+}
+
+func (s *routerState) metricsForEndpoint(runtimeID string) *modelMetrics {
+	if runtimeID == "" {
+		runtimeID = "unknown"
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.endpointMetrics[runtimeID] == nil {
+		s.endpointMetrics[runtimeID] = &modelMetrics{}
+	}
+	return s.endpointMetrics[runtimeID]
 }
 
 func (s *routerState) snapshotMetrics(now time.Time) map[string]modelMetrics {
@@ -357,6 +461,21 @@ func (s *routerState) snapshotMetrics(now time.Time) map[string]modelMetrics {
 	for _, model := range models {
 		m := s.metricsFor(model)
 		out[model] = m.snapshot(now, s.window)
+	}
+	return out
+}
+
+func (s *routerState) snapshotEndpointMetrics(now time.Time) map[string]modelMetrics {
+	s.mu.RLock()
+	ids := make([]string, 0, len(s.endpointMetrics))
+	for id := range s.endpointMetrics {
+		ids = append(ids, id)
+	}
+	s.mu.RUnlock()
+	out := map[string]modelMetrics{}
+	for _, id := range ids {
+		m := s.metricsForEndpoint(id)
+		out[id] = m.snapshot(now, s.window)
 	}
 	return out
 }
@@ -444,8 +563,8 @@ func envDefault(key, fallback string) string {
 	return strings.TrimRight(value, "/")
 }
 
-func initialRoutes() map[string]string {
-	routes := map[string]string{}
+func initialRoutes() map[string][]routeEndpoint {
+	routes := map[string][]routeEndpoint{}
 	for _, item := range []struct {
 		model string
 		key   string
@@ -456,15 +575,16 @@ func initialRoutes() map[string]string {
 	} {
 		value := strings.TrimSpace(os.Getenv(item.key))
 		if value != "" {
-			routes[item.model] = strings.TrimRight(value, "/")
+			endpoint := normalizeEndpoint(routeEndpoint{Model: item.model, Endpoint: value})
+			routes[item.model] = []routeEndpoint{endpoint}
 		}
 	}
 	return routes
 }
 
-func loadStoredRoutes(client *kube.Client, ns, name string) map[string]string {
+func loadStoredRoutes(client *kube.Client, ns, name string) map[string][]routeEndpoint {
 	if client == nil {
-		return map[string]string{}
+		return map[string][]routeEndpoint{}
 	}
 	var cm map[string]any
 	status, err := client.Get(configMapPath(ns, name), &cm)
@@ -472,19 +592,31 @@ func loadStoredRoutes(client *kube.Client, ns, name string) map[string]string {
 		if status != http.StatusNotFound {
 			log.Printf("runtime-router route store load failed: %v", err)
 		}
-		return map[string]string{}
+		return map[string][]routeEndpoint{}
 	}
 	raw := strings.TrimSpace(asString(asMap(cm["data"])["routes.json"]))
 	if raw == "" {
-		return map[string]string{}
+		return map[string][]routeEndpoint{}
 	}
-	out := map[string]string{}
-	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+	out := map[string][]routeEndpoint{}
+	if err := json.Unmarshal([]byte(raw), &out); err == nil {
+		for model, endpoints := range out {
+			normalized := []routeEndpoint{}
+			for _, endpoint := range endpoints {
+				endpoint.Model = firstNonEmpty(endpoint.Model, model)
+				normalized = append(normalized, normalizeEndpoint(endpoint))
+			}
+			out[model] = normalized
+		}
+		return out
+	}
+	legacy := map[string]string{}
+	if err := json.Unmarshal([]byte(raw), &legacy); err != nil {
 		log.Printf("runtime-router route store decode failed: %v", err)
-		return map[string]string{}
+		return map[string][]routeEndpoint{}
 	}
-	for model, endpoint := range out {
-		out[model] = strings.TrimRight(endpoint, "/")
+	for model, endpoint := range legacy {
+		out[model] = []routeEndpoint{normalizeEndpoint(routeEndpoint{Model: model, Endpoint: endpoint})}
 	}
 	return out
 }
@@ -498,11 +630,116 @@ func round(value float64, digits int) float64 {
 	return math.Round(value*pow) / pow
 }
 
+func avgLatency(metrics modelMetrics) float64 {
+	if metrics.Requests == 0 {
+		return 0
+	}
+	return metrics.TotalLatency / float64(metrics.Requests)
+}
+
+func normalizeEndpoint(endpoint routeEndpoint) routeEndpoint {
+	endpoint.Endpoint = strings.TrimRight(endpoint.Endpoint, "/")
+	if endpoint.RuntimeID == "" {
+		endpoint.RuntimeID = runtimeIDFromEndpoint(endpoint.Model, endpoint.Endpoint)
+	}
+	if endpoint.Weight <= 0 {
+		endpoint.Weight = endpoint.Capacity
+	}
+	if endpoint.Weight <= 0 {
+		endpoint.Weight = 1
+	}
+	if !endpoint.Active {
+		endpoint.Active = true
+	}
+	if !endpoint.AcceptingNew && !endpoint.Draining {
+		endpoint.AcceptingNew = true
+	}
+	return endpoint
+}
+
+func upsertEndpoints(existing []routeEndpoint, updates ...routeEndpoint) []routeEndpoint {
+	out := append([]routeEndpoint(nil), existing...)
+	for _, update := range updates {
+		update = normalizeEndpoint(update)
+		replaced := false
+		for idx := range out {
+			if out[idx].RuntimeID == update.RuntimeID {
+				out[idx] = update
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			out = append(out, update)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].RuntimeID < out[j].RuntimeID })
+	return out
+}
+
+func deleteEndpoint(existing []routeEndpoint, runtimeID string) []routeEndpoint {
+	out := []routeEndpoint{}
+	for _, endpoint := range existing {
+		if endpoint.RuntimeID != runtimeID {
+			out = append(out, endpoint)
+		}
+	}
+	return out
+}
+
+func effectiveWeight(endpoint routeEndpoint) float64 {
+	if endpoint.Weight > 0 {
+		return endpoint.Weight
+	}
+	if endpoint.Capacity > 0 {
+		return endpoint.Capacity
+	}
+	return 1
+}
+
+func runtimeIDFromEndpoint(model, endpoint string) string {
+	raw := strings.ToLower(model + "-" + endpoint)
+	replacer := strings.NewReplacer("http://", "", "https://", "", ":", "-", "/", "-", ".", "-")
+	raw = replacer.Replace(raw)
+	raw = strings.Trim(raw, "-")
+	if raw == "" {
+		return "runtime"
+	}
+	return raw
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
 func asMap(v any) map[string]any {
 	if m, ok := v.(map[string]any); ok {
 		return m
 	}
 	return map[string]any{}
+}
+
+func asFloat(v any) float64 {
+	switch x := v.(type) {
+	case float64:
+		return x
+	case float32:
+		return float64(x)
+	case int:
+		return float64(x)
+	case int64:
+		return float64(x)
+	case json.Number:
+		n, _ := x.Float64()
+		return n
+	default:
+		return 0
+	}
 }
 
 func asString(v any) string {

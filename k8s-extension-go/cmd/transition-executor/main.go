@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"sort"
@@ -115,27 +116,27 @@ func reconcile(client *kube.Client, router string) error {
 		}
 		verification, actionStatuses, err := executeActionDAG(client, router, nodes, runtimes, actions, name, trace)
 		trace.Mark("executorFinishedAt")
-			if err != nil {
-				_, patchErr := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
-					"status": map[string]any{"phase": "Failed", "message": err.Error(), "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
-				}, nil)
+		if err != nil {
+			_, patchErr := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
+				"status": map[string]any{"phase": "Failed", "message": err.Error(), "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
+			}, nil)
 			if patchErr != nil {
 				return patchErr
 			}
-				continue
-			}
-			if err := persistFinalLogicalBindings(client, name, spec); err != nil {
-				_, patchErr := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
-					"status": map[string]any{"phase": "Failed", "message": err.Error(), "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
-				}, nil)
-				if patchErr != nil {
-					return patchErr
-				}
-				continue
-			}
-			_, err = client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
-				"status": map[string]any{"phase": "Executed", "message": "action DAG executed by Go transition executor", "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
+			continue
+		}
+		if err := persistFinalLogicalBindings(client, name, spec); err != nil {
+			_, patchErr := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
+				"status": map[string]any{"phase": "Failed", "message": err.Error(), "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
 			}, nil)
+			if patchErr != nil {
+				return patchErr
+			}
+			continue
+		}
+		_, err = client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
+			"status": map[string]any{"phase": "Executed", "message": "action DAG executed by Go transition executor", "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
+		}, nil)
 		if err != nil {
 			return err
 		}
@@ -904,9 +905,21 @@ func deleteRuntimeDeployment(client *kube.Client, model string) error {
 	if model == "" {
 		return nil
 	}
-	status, err := client.Delete(kube.Deployment(client.Namespace(), model+"-runtime"))
-	if err != nil && status != http.StatusNotFound {
+	var list map[string]any
+	if _, err := client.Get(kube.Deployments(client.Namespace()), &list); err != nil {
 		return err
+	}
+	for _, item := range asSlice(list["items"]) {
+		dep := asMap(item)
+		meta := asMap(dep["metadata"])
+		labels := asMap(meta["labels"])
+		if asString(labels["app.kubernetes.io/name"]) != "migrant-model-runtime" || asString(labels["migrant.io/model"]) != model {
+			continue
+		}
+		name := asString(meta["name"])
+		if status, err := client.Delete(kube.Deployment(client.Namespace(), name)); err != nil && status != http.StatusNotFound {
+			return err
+		}
 	}
 	return nil
 }
@@ -1064,7 +1077,7 @@ func prepareRuntimeMutation(client *kube.Client, desired []system.ModelRuntimeSp
 	desiredByName := map[string]system.ModelRuntimeSpec{}
 	satisfied := map[string]bool{}
 	for _, rt := range desired {
-		desiredByName[rt.Model+"-runtime"] = rt
+		desiredByName[runtimeDeploymentName(rt)] = rt
 	}
 	var list map[string]any
 	if _, err := client.Get(kube.Deployments(client.Namespace()), &list); err != nil {
@@ -1098,7 +1111,7 @@ func prepareRuntimeMutation(client *kube.Client, desired []system.ModelRuntimeSp
 		}
 	}
 	for _, rt := range desired {
-		if rt.SlotResource != "" && !satisfied[rt.Model+"-runtime"] {
+		if rt.SlotResource != "" && !satisfied[runtimeDeploymentName(rt)] {
 			gpusToClear[rt.Node+"|"+rt.GPU] = true
 		}
 	}
@@ -1114,12 +1127,15 @@ func runtimeFromDeployment(dep map[string]any) system.ModelRuntimeSpec {
 	annotations := asMap(meta["annotations"])
 	rt := system.ModelRuntimeSpec{
 		Model:           asString(labels["migrant.io/model"]),
+		RuntimeID:       asString(labels["migrant.io/runtime-id"]),
 		Node:            asString(asMap(podSpec["nodeSelector"])["kubernetes.io/hostname"]),
 		Profile:         asString(labels["migrant.io/profile"]),
 		GPU:             asString(labels["migrant.io/gpu"]),
 		SlotResource:    asString(annotations["migrant.io/slot-resource"]),
 		DeviceResource:  asString(annotations["migrant.io/device-resource"]),
 		ExpectedMIGUUID: asString(annotations["migrant.io/expected-mig-uuid"]),
+		Weight:          asFloat(annotations["migrant.io/route-weight"]),
+		Capacity:        asFloat(annotations["migrant.io/capacity"]),
 	}
 	for _, container := range asSlice(podSpec["containers"]) {
 		c := asMap(container)
@@ -1139,10 +1155,10 @@ func runtimeFromDeployment(dep map[string]any) system.ModelRuntimeSpec {
 }
 
 func runtimeEquivalent(a, b system.ModelRuntimeSpec) bool {
-	return a.Model == b.Model && a.BatchSize == b.BatchSize && a.Node == b.Node &&
+	return runtimeID(a) == runtimeID(b) && a.Model == b.Model && a.BatchSize == b.BatchSize && a.Node == b.Node &&
 		a.HostPort == b.HostPort && a.Profile == b.Profile && a.GPU == b.GPU &&
 		a.SlotResource == b.SlotResource && a.DeviceResource == b.DeviceResource &&
-		a.ExpectedMIGUUID == b.ExpectedMIGUUID
+		a.ExpectedMIGUUID == b.ExpectedMIGUUID && floatEqual(routeWeight(a), routeWeight(b)) && floatEqual(a.Capacity, b.Capacity)
 }
 
 func waitForRuntimePodsGone(client *kube.Client, gpus map[string]bool, timeout time.Duration) error {
@@ -1247,7 +1263,7 @@ func syncRuntimes(client *kube.Client, runtimes []system.ModelRuntimeSpec) error
 			return fmt.Errorf("runtime %s missing resolved per-MIG UUID device binding for slot %s", rt.Model, rt.SlotResource)
 		}
 		body := deployment(client.Namespace(), rt)
-		if err := client.Upsert(kube.Deployment(client.Namespace(), rt.Model+"-runtime"), body, nil); err != nil {
+		if err := client.Upsert(kube.Deployment(client.Namespace(), runtimeDeploymentName(rt)), body, nil); err != nil {
 			return err
 		}
 	}
@@ -1537,7 +1553,7 @@ func nodeAgentRegisteredTargets(body map[string]any, targets []allocatableTarget
 }
 
 type runtimeWaitResult struct {
-	model        string
+	runtimeID    string
 	verification map[string]any
 	readiness    map[string]any
 	err          error
@@ -1553,7 +1569,7 @@ func waitForRuntimeReadyAndCUDA(client *kube.Client, nodes map[string]string, ru
 		go func() {
 			defer wg.Done()
 			verification, readiness, err := waitForOneRuntimeReadyAndCUDA(client, nodes, rt, deploymentCreatedAt, deadline)
-			ch <- runtimeWaitResult{model: rt.Model, verification: verification, readiness: readiness, err: err}
+			ch <- runtimeWaitResult{runtimeID: runtimeID(rt), verification: verification, readiness: readiness, err: err}
 		}()
 	}
 	wg.Wait()
@@ -1564,8 +1580,8 @@ func waitForRuntimeReadyAndCUDA(client *kube.Client, nodes map[string]string, ru
 		if result.err != nil {
 			return verified, readiness, result.err
 		}
-		verified[result.model] = result.verification
-		readiness[result.model] = result.readiness
+		verified[result.runtimeID] = result.verification
+		readiness[result.runtimeID] = result.readiness
 	}
 	return verified, readiness, nil
 }
@@ -1626,7 +1642,7 @@ func waitForOneRuntimeReadyAndCUDA(client *kube.Client, nodes map[string]string,
 
 func waitForRuntimePod(client *kube.Client, rt system.ModelRuntimeSpec, deadline time.Time, readiness map[string]any, deploymentCreatedAt time.Time) (map[string]any, error) {
 	for time.Now().Before(deadline) {
-		pod, ok, err := findRuntimePod(client, rt.Model)
+		pod, ok, err := findRuntimePod(client, rt)
 		if err != nil {
 			return nil, err
 		}
@@ -1641,7 +1657,7 @@ func waitForRuntimePod(client *kube.Client, rt system.ModelRuntimeSpec, deadline
 	return nil, fmt.Errorf("runtime %s pod did not start before timeout", rt.Model)
 }
 
-func findRuntimePod(client *kube.Client, model string) (map[string]any, bool, error) {
+func findRuntimePod(client *kube.Client, rt system.ModelRuntimeSpec) (map[string]any, bool, error) {
 	var list map[string]any
 	if _, err := client.Get(kube.Pods(client.Namespace()), &list); err != nil {
 		return nil, false, err
@@ -1657,7 +1673,7 @@ func findRuntimePod(client *kube.Client, model string) (map[string]any, bool, er
 			continue
 		}
 		labels := asMap(meta["labels"])
-		if asString(labels["app.kubernetes.io/name"]) != "migrant-model-runtime" || asString(labels["migrant.io/model"]) != model {
+		if asString(labels["app.kubernetes.io/name"]) != "migrant-model-runtime" || asString(labels["migrant.io/runtime-id"]) != runtimeID(rt) {
 			continue
 		}
 		created := parseKubeTime(asString(meta["creationTimestamp"]))
@@ -1767,7 +1783,7 @@ func getJSON(url string) (map[string]any, error) {
 func deleteStaleRuntimes(client *kube.Client, desired []system.ModelRuntimeSpec) ([]string, error) {
 	keep := map[string]bool{}
 	for _, rt := range desired {
-		keep[rt.Model+"-runtime"] = true
+		keep[runtimeDeploymentName(rt)] = true
 	}
 	deleted := []string{}
 	var list map[string]any
@@ -1790,12 +1806,36 @@ func deleteStaleRuntimes(client *kube.Client, desired []system.ModelRuntimeSpec)
 }
 
 func syncRoutes(router string, runtimes []system.ModelRuntimeSpec, nodes map[string]string) error {
+	cleared := map[string]bool{}
+	for _, rt := range runtimes {
+		if rt.Model == "" || cleared[rt.Model] {
+			continue
+		}
+		if err := deleteRoute(router, rt.Model); err != nil {
+			return err
+		}
+		cleared[rt.Model] = true
+	}
 	for _, rt := range runtimes {
 		ip := nodes[rt.Node]
 		if ip == "" {
 			return fmt.Errorf("node IP not found for %s", rt.Node)
 		}
-		raw, _ := json.Marshal(map[string]any{"model": rt.Model, "endpoint": "http://" + ip + ":" + strconv.Itoa(rt.HostPort)})
+		raw, _ := json.Marshal(map[string]any{
+			"model":           rt.Model,
+			"runtimeId":       runtimeID(rt),
+			"endpoint":        "http://" + ip + ":" + strconv.Itoa(rt.HostPort),
+			"weight":          routeWeight(rt),
+			"capacity":        rt.Capacity,
+			"profile":         rt.Profile,
+			"batchSize":       rt.BatchSize,
+			"gpu":             rt.GPU,
+			"slotResource":    rt.SlotResource,
+			"deviceResource":  rt.DeviceResource,
+			"expectedMigUuid": rt.ExpectedMIGUUID,
+			"active":          true,
+			"acceptingNew":    true,
+		})
 		resp, err := http.Post(router+"/control/routes", "application/json", bytes.NewReader(raw))
 		if err != nil {
 			return err
@@ -1828,7 +1868,8 @@ func deleteRoute(router, model string) error {
 }
 
 func deployment(ns string, rt system.ModelRuntimeSpec) map[string]any {
-	name := rt.Model + "-runtime"
+	name := runtimeDeploymentName(rt)
+	rid := runtimeID(rt)
 	container := map[string]any{
 		"name":            "runtime",
 		"image":           env("MODEL_RUNTIME_IMAGE", "localhost:10690/migrant-model-runtime:go"),
@@ -1836,6 +1877,11 @@ func deployment(ns string, rt system.ModelRuntimeSpec) map[string]any {
 		"args":            []string{"--addr=:" + strconv.Itoa(rt.HostPort)},
 		"env": []map[string]any{
 			{"name": "MODEL_NAME", "value": rt.Model},
+			{"name": "RUNTIME_MODE", "value": env("MODEL_RUNTIME_MODE", "synthetic")},
+			{"name": "TORCHVISION_WEIGHTS", "value": env("TORCHVISION_WEIGHTS", "default")},
+			{"name": "TORCH_HOME", "value": "/tmp/torch"},
+			{"name": "XDG_CACHE_HOME", "value": "/tmp/.cache"},
+			{"name": "OR_SIM_RUNTIME_ID", "value": rid},
 			{"name": "BATCH_SIZE", "value": strconv.Itoa(rt.BatchSize)},
 			{"name": "OR_SIM_GPU", "value": rt.GPU},
 			{"name": "OR_SIM_PROFILE", "value": rt.Profile},
@@ -1863,6 +1909,7 @@ func deployment(ns string, rt system.ModelRuntimeSpec) map[string]any {
 			"labels": map[string]any{
 				"app.kubernetes.io/name": "migrant-model-runtime",
 				"migrant.io/model":       rt.Model,
+				"migrant.io/runtime-id":  rid,
 				"migrant.io/profile":     rt.Profile,
 				"migrant.io/gpu":         rt.GPU,
 			},
@@ -1873,17 +1920,21 @@ func deployment(ns string, rt system.ModelRuntimeSpec) map[string]any {
 			"selector": map[string]any{"matchLabels": map[string]any{
 				"app.kubernetes.io/name": "migrant-model-runtime",
 				"migrant.io/model":       rt.Model,
+				"migrant.io/runtime-id":  rid,
 			}},
 			"template": map[string]any{
 				"metadata": map[string]any{"labels": map[string]any{
 					"app.kubernetes.io/name": "migrant-model-runtime",
 					"migrant.io/model":       rt.Model,
+					"migrant.io/runtime-id":  rid,
 					"migrant.io/profile":     rt.Profile,
 					"migrant.io/gpu":         rt.GPU,
 				}, "annotations": map[string]any{
 					"migrant.io/slot-resource":      rt.SlotResource,
 					"migrant.io/device-resource":    rt.DeviceResource,
 					"migrant.io/expected-mig-uuid":  rt.ExpectedMIGUUID,
+					"migrant.io/route-weight":       fmt.Sprintf("%.6g", routeWeight(rt)),
+					"migrant.io/capacity":           fmt.Sprintf("%.6g", rt.Capacity),
 					"migrant.io/binding-mechanism":  "per-mig-uuid-resource",
 					"migrant.io/binding-layer":      "kubelet-device-plugin-allocate",
 					"migrant.io/long-term-identity": "logical-slot",
@@ -1933,6 +1984,7 @@ func parseRuntimes(spec map[string]any) []system.ModelRuntimeSpec {
 		m := asMap(item)
 		out = append(out, system.ModelRuntimeSpec{
 			Model:           asString(m["model"]),
+			RuntimeID:       asString(m["runtimeId"]),
 			BatchSize:       intNumber(m["batchSize"]),
 			Node:            asString(m["node"]),
 			HostPort:        intNumber(m["hostPort"]),
@@ -1941,6 +1993,8 @@ func parseRuntimes(spec map[string]any) []system.ModelRuntimeSpec {
 			SlotResource:    asString(m["slotResource"]),
 			DeviceResource:  asString(m["deviceResource"]),
 			ExpectedMIGUUID: asString(m["expectedMigUuid"]),
+			Weight:          asFloat(m["weight"]),
+			Capacity:        asFloat(m["capacity"]),
 		})
 	}
 	return out
@@ -2051,6 +2105,74 @@ func firstNonNil(values ...any) any {
 	return nil
 }
 
+func runtimeID(rt system.ModelRuntimeSpec) string {
+	if rt.RuntimeID != "" {
+		return rt.RuntimeID
+	}
+	raw := strings.ToLower(strings.Join([]string{rt.Model, rt.GPU, rt.SlotResource}, "-"))
+	replacer := strings.NewReplacer("/", "-", ".", "-", "_", "-", ":", "-", " ", "-")
+	raw = replacer.Replace(raw)
+	raw = strings.Trim(raw, "-")
+	if raw == "" {
+		return "runtime"
+	}
+	return raw
+}
+
+func runtimeDeploymentName(rt system.ModelRuntimeSpec) string {
+	name := runtimeID(rt)
+	if !strings.HasSuffix(name, "-runtime") {
+		name += "-runtime"
+	}
+	return dnsLabel(name)
+}
+
+func dnsLabel(value string) string {
+	out := strings.ToLower(value)
+	replacer := strings.NewReplacer("/", "-", ".", "-", "_", "-", ":", "-", " ", "-")
+	out = replacer.Replace(out)
+	parts := strings.Split(out, "-")
+	kept := []string{}
+	for _, part := range parts {
+		if part != "" {
+			kept = append(kept, part)
+		}
+	}
+	out = strings.Join(kept, "-")
+	if len(out) > 63 {
+		out = strings.Trim(out[:63], "-")
+	}
+	if out == "" {
+		return "runtime"
+	}
+	return out
+}
+
+func routeWeight(rt system.ModelRuntimeSpec) float64 {
+	if rt.Weight > 0 {
+		return rt.Weight
+	}
+	if rt.Capacity > 0 {
+		return rt.Capacity
+	}
+	switch rt.Profile {
+	case "7g":
+		return 7
+	case "4g":
+		return 4
+	case "3g":
+		return 3
+	case "2g":
+		return 2
+	default:
+		return 1
+	}
+}
+
+func floatEqual(a, b float64) bool {
+	return math.Abs(a-b) < 0.000001
+}
+
 func stringList(values []any) []string {
 	out := []string{}
 	for _, raw := range values {
@@ -2059,6 +2181,23 @@ func stringList(values []any) []string {
 		}
 	}
 	return out
+}
+
+func asFloat(v any) float64 {
+	switch x := v.(type) {
+	case float64:
+		return x
+	case float32:
+		return float64(x)
+	case int:
+		return float64(x)
+	case string:
+		value, err := strconv.ParseFloat(x, 64)
+		if err == nil {
+			return value
+		}
+	}
+	return 0
 }
 
 func intNumber(v any) int {

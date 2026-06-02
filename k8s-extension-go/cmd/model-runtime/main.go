@@ -16,6 +16,8 @@ import (
 type runtimeState struct {
 	mu           sync.Mutex
 	model        string
+	runtimeID    string
+	runtimeMode  string
 	batchSize    int
 	startedAt    time.Time
 	requests     int64
@@ -29,9 +31,11 @@ func main() {
 	flag.Parse()
 
 	state := &runtimeState{
-		model:     envDefault("MODEL_NAME", "gpt2"),
-		batchSize: envIntDefault("BATCH_SIZE", 4),
-		startedAt: time.Now(),
+		model:       envDefault("MODEL_NAME", "gpt2"),
+		runtimeID:   envDefault("OR_SIM_RUNTIME_ID", envDefault("MODEL_NAME", "gpt2")),
+		runtimeMode: envDefault("RUNTIME_MODE", "synthetic"),
+		batchSize:   envIntDefault("BATCH_SIZE", 4),
+		startedAt:   time.Now(),
 	}
 	state.startCUDAWorker()
 
@@ -49,6 +53,8 @@ func (s *runtimeState) healthz(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":                   true,
 		"model":                s.model,
+		"runtimeId":            s.runtimeID,
+		"runtimeMode":          s.runtimeMode,
 		"cudaWorker":           envDefault("ENABLE_CUDA_SPIN", "true"),
 		"nvidiaVisibleDevices": os.Getenv("NVIDIA_VISIBLE_DEVICES"),
 		"orSimMIGUUID":         os.Getenv("OR_SIM_MIG_UUID"),
@@ -67,16 +73,27 @@ func (s *runtimeState) metrics(w http.ResponseWriter, _ *http.Request) {
 	if s.requests > 0 {
 		avg = s.totalLatency / float64(s.requests)
 	}
+	throughput := 0.0
+	if avg > 0 {
+		throughput = 1000.0 * float64(max(1, s.batchSize)) / avg
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"model":          s.model,
-		"uptimeSeconds":  time.Since(s.startedAt).Seconds(),
-		"requests":       s.requests,
-		"errors":         s.errors,
-		"avgLatencyMs":   avg,
-		"batchSize":      s.batchSize,
-		"migUuid":        os.Getenv("OR_SIM_MIG_UUID"),
-		"slotResource":   os.Getenv("OR_SIM_SLOT_RESOURCE"),
-		"deviceResource": os.Getenv("OR_SIM_DEVICE_RESOURCE"),
+		"model":               s.model,
+		"runtimeId":           s.runtimeID,
+		"runtimeMode":         s.runtimeMode,
+		"uptimeSeconds":       time.Since(s.startedAt).Seconds(),
+		"requests":            s.requests,
+		"errors":              s.errors,
+		"avgLatencyMs":        avg,
+		"runtimeLatencyMs":    avg,
+		"runtimeThroughput":   throughput,
+		"batchSize":           s.batchSize,
+		"migUuid":             os.Getenv("OR_SIM_MIG_UUID"),
+		"slotResource":        os.Getenv("OR_SIM_SLOT_RESOURCE"),
+		"deviceResource":      os.Getenv("OR_SIM_DEVICE_RESOURCE"),
+		"expectedMigUuid":     os.Getenv("OR_SIM_EXPECTED_MIG_UUID"),
+		"physicalGpuId":       os.Getenv("OR_SIM_PHYSICAL_GPU_ID"),
+		"nvidiaVisibleDevice": os.Getenv("NVIDIA_VISIBLE_DEVICES"),
 	})
 }
 
@@ -126,11 +143,14 @@ func (s *runtimeState) infer(w http.ResponseWriter, r *http.Request) {
 	s.record(latency, false)
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"model":     s.model,
-		"batchSize": s.batchSize,
-		"latencyMs": float64(latency.Microseconds()) / 1000.0,
-		"input":     payload,
-		"output":    s.output(payload),
+		"model":            s.model,
+		"runtimeId":        s.runtimeID,
+		"runtimeMode":      s.runtimeMode,
+		"batchSize":        s.batchSize,
+		"runtimeLatencyMs": float64(latency.Microseconds()) / 1000.0,
+		"latencyMs":        float64(latency.Microseconds()) / 1000.0,
+		"input":            payload,
+		"output":           s.output(payload),
 	})
 }
 

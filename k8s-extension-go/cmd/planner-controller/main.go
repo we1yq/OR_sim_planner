@@ -107,13 +107,19 @@ func reconcile(client *kube.Client, plannerURL string) error {
 
 func createPlan(client *kube.Client, plannerURL string, snap map[string]any, planName string) error {
 	spec := asMap(snap["spec"])
+	if wait, err := registryNeedsRepair(client); err != nil {
+		return err
+	} else if wait {
+		return nil
+	}
 	current, err := loadCurrentAllocation(client)
 	if err != nil {
 		return err
 	}
 	planInput := planningInputFromSnapshot(spec)
 	current.AllowedNodes = planInput.PlacementNodes
-	planned, err := callPlannerEngine(plannerURL, planInput, current)
+	runtimeProfileCorrection := loadRuntimeProfileCorrection(client)
+	planned, err := callPlannerEngine(plannerURL, planInput, current, runtimeProfileCorrection)
 	if err != nil {
 		return err
 	}
@@ -135,17 +141,18 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 			},
 		},
 		"spec": map[string]any{
-			"executor":             "go-transition-executor",
-			"phaseGate":            "auto",
-			"actionCount":          actionCount,
-			"targetGpuCount":       uniqueGPUCountFromMaps(runtimes),
-			"plannerMetadata":      planned["metadata"],
-			"planningInput":        planInput,
-			"currentAllocationRef": "physicalgpuregistries/default",
-			"targetAllocationPlan": planned["targetAllocationPlan"],
-			"abstractActions":      planned["abstractActions"],
-			"actionDag":            actionDag,
-			"validationTargets":    planned["validationTargets"],
+			"executor":                 "go-transition-executor",
+			"phaseGate":                "auto",
+			"actionCount":              actionCount,
+			"targetGpuCount":           uniqueGPUCountFromMaps(runtimes),
+			"plannerMetadata":          planned["metadata"],
+			"planningInput":            planInput,
+			"runtimeProfileCorrection": runtimeProfileCorrection,
+			"currentAllocationRef":     "physicalgpuregistries/default",
+			"targetAllocationPlan":     planned["targetAllocationPlan"],
+			"abstractActions":          planned["abstractActions"],
+			"actionDag":                actionDag,
+			"validationTargets":        planned["validationTargets"],
 			"summary": map[string]any{
 				"arrivalSnapshotRef": asString(asMap(snap["metadata"])["name"]),
 				"targetArrival":      planInput.TargetArrival,
@@ -162,11 +169,37 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 	return err
 }
 
-func callPlannerEngine(plannerURL string, input system.PlanningInput, current system.CurrentAllocation) (map[string]any, error) {
+func registryNeedsRepair(client *kube.Client) (bool, error) {
+	var registry map[string]any
+	status, err := client.Get(kube.NamespacedResourceName(client.Namespace(), "physicalgpuregistries", "default"), &registry)
+	if err != nil {
+		if status == http.StatusNotFound {
+			return true, nil
+		}
+		return false, err
+	}
+	if status != http.StatusOK {
+		return true, nil
+	}
+	health := asMap(asMap(registry["status"])["health"])
+	if len(health) == 0 {
+		return false, nil
+	}
+	if asBool(health["repairRequired"]) {
+		return true, nil
+	}
+	if stable, ok := health["stable"].(bool); ok && !stable {
+		return true, nil
+	}
+	return false, nil
+}
+
+func callPlannerEngine(plannerURL string, input system.PlanningInput, current system.CurrentAllocation, runtimeProfileCorrection map[string]any) (map[string]any, error) {
 	body := map[string]any{
-		"planningInput":     input,
-		"currentAllocation": current,
-		"scenarioPath":      "mock/scenarios/stage0.yaml",
+		"planningInput":            input,
+		"currentAllocation":        current,
+		"runtimeProfileCorrection": runtimeProfileCorrection,
+		"scenarioPath":             "mock/scenarios/stage0.yaml",
 	}
 	raw, _ := json.Marshal(body)
 	resp, err := http.Post(strings.TrimRight(plannerURL, "/")+"/plan", "application/json", bytes.NewReader(raw))
@@ -284,32 +317,62 @@ func currentGPUsFromCanonical(canonical map[string]any, fallback map[string]syst
 	return out
 }
 
-func loadCalibrationOverlay(client *kube.Client) map[string]float64 {
+func loadRuntimeProfileCorrection(client *kube.Client) map[string]any {
 	var registry map[string]any
 	status, err := client.Get(kube.NamespacedResourceName(client.Namespace(), "physicalgpuregistries", "default"), &registry)
 	if err != nil || status != http.StatusOK {
-		return nil
+		return map[string]any{"available": false, "observations": []any{}}
 	}
 	overlay := asMap(asMap(registry["status"])["profileCalibrationOverlay"])
-	out := map[string]float64{}
+	observations := []map[string]any{}
 	for _, raw := range asSlice(overlay["observations"]) {
 		row := asMap(raw)
 		model := asString(row["model"])
 		if model == "" || asString(row["confidence"]) == "none" {
 			continue
 		}
-		latencyMs := asFloat(row["runtime.avgLatencyMs"])
+		obs := map[string]any{
+			"model":      model,
+			"confidence": asString(row["confidence"]),
+		}
+		if batch := intNumber(row["runtime.batchSize"]); batch > 0 {
+			obs["batch"] = batch
+		}
+		if slot := asString(row["runtime.slotResource"]); slot != "" {
+			obs["slotResource"] = slot
+		}
+		latencyMs := asFloat(row["runtime.runtimeLatencyMs"])
+		if latencyMs == 0 {
+			latencyMs = asFloat(row["runtime.avgLatencyMs"])
+		}
 		if latencyMs == 0 {
 			latencyMs = asFloat(row["avgLatencyMs"])
 		}
 		if latencyMs > 0 {
-			out[model] = latencyMs
+			obs["observedLatencyMs"] = latencyMs
+			observedMu := asFloat(row["runtime.runtimeThroughput"])
+			if observedMu == 0 {
+				observedMu = 1000.0 / latencyMs
+			}
+			obs["observedMu"] = observedMu
+		}
+		if requests := intNumber(row["runtime.requests"]); requests > 0 {
+			obs["sampleCount"] = requests
+		} else if requests := intNumber(row["sampleCount"]); requests > 0 {
+			obs["sampleCount"] = requests
+		}
+		if len(obs) > 2 {
+			observations = append(observations, obs)
 		}
 	}
-	if len(out) == 0 {
-		return nil
+	return map[string]any{
+		"available":     len(observations) > 0,
+		"source":        "cluster-state-manager.profileCalibrationOverlay",
+		"policy":        "runtime-profile-correction/v1",
+		"muPolicy":      "min(originalMu, observedMu)",
+		"latencyPolicy": "max(originalLatencyMs, observedLatencyMs)",
+		"observations":  observations,
 	}
-	return out
 }
 
 func runtimesAsMaps(runtimes []system.ModelRuntimeSpec) []map[string]any {

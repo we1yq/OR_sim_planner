@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"math"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"or-sim/k8s-extension-go/internal/kube"
@@ -15,6 +18,7 @@ import (
 
 type state struct {
 	epoch        int
+	repairEpoch  int
 	lastArrival  map[string]float64
 	lastSnapshot time.Time
 }
@@ -42,17 +46,33 @@ func main() {
 }
 
 func loop(client *kube.Client, router string, st *state) {
+	trigger := make(chan struct{}, 1)
+	go watchTrigger(client, kube.NamespacedResourceName(client.Namespace(), "physicalgpuregistries", "default"), "physicalgpuregistry/default", trigger)
+	go watchTrigger(client, configMaps(client.Namespace()), "configmaps", trigger)
 	tick := time.NewTicker(10 * time.Second)
 	defer tick.Stop()
 	for {
 		if err := reconcile(client, router, st); err != nil {
 			log.Printf("epoch reconcile failed: %v", err)
 		}
-		<-tick.C
+		select {
+		case <-trigger:
+		case <-tick.C:
+		}
 	}
 }
 
 func reconcile(client *kube.Client, router string, st *state) error {
+	if created, err := reconcileRepair(client, st); err != nil {
+		return err
+	} else if created {
+		return nil
+	}
+	if created, err := reconcileScheduledTrace(client); err != nil {
+		return err
+	} else if created {
+		return nil
+	}
 	resp, err := http.Get(router + "/metrics/demand")
 	if err != nil {
 		return err
@@ -81,6 +101,22 @@ func reconcile(client *kube.Client, router string, st *state) error {
 	st.lastSnapshot = time.Now()
 	st.lastArrival = current
 	name := "runtime-epoch-" + strconv.Itoa(st.epoch)
+	spec := map[string]any{
+		"source":          "runtime-router",
+		"mode":            "observed",
+		"epoch":           strconv.Itoa(st.epoch),
+		"windowSeconds":   int(demand.WindowSeconds),
+		"unit":            "requests_per_second",
+		"observedAt":      time.Now().Format(time.RFC3339Nano),
+		"triggerReason":   reason,
+		"registeredSLOMs": registeredSLOMs,
+		"targetArrival":   current,
+		"requestCount":    requests,
+	}
+	return createArrivalSnapshot(client, name, "epoch-controller", spec)
+}
+
+func createArrivalSnapshot(client *kube.Client, name, component string, spec map[string]any) error {
 	body := map[string]any{
 		"apiVersion": "mig.or-sim.io/v1alpha1",
 		"kind":       "ArrivalSnapshot",
@@ -89,29 +125,318 @@ func reconcile(client *kube.Client, router string, st *state) error {
 			"namespace": client.Namespace(),
 			"labels": map[string]any{
 				"app.kubernetes.io/name":  "migrant-go",
-				"mig.or-sim.io/component": "epoch-controller",
+				"mig.or-sim.io/component": component,
 			},
 		},
-		"spec": map[string]any{
-			"source":          "runtime-router",
-			"mode":            "observed",
-			"epoch":           strconv.Itoa(st.epoch),
-			"windowSeconds":   int(demand.WindowSeconds),
-			"unit":            "requests_per_second",
-			"observedAt":      time.Now().Format(time.RFC3339Nano),
-			"triggerReason":   reason,
-			"registeredSLOMs": registeredSLOMs,
-			"targetArrival":   current,
-			"requestCount":    requests,
-		},
+		"spec": spec,
 	}
 	if err := client.Upsert(kube.NamespacedResourceName(client.Namespace(), "arrivalsnapshots", name), body, nil); err != nil {
 		return err
 	}
-	_, err = client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "arrivalsnapshots", name)+"/status", map[string]any{
-		"status": map[string]any{"phase": "Ready", "message": "created from runtime-router demand"},
+	_, err := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "arrivalsnapshots", name)+"/status", map[string]any{
+		"status": map[string]any{"phase": "Ready", "message": "created by " + component},
 	}, nil)
 	return err
+}
+
+func reconcileScheduledTrace(client *kube.Client) (bool, error) {
+	schedule, ok, err := loadTraceSchedule(client)
+	if err != nil || !ok {
+		return false, err
+	}
+	if hasActiveMigActionPlan(client) {
+		return false, nil
+	}
+	stages := asSlice(schedule["stages"])
+	sort.Slice(stages, func(i, j int) bool {
+		left := intNumber(asMap(stages[i])["offsetSeconds"])
+		right := intNumber(asMap(stages[j])["offsetSeconds"])
+		if left != right {
+			return left < right
+		}
+		return asString(asMap(stages[i])["epoch"]) < asString(asMap(stages[j])["epoch"])
+	})
+	now := time.Now()
+	startedAt := scheduleStartedAt(schedule, now)
+	for _, rawStage := range stages {
+		stage := asMap(rawStage)
+		epoch := firstNonEmpty(asString(stage["epoch"]), asString(stage["name"]))
+		if epoch == "" {
+			continue
+		}
+		offset := time.Duration(intNumber(stage["offsetSeconds"])) * time.Second
+		if now.Before(startedAt.Add(offset)) {
+			continue
+		}
+		name := "scheduled-" + sanitize(epoch)
+		if status, _ := client.Get(kube.NamespacedResourceName(client.Namespace(), "arrivalsnapshots", name), nil); status == http.StatusOK {
+			continue
+		}
+		spec := map[string]any{
+			"source":               firstNonEmpty(asString(schedule["source"]), "trace"),
+			"mode":                 firstNonEmpty(asString(schedule["mode"]), "scheduled"),
+			"epoch":                epoch,
+			"windowSeconds":        firstPositive(intNumber(stage["windowSeconds"]), intNumber(schedule["windowSeconds"]), 60),
+			"unit":                 firstNonEmpty(asString(schedule["unit"]), "requests_per_second"),
+			"observedAt":           now.Format(time.RFC3339Nano),
+			"triggerReason":        "scheduled_trace_window",
+			"profileCatalogRef":    firstNonEmpty(asString(stage["profileCatalogRef"]), asString(schedule["profileCatalogRef"]), "default"),
+			"currentAllocationRef": firstNonEmpty(asString(stage["currentAllocationRef"]), asString(schedule["currentAllocationRef"]), "physicalgpuregistry/default"),
+			"registeredSLOMs":      firstNonEmptyMap(asMap(stage["registeredSLOMs"]), asMap(schedule["registeredSLOMs"]), registeredSLOMs),
+			"targetArrival":        asMap(stage["targetArrival"]),
+			"notes": []string{
+				"scheduled/forecast epoch created from trace-derived request-rate vector",
+				"the predictor is external to this system; this ConfigMap supplies its output for experiments",
+			},
+		}
+		if placement := asMap(stage["placement"]); len(placement) > 0 {
+			spec["placement"] = placement
+		} else if placement := asMap(schedule["placement"]); len(placement) > 0 {
+			spec["placement"] = placement
+		}
+		if err := createArrivalSnapshot(client, name, "scheduled-trace", spec); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func loadTraceSchedule(client *kube.Client) (map[string]any, bool, error) {
+	var cm map[string]any
+	status, err := client.Get(configMapPath(client.Namespace(), "arrival-trace-schedule"), &cm)
+	if err != nil {
+		if status == http.StatusNotFound {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	raw := strings.TrimSpace(asString(asMap(cm["data"])["schedule.json"]))
+	if raw == "" {
+		return nil, false, nil
+	}
+	var schedule map[string]any
+	if err := json.Unmarshal([]byte(raw), &schedule); err != nil {
+		return nil, false, err
+	}
+	if asString(schedule["startAt"]) == "" && asString(schedule["createdAt"]) == "" {
+		if createdAt := asString(asMap(cm["metadata"])["creationTimestamp"]); createdAt != "" {
+			schedule["createdAt"] = createdAt
+		}
+	}
+	return schedule, true, nil
+}
+
+func configMaps(ns string) string {
+	return "/api/v1/namespaces/" + ns + "/configmaps"
+}
+
+func configMapPath(ns, name string) string {
+	return "/api/v1/namespaces/" + ns + "/configmaps/" + name
+}
+
+func hasActiveMigActionPlan(client *kube.Client) bool {
+	var list map[string]any
+	if _, err := client.Get(kube.NamespacedResource(client.Namespace(), "migactionplans"), &list); err != nil {
+		return false
+	}
+	for _, raw := range asSlice(list["items"]) {
+		phase := asString(asMap(asMap(raw)["status"])["phase"])
+		if phase != "Executed" && phase != "Failed" {
+			return true
+		}
+	}
+	return false
+}
+
+func scheduleStartedAt(schedule map[string]any, fallback time.Time) time.Time {
+	raw := asString(schedule["startAt"])
+	if raw == "" {
+		raw = asString(schedule["createdAt"])
+	}
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil {
+		parsed, err = time.Parse(time.RFC3339, raw)
+	}
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func reconcileRepair(client *kube.Client, st *state) (bool, error) {
+	var registry map[string]any
+	status, err := client.Get(kube.NamespacedResourceName(client.Namespace(), "physicalgpuregistries", "default"), &registry)
+	if err != nil || status != http.StatusOK {
+		return false, err
+	}
+	health := asMap(asMap(registry["status"])["health"])
+	if !asBool(health["repairRequired"]) {
+		return false, nil
+	}
+	required := asSlice(health["requiredActions"])
+	if len(required) == 0 {
+		return false, nil
+	}
+	if hasActiveRepairPlan(client) {
+		return false, nil
+	}
+	st.repairEpoch++
+	name := "repair-epoch-" + strconv.Itoa(st.repairEpoch) + "-" + strconv.FormatInt(time.Now().Unix(), 10)
+	actions := repairActions(required)
+	if len(actions) == 0 {
+		return false, nil
+	}
+	body := map[string]any{
+		"apiVersion": "mig.or-sim.io/v1alpha1",
+		"kind":       "MigActionPlan",
+		"metadata": map[string]any{
+			"name":      name,
+			"namespace": client.Namespace(),
+			"labels": map[string]any{
+				"app.kubernetes.io/name":  "migrant-go",
+				"mig.or-sim.io/component": "reconciler",
+				"mig.or-sim.io/plan-type": "repair",
+			},
+		},
+		"spec": map[string]any{
+			"executor":             "go-transition-executor",
+			"phaseGate":            "auto",
+			"planType":             "repair",
+			"actionCount":          len(actions),
+			"targetGpuCount":       intNumber(asMap(asMap(registry["status"])["queueCounts"])["active"]),
+			"currentAllocationRef": "physicalgpuregistries/default",
+			"plannerMetadata": map[string]any{
+				"planner": "state-repair-reconciler",
+				"reason":  "PhysicalGpuRegistry health requires repair",
+			},
+			"abstractActions": []any{},
+			"actionDag": map[string]any{
+				"format": "migrant.action-dag/v1",
+				"name":   name,
+				"nodes":  actions,
+			},
+			"validationTargets": map[string]any{
+				"registryHealth": health,
+			},
+			"summary": map[string]any{
+				"planType":        "repair",
+				"requiredActions": required,
+				"desiredRuntimes": []any{},
+			},
+		},
+	}
+	if err := client.Upsert(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name), body, nil); err != nil {
+		return false, err
+	}
+	_, err = client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
+		"status": map[string]any{"phase": "Planned", "message": "state repair plan created by reconciler"},
+	}, nil)
+	return true, err
+}
+
+func repairActions(required []any) []map[string]any {
+	nodes := []map[string]any{}
+	index := 0
+	for _, raw := range required {
+		req := asMap(raw)
+		if asString(req["type"]) != "clear_template_before_available" {
+			continue
+		}
+		physicalID := asString(req["physicalGpuId"])
+		if physicalID == "" {
+			continue
+		}
+		clearID := "repair-clear-template-" + sanitize(physicalID)
+		returnID := "repair-return-gpu-" + sanitize(physicalID)
+		common := map[string]any{
+			"physical_gpu_id": physicalID,
+			"physicalGpuId":   physicalID,
+			"gpu":             physicalID,
+			"node":            req["node"],
+			"gpuIndex":        req["gpuIndex"],
+			"reason":          firstNonEmpty(asString(req["reason"]), "clear_template_before_available"),
+		}
+		nodes = append(nodes, map[string]any{
+			"id":    clearID,
+			"type":  "clear_template",
+			"phase": index,
+			"index": index,
+			"action": mergeMap(common, map[string]any{
+				"type":           "clear_template",
+				"abstractAction": "Clear Template Before Available",
+			}),
+		})
+		index++
+		nodes = append(nodes, map[string]any{
+			"id":        returnID,
+			"type":      "return_gpu",
+			"phase":     index,
+			"index":     index,
+			"dependsOn": []string{clearID},
+			"action": mergeMap(common, map[string]any{
+				"type":           "return_gpu",
+				"abstractAction": "Return GPU",
+			}),
+		})
+		index++
+	}
+	return nodes
+}
+
+func hasActiveRepairPlan(client *kube.Client) bool {
+	var list map[string]any
+	if _, err := client.Get(kube.NamespacedResource(client.Namespace(), "migactionplans"), &list); err != nil {
+		return false
+	}
+	for _, raw := range asSlice(list["items"]) {
+		plan := asMap(raw)
+		spec := asMap(plan["spec"])
+		meta := asMap(plan["metadata"])
+		labels := asMap(meta["labels"])
+		if asString(spec["planType"]) != "repair" && asString(labels["mig.or-sim.io/plan-type"]) != "repair" {
+			continue
+		}
+		phase := asString(asMap(plan["status"])["phase"])
+		if phase != "Executed" && phase != "Failed" {
+			return true
+		}
+	}
+	return false
+}
+
+func watchTrigger(client *kube.Client, apiPath, label string, trigger chan<- struct{}) {
+	for {
+		rv := resourceVersion(client, apiPath)
+		err := client.Watch(context.Background(), apiPath, rv, func(eventType string, _ map[string]any) {
+			if eventType != "BOOKMARK" {
+				signal(trigger)
+			}
+		})
+		if err != nil && err != context.Canceled {
+			log.Printf("epoch watch %s ended: %v", label, err)
+		}
+		time.Sleep(time.Second)
+	}
+}
+
+func resourceVersion(client *kube.Client, apiPath string) string {
+	var obj map[string]any
+	if _, err := client.Get(apiPath, &obj); err != nil {
+		log.Printf("epoch list before watch failed for %s: %v", apiPath, err)
+		return ""
+	}
+	return asString(asMap(obj["metadata"])["resourceVersion"])
+}
+
+func signal(trigger chan<- struct{}) {
+	select {
+	case trigger <- struct{}{}:
+	default:
+	}
 }
 
 func shouldOpen(st *state, current map[string]float64, models []system.DemandModel) (bool, string) {
@@ -150,4 +475,102 @@ func env(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func asMap(v any) map[string]any {
+	if m, ok := v.(map[string]any); ok {
+		return m
+	}
+	return map[string]any{}
+}
+
+func asSlice(v any) []any {
+	if s, ok := v.([]any); ok {
+		return s
+	}
+	return nil
+}
+
+func asString(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
+}
+
+func asBool(v any) bool {
+	if b, ok := v.(bool); ok {
+		return b
+	}
+	return false
+}
+
+func intNumber(v any) int {
+	switch n := v.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case float64:
+		return int(n)
+	default:
+		return 0
+	}
+}
+
+func firstPositive(values ...int) int {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
+}
+
+func firstNonEmptyMap(values ...any) map[string]any {
+	for _, value := range values {
+		switch typed := value.(type) {
+		case map[string]any:
+			if len(typed) > 0 {
+				return typed
+			}
+		case map[string]float64:
+			if len(typed) > 0 {
+				out := map[string]any{}
+				for key, item := range typed {
+					out[key] = item
+				}
+				return out
+			}
+		}
+	}
+	return map[string]any{}
+}
+
+func sanitize(value string) string {
+	out := strings.ToLower(value)
+	out = strings.ReplaceAll(out, "_", "-")
+	out = strings.ReplaceAll(out, ".", "-")
+	out = strings.ReplaceAll(out, "/", "-")
+	return out
+}
+
+func mergeMap(left, right map[string]any) map[string]any {
+	out := map[string]any{}
+	for key, value := range left {
+		out[key] = value
+	}
+	for key, value := range right {
+		out[key] = value
+	}
+	return out
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

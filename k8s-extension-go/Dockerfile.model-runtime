@@ -11,10 +11,20 @@ WORKDIR /src
 COPY --from=build /src/cmd/model-runtime/cuda_spin.cu .
 RUN mkdir -p /out && nvcc -O2 -std=c++17 -o /out/cuda-spin cuda_spin.cu
 
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
-RUN useradd -u 65532 -m nonroot
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+ENV TORCH_HOME=/opt/torch-cache \
+    XDG_CACHE_HOME=/opt/cache \
+    ENABLE_CUDA_SPIN=true \
+    RUNTIME_MODE=synthetic \
+    TORCHVISION_WEIGHTS=default
+RUN useradd -u 65532 -m nonroot && mkdir -p /opt/torch-cache /opt/cache && chown -R 65532:65532 /opt/torch-cache /opt/cache
 COPY --from=build /out/model-runtime /model-runtime
 COPY --from=cuda-build /out/cuda-spin /cuda-spin
+COPY ./cmd/model-runtime/torchvision_runtime.py /torchvision_runtime.py
+COPY ./cmd/model-runtime/prefetch_torchvision_weights.py /prefetch_torchvision_weights.py
+COPY ./cmd/model-runtime/entrypoint.sh /entrypoint.sh
+RUN chmod +x /model-runtime /cuda-spin /torchvision_runtime.py /prefetch_torchvision_weights.py /entrypoint.sh \
+    && python /prefetch_torchvision_weights.py \
+    && chown -R 65532:65532 /opt/torch-cache /opt/cache
 USER 65532:65532
-ENV ENABLE_CUDA_SPIN=true
-ENTRYPOINT ["/model-runtime"]
+ENTRYPOINT ["/entrypoint.sh"]

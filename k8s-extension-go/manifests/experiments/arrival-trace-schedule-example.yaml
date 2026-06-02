@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arrival-trace-schedule
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    mig.or-sim.io/component: scheduled-trace
+data:
+  schedule.json: |
+    {
+      "source": "trace",
+      "mode": "scheduled",
+      "windowSeconds": 60,
+      "unit": "requests_per_second",
+      "profileCatalogRef": "default",
+      "currentAllocationRef": "physicalgpuregistry/default",
+      "registeredSLOMs": {
+        "llama": 1500,
+        "gpt2": 1000,
+        "resnet50": 500
+      },
+      "placement": {
+        "nodes": ["ampere"]
+      },
+      "stages": [
+        {
+          "epoch": "trace-stage0",
+          "offsetSeconds": 0,
+          "targetArrival": {
+            "llama": 0.04,
+            "gpt2": 0.16,
+            "resnet50": 0.0
+          }
+        },
+        {
+          "epoch": "trace-stage1-scale-up",
+          "offsetSeconds": 120,
+          "targetArrival": {
+            "llama": 0.10,
+            "gpt2": 0.22,
+            "resnet50": 0.08
+          }
+        },
+        {
+          "epoch": "trace-stage2-zero-arrival",
+          "offsetSeconds": 240,
+          "targetArrival": {
+            "llama": 0.0,
+            "gpt2": 0.0,
+            "resnet50": 0.0
+          }
+        }
+      ]
+    }

@@ -9,6 +9,8 @@ trap 'rm -rf "${TMP}"' EXIT
 tar -C "${ROOT}" \
   --exclude='./reports' \
   --exclude='./.git' \
+  --exclude='*/__pycache__' \
+  --exclude='*.pyc' \
   -czf "${TMP}/context.tar.gz" \
   .
 
