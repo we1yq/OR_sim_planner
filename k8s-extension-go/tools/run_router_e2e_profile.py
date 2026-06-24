@@ -51,9 +51,10 @@ def main() -> int:
         slots = runner.configure_mig(runtime_args, args.profile, node_ip)
         slot = runner.pick_slot(slots, args.profile)
         mig_uuid = slot.get("migDeviceUuid", "")
-        resource = runner.mig_uuid_resource(mig_uuid) if mig_uuid else slot_resource
+        device_resource = runner.mig_uuid_resource(mig_uuid) if mig_uuid else ""
+        allocation_resource = slot_resource
         runner.wait_allocatable(args.node, slot_resource, min_value=1, timeout_s=120)
-        runner.deploy_runtime_pod(runtime_args, item, resource, mig_uuid, slot_resource)
+        runner.deploy_runtime_pod(runtime_args, item, allocation_resource, mig_uuid, slot_resource)
         runner.wait_runtime_pod_running(args.namespace, timeout_s=120)
         runner.wait_health(args.namespace, node_ip, args.runtime_port, args.health_timeout_s)
         endpoint = f"http://{node_ip}:{args.runtime_port}"
@@ -67,11 +68,12 @@ def main() -> int:
             "batchSize": item["batch"],
             "gpu": f"{args.node}-gpu{args.gpu_index}",
             "slotResource": slot_resource,
-            "deviceResource": resource,
+            "deviceResource": device_resource or allocation_resource,
             "expectedMigUuid": mig_uuid,
             "active": True,
             "acceptingNew": True,
         }
+        delete_url(f"{router}/control/routes?model={route_model}", timeout_s=30)
         post_json(f"{router}/control/routes", route, timeout_s=30)
         latencies: list[float] = []
         runtime_latencies: list[float] = []
@@ -90,7 +92,7 @@ def main() -> int:
         metrics = get_json(f"{endpoint}/metrics", timeout_s=30)
         routes = get_json(f"{router}/routes", timeout_s=30).get("routes", [])
         observations = get_json(f"{router}/metrics/profile-observations", timeout_s=30).get("observations", [])
-        row = summarize(args, route_model, runtime_id, node_ip, endpoint, mig_uuid, slot_resource, resource, latencies, runtime_latencies, errors, metrics)
+        row = summarize(args, route_model, runtime_id, node_ip, endpoint, mig_uuid, slot_resource, device_resource or allocation_resource, latencies, runtime_latencies, errors, metrics)
         write_csv(rows_path, row)
         report_path.write_text(render_report(row, routes, observations), encoding="utf-8")
         print(report_path)
@@ -147,6 +149,7 @@ def summarize(
 ) -> dict[str, Any]:
     e2e_mean = mean(e2e)
     rt_mean = mean(runtime)
+    overhead = [max(0.0, e - r) for e, r in zip(e2e, runtime)]
     return {
         "run_id": args.run_id,
         "model": route_model,
@@ -174,6 +177,9 @@ def summarize(
         "runtime_ms_p95": round(percentile(runtime, 0.95), 6),
         "runtime_ms_p99": round(percentile(runtime, 0.99), 6),
         "router_overhead_ms_mean": round(max(0.0, e2e_mean - rt_mean), 6),
+        "router_overhead_ms_p50": round(percentile(overhead, 0.50), 6),
+        "router_overhead_ms_p95": round(percentile(overhead, 0.95), 6),
+        "router_overhead_ms_p99": round(percentile(overhead, 0.99), 6),
         "e2e_throughput_rps": round(1000.0 / e2e_mean, 6) if e2e_mean > 0 else 0.0,
         "runtime_reported_latency_ms": metrics.get("runtimeLatencyMs", 0.0),
         "runtime_reported_throughput": metrics.get("runtimeThroughput", 0.0),
@@ -201,6 +207,7 @@ def render_report(row: dict[str, Any], routes: list[dict[str, Any]], observation
         "runtime_ms_mean",
         "runtime_ms_p95",
         "router_overhead_ms_mean",
+        "router_overhead_ms_p95",
         "e2e_throughput_rps",
     ]:
         lines.append(f"| {key} | {row[key]} |")

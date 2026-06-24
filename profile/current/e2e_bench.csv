@@ -1,0 +1,5 @@
+workload,model,shape,mig_profile,source_gpus,gpu_count,e2e_sample_count_per_gpu,max_e2e_ms_mean,max_e2e_ms_p50,max_e2e_ms_p95,max_e2e_ms_p99,max_overhead_ms_mean,max_overhead_ms_p95,min_e2e_throughput_rps
+gpt2_p512_o128,gpt2-medium,p512/o128,3g,"ampere-gpu0,ampere-gpu1,rtx1-worker-gpu0",3,5,1490.506698,1353.820039,2018.699886,2018.699886,23.834872,25.057993,0.670913
+llama32_3b_p1024_o128,llama32_3b,p1024/o128,3g,"ampere-gpu0,ampere-gpu1,rtx1-worker-gpu0",3,5,2990.132440,3060.257036,3084.682493,3084.682493,105.165155,122.865194,0.334433
+llama32_3b_p2048_o64,llama32_3b,p2048/o64,3g,"ampere-gpu0,ampere-gpu1,rtx1-worker-gpu0",3,5,1863.690472,1838.127676,2249.521611,2249.521611,199.785125,217.697835,0.536570
+llama32_3b_p4096_o512,llama32_3b,p4096/o512,3g,"ampere-gpu0,ampere-gpu1,rtx1-worker-gpu0",3,3,14844.970416,14728.642618,15142.877324,15142.877324,409.148151,409.374705,0.067363

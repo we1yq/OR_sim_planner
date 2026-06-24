@@ -87,6 +87,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--llm-requests", type=int, default=5)
     parser.add_argument("--health-timeout-s", type=int, default=900)
     parser.add_argument("--infer-timeout-s", type=int, default=600)
+    parser.add_argument("--router-url", default="http://115.145.179.144:10680")
+    parser.add_argument("--e2e-requests", type=int, default=0, help="if >0, also measure router E2E latency on the same runtime pod")
+    parser.add_argument("--e2e-warmup", type=int, default=1)
     parser.add_argument("--quick", action="store_true", help="small readiness matrix")
     parser.add_argument("--skip-mig-config", action="store_true")
     return parser.parse_args()
@@ -188,16 +191,18 @@ def run_one_setting(args: argparse.Namespace, run_id: str, node_ip: str, item: d
             runtime_port = args.port
         samples = run_samples(args, runtime_host, runtime_port, item)
         metrics = get_json(f"http://{runtime_host}:{runtime_port}/metrics", timeout_s=30)
+        e2e_samples = run_e2e_samples(args, run_id, node_ip, item, mig_uuid, device_resource or allocation_resource, slot_resource, samples)
     except Exception as exc:
         status = "error"
         error = str(exc)
         samples = []
         metrics = {}
+        e2e_samples = []
     finally:
         stop_port_forward(port_forward)
         cleanup_runtime_pod(args.namespace)
 
-    return build_row(run_id, args, item, status, error, mig_uuid, device_resource, slot_resource, samples, metrics)
+    return build_row(run_id, args, item, status, error, mig_uuid, device_resource, slot_resource, samples, metrics, e2e_samples)
 
 
 def configure_mig(args: argparse.Namespace, profile: str, node_ip: str) -> list[dict[str, Any]]:
@@ -313,6 +318,77 @@ def run_samples(args: argparse.Namespace, host: str, port: int, item: dict[str, 
     return samples
 
 
+def run_e2e_samples(
+    args: argparse.Namespace,
+    run_id: str,
+    node_ip: str,
+    item: dict[str, Any],
+    mig_uuid: str,
+    device_resource: str,
+    slot_resource: str,
+    runtime_samples: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if args.e2e_requests <= 0:
+        return []
+    router = args.router_url.rstrip("/")
+    endpoint = f"http://{node_ip}:{args.port}"
+    route_model = f"{run_id}-{args.node}-gpu{args.gpu_index}-{item['workload']}-{item['profile']}".replace("_", "-")
+    runtime_id = f"e2e-{args.node}-gpu{args.gpu_index}-{item['workload']}-{item['profile']}".replace("_", "-")
+    capacity = float(build_capacity(args, item, runtime_samples))
+    route = {
+        "model": route_model,
+        "runtimeId": runtime_id,
+        "endpoint": endpoint,
+        "weight": 1,
+        "capacity": capacity,
+        "profile": item["profile"],
+        "batchSize": item["batch"],
+        "gpu": f"{args.node}-gpu{args.gpu_index}",
+        "slotResource": slot_resource,
+        "deviceResource": device_resource,
+        "expectedMigUuid": mig_uuid,
+        "active": True,
+        "acceptingNew": True,
+    }
+    delete_url(f"{router}/control/routes?model={route_model}", timeout_s=30)
+    post_json(f"{router}/control/routes", route, timeout_s=30)
+    samples: list[dict[str, Any]] = []
+    try:
+        payload: dict[str, Any] = {"benchmark": True}
+        if item["family"] == "llm":
+            payload.update({"prompt_len": item["prompt_len"], "output_tokens": item["output_tokens"], "batch": item["batch"]})
+        for idx in range(args.e2e_warmup + args.e2e_requests):
+            started = time.perf_counter()
+            response = post_json(f"{router}/infer/{route_model}", payload, timeout_s=args.infer_timeout_s)
+            elapsed = (time.perf_counter() - started) * 1000.0
+            if idx >= args.e2e_warmup:
+                runtime_ms = float(response.get("runtimeLatencyMs", 0.0) or 0.0)
+                samples.append({"e2eLatencyMs": elapsed, "runtimeLatencyMs": runtime_ms, "routerOverheadMs": max(0.0, elapsed - runtime_ms)})
+    finally:
+        try:
+            delete_url(f"{router}/control/routes?model={route_model}&runtimeId={runtime_id}", timeout_s=30)
+        except Exception:
+            pass
+    return samples
+
+
+def build_capacity(args: argparse.Namespace, item: dict[str, Any], samples: list[dict[str, Any]]) -> float:
+    row = build_row(
+        "capacity-preview",
+        args,
+        item,
+        "ok",
+        "",
+        "",
+        "",
+        "",
+        samples,
+        {},
+        [],
+    )
+    return float(row.get("throughput_rps", 1.0) or 1.0)
+
+
 def build_row(
     run_id: str,
     args: argparse.Namespace,
@@ -324,6 +400,7 @@ def build_row(
     slot_resource: str,
     samples: list[dict[str, Any]],
     metrics: dict[str, Any],
+    e2e_samples: list[dict[str, Any]],
 ) -> dict[str, Any]:
     family = item["family"]
     if family == "vision":
@@ -344,6 +421,11 @@ def build_row(
         throughput = (1000.0 * int(item["batch"]) / service) if service > 0 else 0.0
     peak_alloc = max([float(s.get("peakAllocMb", 0.0) or 0.0) for s in samples] + [0.0, float(metrics.get("peakAllocMb", 0.0) or 0.0)])
     peak_reserved = max([float(s.get("peakReservedMb", 0.0) or 0.0) for s in samples] + [0.0, float(metrics.get("peakReservedMb", 0.0) or 0.0)])
+    e2e_latencies = [float(s.get("e2eLatencyMs", 0.0) or 0.0) for s in e2e_samples]
+    e2e_runtime_latencies = [float(s.get("runtimeLatencyMs", 0.0) or 0.0) for s in e2e_samples]
+    e2e_overheads = [float(s.get("routerOverheadMs", 0.0) or 0.0) for s in e2e_samples]
+    e2e_mean = mean(e2e_latencies)
+    e2e_throughput = (1000.0 * int(item["batch"]) / e2e_mean) if e2e_mean > 0 else 0.0
     return {
         "run_id": run_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -374,6 +456,18 @@ def build_row(
         "service_time_ms": round(service, 6),
         "peak_alloc_mb": round(peak_alloc, 6),
         "peak_reserved_mb": round(peak_reserved, 6),
+        "e2e_sample_count": len(e2e_samples),
+        "e2e_ms_mean": round(e2e_mean, 6),
+        "e2e_ms_p50": round(percentile(e2e_latencies, 0.50), 6),
+        "e2e_ms_p95": round(percentile(e2e_latencies, 0.95), 6),
+        "e2e_ms_p99": round(percentile(e2e_latencies, 0.99), 6),
+        "e2e_runtime_ms_mean": round(mean(e2e_runtime_latencies), 6),
+        "e2e_runtime_ms_p95": round(percentile(e2e_runtime_latencies, 0.95), 6),
+        "router_overhead_ms_mean": round(mean(e2e_overheads), 6),
+        "router_overhead_ms_p50": round(percentile(e2e_overheads, 0.50), 6),
+        "router_overhead_ms_p95": round(percentile(e2e_overheads, 0.95), 6),
+        "router_overhead_ms_p99": round(percentile(e2e_overheads, 0.99), 6),
+        "e2e_throughput_rps": round(e2e_throughput, 6),
     }
 
 
@@ -573,6 +667,12 @@ def get_json(url: str, timeout_s: int) -> dict[str, Any]:
         return json.loads(resp.read().decode())
 
 
+def delete_url(url: str, timeout_s: int) -> dict[str, Any]:
+    req = urllib.request.Request(url, method="DELETE")
+    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        return json.loads(resp.read().decode())
+
+
 def get_health(url: str, timeout_s: int) -> dict[str, Any]:
     with urllib.request.urlopen(url, timeout=timeout_s) as resp:
         body = resp.read().decode()
@@ -654,6 +754,18 @@ def raw_fieldnames() -> list[str]:
         "service_time_ms",
         "peak_alloc_mb",
         "peak_reserved_mb",
+        "e2e_sample_count",
+        "e2e_ms_mean",
+        "e2e_ms_p50",
+        "e2e_ms_p95",
+        "e2e_ms_p99",
+        "e2e_runtime_ms_mean",
+        "e2e_runtime_ms_p95",
+        "router_overhead_ms_mean",
+        "router_overhead_ms_p50",
+        "router_overhead_ms_p95",
+        "router_overhead_ms_p99",
+        "e2e_throughput_rps",
     ]
 
 
