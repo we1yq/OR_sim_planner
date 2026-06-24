@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: preload-hf-model-rtx1-llama32-3b
+  namespace: or-sim
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: rtx1-worker
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: preload
+          image: localhost:10690/migrant-model-runtime:llm-transformers-20260622
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -c
+            - |
+              import os
+              from huggingface_hub import snapshot_download
+
+              model_id = "meta-llama/Llama-3.2-3B"
+              cache_dir = os.environ.get("HUGGINGFACE_HUB_CACHE", "/opt/hf-cache/hub")
+              snapshot_download(
+                  repo_id=model_id,
+                  cache_dir=cache_dir,
+                  token=os.environ.get("HF_TOKEN"),
+                  local_files_only=False,
+              )
+              print(f"preloaded {model_id} into {cache_dir}")
+          env:
+            - name: HF_HOME
+              value: /opt/hf-cache
+            - name: HUGGINGFACE_HUB_CACHE
+              value: /opt/hf-cache/hub
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: HF_TOKEN
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /opt/hf-cache
+      volumes:
+        - name: hf-cache
+          hostPath:
+            path: /var/lib/or-sim/hf-cache
+            type: DirectoryOrCreate

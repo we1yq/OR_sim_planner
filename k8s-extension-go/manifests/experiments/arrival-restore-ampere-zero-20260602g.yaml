@@ -1,0 +1,27 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-restore-ampere-zero-20260602g
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    experiment.or-sim.io/name: restore-ampere-zero-20260602g
+spec:
+  source: manual-experiment
+  mode: target
+  epoch: exp-restore-ampere-zero-20260602g
+  triggerReason: reset_after_torch_cache_path_fix
+  windowSeconds: 60
+  unit: requestsPerSecond
+  profileCatalogRef: default
+  currentAllocationRef: physicalgpuregistries/default
+  calibrationOverlayRef: physicalgpuregistries/default
+  placement:
+    nodes:
+      - ampere
+  registeredSLOMs:
+    resnet50: 500
+  targetArrival:
+    resnet50: 0.0
+    gpt2: 0.0
+    llama: 0.0

@@ -374,7 +374,7 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 		return updateLogicalBinding(client, planName, action, "active")
 	case "keep_gpu_layout", "keep_runtime", "validate_target_allocation":
 		return nil
-	case "stop_accepting_new":
+	case "stop_accepting_new", "stop_gpu_traffic", "deactivate_route":
 		return deleteRoute(router, modelFromAction(action))
 	case "wait_drain", "drain_runtime", "mark_draining_instance":
 		trace.Mark("drainWaitStartedAt")
@@ -1879,8 +1879,8 @@ func deployment(ns string, rt system.ModelRuntimeSpec) map[string]any {
 			{"name": "MODEL_NAME", "value": rt.Model},
 			{"name": "RUNTIME_MODE", "value": env("MODEL_RUNTIME_MODE", "synthetic")},
 			{"name": "TORCHVISION_WEIGHTS", "value": env("TORCHVISION_WEIGHTS", "default")},
-			{"name": "TORCH_HOME", "value": "/tmp/torch"},
-			{"name": "XDG_CACHE_HOME", "value": "/tmp/.cache"},
+			{"name": "TORCH_HOME", "value": env("MODEL_RUNTIME_TORCH_HOME", "/opt/torch-cache")},
+			{"name": "XDG_CACHE_HOME", "value": env("MODEL_RUNTIME_XDG_CACHE_HOME", "/opt/cache")},
 			{"name": "OR_SIM_RUNTIME_ID", "value": rid},
 			{"name": "BATCH_SIZE", "value": strconv.Itoa(rt.BatchSize)},
 			{"name": "OR_SIM_GPU", "value": rt.GPU},

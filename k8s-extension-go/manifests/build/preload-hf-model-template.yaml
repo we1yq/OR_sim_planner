@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: __JOB_NAME__
+  namespace: or-sim
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: __NODE__
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: preload
+          image: localhost:10690/migrant-model-runtime:llm-transformers-20260622
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -c
+            - |
+              import os
+              from huggingface_hub import snapshot_download
+
+              model_id = os.environ["MODEL_ID"]
+              cache_dir = os.environ.get("HF_HOME", "/opt/hf-cache")
+              snapshot_download(
+                  repo_id=model_id,
+                  cache_dir=cache_dir,
+                  token=os.environ.get("HF_TOKEN"),
+                  local_files_only=False,
+              )
+              print(f"preloaded {model_id} into {cache_dir}")
+          env:
+            - name: MODEL_ID
+              value: __MODEL_ID__
+            - name: HF_HOME
+              value: /opt/hf-cache
+            - name: HUGGINGFACE_HUB_CACHE
+              value: /opt/hf-cache/hub
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: HF_TOKEN
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /opt/hf-cache
+      volumes:
+        - name: hf-cache
+          hostPath:
+            path: /var/lib/or-sim/hf-cache
+            type: DirectoryOrCreate

@@ -1,0 +1,28 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: ArrivalSnapshot
+metadata:
+  name: exp-resnet50-torchvision-20260602b
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: migrant-go
+    experiment.or-sim.io/name: resnet50-torchvision-20260602b
+spec:
+  source: manual-experiment
+  mode: target
+  epoch: exp-resnet50-torchvision-20260602b
+  triggerReason: real_torchvision_runtime_validation
+  windowSeconds: 60
+  unit: requestsPerSecond
+  profileCatalogRef: default
+  currentAllocationRef: physicalgpuregistries/default
+  calibrationOverlayRef: physicalgpuregistries/default
+  placement:
+    nodes:
+      - ampere
+  registeredSLOMs:
+    resnet50: 500
+  targetArrival:
+    resnet50: 0.08
+  notes:
+    - Validate torchvision DEFAULT weights runtime through the real planner/action-DAG/executor path.
+    - Placement is restricted to ampere because rtx1 may be in use by other users.

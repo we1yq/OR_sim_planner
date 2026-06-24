@@ -1,0 +1,25 @@
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+
+ENV HF_HOME=/opt/hf-cache \
+    HUGGINGFACE_HUB_CACHE=/opt/hf-cache/hub \
+    TRANSFORMERS_CACHE=/opt/hf-cache/hub \
+    XDG_CACHE_HOME=/opt/cache \
+    RUNTIME_MODE=transformers \
+    MODEL_DTYPE=float16
+
+RUN pip install --no-cache-dir \
+      "transformers==4.47.1" \
+      "accelerate==1.2.1" \
+      "huggingface_hub==0.27.1" \
+      "safetensors==0.4.5" \
+      "sentencepiece==0.2.0" \
+      "protobuf==5.29.2" \
+    && useradd -u 65532 -m nonroot \
+    && mkdir -p /opt/hf-cache /opt/cache \
+    && chown -R 65532:65532 /opt/hf-cache /opt/cache
+
+COPY cmd/model-runtime/transformers_runtime.py /transformers_runtime.py
+RUN chmod +x /transformers_runtime.py
+
+USER 65532:65532
+ENTRYPOINT ["python", "/transformers_runtime.py"]

@@ -20,9 +20,9 @@ ENV TORCH_HOME=/opt/torch-cache \
 RUN useradd -u 65532 -m nonroot && mkdir -p /opt/torch-cache /opt/cache && chown -R 65532:65532 /opt/torch-cache /opt/cache
 COPY --from=build /out/model-runtime /model-runtime
 COPY --from=cuda-build /out/cuda-spin /cuda-spin
-COPY ./cmd/model-runtime/torchvision_runtime.py /torchvision_runtime.py
-COPY ./cmd/model-runtime/prefetch_torchvision_weights.py /prefetch_torchvision_weights.py
-COPY ./cmd/model-runtime/entrypoint.sh /entrypoint.sh
+COPY --from=build /src/cmd/model-runtime/torchvision_runtime.py /torchvision_runtime.py
+COPY --from=build /src/cmd/model-runtime/prefetch_torchvision_weights.py /prefetch_torchvision_weights.py
+COPY --from=build /src/cmd/model-runtime/entrypoint.sh /entrypoint.sh
 RUN chmod +x /model-runtime /cuda-spin /torchvision_runtime.py /prefetch_torchvision_weights.py /entrypoint.sh \
     && python /prefetch_torchvision_weights.py \
     && chown -R 65532:65532 /opt/torch-cache /opt/cache

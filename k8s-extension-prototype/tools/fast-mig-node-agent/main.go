@@ -94,6 +94,14 @@ var profileToSize = map[string]int{
 	"7g": 7,
 }
 
+var profileToPlacementSize = map[string]int{
+	"1g": 1,
+	"2g": 2,
+	"3g": 4,
+	"4g": 4,
+	"7g": 8,
+}
+
 var gpuIndexRe = regexp.MustCompile(`^[0-9]+$`)
 var giLineRe = regexp.MustCompile(`^\|\s+([0-9]+)\s+(MIG [0-9]+g\.[0-9]+gb)\s+([0-9]+)\s+([0-9]+)\s+([0-9]+):([0-9]+)\s+\|`)
 var migUUIDLineRe = regexp.MustCompile(`^MIG ([0-9]+g\.[0-9]+gb)\s+Device\s+[0-9]+:\s+\(UUID:\s+([^)]+)\)`)
@@ -698,6 +706,9 @@ func parseSlotSpecs(value string, allowUUID bool, allowPlacementSize bool) ([]sl
 		if !ok {
 			return nil, fmt.Errorf("slot %q uses unsupported profile %q", raw, parts[2])
 		}
+		if allowPlacementSize {
+			expectedSize = profileToPlacementSize[profile]
+		}
 		maxEnd := 7
 		if allowPlacementSize {
 			maxEnd = 8
@@ -705,7 +716,7 @@ func parseSlotSpecs(value string, allowUUID bool, allowPlacementSize bool) ([]sl
 		if start < 0 || size <= 0 || start+size > maxEnd {
 			return nil, fmt.Errorf("slot %q is outside A100 placement range 0..%d", raw, maxEnd)
 		}
-		if size != expectedSize && !(allowPlacementSize && size > expectedSize) {
+		if size != expectedSize {
 			return nil, fmt.Errorf("slot %q size does not match profile %s", raw, profile)
 		}
 		spec := slotSpec{Start: start, Size: size, Profile: profile}

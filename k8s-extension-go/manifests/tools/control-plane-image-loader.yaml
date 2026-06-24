@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: control-plane-image-loader
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/name: control-plane-image-loader
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    kubernetes.io/hostname: or-sim-control-plane
+  hostNetwork: true
+  dnsPolicy: Default
+  tolerations:
+    - operator: Exists
+  containers:
+    - name: loader
+      image: registry:2
+      imagePullPolicy: IfNotPresent
+      command: ["/bin/sh", "-c", "sleep 3600"]
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - name: host-root
+          mountPath: /host
+        - name: host-tmp
+          mountPath: /host-tmp
+  volumes:
+    - name: host-root
+      hostPath:
+        path: /
+        type: Directory
+    - name: host-tmp
+      hostPath:
+        path: /tmp
+        type: Directory

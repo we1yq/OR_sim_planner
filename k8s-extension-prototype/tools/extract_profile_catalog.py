@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 
 
-PROFILE_ORDER = ["7g", "4g", "3g", "2g", "1g"]
+PROFILE_ORDER = ["1g", "2g", "3g", "4g", "7g"]
 PROFILE_MEM_MB = {
     "1g": 5 * 1024,
     "2g": 10 * 1024,
@@ -17,59 +17,17 @@ PROFILE_MEM_MB = {
     "7g": 40 * 1024,
 }
 
-WORKLOAD_SPECS = [
-    {
-        "name": "llama",
-        "family": "llm",
-        "csv": "llama32_3b_streaming_bench.csv",
-        "model_match": "Llama-3.2-3B-Instruct",
-        "prompt_len": 1024,
-        "output_tokens": 64,
-        "ttft_slo_ms": 100.0,
-        "tpot_slo_ms": 25.0,
-    },
-    {
-        "name": "gpt2",
-        "family": "llm",
-        "csv": "gpt2m_streaming_bench.csv",
-        "model_match": "gpt2-medium",
-        "prompt_len": 64,
-        "output_tokens": 64,
-        "ttft_slo_ms": 20.0,
-        "tpot_slo_ms": 15.0,
-    },
-    {
-        "name": "vgg16",
-        "family": "cv",
-        "csv": "cnn_bench.csv",
-        "model_match": "vgg16",
-        "e2e_slo_ms": 50.0,
-    },
-    {
-        "name": "resnet50",
-        "family": "cv",
-        "csv": "cnn_bench.csv",
-        "model_match": "resnet50",
-        "e2e_slo_ms": 50.0,
-    },
-    {
-        "name": "vit_base",
-        "family": "cv",
-        "csv": "vit_base_bench.csv",
-        "model_match": "vit-base-patch16-224",
-        "e2e_slo_ms": 50.0,
-    },
+
+CV_SPECS = [
+    {"name": "resnet50", "csv": "cnn_bench.csv", "model": "resnet50"},
+    {"name": "vgg16", "csv": "cnn_bench.csv", "model": "vgg16"},
+    {"name": "vit_base", "csv": "vit_base_bench.csv", "model": "vit-base-patch16-224"},
 ]
 
-
-def normalize_mig_name(raw: str | None) -> str | None:
-    if not raw:
-        return None
-    value = raw.lower().replace(" ", "")
-    for profile in ["1g", "2g", "3g", "4g", "7g"]:
-        if f"{profile}." in value or profile in value:
-            return profile
-    return None
+LLM_SPECS = [
+    {"prefix": "gpt2", "csv": "gpt2m_streaming_bench.csv", "model": "gpt2-medium"},
+    {"prefix": "llama32_3b", "csv": "llama32_3b_streaming_bench.csv", "model": "Llama-3.2-3B"},
+]
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -84,126 +42,143 @@ def to_float(row: dict[str, str], key: str, default: float = 0.0) -> float:
     return float(value)
 
 
+def to_int(row: dict[str, str], key: str, default: int = 0) -> int:
+    value = row.get(key)
+    if value in {None, ""}:
+        return default
+    return int(float(value))
+
+
 def safe_mu(batch: int, service_time_ms: float) -> float:
-    if service_time_ms <= 0:
-        return 0.0
-    return batch * 1000.0 / service_time_ms
+    return batch * 1000.0 / service_time_ms if service_time_ms > 0 else 0.0
 
 
-def extract_cv_options(spec: dict[str, Any], rows: list[dict[str, str]]) -> list[dict[str, Any]]:
-    best: dict[tuple[int, str], dict[str, str]] = {}
-    for row in rows:
-        if row.get("model") != spec["model_match"]:
-            continue
-        profile = normalize_mig_name(row.get("mig_name"))
-        if profile not in PROFILE_ORDER:
-            continue
-        batch = int(float(row["batch"]))
-        key = (batch, profile)
-        prev = best.get(key)
-        if prev is None or to_float(row, "time_ms_mean") < to_float(prev, "time_ms_mean"):
-            best[key] = row
+def fit_memory(row: dict[str, str]) -> tuple[bool, float]:
+    profile = row["mig_profile"]
+    peak_mem_mb = to_float(row, "peak_reserved_mb", to_float(row, "peak_alloc_mb"))
+    return peak_mem_mb <= PROFILE_MEM_MB[profile], peak_mem_mb
 
-    options = []
-    for (batch, profile), row in sorted(best.items()):
-        e2e_ms = to_float(row, "time_ms_mean")
-        peak_mem_mb = to_float(row, "peak_reserved_mb", to_float(row, "peak_alloc_mb"))
-        fit_mem = peak_mem_mb <= PROFILE_MEM_MB[profile]
-        fit_slo = e2e_ms <= spec["e2e_slo_ms"]
-        fit = bool(fit_mem and fit_slo)
-        options.append(
+
+def row_ok(row: dict[str, str]) -> bool:
+    return row.get("status", "ok") == "ok"
+
+
+def build_option(workload: str, family: str, row: dict[str, str]) -> dict[str, Any]:
+    batch = to_int(row, "batch", 1)
+    service_ms = to_float(row, "time_ms_mean")
+    fit_mem, peak_mem_mb = fit_memory(row)
+    fit = row_ok(row) and fit_mem and service_ms > 0
+    option: dict[str, Any] = {
+        "workload": workload,
+        "family": family,
+        "batch": batch,
+        "profile": row["mig_profile"],
+        "mu": round(safe_mu(batch, service_ms), 6) if fit else 0.0,
+        "fit": bool(fit),
+        "fitMem": bool(fit_mem),
+        "fitSlo": bool(row_ok(row)),
+        "status": row.get("status", "ok"),
+        "error": row.get("error", ""),
+        "serviceTimeMs": round(service_ms, 6),
+        "runtimeP50Ms": round(to_float(row, "time_ms_p50"), 6),
+        "runtimeP95Ms": round(to_float(row, "time_ms_p95"), 6),
+        "runtimeP99Ms": round(to_float(row, "time_ms_p99"), 6),
+        "throughputRps": round(to_float(row, "throughput_rps"), 6),
+        "peakMemMb": round(peak_mem_mb, 6),
+        "sourceCsv": row.get("source_run_id", ""),
+    }
+    if family == "llm":
+        option.update(
             {
-                "workload": spec["name"],
-                "family": "cv",
-                "batch": batch,
-                "profile": profile,
-                "mu": round(safe_mu(batch, e2e_ms), 6) if fit else 0.0,
-                "fit": fit,
-                "e2eMs": round(e2e_ms, 6),
-                "peakMemMb": round(peak_mem_mb, 6),
-                "fitMem": fit_mem,
-                "fitSlo": fit_slo,
-                "sourceCsv": spec["csv"],
+                "promptLen": to_int(row, "prompt_len"),
+                "outputTokens": to_int(row, "output_tokens"),
+                "ttftMs": round(to_float(row, "ttft_ms"), 6),
+                "tpotMs": round(to_float(row, "tpot_ms"), 6),
+                "decodeTps": round(to_float(row, "decode_tps"), 6),
             }
         )
-    return options
+    return option
 
 
-def extract_llm_options(spec: dict[str, Any], rows: list[dict[str, str]]) -> list[dict[str, Any]]:
-    best: dict[tuple[int, str], dict[str, str]] = {}
+def best_rows(rows: list[dict[str, str]], keys: list[str]) -> dict[tuple[Any, ...], dict[str, str]]:
+    out: dict[tuple[Any, ...], dict[str, str]] = {}
     for row in rows:
-        if row.get("model") != spec["model_match"]:
+        key = tuple(row[k] for k in keys)
+        prev = out.get(key)
+        if prev is None:
+            out[key] = row
             continue
-        if int(float(row.get("prompt_len", 0))) != int(spec["prompt_len"]):
+        if row_ok(row) and not row_ok(prev):
+            out[key] = row
             continue
-        if int(float(row.get("output_tokens", 0))) != int(spec["output_tokens"]):
-            continue
-        profile = normalize_mig_name(row.get("mig_name"))
-        if profile not in PROFILE_ORDER:
-            continue
-        batch = int(float(row["batch"]))
-        key = (batch, profile)
-        prev = best.get(key)
-        if prev is None or to_float(row, "time_ms_mean") < to_float(prev, "time_ms_mean"):
-            best[key] = row
+        if row_ok(row) == row_ok(prev) and to_float(row, "time_ms_mean") < to_float(prev, "time_ms_mean"):
+            out[key] = row
+    return out
 
-    options = []
-    for (batch, profile), row in sorted(best.items()):
-        ttft_ms = to_float(row, "ttft_ms")
-        decode_tps = to_float(row, "decode_tps")
-        tpot_ms = 1000.0 / decode_tps if decode_tps > 0 else 0.0
-        service_time_ms = ttft_ms + int(spec["output_tokens"]) * tpot_ms
-        peak_mem_mb = to_float(row, "peak_reserved_mb", to_float(row, "peak_alloc_mb"))
-        fit_mem = peak_mem_mb <= PROFILE_MEM_MB[profile]
-        fit_slo = ttft_ms <= spec["ttft_slo_ms"] and tpot_ms <= spec["tpot_slo_ms"]
-        fit = bool(fit_mem and fit_slo)
-        options.append(
-            {
-                "workload": spec["name"],
-                "family": "llm",
-                "batch": batch,
-                "profile": profile,
-                "mu": round(safe_mu(batch, service_time_ms), 6) if fit else 0.0,
-                "fit": fit,
-                "ttftMs": round(ttft_ms, 6),
-                "tpotMs": round(tpot_ms, 6),
-                "serviceTimeMs": round(service_time_ms, 6),
-                "peakMemMb": round(peak_mem_mb, 6),
-                "fitMem": fit_mem,
-                "fitSlo": fit_slo,
-                "sourceCsv": spec["csv"],
-            }
-        )
-    return options
+
+def build_cv_catalogs(profile_dir: Path) -> dict[str, dict[str, Any]]:
+    catalogs: dict[str, dict[str, Any]] = {}
+    for spec in CV_SPECS:
+        rows = [r for r in read_csv(profile_dir / spec["csv"]) if r.get("model") == spec["model"]]
+        selected = best_rows(rows, ["batch", "mig_profile"])
+        options = [build_option(spec["name"], "cv", r) for r in selected.values()]
+        catalogs[spec["name"]] = catalog(spec["name"], "cv", spec, options)
+    return catalogs
+
+
+def build_llm_catalogs(profile_dir: Path) -> dict[str, dict[str, Any]]:
+    catalogs: dict[str, dict[str, Any]] = {}
+    for spec in LLM_SPECS:
+        rows = [r for r in read_csv(profile_dir / spec["csv"]) if r.get("model") == spec["model"]]
+        shapes = sorted({(to_int(r, "prompt_len"), to_int(r, "output_tokens")) for r in rows})
+        for prompt_len, output_tokens in shapes:
+            workload = f"{spec['prefix']}_p{prompt_len}_o{output_tokens}"
+            shape_rows = [
+                r
+                for r in rows
+                if to_int(r, "prompt_len") == prompt_len and to_int(r, "output_tokens") == output_tokens
+            ]
+            selected = best_rows(shape_rows, ["batch", "mig_profile"])
+            options = [build_option(workload, "llm", r) for r in selected.values()]
+            catalogs[workload] = catalog(
+                workload,
+                "llm",
+                {**spec, "promptLen": prompt_len, "outputTokens": output_tokens},
+                options,
+            )
+    return catalogs
+
+
+def catalog(workload: str, family: str, spec: dict[str, Any], options: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "metadata": {
+            "source": f"profile/current/{spec['csv']}",
+            "generatedBy": "k8s-extension-prototype/tools/extract_profile_catalog.py",
+            "profileOrder": PROFILE_ORDER,
+            "workload": workload,
+            "family": family,
+            "model": spec["model"],
+            **({"promptLen": spec["promptLen"], "outputTokens": spec["outputTokens"]} if family == "llm" else {}),
+        },
+        "options": sorted(options, key=lambda x: (x["batch"], PROFILE_ORDER.index(x["profile"]))),
+    }
 
 
 def build_catalogs(profile_dir: Path) -> dict[str, dict[str, Any]]:
-    catalogs = {}
-    for spec in WORKLOAD_SPECS:
-        rows = read_csv(profile_dir / spec["csv"])
-        if spec["family"] == "llm":
-            options = extract_llm_options(spec, rows)
-        else:
-            options = extract_cv_options(spec, rows)
-
-        catalogs[spec["name"]] = {
-            "metadata": {
-                "source": f"profile/{spec['csv']}",
-                "generatedBy": "k8s-extension-prototype/tools/extract_profile_catalog.py",
-                "profileOrder": PROFILE_ORDER,
-                "workload": spec["name"],
-                "modelMatch": spec["model_match"],
-            },
-            "options": sorted(options, key=lambda x: (x["batch"], x["profile"])),
-        }
+    catalogs = build_cv_catalogs(profile_dir)
+    catalogs.update(build_llm_catalogs(profile_dir))
     return catalogs
 
 
 def parse_args() -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[2]
-    parser = argparse.ArgumentParser(description="Extract normalized ProfileCatalog from profile CSVs.")
-    parser.add_argument("--profile-dir", type=Path, default=repo_root / "profile")
-    parser.add_argument("--output-dir", type=Path, default=repo_root / "k8s-extension-prototype/mock/profile-catalogs")
+    parser = argparse.ArgumentParser(description="Extract normalized ProfileCatalog YAMLs from profile CSVs.")
+    parser.add_argument("--profile-dir", type=Path, default=repo_root / "profile" / "current")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=repo_root / "k8s-extension-go" / "planner-engine" / "app" / "mock" / "profile-catalogs",
+    )
     return parser.parse_args()
 
 
@@ -212,12 +187,12 @@ def main() -> int:
     catalogs = build_catalogs(args.profile_dir)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     total = 0
-    for workload, catalog in sorted(catalogs.items()):
+    for workload, data in sorted(catalogs.items()):
         output = args.output_dir / f"{workload}.yaml"
         with output.open("w", encoding="utf-8") as f:
-            yaml.safe_dump(catalog, f, sort_keys=False)
-        total += len(catalog["options"])
-        print(f"Wrote {len(catalog['options'])} options to {output}")
+            yaml.safe_dump(data, f, sort_keys=False)
+        total += len(data["options"])
+        print(f"Wrote {len(data['options'])} options to {output}")
     print(f"Wrote {total} total options to {args.output_dir}")
     return 0
 

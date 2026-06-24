@@ -5,6 +5,7 @@ import contextlib
 import io
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,7 @@ from migrant_core.state import (
     assert_valid_cluster_state,
 )
 from migrant_core.target_materializer.target_builder import build_target_state_from_milp
+from migrant_core.target_materializer.templates import PROFILE_ORDER, TEMPLATE_K
 from migrant_core.transition_planner import canonical_planner_name, planner_runners
 
 
@@ -87,12 +89,17 @@ def plan_scenario_as_migplan_status(
         runtime_profile_correction=runtime_profile_correction,
     )
     feasible_elapsed_sec = time.perf_counter() - feasible_start
+    milp_warm_start_res = build_milp_warm_start_from_current_allocation(
+        source_state=source_state,
+        feasible_option_df=feasible_option_df,
+    )
     milp_res = _call_planner(
         solve_milp_gurobi_batch_unified,
         capture_stdout=not verbose,
         feasible_option_df=feasible_option_df,
         arrival_rate=target_arrival,
         n_workloads=len(workload_names),
+        warm_start_res=milp_warm_start_res,
         time_limit_s=milp_time_limit_s,
         verbose=verbose,
     )
@@ -135,6 +142,7 @@ def plan_scenario_as_migplan_status(
         canonical_next=canonical_next,
         current_feasibility=current_feasibility,
         runtime_profile_correction=runtime_profile_correction,
+        milp_warm_start=milp_warm_start_res,
     )
 
 
@@ -216,6 +224,90 @@ def build_feasible_option_dataframe(
             rows.append(row)
             opt_idx += 1
     return pd.DataFrame(rows)
+
+
+def build_milp_warm_start_from_current_allocation(
+    source_state: ClusterState,
+    feasible_option_df: Any,
+) -> dict[str, Any]:
+    """Derive Gurobi Start values from the observed current allocation.
+
+    The formal system source of truth is PhysicalGpuRegistry/currentAllocation,
+    not the previous planner output.  This function maps the observed active
+    runtime placements and GPU templates into the MILP variables used by the
+    current feasible-option table.
+    """
+    template_capacity_to_idx = {
+        tuple(int(capacity[profile]) for profile in PROFILE_ORDER): idx
+        for idx, capacity in enumerate(TEMPLATE_K)
+    }
+    y_sol: Counter[int] = Counter()
+    x_sol: Counter[int] = Counter()
+    unmatched_instances = []
+    template_misses = []
+
+    option_index: dict[tuple[str, str, int], int] = {}
+    if hasattr(feasible_option_df, "iterrows"):
+        for _, row in feasible_option_df.iterrows():
+            key = (str(row["workload"]), str(row["profile"]), int(row["batch"]))
+            option_index.setdefault(key, int(row["opt_idx"]))
+
+    for gpu in source_state.real_gpus():
+        template_key = _template_capacity_key_for_gpu(gpu)
+        if any(template_key):
+            template_idx = template_capacity_to_idx.get(template_key)
+            if template_idx is not None:
+                y_sol[template_idx] += 1
+            else:
+                template_misses.append(
+                    {
+                        "gpuId": int(gpu.gpu_id),
+                        "templateCapacity": dict(zip(PROFILE_ORDER, template_key)),
+                    }
+                )
+        for inst in gpu.instances:
+            if inst.profile == "void" or not inst.workload:
+                continue
+            key = (str(inst.workload), str(inst.profile), int(inst.batch or 1))
+            opt_idx = option_index.get(key)
+            if opt_idx is None:
+                unmatched_instances.append(
+                    {
+                        "gpuId": int(gpu.gpu_id),
+                        "workload": str(inst.workload),
+                        "profile": str(inst.profile),
+                        "batch": int(inst.batch or 1),
+                    }
+                )
+                continue
+            x_sol[opt_idx] += 1
+
+    return {
+        "source": "currentAllocation",
+        "description": (
+            "Warm start derived from observed runtime bindings and current MIG "
+            "templates in PhysicalGpuRegistry/currentAllocation."
+        ),
+        "x_sol": dict(sorted(x_sol.items())),
+        "y_sol": dict(sorted(y_sol.items())),
+        "summary": {
+            "sourceGpuCount": len(source_state.real_gpus()),
+            "xSolCount": sum(x_sol.values()),
+            "ySolCount": sum(y_sol.values()),
+            "unmatchedInstanceCount": len(unmatched_instances),
+            "templateMissCount": len(template_misses),
+            "unmatchedInstances": unmatched_instances,
+            "templateMisses": template_misses,
+        },
+    }
+
+
+def _template_capacity_key_for_gpu(gpu: GPUState) -> tuple[int, ...]:
+    counts = Counter({profile: 0 for profile in PROFILE_ORDER})
+    for inst in gpu.instances:
+        if inst.profile != "void":
+            counts[str(inst.profile)] += 1
+    return tuple(int(counts[profile]) for profile in PROFILE_ORDER)
 
 
 def cluster_state_from_mock_yaml(obj: dict[str, Any]) -> ClusterState:
@@ -304,6 +396,7 @@ def _migplan_status_from_results(
     canonical_next: ClusterState,
     current_feasibility: dict[str, Any],
     runtime_profile_correction: dict[str, Any] | None = None,
+    milp_warm_start: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     actions = [_to_yamlable(action) for action in transition_res.get("executed_actions", [])]
     metrics = {
@@ -332,6 +425,7 @@ def _migplan_status_from_results(
         actions=actions,
         current_feasibility=current_feasibility,
         runtime_profile_correction=runtime_profile_correction,
+        milp_warm_start=milp_warm_start,
     )
     reached = bool(transition_res.get("reached_target", False))
     return {
@@ -362,6 +456,11 @@ def _migplan_status_from_results(
                 "chosenTemplates": list(milp_res.get("chosen_templates", [])),
                 "KTotal": dict(milp_res.get("K_total", {})),
                 "alloc": _to_yamlable(milp_res.get("alloc", [])),
+                "rawSolution": {
+                    "x_sol": _to_yamlable(milp_res.get("x_sol", {})),
+                    "y_sol": _to_yamlable(milp_res.get("y_sol", {})),
+                },
+                "warmStart": _milp_warm_start_summary(milp_warm_start),
             },
             "targetState": cluster_state_to_dict(target_state),
             "executedState": cluster_state_to_dict(transition_res["executed_state"]),
@@ -516,6 +615,7 @@ def _planning_trace(
     actions: list[dict[str, Any]],
     current_feasibility: dict[str, Any],
     runtime_profile_correction: dict[str, Any] | None = None,
+    milp_warm_start: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     build_metrics = dict(target_state.metadata.get("build_metrics", {}))
     return {
@@ -555,6 +655,7 @@ def _planning_trace(
             "status": milp_res.get("status"),
             "feasible": bool(milp_res.get("feasible")),
             "elapsedSec": float(milp_res.get("elapsed", 0.0)),
+            "warmStart": _milp_warm_start_summary(milp_warm_start),
             "objectiveGpuCount": milp_res.get("objective"),
             "gpuCount": milp_res.get("gpu_count"),
             "totalInstances": milp_res.get("total_instances"),
@@ -685,6 +786,22 @@ def _milp_alloc_summary(alloc: Any) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def _milp_warm_start_summary(warm_start: dict[str, Any] | None) -> dict[str, Any]:
+    if not warm_start:
+        return {"available": False, "source": "none", "xSolCount": 0, "ySolCount": 0}
+    summary = dict(warm_start.get("summary") or {})
+    return {
+        "available": bool(warm_start.get("x_sol") or warm_start.get("y_sol")),
+        "source": str(warm_start.get("source") or "currentAllocation"),
+        "xSolCount": int(summary.get("xSolCount", 0) or 0),
+        "ySolCount": int(summary.get("ySolCount", 0) or 0),
+        "unmatchedInstanceCount": int(summary.get("unmatchedInstanceCount", 0) or 0),
+        "templateMissCount": int(summary.get("templateMissCount", 0) or 0),
+        "unmatchedInstances": _to_yamlable(summary.get("unmatchedInstances", [])),
+        "templateMisses": _to_yamlable(summary.get("templateMisses", [])),
+    }
 
 
 def _action_counts_by_type(actions: list[dict[str, Any]]) -> dict[str, int]:

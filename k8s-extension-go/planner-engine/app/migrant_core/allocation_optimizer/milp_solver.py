@@ -304,8 +304,8 @@ def solve_milp_gurobi_batch_unified(
     model.setObjectiveN(total_remaining_slots, index=2, priority=1, weight=-1.0, name="obj_remaining")
 
     if warm_start_res is not None:
-        prev_x = dict(warm_start_res.get("x_sol", {}) or {})
-        prev_y = dict(warm_start_res.get("y_sol", {}) or {})
+        prev_x = _int_key_dict(warm_start_res.get("x_sol", {}) or {})
+        prev_y = _int_key_dict(warm_start_res.get("y_sol", {}) or {})
         global_to_local = {int(df.loc[row_idx, "opt_idx"]): row_idx for row_idx in opt_rows}
 
         for template_idx in template_ids:
@@ -381,3 +381,13 @@ def solve_milp_gurobi_batch_unified(
         "effective_option_df": df,
         "arrival_rate": list(arrival_rate),
     }
+
+
+def _int_key_dict(value: dict[Any, Any]) -> dict[int, Any]:
+    out: dict[int, Any] = {}
+    for key, val in dict(value).items():
+        try:
+            out[int(key)] = val
+        except (TypeError, ValueError):
+            continue
+    return out

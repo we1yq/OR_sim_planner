@@ -97,6 +97,14 @@ var profileToSize = map[string]int{
 	"7g": 7,
 }
 
+var profileToPlacementSize = map[string]int{
+	"1g": 1,
+	"2g": 2,
+	"3g": 4,
+	"4g": 4,
+	"7g": 8,
+}
+
 var gpuIndexRe = regexp.MustCompile(`^[0-9]+$`)
 var giLineRe = regexp.MustCompile(`^\|\s+([0-9]+)\s+(MIG [0-9]+g\.[0-9]+gb)\s+([0-9]+)\s+([0-9]+)\s+([0-9]+):([0-9]+)\s+\|`)
 var migUUIDLineRe = regexp.MustCompile(`^MIG ([0-9]+g\.[0-9]+gb)\s+Device\s+[0-9]+:\s+\(UUID:\s+([^)]+)\)`)
@@ -930,6 +938,9 @@ func parseSlotSpecs(value string, allowUUID bool, allowPlacementSize bool) ([]sl
 		if !ok {
 			return nil, fmt.Errorf("slot %q uses unsupported profile %q", raw, parts[2])
 		}
+		if allowPlacementSize {
+			expectedSize = profileToPlacementSize[profile]
+		}
 		maxEnd := 7
 		if allowPlacementSize {
 			maxEnd = 8
@@ -937,7 +948,7 @@ func parseSlotSpecs(value string, allowUUID bool, allowPlacementSize bool) ([]sl
 		if start < 0 || size <= 0 || start+size > maxEnd {
 			return nil, fmt.Errorf("slot %q is outside A100 placement range 0..%d", raw, maxEnd)
 		}
-		if size != expectedSize && !(allowPlacementSize && size > expectedSize) {
+		if size != expectedSize {
 			return nil, fmt.Errorf("slot %q size does not match profile %s", raw, profile)
 		}
 		spec := slotSpec{Start: start, Size: size, Profile: profile}
@@ -1603,8 +1614,15 @@ func discoverSlotDevices(nodeName string) ([]slotDevice, error) {
 	if err != nil {
 		return nil, err
 	}
+	slots, err := possibleSlotDevicesFromSMI(nodeName, smi)
+	if err != nil {
+		return nil, err
+	}
+	byPlacement := map[string]int{}
+	for i, slot := range slots {
+		byPlacement[slotPlacementKey(slot.PhysicalGPUID, slot.SlotStart, slot.SlotEnd, slot.Profile)] = i
+	}
 	gpuUUIDs := parseGPUUUIDs(smi)
-	slots := []slotDevice{}
 	for gpuIndex := range gpuUUIDs {
 		instances, _, err := listGPUInstances(gpuIndex)
 		if err != nil {
@@ -1616,21 +1634,54 @@ func discoverSlotDevices(nodeName string) ([]slotDevice, error) {
 				continue
 			}
 			physicalID := fmt.Sprintf("%s-gpu%s", nodeName, gpuIndex)
-			resourceName := migUUIDResourceName(slot.MIGDeviceUUID)
-			slots = append(slots, slotDevice{
-				ResourceName:  resourceName,
-				SocketName:    socketNameForResource(resourceName),
-				PhysicalGPUID: physicalID,
-				GPUIndex:      gpuIndex,
-				SlotStart:     slot.SlotStart,
-				SlotEnd:       slot.SlotEnd,
-				Profile:       slot.Profile,
-				MIGUUID:       slot.MIGDeviceUUID,
-			})
+			key := slotPlacementKey(physicalID, slot.SlotStart, slot.SlotEnd, slot.Profile)
+			if i, ok := byPlacement[key]; ok {
+				slots[i].MIGUUID = slot.MIGDeviceUUID
+			}
 		}
 	}
 	sort.Slice(slots, func(i, j int) bool { return slots[i].ResourceName < slots[j].ResourceName })
 	return slots, nil
+}
+
+func possibleSlotDevicesFromSMI(nodeName, smi string) ([]slotDevice, error) {
+	gpuNames := parseGPUNames(smi)
+	seen := map[string]slotDevice{}
+	for gpuIndex, gpuName := range gpuNames {
+		if !isMIGCapableA100Name(gpuName) {
+			continue
+		}
+		physicalID := fmt.Sprintf("%s-gpu%s", nodeName, gpuIndex)
+		for _, templateSpec := range templateSlotSpecs {
+			specs, err := parseSlotSpecs(templateSpec, false, true)
+			if err != nil {
+				return nil, err
+			}
+			for _, spec := range specs {
+				end := spec.Start + spec.Size
+				resourceName := slotResourceName(physicalID, spec.Start, end, spec.Profile)
+				seen[resourceName] = slotDevice{
+					ResourceName:  resourceName,
+					SocketName:    socketNameForResource(resourceName),
+					PhysicalGPUID: physicalID,
+					GPUIndex:      gpuIndex,
+					SlotStart:     spec.Start,
+					SlotEnd:       end,
+					Profile:       spec.Profile,
+				}
+			}
+		}
+	}
+	slots := make([]slotDevice, 0, len(seen))
+	for _, slot := range seen {
+		slots = append(slots, slot)
+	}
+	sort.Slice(slots, func(i, j int) bool { return slots[i].ResourceName < slots[j].ResourceName })
+	return slots, nil
+}
+
+func slotPlacementKey(physicalGPUID string, start, end int, profile string) string {
+	return fmt.Sprintf("%s/%d/%d/%s", physicalGPUID, start, end, canonicalProfile(profile))
 }
 
 func parseGPUUUIDs(smi string) map[string]string {

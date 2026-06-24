@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-model-runtime-llm-build-NODE
+  namespace: or-sim
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: NODE
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context-model
+              tar -xzf /input/context.tar.gz -C /workspace/context-model
+              /kaniko/executor \
+                --context=/workspace/context-model \
+                --dockerfile=/workspace/context-model/Dockerfile.model-runtime-llm \
+                --destination=localhost:10690/migrant-model-runtime:llm-transformers-20260622 \
+                --insecure \
+                --skip-tls-verify
+          volumeMounts:
+            - name: build-context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: build-context
+          configMap:
+            name: migrant-go-build-context

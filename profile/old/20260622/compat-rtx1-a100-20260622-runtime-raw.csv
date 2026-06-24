@@ -1,0 +1,97 @@
+run_id,timestamp,node,gpu_index,mig_profile,mig_uuid,device_resource,slot_resource,workload,model,model_id,family,batch,prompt_len,output_tokens,status,error,sample_count,latency_ms_mean,latency_ms_p50,latency_ms_p95,latency_ms_p99,throughput_rps,ttft_ms_mean,tpot_ms_mean,decode_tps,service_time_ms,peak_alloc_mb,peak_reserved_mb
+compat-rtx1-a100-20260622,2026-06-22T13:47:48.808120+00:00,rtx1-worker,0,1g,MIG-4bc33233-28f9-566c-9f82-89bd8db02cf6,or-sim.io/mig-4bc33233-28f9-566c-9f82-89bd8db02cf6,or-sim.io/rtx1-worker-gpu0-s0-1-1g,resnet50,resnet50,,vision,4,,,ok,,3,23.757515,23.66032,24.089056,24.089056,168.367778,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:48:29.901927+00:00,rtx1-worker,0,2g,MIG-7076f62a-e0b2-533b-99af-74c7b443d5ba,or-sim.io/mig-7076f62a-e0b2-533b-99af-74c7b443d5ba,or-sim.io/rtx1-worker-gpu0-s0-2-2g,resnet50,resnet50,,vision,4,,,ok,,3,24.026229,22.788321,26.649599,26.649599,166.484718,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:48:31.184540+00:00,rtx1-worker,0,3g,,,or-sim.io/rtx1-worker-gpu0-s0-3-3g,resnet50,resnet50,,vision,4,,,error,"apply-slots failed for 3g: invalid create spec: slot ""0:3:3g"" size does not match profile 3g",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:49:10.296257+00:00,rtx1-worker,0,4g,MIG-7aafc298-b386-508f-80b7-938481c587bc,or-sim.io/mig-7aafc298-b386-508f-80b7-938481c587bc,or-sim.io/rtx1-worker-gpu0-s0-4-4g,resnet50,resnet50,,vision,4,,,ok,,3,24.34976,23.138208,26.8256,26.8256,164.272666,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:49:11.659241+00:00,rtx1-worker,0,7g,,,or-sim.io/rtx1-worker-gpu0-s0-8-7g,resnet50,resnet50,,vision,4,,,error,"apply-slots failed for 7g: invalid create spec: slot ""0:7:7g"" size does not match profile 7g",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:49:55.095417+00:00,rtx1-worker,0,1g,MIG-4bc33233-28f9-566c-9f82-89bd8db02cf6,or-sim.io/mig-4bc33233-28f9-566c-9f82-89bd8db02cf6,or-sim.io/rtx1-worker-gpu0-s0-1-1g,vgg16,vgg16,,vision,4,,,ok,,3,23.519466,22.433567,25.739807,25.739807,170.07189,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:50:06.875193+00:00,rtx1-worker,0,2g,MIG-7076f62a-e0b2-533b-99af-74c7b443d5ba,or-sim.io/mig-7076f62a-e0b2-533b-99af-74c7b443d5ba,or-sim.io/rtx1-worker-gpu0-s0-2-2g,vgg16,vgg16,,vision,4,,,error,"The Pod ""or-sim-profile-runtime"" is invalid: spec: Forbidden: pod updates may not change fields other than `spec.containers[*].image`,`spec.initContainers[*].image`,`spec.activeDeadlineSeconds`,`spec.tolerations` (only additions to existing tolerations),`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)
+  core.PodSpec{
+  	Volumes:        {{Name: ""kube-api-access-jcg4t"", VolumeSource: {Projected: &{Sources: {{ServiceAccountToken: &{ExpirationSeconds: 3607, Path: ""token""}}, {ConfigMap: &{LocalObjectReference: {Name: ""kube-root-ca.crt""}, Items: {{Key: ""ca.crt"", Path: ""ca.crt""}}}}, {DownwardAPI: &{Items: {{Path: ""namespace"", FieldRef: &{APIVersion: ""v1"", FieldPath: ""metadata.namespace""}}}}}}, DefaultMode: &420}}}},
+  	InitContainers: nil,
+  	Containers: []core.Container{
+  		{
+  			... // 5 identical fields
+  			Ports:   {{HostPort: 18080, ContainerPort: 18080, Protocol: ""TCP""}},
+  			EnvFrom: nil,
+  			Env: []core.EnvVar{
+  				{
+  					Name:      ""MODEL_NAME"",
+- 					Value:     ""resnet50"",
++ 					Value:     ""vgg16"",
+  					ValueFrom: nil,
+  				},
+  				{Name: ""OR_SIM_RUNTIME_ID"", Value: ""or-sim-profile-runtime""},
+  				{Name: ""BATCH_SIZE"", Value: ""4""},
+  				{
+  					Name:      ""OR_SIM_PROFILE"",
+- 					Value:     ""1g"",
++ 					Value:     ""2g"",
+  					ValueFrom: nil,
+  				},
+  				{
+  					Name: ""OR_SIM_MIG_UUID"",
+  					Value: strings.Join({
+  						""MIG-"",
+- 						""4bc33233-28f9-566c-9f82-89bd8db02cf6"",
++ 						""7076f62a-e0b2-533b-99af-74c7b443d5ba"",
+  					}, """"),
+  					ValueFrom: nil,
+  				},
+  				{
+  					Name: ""OR_SIM_SLOT_RESOURCE"",
+  					Value: strings.Join({
+  						""or-sim.io/rtx1-worker-gpu0-s0-"",
+- 						""1-1"",
++ 						""2-2"",
+  						""g"",
+  					}, """"),
+  					ValueFrom: nil,
+  				},
+  				{
+  					Name: ""OR_SIM_DEVICE_RESOURCE"",
+  					Value: strings.Join({
+  						""or-sim.io/mig-"",
+- 						""4bc33233-28f9-566c-9f82-89bd8db02cf6"",
++ 						""7076f62a-e0b2-533b-99af-74c7b443d5ba"",
+  					}, """"),
+  					ValueFrom: nil,
+  				},
+  				{Name: ""RUNTIME_MODE"", Value: ""torchvision""},
+  				{Name: ""TORCHVISION_WEIGHTS"", Value: ""default""},
+  				{Name: ""TORCHVISION_WARMUP_ITERS"", Value: ""10""},
+  			},
+  			Resources: core.ResourceRequirements{
+  				Limits: core.ResourceList{
+- 					s""or-sim.io/mig-4bc33233-28f9-566c-9f82-89bd8db02cf6"": {i: resource.int64Amount{value: 1}, s: ""1"", Format: ""DecimalSI""},
++ 					s""or-sim.io/mig-7076f62a-e0b2-533b-99af-74c7b443d5ba"": {i: resource.int64Amount{value: 1}, s: ""1"", Format: ""DecimalSI""},
+  				},
+  				Requests: core.ResourceList{
+- 					s""or-sim.io/mig-4bc33233-28f9-566c-9f82-89bd8db02cf6"": {i: resource.int64Amount{value: 1}, s: ""1"", Format: ""DecimalSI""},
++ 					s""or-sim.io/mig-7076f62a-e0b2-533b-99af-74c7b443d5ba"": {i: resource.int64Amount{value: 1}, s: ""1"", Format: ""DecimalSI""},
+  				},
+  				Claims: nil,
+  			},
+  			ResizePolicy:  nil,
+  			RestartPolicy: nil,
+  			... // 13 identical fields
+  		},
+  	},
+  	EphemeralContainers: nil,
+  	RestartPolicy:       ""Never"",
+  	... // 29 identical fields
+  }",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:50:08.307251+00:00,rtx1-worker,0,3g,,,or-sim.io/rtx1-worker-gpu0-s0-3-3g,vgg16,vgg16,,vision,4,,,error,"apply-slots failed for 3g: invalid create spec: slot ""0:3:3g"" size does not match profile 3g",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:50:53.511872+00:00,rtx1-worker,0,4g,MIG-7aafc298-b386-508f-80b7-938481c587bc,or-sim.io/mig-7aafc298-b386-508f-80b7-938481c587bc,or-sim.io/rtx1-worker-gpu0-s0-4-4g,vgg16,vgg16,,vision,4,,,ok,,3,9.288768,9.265248,9.368,9.368,430.627608,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:50:54.892515+00:00,rtx1-worker,0,7g,,,or-sim.io/rtx1-worker-gpu0-s0-8-7g,vgg16,vgg16,,vision,4,,,error,"apply-slots failed for 7g: invalid create spec: slot ""0:7:7g"" size does not match profile 7g",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:51:45.331527+00:00,rtx1-worker,0,1g,MIG-4bc33233-28f9-566c-9f82-89bd8db02cf6,or-sim.io/mig-4bc33233-28f9-566c-9f82-89bd8db02cf6,or-sim.io/rtx1-worker-gpu0-s0-1-1g,vit_base,vit_base,,vision,4,,,ok,,3,106.490049,71.851837,175.767426,175.767426,37.562195,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:52:30.543995+00:00,rtx1-worker,0,2g,MIG-7076f62a-e0b2-533b-99af-74c7b443d5ba,or-sim.io/mig-7076f62a-e0b2-533b-99af-74c7b443d5ba,or-sim.io/rtx1-worker-gpu0-s0-2-2g,vit_base,vit_base,,vision,4,,,ok,,3,268.178463,272.944345,281.63558,281.63558,14.915441,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:52:32.003782+00:00,rtx1-worker,0,3g,,,or-sim.io/rtx1-worker-gpu0-s0-3-3g,vit_base,vit_base,,vision,4,,,error,"apply-slots failed for 3g: invalid create spec: slot ""0:3:3g"" size does not match profile 3g",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:53:11.637096+00:00,rtx1-worker,0,4g,MIG-7aafc298-b386-508f-80b7-938481c587bc,or-sim.io/mig-7aafc298-b386-508f-80b7-938481c587bc,or-sim.io/rtx1-worker-gpu0-s0-4-4g,vit_base,vit_base,,vision,4,,,ok,,3,21.287669,19.911968,24.18976,24.18976,187.902203,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:53:13.179779+00:00,rtx1-worker,0,7g,,,or-sim.io/rtx1-worker-gpu0-s0-8-7g,vit_base,vit_base,,vision,4,,,error,"apply-slots failed for 7g: invalid create spec: slot ""0:7:7g"" size does not match profile 7g",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:53:20.264347+00:00,rtx1-worker,0,1g,MIG-4bc33233-28f9-566c-9f82-89bd8db02cf6,or-sim.io/mig-4bc33233-28f9-566c-9f82-89bd8db02cf6,or-sim.io/rtx1-worker-gpu0-s0-1-1g,gpt2_p64_o64,gpt2-medium,gpt2-medium,llm,1,64,64,error,"The Pod ""or-sim-profile-runtime"" is invalid: spec.initContainers: Forbidden: pod updates may not add or remove containers",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:54:37.859215+00:00,rtx1-worker,0,2g,MIG-7076f62a-e0b2-533b-99af-74c7b443d5ba,or-sim.io/mig-7076f62a-e0b2-533b-99af-74c7b443d5ba,or-sim.io/rtx1-worker-gpu0-s0-2-2g,gpt2_p64_o64,gpt2-medium,gpt2-medium,llm,1,64,64,ok,,1,1238.077393,1238.077393,1238.077393,1238.077393,0.807704,18.077696,19.062495,52.459029,1238.077393,768.800293,836.0
+compat-rtx1-a100-20260622,2026-06-22T13:54:40.293730+00:00,rtx1-worker,0,3g,,,or-sim.io/rtx1-worker-gpu0-s0-3-3g,gpt2_p64_o64,gpt2-medium,gpt2-medium,llm,1,64,64,error,"apply-slots failed for 3g: invalid create spec: slot ""0:3:3g"" size does not match profile 3g",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:56:43.928870+00:00,rtx1-worker,0,4g,MIG-7aafc298-b386-508f-80b7-938481c587bc,or-sim.io/mig-7aafc298-b386-508f-80b7-938481c587bc,or-sim.io/rtx1-worker-gpu0-s0-4-4g,gpt2_p64_o64,gpt2-medium,gpt2-medium,llm,1,64,64,error,resource or-sim.io/mig-7aafc298-b386-508f-80b7-938481c587bc did not become allocatable on rtx1-worker,0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:56:45.190374+00:00,rtx1-worker,0,7g,,,or-sim.io/rtx1-worker-gpu0-s0-8-7g,gpt2_p64_o64,gpt2-medium,gpt2-medium,llm,1,64,64,error,"apply-slots failed for 7g: invalid create spec: slot ""0:7:7g"" size does not match profile 7g",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+compat-rtx1-a100-20260622,2026-06-22T13:57:39.248211+00:00,rtx1-worker,0,1g,MIG-4bc33233-28f9-566c-9f82-89bd8db02cf6,or-sim.io/mig-4bc33233-28f9-566c-9f82-89bd8db02cf6,or-sim.io/rtx1-worker-gpu0-s0-1-1g,llama32_3b_p64_o64,llama32_3b,meta-llama/Llama-3.2-3B,llm,1,64,64,error,"The Pod ""or-sim-profile-runtime"" is invalid: spec.initContainers: Forbidden: pod updates may not add or remove containers",0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0

@@ -171,6 +171,7 @@ func reconcile(client *kube.Client, router string) error {
 			if len(devices) == 0 {
 				devices = observedMIG.Devices[i]
 			}
+			repairPaused := asString(labels["mig.or-sim.io/repair-paused"]) == "true"
 			runtimes := runtimeByGPU[id]
 			logicalBinding := asMap(logicalBindings[id])
 			activeLogicalID := asString(logicalBinding["activeLogicalGpuId"])
@@ -192,8 +193,12 @@ func reconcile(client *kube.Client, router string) error {
 				activeQueue = append(activeQueue, id)
 			} else if len(devices) > 0 {
 				state = "transitioning"
-				reason = "mig_devices_present_without_runtime"
-				requiredAction = "clear_template_before_available"
+				if repairPaused {
+					reason = "repair_paused_mig_devices_present_without_runtime"
+				} else {
+					reason = "mig_devices_present_without_runtime"
+					requiredAction = "clear_template_before_available"
+				}
 				transitioningQueue = append(transitioningQueue, id)
 			} else {
 				availableQueue = append(availableQueue, id)
@@ -223,10 +228,11 @@ func reconcile(client *kube.Client, router string) error {
 				"logicalMigSlots":     migDevicesAsMaps(devices),
 				"runtimeBindings":     runtimeBindingsAsMaps(runtimes),
 				"cleanliness":         cleanliness,
-				"state":               state,
-				"availabilityReason":  reason,
-				"requiredAction":      requiredAction,
-				"activeLogicalGpuId":  nilIfEmpty(activeLogicalID),
+					"state":               state,
+					"availabilityReason":  reason,
+					"requiredAction":      requiredAction,
+					"repairPaused":        repairPaused,
+					"activeLogicalGpuId":  nilIfEmpty(activeLogicalID),
 				"pendingLogicalGpuId": nilIfEmpty(pendingLogicalID),
 				"logicalBinding":      logicalBinding,
 			}
@@ -244,7 +250,11 @@ func reconcile(client *kube.Client, router string) error {
 				"app.kubernetes.io/name": "migrant-go",
 			},
 		},
-		"spec": map[string]any{"policy": map[string]any{"source": "cluster-state-manager"}},
+		"spec": map[string]any{"policy": map[string]any{
+			"source":                                   "cluster-state-manager",
+			"emptyMigConfig":                           nil,
+			"requireMigConfigStateSuccessBeforeAvailable": nil,
+		}},
 	}
 	namePath := kube.NamespacedResourceName(client.Namespace(), "physicalgpuregistries", "default")
 	if err := client.Upsert(namePath, body, nil); err != nil {
@@ -274,7 +284,25 @@ func reconcile(client *kube.Client, router string) error {
 func buildRegistryHealth(bindings map[string]any, activeQueue, availableQueue, transitioningQueue []string) map[string]any {
 	reasons := []string{}
 	requiredActions := []map[string]any{}
+	requiredByGPU := map[string]bool{}
 	stable := len(transitioningQueue) == 0
+	addClearAction := func(id string, binding map[string]any, reason string) {
+		if id == "" || requiredByGPU[id] {
+			return
+		}
+		if asBool(binding["repairPaused"]) {
+			reasons = append(reasons, id+" repair paused: "+reason)
+			return
+		}
+		requiredByGPU[id] = true
+		requiredActions = append(requiredActions, map[string]any{
+			"type":          "clear_template_before_available",
+			"physicalGpuId": id,
+			"node":          binding["node"],
+			"gpuIndex":      binding["gpuIndex"],
+			"reason":        reason,
+		})
+	}
 
 	ids := make([]string, 0, len(bindings))
 	for id := range bindings {
@@ -286,34 +314,32 @@ func buildRegistryHealth(bindings map[string]any, activeQueue, availableQueue, t
 		state := asString(binding["state"])
 		cleanliness := asString(binding["cleanliness"])
 		requiredAction := asString(binding["requiredAction"])
-		migConfig := asString(binding["migConfig"])
-		migConfigState := asString(binding["migConfigState"])
 		migDevices := asSlice(binding["migDevices"])
 		runtimes := asSlice(binding["runtimeBindings"])
 
 		if state == "transitioning" || cleanliness == "dirty" {
 			stable = false
-			reasons = append(reasons, id+" is not stable: state="+state+", cleanliness="+cleanliness+", reason="+asString(binding["availabilityReason"]))
+			reason := id + " is not stable: state=" + state + ", cleanliness=" + cleanliness + ", reason=" + asString(binding["availabilityReason"])
+			reasons = append(reasons, reason)
+			addClearAction(id, binding, reason)
 		}
 		if requiredAction == "clear_template_before_available" {
-			requiredActions = append(requiredActions, map[string]any{
-				"type":          "clear_template_before_available",
-				"physicalGpuId": id,
-				"node":          binding["node"],
-				"gpuIndex":      binding["gpuIndex"],
-				"reason":        asString(binding["availabilityReason"]),
-			})
+			addClearAction(id, binding, firstNonEmpty(asString(binding["availabilityReason"]), "explicit clear_template_before_available"))
 		}
 		if state == "available" {
-			if cleanliness != "empty" || len(migDevices) != 0 || migConfig != "or-sim-empty" || migConfigState != "success" {
+			if cleanliness != "empty" || len(migDevices) != 0 {
 				stable = false
-				reasons = append(reasons, id+" is marked available but is not empty/or-sim-empty/success")
+				reason := id + " is marked available but is not empty"
+				reasons = append(reasons, reason)
+				addClearAction(id, binding, reason)
 			}
 		}
 		if state == "active" {
 			if len(runtimes) == 0 {
 				stable = false
-				reasons = append(reasons, id+" is marked active but has no runtime bindings")
+				reason := id + " is marked active but has no runtime bindings"
+				reasons = append(reasons, reason)
+				addClearAction(id, binding, reason)
 			}
 			if binding["activeLogicalGpuId"] == nil || asString(binding["activeLogicalGpuId"]) == "" {
 				stable = false
@@ -849,6 +875,13 @@ func asString(v any) string {
 		return s
 	}
 	return ""
+}
+
+func asBool(v any) bool {
+	if b, ok := v.(bool); ok {
+		return b
+	}
+	return false
 }
 
 func atoi(s string) int {

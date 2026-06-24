@@ -81,7 +81,7 @@ def plan(payload: dict[str, Any]) -> dict[str, Any]:
     apply_canonical_physical_ids(target_state, planning_trace)
     transition = dict(planning_trace.get("transition", {}))
     action_dag = transition.get("phasedActionPlan") or transition.get("phasedActionPlanSummary") or {}
-    desired_runtimes = desired_runtimes_from_target_state(target_state)
+    desired_runtimes = desired_runtimes_from_target_state(target_state, planning_trace)
     return {
         "targetAllocationPlan": {
             "planner": "placement.milp_enhanced + target.preserve_greedy",
@@ -330,13 +330,15 @@ def exact_slot_resource(physical_id: str, start: int, _abstract_end: int, profil
     return f"or-sim.io/{physical_id}-s{start}-{placement_end}-{profile}"
 
 
-def desired_runtimes_from_target_state(target_state: dict[str, Any]) -> list[dict[str, Any]]:
+def desired_runtimes_from_target_state(target_state: dict[str, Any], planning_trace: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     metadata = dict(target_state.get("metadata", {}))
     physical_map = {int(k): v for k, v in dict(metadata.get("physical_id_map", {})).items()}
+    transition = dict((planning_trace or {}).get("transition") or {})
+    executed_physical_ids = {int(k): v for k, v in dict(transition.get("executedPhysicalIds") or {}).items()}
     runtimes = []
     for gpu in list(target_state.get("gpus", [])):
         gpu_id = int(gpu.get("gpuId"))
-        physical_id = str(physical_map.get(gpu_id, f"gpu{gpu_id}"))
+        physical_id = str(executed_physical_ids.get(gpu_id) or physical_map.get(gpu_id) or f"gpu{gpu_id}")
         node = physical_id.split("-gpu", 1)[0] if "-gpu" in physical_id else ""
         for inst in list(gpu.get("instances", [])):
             profile = str(inst.get("profile"))
