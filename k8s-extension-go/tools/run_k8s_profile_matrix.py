@@ -41,7 +41,7 @@ def main() -> int:
     summary_path = out_dir / f"{run_id}-capacity-summary.md"
     row_fieldnames = raw_fieldnames()
 
-    node_ip = node_internal_ip(args.node)
+    node_ip = args.node_ip or node_internal_ip(args.node)
     print(f"profile run_id={run_id} node={args.node} node_ip={node_ip} gpu_index={args.gpu_index}", flush=True)
 
     rows: list[dict[str, Any]] = []
@@ -55,7 +55,10 @@ def main() -> int:
             print(format_progress(row), flush=True)
     finally:
         cleanup_runtime_pod(args.namespace)
-        set_repair_paused(args.node, False)
+        try:
+            clear_mig_and_wait_empty(node_ip, args.gpu_index)
+        finally:
+            set_repair_paused(args.node, False)
 
     write_summary(summary_path, rows)
     print(f"wrote raw rows: {rows_path}")
@@ -66,6 +69,7 @@ def main() -> int:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Kubernetes pod-based MIG profile matrix.")
     parser.add_argument("--node", default="rtx1-worker")
+    parser.add_argument("--node-ip", default="", help="override Kubernetes InternalIP; useful when node addresses are stale")
     parser.add_argument("--gpu-index", default="0", help="default targets rtx1-worker-gpu0, an A100 with MIG mode enabled")
     parser.add_argument("--namespace", default="or-sim")
     parser.add_argument("--out-dir", default="profile/current")
@@ -87,6 +91,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--llm-requests", type=int, default=5)
     parser.add_argument("--health-timeout-s", type=int, default=900)
     parser.add_argument("--infer-timeout-s", type=int, default=600)
+    parser.add_argument("--resource-timeout-s", type=int, default=120)
     parser.add_argument("--router-url", default="http://115.145.179.144:10680")
     parser.add_argument("--e2e-requests", type=int, default=0, help="if >0, also measure router E2E latency on the same runtime pod")
     parser.add_argument("--e2e-warmup", type=int, default=1)
@@ -155,7 +160,7 @@ def run_one_setting(args: argparse.Namespace, run_id: str, node_ip: str, item: d
             mig_uuid = slot.get("migDeviceUuid", "")
             if mig_uuid:
                 device_resource = mig_uuid_resource(mig_uuid)
-            wait_allocatable(args.node, slot_resource, min_value=1, timeout_s=120)
+            wait_allocatable(args.node, slot_resource, min_value=1, timeout_s=args.resource_timeout_s)
         allocation_resource = slot_resource
         for attempt in range(2):
             cleanup_runtime_pod(args.namespace)
@@ -181,7 +186,7 @@ def run_one_setting(args: argparse.Namespace, run_id: str, node_ip: str, item: d
                     time.sleep(5)
                     if not args.skip_mig_config:
                         post_json(f"http://{node_ip}:10684/refresh-cdi?gpuIndex={args.gpu_index}", {}, timeout_s=120)
-                        wait_allocatable(args.node, allocation_resource, min_value=1, timeout_s=120)
+                        wait_allocatable(args.node, allocation_resource, min_value=1, timeout_s=args.resource_timeout_s)
                     continue
                 raise
         if port_forward is None:
@@ -206,17 +211,42 @@ def run_one_setting(args: argparse.Namespace, run_id: str, node_ip: str, item: d
 
 
 def configure_mig(args: argparse.Namespace, profile: str, node_ip: str) -> list[dict[str, Any]]:
-    post_json_allow_error(f"http://{node_ip}:10684/clear?gpuIndex={args.gpu_index}", {}, timeout_s=180)
     create = f"0:{MIG_PLACEMENT_SIZE[profile]}:{profile}"
-    res = post_json_allow_error(f"http://{node_ip}:10684/apply-slots?gpuIndex={args.gpu_index}", {"create": create}, timeout_s=180)
-    slots = res.get("migSlots") or []
-    if not slots:
-        raise RuntimeError(f"apply-slots failed for {profile}: {res.get('message')}")
-    if not res.get("success") and not any(slot.get("profile") == profile for slot in slots):
-        raise RuntimeError(f"apply-slots failed for {profile}: {res.get('message')}")
-    # refresh-cdi also nudges the slot device plugin in this node-agent version.
-    post_json(f"http://{node_ip}:10684/refresh-cdi?gpuIndex={args.gpu_index}", {}, timeout_s=120)
-    return slots
+    last_message = ""
+    for attempt in range(3):
+        try:
+            clear_mig_and_wait_empty(node_ip, args.gpu_index)
+        except RuntimeError as exc:
+            last_message = str(exc)
+        time.sleep(2 + attempt)
+        res = post_json_allow_error(f"http://{node_ip}:10684/apply-slots?gpuIndex={args.gpu_index}", {"create": create}, timeout_s=180)
+        slots = res.get("migSlots") or []
+        if slots and (res.get("success") or any(slot.get("profile") == profile for slot in slots)):
+            # refresh-cdi also nudges the slot device plugin in this node-agent version.
+            post_json(f"http://{node_ip}:10684/refresh-cdi?gpuIndex={args.gpu_index}", {}, timeout_s=120)
+            return slots
+        last_message = str(res.get("message") or res)
+        if "Insufficient Resources" not in last_message and "Invalid Argument" not in last_message:
+            break
+        time.sleep(3 + attempt)
+    raise RuntimeError(f"apply-slots failed for {profile}: {last_message}")
+
+
+def clear_mig_and_wait_empty(node_ip: str, gpu_index: str) -> None:
+    last_message = ""
+    for attempt in range(10):
+        res = post_json_allow_error(f"http://{node_ip}:10684/clear?gpuIndex={gpu_index}", {}, timeout_s=180)
+        last_message = str(res.get("message") or res.get("nvidiaSmiL") or res)
+        time.sleep(1 + min(attempt, 3))
+        state = get_json(f"http://{node_ip}:10684/list?gpuIndex={gpu_index}", timeout_s=30)
+        smi = str(state.get("nvidiaSmiL") or "")
+        slots = state.get("migSlots") or []
+        message = str(state.get("message") or "")
+        if not slots and "No GPU instances found" in message and "MIG " not in smi:
+            return
+        last_message = message or smi
+        time.sleep(3 + min(attempt, 4))
+    raise RuntimeError(f"clear did not reach empty MIG state on gpu {gpu_index}: {last_message}")
 
 
 def pick_slot(slots: list[dict[str, Any]], profile: str) -> dict[str, Any]:
@@ -407,6 +437,8 @@ def build_row(
         latencies = [float(s.get("runtimeLatencyMs", 0.0) or 0.0) for s in samples if s.get("runtimeLatencyMs") is not None]
         mean_ms = mean(latencies)
         throughput = (1000.0 * int(item["batch"]) / mean_ms) if mean_ms > 0 else 0.0
+        ttft_values: list[float] = []
+        tpot_values: list[float] = []
         ttft = tpot = decode_tps = service = 0.0
     else:
         service_values = [float(s.get("runtimeLatencyMs", 0.0) or 0.0) for s in samples if s.get("runtimeLatencyMs") is not None]
@@ -451,7 +483,13 @@ def build_row(
         "latency_ms_p99": round(percentile(latencies, 0.99), 6),
         "throughput_rps": round(throughput, 6),
         "ttft_ms_mean": round(ttft, 6),
+        "ttft_ms_p50": round(percentile(ttft_values, 0.50), 6),
+        "ttft_ms_p95": round(percentile(ttft_values, 0.95), 6),
+        "ttft_ms_p99": round(percentile(ttft_values, 0.99), 6),
         "tpot_ms_mean": round(tpot, 6),
+        "tpot_ms_p50": round(percentile(tpot_values, 0.50), 6),
+        "tpot_ms_p95": round(percentile(tpot_values, 0.95), 6),
+        "tpot_ms_p99": round(percentile(tpot_values, 0.99), 6),
         "decode_tps": round(decode_tps, 6),
         "service_time_ms": round(service, 6),
         "peak_alloc_mb": round(peak_alloc, 6),
@@ -571,17 +609,31 @@ def free_local_port() -> int:
 def wait_health(namespace: str, node_ip: str, port: int, timeout_s: int) -> None:
     deadline = time.time() + timeout_s
     last_error = ""
+    repeated_load_error = ""
+    repeated_load_error_count = 0
     while time.time() < deadline:
         phase, message = runtime_pod_phase(namespace)
         if phase == "Failed":
             raise RuntimeError(f"runtime pod failed: {message}")
+        fail_fast_error = ""
         try:
             payload = get_health(f"http://{node_ip}:{port}/healthz", timeout_s=5)
             if payload.get("ok"):
                 return
-            last_error = str(payload.get("loadError") or payload)
+            load_error = str(payload.get("loadError") or "")
+            last_error = load_error or str(payload)
+            if load_error:
+                if load_error == repeated_load_error:
+                    repeated_load_error_count += 1
+                else:
+                    repeated_load_error = load_error
+                    repeated_load_error_count = 1
+                if repeated_load_error_count >= 3:
+                    fail_fast_error = load_error
         except Exception as exc:
             last_error = str(exc)
+        if fail_fast_error:
+            raise RuntimeError(f"runtime load failed: {fail_fast_error}")
         time.sleep(2)
     raise RuntimeError(f"runtime health timeout: {last_error}")
 
@@ -623,6 +675,9 @@ def wait_allocatable(node: str, resource: str, min_value: int, timeout_s: int) -
 def node_internal_ip(node: str) -> str:
     raw = kubectl(["get", "node", node, "-o", "json"])
     data = json.loads(raw)
+    provided = data.get("metadata", {}).get("annotations", {}).get("alpha.kubernetes.io/provided-node-ip", "")
+    if provided:
+        return provided
     for address in data["status"]["addresses"]:
         if address["type"] == "InternalIP":
             return address["address"]
@@ -749,7 +804,13 @@ def raw_fieldnames() -> list[str]:
         "latency_ms_p99",
         "throughput_rps",
         "ttft_ms_mean",
+        "ttft_ms_p50",
+        "ttft_ms_p95",
+        "ttft_ms_p99",
         "tpot_ms_mean",
+        "tpot_ms_p50",
+        "tpot_ms_p95",
+        "tpot_ms_p99",
         "decode_tps",
         "service_time_ms",
         "peak_alloc_mb",

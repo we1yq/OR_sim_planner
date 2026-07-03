@@ -819,6 +819,11 @@ func runtimeBindingsAsMaps(bindings []runtimeBinding) []map[string]any {
 }
 
 func nodeInternalIP(node map[string]any) string {
+	meta := asMap(node["metadata"])
+	annotations := asMap(meta["annotations"])
+	if provided := asString(annotations["alpha.kubernetes.io/provided-node-ip"]); provided != "" {
+		return provided
+	}
 	for _, addr := range asSlice(asMap(node["status"])["addresses"]) {
 		item := asMap(addr)
 		if asString(item["type"]) == "InternalIP" {

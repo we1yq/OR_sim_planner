@@ -1960,7 +1960,13 @@ func nodeIPs(client *kube.Client) (map[string]string, error) {
 	out := map[string]string{}
 	for _, item := range asSlice(list["items"]) {
 		node := asMap(item)
-		name := asString(asMap(node["metadata"])["name"])
+		meta := asMap(node["metadata"])
+		name := asString(meta["name"])
+		annotations := asMap(meta["annotations"])
+		if provided := asString(annotations["alpha.kubernetes.io/provided-node-ip"]); provided != "" {
+			out[name] = provided
+			continue
+		}
 		for _, addr := range asSlice(asMap(node["status"])["addresses"]) {
 			a := asMap(addr)
 			if asString(a["type"]) == "InternalIP" {

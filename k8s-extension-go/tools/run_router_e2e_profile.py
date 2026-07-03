@@ -25,7 +25,7 @@ def main() -> int:
     args = parse_args()
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    node_ip = runner.node_internal_ip(args.node)
+    node_ip = args.node_ip or runner.node_internal_ip(args.node)
     runtime_id = f"router-e2e-{args.model}-{args.profile}-p{args.prompt_len}-o{args.output_tokens}"
     slot_resource = f"or-sim.io/{args.node}-gpu{args.gpu_index}-s0-{runner.MIG_PLACEMENT_SIZE[args.profile]}-{args.profile}"
     route_model = args.route_model or args.model
@@ -258,6 +258,7 @@ def percentile(values: list[float], q: float) -> float:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run one router E2E profile point.")
     parser.add_argument("--node", default="ampere")
+    parser.add_argument("--node-ip", default="", help="override Kubernetes InternalIP; useful when node addresses are stale")
     parser.add_argument("--gpu-index", default="0")
     parser.add_argument("--namespace", default="or-sim")
     parser.add_argument("--router-url", default="http://115.145.179.144:10680")
