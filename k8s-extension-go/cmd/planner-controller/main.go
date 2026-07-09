@@ -25,7 +25,7 @@ func main() {
 	}
 	go loop(client, plannerURL)
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "component": "planner-controller", "planner": "final-migrant-planner-only"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "component": "planner-controller", "planner": "selector"})
 	})
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
@@ -123,12 +123,21 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 	if err != nil {
 		return err
 	}
-	runtimes := asSlice(planned["desiredRuntimes"])
+	finalRuntimes := asSlice(planned["desiredRuntimes"])
+	executionRuntimes := asSlice(planned["executionRuntimes"])
+	if len(executionRuntimes) == 0 {
+		executionRuntimes = finalRuntimes
+	}
 	actionDag := asMap(planned["actionDag"])
 	actionCount := len(asSlice(actionDag["nodes"]))
 	if actionCount == 0 {
 		actionCount = len(asSlice(planned["abstractActions"]))
 	}
+	plannerName := asString(asMap(planned["metadata"])["requestedPlanner"])
+	if plannerName == "" {
+		plannerName = firstNonEmpty(planInput.Planner, asString(asMap(planned["metadata"])["planner"]), "ours")
+	}
+	plannerMetrics := asMap(asMap(planned["metadata"])["metrics"])
 	body := map[string]any{
 		"apiVersion": "mig.or-sim.io/v1alpha1",
 		"kind":       "MigActionPlan",
@@ -144,7 +153,7 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 			"executor":                 "go-transition-executor",
 			"phaseGate":                "auto",
 			"actionCount":              actionCount,
-			"targetGpuCount":           uniqueGPUCountFromMaps(runtimes),
+			"targetGpuCount":           uniqueGPUCountFromMaps(finalRuntimes),
 			"plannerMetadata":          planned["metadata"],
 			"planningInput":            planInput,
 			"runtimeProfileCorrection": runtimeProfileCorrection,
@@ -155,8 +164,14 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 			"validationTargets":        planned["validationTargets"],
 			"summary": map[string]any{
 				"arrivalSnapshotRef": asString(asMap(snap["metadata"])["name"]),
+				"sourceArrival":      planInput.SourceArrival,
 				"targetArrival":      planInput.TargetArrival,
-				"desiredRuntimes":    runtimes,
+				"sourceGpuCount":     sourceGPUCount(current),
+				"targetGpuCount":     uniqueGPUCountFromMaps(finalRuntimes),
+				"planner":            plannerName,
+				"plannerMakespanSec": asFloat(plannerMetrics["plannerMakespanSec"]),
+				"desiredRuntimes":    executionRuntimes,
+				"finalDesiredRuntimes": finalRuntimes,
 			},
 		},
 	}
@@ -164,7 +179,7 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 		return err
 	}
 	_, err = client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", planName)+"/status", map[string]any{
-		"status": map[string]any{"phase": "Planned", "message": "planned by planner-engine with original Gurobi MILP, target materialization, and effect-aware DAG"},
+		"status": map[string]any{"phase": "Planned", "message": "planned by planner-engine using planner=" + plannerName},
 	}, nil)
 	return err
 }
@@ -218,17 +233,32 @@ func callPlannerEngine(plannerURL string, input system.PlanningInput, current sy
 }
 
 func planningInputFromSnapshot(spec map[string]any) system.PlanningInput {
+	slo := asMap(spec["slo"])
 	return system.PlanningInput{
 		Source:                asString(spec["source"]),
 		Mode:                  asString(spec["mode"]),
+		Planner:               firstNonEmpty(asString(spec["planner"]), asString(spec["planningMethod"]), asString(spec["targetPlanner"]), "ours"),
 		Epoch:                 asString(spec["epoch"]),
 		WindowSeconds:         intNumber(spec["windowSeconds"]),
 		Unit:                  asString(spec["unit"]),
 		ObservedAt:            asString(spec["observedAt"]),
 		TriggerReason:         asString(spec["triggerReason"]),
-		TargetArrival:         numberMap(spec["targetArrival"]),
+		SourceArrival: firstNonEmptyNumberMap(
+			numberMap(spec["sourceArrival"]),
+			numberMap(spec["currentDemand"]),
+			numberMap(spec["currentArrival"]),
+			numberMap(spec["sourceDemand"]),
+			demandRateMapFromSLO(slo, "sourceArrival", "currentDemandRate", "currentDemand", "sourceDemandRate", "sourceDemand"),
+		),
+		TargetArrival: firstNonEmptyNumberMap(
+			numberMap(spec["targetArrival"]),
+			numberMap(spec["targetDemand"]),
+			demandRateMapFromSLO(slo, "targetArrival", "demandRate", "targetDemandRate", "targetDemand"),
+		),
 		RegisteredSLOMs:       numberMap(spec["registeredSLOMs"]),
+		SLO:                   slo,
 		RequestCount:          int64Map(spec["requestCount"]),
+		TransitionDemandPolicy: asString(spec["transitionDemandPolicy"]),
 		ProfileCatalogRef:     asString(spec["profileCatalogRef"]),
 		CalibrationOverlayRef: asString(spec["calibrationOverlayRef"]),
 		CurrentAllocationRef:  asString(spec["currentAllocationRef"]),
@@ -397,6 +427,19 @@ func uniqueGPUCount(runtimes []system.ModelRuntimeSpec) int {
 	return len(seen)
 }
 
+func sourceGPUCount(current system.CurrentAllocation) int {
+	if len(current.LogicalGPUs) > 0 {
+		return len(current.LogicalGPUs)
+	}
+	count := 0
+	for _, gpu := range current.GPUs {
+		if len(gpu.RuntimeBindings) > 0 || len(gpu.MIGDevices) > 0 {
+			count++
+		}
+	}
+	return count
+}
+
 func uniqueGPUCountFromMaps(runtimes []any) int {
 	seen := map[string]bool{}
 	for _, raw := range runtimes {
@@ -429,6 +472,15 @@ func mapSlice(values []any) []map[string]any {
 }
 
 func sanitize(s string) string { return strings.ReplaceAll(s, "_", "-") }
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
 
 func env(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
@@ -478,8 +530,40 @@ func stringSet(values []any) map[string]bool {
 func numberMap(v any) map[string]float64 {
 	out := map[string]float64{}
 	for k, raw := range asMap(v) {
-		if n := asFloat(raw); n != 0 {
+		if n, ok := optionalFloat(raw); ok {
 			out[k] = n
+		}
+	}
+	return out
+}
+
+func firstNonEmptyNumberMap(values ...map[string]float64) map[string]float64 {
+	for _, value := range values {
+		if len(value) > 0 {
+			return value
+		}
+	}
+	return map[string]float64{}
+}
+
+func demandRateMapFromSLO(slo map[string]any, keys ...string) map[string]float64 {
+	for _, key := range keys {
+		if direct := numberMap(slo[key]); len(direct) > 0 {
+			return direct
+		}
+	}
+	out := map[string]float64{}
+	keySet := map[string]bool{}
+	for _, key := range keys {
+		keySet[key] = true
+	}
+	for model, raw := range slo {
+		modelSLO := asMap(raw)
+		for key := range keySet {
+			if n, ok := optionalFloat(modelSLO[key]); ok {
+				out[model] = n
+				break
+			}
 		}
 	}
 	return out
@@ -520,19 +604,24 @@ func intNumber(v any) int {
 }
 
 func asFloat(v any) float64 {
+	value, _ := optionalFloat(v)
+	return value
+}
+
+func optionalFloat(v any) (float64, bool) {
 	switch x := v.(type) {
 	case float64:
-		return x
+		return x, true
 	case float32:
-		return float64(x)
+		return float64(x), true
 	case int:
-		return float64(x)
+		return float64(x), true
 	case int64:
-		return float64(x)
+		return float64(x), true
 	case json.Number:
 		n, _ := x.Float64()
-		return n
+		return n, true
 	default:
-		return 0
+		return 0, false
 	}
 }

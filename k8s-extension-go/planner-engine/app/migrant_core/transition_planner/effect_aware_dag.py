@@ -35,6 +35,7 @@ def run(
     default_queued: int = 2,
     default_inflight: int = 1,
     override_existing_runtime_for_changed_slots: bool = False,
+    transition_demand_policy: str = "min",
     **_: Any,
 ) -> dict[str, Any]:
     """Build a final transition DAG from explicit action effects.
@@ -59,7 +60,12 @@ def run(
     target_state = deepcopy_state(target_state)
     ensure_state_metadata(target_state)
 
-    required = required_arrival_dict(src_arrival, tgt_arrival, workload_names=workload_names)
+    required = required_arrival_dict(
+        src_arrival,
+        tgt_arrival,
+        workload_names=workload_names,
+        policy=transition_demand_policy,
+    )
     actions, plan_items, decision_trace = _build_effect_aware_actions(
         source_state=current_state,
         target_state=target_state,
@@ -67,8 +73,9 @@ def run(
     )
     actions = _annotate_effects(actions, current_state, target_state, required)
     _add_capacity_dependency_edges(actions, current_state, required)
+    _assert_executable_actions(actions)
     _add_physical_reuse_dependency_edges(actions)
-    actions = action_builder._coalesce_slot_delete_pods(actions)
+    actions = action_builder._preserve_independent_slot_deletes(actions)
     action_builder._assert_reroute_destinations_stable(current_state, target_state, actions)
     planned_state = action_builder._planned_state_for_actions(current_state, target_state, actions)
     executed_state = simulate_transition_actions(
@@ -86,12 +93,12 @@ def run(
         "required": required,
         "fine_actions": actions,
         "executed_actions": actions,
-        "blocked_actions": [action for action in actions if str(action.get("type", "")).startswith("defer_")],
+        "blocked_actions": [],
         "planned_state": planned_state,
         "executed_state": executed_state,
         "plan_items": plan_items,
         "planner_objective_order": [
-            "capacity and runtime safety as hard constraints",
+            "active service capacity must cover the committed demand for every workload",
             "physical GPU availability and reuse constraints",
             "prefer feasible partial reconfiguration",
             "prefer feasible in-place reconfiguration",
@@ -101,10 +108,12 @@ def run(
             "defaultQueued": int(default_queued),
             "defaultInflight": int(default_inflight),
             "overrideExistingChangedSlots": bool(override_existing_runtime_for_changed_slots),
+            "transitionDemandPolicy": str(transition_demand_policy),
+            "committedDemandPolicy": "component-wise min(source demand, target demand)",
         },
         "effect_model": {
             "capacity": "producesCapacity/consumesCapacity annotate route activation and serving removal",
-            "router": "stop_accepting_new owns router queue redispatch when routerQueueRedispatch=true",
+            "router": "deactivate_instance_route owns router queue redispatch when routerQueueRedispatch=true",
             "physicalGpu": "allocate_gpu and return_gpu carry physicalGpuEffect",
             "mig": "configure/observe/clear actions carry migEffect",
         },
@@ -141,6 +150,7 @@ def run(
         "phased_action_plan_summary": compact_phased_action_plan(dag),
         "transition_planner_module": NAME,
         "max_iters_ignored": max_iters,
+        "transition_demand_policy": str(transition_demand_policy),
     }
 
 
@@ -193,28 +203,11 @@ def _build_effect_aware_actions(
         )
         feasible = [candidate for candidate in candidates if candidate["feasible"]]
         if not feasible:
-            root = f"RECONF_BLOCKED_gpu{gpu_id}"
-            actions.append(
-                {
-                    "type": "defer_reconfiguration",
-                    "gpu_id": gpu_id,
-                    "physical_gpu_id": old_physical_id,
-                    "abstractRoot": root,
-                    "transitionMode": "blocked_reconfiguration",
-                    "abstractAction": "Blocked Reconfiguration",
-                    "blockedByCapacity": True,
-                    "reason": "no_feasible_reconfiguration_candidate",
-                }
-            )
-            plan_items.append(
-                {
-                    **action_builder._plan_item(root, "blocked_reconfiguration", gpu_id, old_physical_id),
-                    "status": "blocked",
-                    "blocked_by": "no_feasible_reconfiguration_candidate",
-                }
-            )
             decisions.append(_candidate_decision("reconfiguration", gpu_id, "blocked", candidates))
-            continue
+            raise RuntimeError(
+                f"stage3 failed to build an executable reconfiguration DAG for gpu {gpu_id}: "
+                "no feasible reconfiguration candidate"
+            )
         chosen = min(feasible, key=lambda candidate: candidate["rank"])
         actions.extend(chosen["actions"])
         plan_items.extend(chosen["plan_items"])
@@ -245,43 +238,58 @@ def _append_effect_instance_diff(
     tgt_gpu = gpu_map_by_id(target_state)[gpu_id]
     physical_id = get_physical_id(source_state, gpu_id)
     for inst_action in diff_instances_within_same_template(src_gpu, tgt_gpu):
-        if inst_action["type"] == "workload_change" and not _workload_replacement_possible(source_state, inst_action["src"], required):
-            slot = inst_action["slot"]
-            root = f"SLOT_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}"
-            common = {"transitionMode": "workload_replacement", "abstractRoot": root}
-            actions.extend(action_builder._queue_and_drain_actions(source_state, target_state, gpu_id, physical_id, inst_action["src"], required, common))
-            actions.append(
-                {
-                    "type": "defer_workload_change",
-                    "gpu_id": gpu_id,
-                    "physical_gpu_id": physical_id,
-                    "slot": slot,
-                    "workload": inst_action["src"].workload,
-                    "new_workload": inst_action["tgt"].workload,
-                    "abstractRoot": root,
-                    "transitionMode": "workload_replacement",
-                    "abstractAction": "Blocked Workload Replacement",
-                    "blockedByCapacity": True,
-                    "reason": "no_same_workload_capacity_producer",
-                }
-            )
-            plan_items.append(
-                {
-                    **action_builder._plan_item(root, "workload_replacement", gpu_id, physical_id, slot=slot, workload=inst_action["src"].workload),
-                    "status": "blocked",
-                    "blocked_by": "no_same_workload_capacity_producer",
-                }
-            )
-            continue
-        tmp_actions: list[dict[str, Any]] = []
-        tmp_items: list[dict[str, Any]] = []
-        action_builder._append_instance_diff_actions(tmp_actions, tmp_items, source_state, target_state, gpu_id, required)
         if inst_action["type"] == "keep":
             continue
         slot = inst_action.get("slot")
-        root = f"SLOT_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}" if slot is not None else None
-        actions.extend([action for action in tmp_actions if root is None or action.get("abstractRoot") == root])
-        plan_items.extend([item for item in tmp_items if root is None or item.get("id") == root])
+        if slot is None:
+            continue
+        root = f"SLOT_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}"
+        common = {"transitionMode": inst_action["type"], "abstractRoot": root}
+        change_type = inst_action["type"]
+        if change_type == "batch_change":
+            src = inst_action["src"]
+            tgt = inst_action["tgt"]
+            actions.extend(
+                [
+                    action_builder._action("patch_batch_config", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, old_batch=src.batch, new_batch=tgt.batch, workload=src.workload, **common),
+                    action_builder._action("apply_batch", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, old_batch=src.batch, new_batch=tgt.batch, workload=src.workload, **common),
+                    action_builder._action("verify_batch", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, old_batch=src.batch, new_batch=tgt.batch, workload=src.workload, **common),
+                    action_builder._action("activate_instance_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=src.workload, **common),
+                ]
+            )
+            plan_items.append(action_builder._plan_item(root, "batch_update", gpu_id, physical_id, slot=slot, workload=src.workload))
+            continue
+        if change_type == "place_instance":
+            tgt = inst_action["tgt"]
+            actions.extend(
+                [
+                    action_builder._action("place_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, batch=tgt.batch, **common),
+                    action_builder._action("activate_instance_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **common),
+                ]
+            )
+            plan_items.append(action_builder._plan_item(root, "place_instance", gpu_id, physical_id, slot=slot, workload=tgt.workload))
+            continue
+        if change_type == "safe_delete_instance":
+            src = inst_action["src"]
+            actions.extend(action_builder._queue_and_drain_actions(source_state, target_state, gpu_id, physical_id, src, required, common))
+            actions.append(
+                action_builder._action("delete_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=src.workload, **common)
+            )
+            plan_items.append(action_builder._plan_item(root, "delete_instance", gpu_id, physical_id, slot=slot, workload=src.workload))
+            continue
+        if change_type == "workload_change":
+            src = inst_action["src"]
+            tgt = inst_action["tgt"]
+            common = {"transitionMode": "workload_replacement", "abstractRoot": root}
+            actions.extend(action_builder._queue_and_drain_actions(source_state, target_state, gpu_id, physical_id, src, required, common))
+            actions.extend(
+                [
+                    action_builder._action("delete_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=src.workload, **common),
+                    action_builder._action("place_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, batch=tgt.batch, **common),
+                    action_builder._action("activate_instance_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **common),
+                ]
+            )
+            plan_items.append(action_builder._plan_item(root, "workload_replacement", gpu_id, physical_id, slot=slot, workload=src.workload))
 
 
 def _workload_replacement_possible(source_state: ClusterState, src: MigInstance, required: dict[str, float]) -> bool:
@@ -424,20 +432,9 @@ def _append_effect_bridge_reconfiguration_actions(
                 clearsPendingLogicalGpuId=True,
                 **common,
             ),
-            *action_builder._tag_actions(action_builder._target_activation_actions(gpu_id, new_physical_id), common),
+            *action_builder._tag_actions(action_builder._target_activation_actions(gpu_id, new_physical_id, target_gpu), common),
         ]
     )
-    if slots:
-        actions.append(
-            action_builder._action(
-                "stop_gpu_traffic",
-                gpu_id=gpu_id,
-                physical_gpu_id=old_physical_id,
-                slots=slots,
-                slotCount=len(slots),
-                **common,
-            )
-        )
     for inst in action_builder._nonfree_instances(src_gpu):
         actions.extend(
             action_builder._queue_and_drain_actions(
@@ -448,13 +445,23 @@ def _append_effect_bridge_reconfiguration_actions(
                 inst,
                 {},
                 common,
-                stop_new=False,
+                stop_new=True,
                 exclude_entire_gpu=True,
             )
         )
     actions.extend(
         [
-            action_builder._action("delete_pods", gpu_id=gpu_id, physical_gpu_id=old_physical_id, slots=slots, **common),
+            *[
+                action_builder._action(
+                    "delete_instance",
+                    gpu_id=gpu_id,
+                    physical_gpu_id=old_physical_id,
+                    slot=(inst.start, inst.end, inst.profile),
+                    workload=inst.workload,
+                    **common,
+                )
+                for inst in action_builder._nonfree_instances(src_gpu)
+            ],
             action_builder._action(
                 "clear_gpu_binding",
                 gpu_id=gpu_id,
@@ -462,9 +469,18 @@ def _append_effect_bridge_reconfiguration_actions(
                 logical_gpu_id=gpu_id,
                 pendingLogicalGpuId=gpu_id,
                 clearsActiveLogicalGpuId=True,
+                slots=slots,
                 **common,
             ),
-            action_builder._action("clear_template", gpu_id=gpu_id, physical_gpu_id=old_physical_id, template=src_gpu.template_str(), **common),
+            action_builder._action(
+                "clear_template",
+                gpu_id=gpu_id,
+                physical_gpu_id=old_physical_id,
+                template=src_gpu.template_str(),
+                deleteSlots=[list(slot) for slot in slots],
+                slotCount=len(slots),
+                **common,
+            ),
             action_builder._action(
                 "return_gpu",
                 gpu_id=gpu_id,
@@ -529,7 +545,7 @@ def _append_preserved_slot_serving_updates(
                     action_builder._action("patch_batch_config", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, old_batch=src.batch, new_batch=tgt.batch, workload=src.workload, **common),
                     action_builder._action("apply_batch", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, old_batch=src.batch, new_batch=tgt.batch, workload=src.workload, **common),
                     action_builder._action("verify_batch", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, old_batch=src.batch, new_batch=tgt.batch, workload=src.workload, **common),
-                    action_builder._action("activate_serving_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=src.workload, **common),
+                    action_builder._action("activate_instance_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=src.workload, **common),
                 ]
             )
             plan_items.append(action_builder._plan_item(root, "preserved_slot_batch_update", gpu_id, physical_id, slot=slot, workload=src.workload))
@@ -539,16 +555,16 @@ def _append_preserved_slot_serving_updates(
             actions.extend(
                 [
                     action_builder._action("place_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, batch=tgt.batch, **common),
-                    action_builder._action("activate_serving_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **common),
+                    action_builder._action("activate_instance_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **common),
                 ]
             )
             plan_items.append(action_builder._plan_item(root, "preserved_slot_place_instance", gpu_id, physical_id, slot=slot, workload=tgt.workload))
             continue
-        if change_type == "safe_remove_instance":
+        if change_type == "safe_delete_instance":
             src = inst_action["src"]
             actions.extend(action_builder._queue_and_drain_actions(source_state, target_state, gpu_id, physical_id, src, required, common))
-            actions.append(action_builder._action("delete_pods", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, slots=[slot], workload=src.workload, **common))
-            plan_items.append(action_builder._plan_item(root, "preserved_slot_remove_instance", gpu_id, physical_id, slot=slot, workload=src.workload))
+            actions.append(action_builder._action("delete_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=src.workload, **common))
+            plan_items.append(action_builder._plan_item(root, "preserved_slot_delete_instance", gpu_id, physical_id, slot=slot, workload=src.workload))
             continue
         if change_type == "workload_change":
             src = inst_action["src"]
@@ -557,9 +573,9 @@ def _append_preserved_slot_serving_updates(
             actions.extend(action_builder._queue_and_drain_actions(source_state, target_state, gpu_id, physical_id, src, required, common))
             actions.extend(
                 [
-                    action_builder._action("delete_pods", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, slots=[slot], workload=src.workload, **change_common),
-                    action_builder._action("workload_change", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, batch=tgt.batch, **change_common),
-                    action_builder._action("activate_serving_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **change_common),
+                    action_builder._action("delete_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=src.workload, **change_common),
+                    action_builder._action("place_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, batch=tgt.batch, **change_common),
+                    action_builder._action("activate_instance_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **change_common),
                 ]
             )
             plan_items.append(action_builder._plan_item(root, "preserved_slot_workload_replacement", gpu_id, physical_id, slot=slot, workload=src.workload))
@@ -649,6 +665,28 @@ def _add_capacity_dependency_edges(
         if blocked:
             action["blockedByCapacity"] = True
             action["capacityGate"] = {**gate, "blockedCapacityDeficit": blocked}
+
+
+def _assert_executable_actions(actions: list[dict[str, Any]]) -> None:
+    blocked = [
+        action
+        for action in actions
+        if str(action.get("type", "")).startswith("defer_") or bool(action.get("blockedByCapacity"))
+    ]
+    if not blocked:
+        return
+    summary = [
+        {
+            "type": action.get("type"),
+            "gpu_id": action.get("gpu_id"),
+            "physical_gpu_id": action.get("physical_gpu_id"),
+            "slot": action.get("slot"),
+            "reason": action.get("reason"),
+            "capacityGate": action.get("capacityGate"),
+        }
+        for action in blocked[:5]
+    ]
+    raise RuntimeError(f"stage3 produced non-executable blocked actions: {summary}")
 
 
 def _capacity_dependency_context(actions: list[dict[str, Any]]) -> dict[str, Any]:
@@ -790,22 +828,16 @@ def _effects_for_action(
         out["migEffect"] = {"type": "create_mig_slot", "template": action.get("template")}
     elif action_type == "clear_template":
         out["migEffect"] = {"type": "delete_mig_slot", "template": action.get("template")}
-    elif action_type == "stop_accepting_new":
+    elif action_type == "deactivate_instance_route":
         consumed = _capacity_for_action_source(action, source_map)
         if consumed:
             out["consumesCapacity"] = consumed
             out["capacityGate"] = _capacity_gate(consumed, required)
         out["routeEffect"] = {
-            "type": "deactivate_route",
+            "type": "deactivate_instance_route",
             "routerQueueRedispatch": bool(action.get("routerQueueRedispatch")),
         }
-    elif action_type == "stop_gpu_traffic":
-        consumed = _capacity_for_action_source(action, source_map)
-        if consumed:
-            out["consumesCapacity"] = consumed
-            out["capacityGate"] = _capacity_gate(consumed, required)
-        out["routeEffect"] = {"type": "deactivate_route"}
-    elif action_type == "activate_serving_route":
+    elif action_type == "activate_instance_route":
         produced = _capacity_for_action_target(action, target_map)
         if produced:
             out["producesCapacity"] = produced

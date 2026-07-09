@@ -12,6 +12,7 @@ PROFILE_SIZE = {
     "2g": 2,
     "1g": 1,
     "void": 0,
+    "unusable": 0,
 }
 
 
@@ -39,7 +40,11 @@ class GPUState:
 
     def template_str(self) -> str:
         self.sort_instances()
-        return "+".join(str(PROFILE_SIZE[inst.profile]) for inst in self.instances if inst.profile != "void")
+        return "+".join(
+            str(PROFILE_SIZE[inst.profile])
+            for inst in self.instances
+            if inst.profile not in {"void", "unusable"}
+        )
 
 
 @dataclass
@@ -68,7 +73,7 @@ def assert_valid_cluster_state(state: ClusterState, slice_count: int = 7) -> Non
                 raise ValueError(f"GPU {gpu.gpu_id}: expected start={cur}, got {inst.start}")
             if inst.end <= inst.start:
                 raise ValueError(f"GPU {gpu.gpu_id}: bad interval ({inst.start},{inst.end})")
-            if inst.profile != "void" and PROFILE_SIZE[inst.profile] != (inst.end - inst.start):
+            if inst.profile not in {"void", "unusable"} and PROFILE_SIZE[inst.profile] != (inst.end - inst.start):
                 raise ValueError(f"GPU {gpu.gpu_id}: profile-size mismatch on {inst.profile}")
             cur = inst.end
         if cur != slice_count:

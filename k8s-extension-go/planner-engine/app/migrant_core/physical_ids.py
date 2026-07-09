@@ -3,7 +3,12 @@ from __future__ import annotations
 from .state import ClusterState, deepcopy_state
 
 
-PHYSICAL_ID_POOL = [chr(ord("A") + i) for i in range(26)]
+PHYSICAL_ID_POOL = (
+    [chr(ord("A") + i) for i in range(26)]
+    + [f"A{chr(ord('A') + i)}" for i in range(26)]
+    + [f"B{chr(ord('A') + i)}" for i in range(26)]
+    + [f"C{chr(ord('A') + i)}" for i in range(26)]
+)
 
 
 def ensure_state_metadata(state: ClusterState) -> None:

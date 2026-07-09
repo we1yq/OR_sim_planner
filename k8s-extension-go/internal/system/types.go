@@ -19,6 +19,7 @@ type DemandModel struct {
 
 type StageSpec struct {
 	Name          string             `json:"name"`
+	SourceArrival map[string]float64 `json:"sourceArrival,omitempty"`
 	TargetArrival map[string]float64 `json:"targetArrival"`
 	Models        []ModelRuntimeSpec `json:"models"`
 }

@@ -26,7 +26,7 @@ from ...state import (
 
 def gpu_template_signature(gpu: GPUState) -> tuple[int, ...]:
     gpu.sort_instances()
-    return tuple(sorted(PROFILE_SIZE[inst.profile] for inst in gpu.instances if inst.profile != "void"))
+    return tuple(sorted(PROFILE_SIZE[inst.profile] for inst in gpu.instances if inst.profile not in {"void", "unusable"}))
 
 
 def same_template(src_gpu: GPUState | None, tgt_gpu: GPUState | None) -> bool:
@@ -81,7 +81,7 @@ def diff_instances_within_same_template(
         elif src_inst.workload == tgt_inst.workload and src_inst.workload is not None and src_inst.batch != tgt_inst.batch:
             out.append({"type": "batch_change", "slot": slot, "src": src_inst, "tgt": tgt_inst})
         elif tgt_inst.workload is None:
-            out.append({"type": "safe_remove_instance", "slot": slot, "src": src_inst, "tgt": tgt_inst})
+            out.append({"type": "safe_delete_instance", "slot": slot, "src": src_inst, "tgt": tgt_inst})
         elif src_inst.workload is None:
             out.append({"type": "place_instance", "slot": slot, "src": src_inst, "tgt": tgt_inst})
         else:
@@ -104,6 +104,7 @@ def required_arrival_dict(
     src_arrival: list[float] | tuple[float, ...] | dict[str, float],
     tgt_arrival: list[float] | tuple[float, ...] | dict[str, float],
     workload_names: list[str] | tuple[str, ...] | None = None,
+    policy: str = "min",
 ) -> dict[str, float]:
     if isinstance(src_arrival, dict):
         src_dict = {str(k): float(v) for k, v in src_arrival.items()}
@@ -120,7 +121,16 @@ def required_arrival_dict(
         tgt_dict = arrival_dict_from_vector(tgt_arrival, workload_names)
 
     names = list(workload_names) if workload_names is not None else sorted(set(src_dict) | set(tgt_dict))
-    return {str(workload): min(src_dict.get(workload, 0.0), tgt_dict.get(workload, 0.0)) for workload in names}
+    policy = str(policy)
+    if policy == "source":
+        return {str(workload): float(src_dict.get(workload, 0.0)) for workload in names}
+    if policy == "target":
+        return {str(workload): float(tgt_dict.get(workload, 0.0)) for workload in names}
+    if policy == "max":
+        return {str(workload): max(src_dict.get(workload, 0.0), tgt_dict.get(workload, 0.0)) for workload in names}
+    if policy == "min":
+        return {str(workload): min(src_dict.get(workload, 0.0), tgt_dict.get(workload, 0.0)) for workload in names}
+    raise ValueError(f"unknown transition demand policy: {policy}")
 
 
 def provided_by_workload(state: ClusterState) -> dict[str, float]:
@@ -178,7 +188,7 @@ def find_free_profile_slots(state: ClusterState) -> list[dict[str, Any]]:
     slots = []
     for gpu in state.real_gpus():
         for inst in gpu.instances:
-            if inst.workload is None:
+            if inst.workload is None and inst.profile != "unusable":
                 slots.append(
                     {
                         "gpu_id": gpu.gpu_id,
@@ -236,32 +246,28 @@ def alloc_from_free_pool(free_pool: list[str]) -> str:
 def state_semantic_signature(state: ClusterState) -> tuple:
     rows = []
     for gpu in sorted(state.real_gpus(), key=lambda x: x.gpu_id):
-        inst_rows = []
-        for inst in sorted(gpu.instances, key=lambda x: (x.start, x.end, x.profile)):
-            inst_rows.append(
-                (
-                    int(inst.start),
-                    int(inst.end),
-                    inst.profile,
-                    inst.workload,
-                    getattr(inst, "model_key", None),
-                    getattr(inst, "placement_group", None),
-                    None if inst.batch is None else int(inst.batch),
-                )
-            )
-        rows.append((int(gpu.gpu_id), tuple(inst_rows)))
+        rows.append((int(gpu.gpu_id), _normalized_instance_rows(gpu)))
     return tuple(rows)
 
 
 def gpu_semantic_signature(gpu: GPUState | None) -> tuple | None:
     if gpu is None:
         return None
-    inst_rows = []
+    return _normalized_instance_rows(gpu)
+
+
+def _normalized_instance_rows(gpu: GPUState, slice_count: int = 7) -> tuple:
+    rows = []
+    cur = 0
     for inst in sorted(gpu.instances, key=lambda x: (x.start, x.end, x.profile)):
-        inst_rows.append(
+        start = int(inst.start)
+        end = int(inst.end)
+        if start > cur:
+            rows.append((cur, start, "void", None, None, None, None))
+        rows.append(
             (
-                int(inst.start),
-                int(inst.end),
+                start,
+                end,
                 inst.profile,
                 inst.workload,
                 getattr(inst, "model_key", None),
@@ -269,7 +275,10 @@ def gpu_semantic_signature(gpu: GPUState | None) -> tuple | None:
                 None if inst.batch is None else int(inst.batch),
             )
         )
-    return tuple(inst_rows)
+        cur = max(cur, end)
+    if cur < slice_count:
+        rows.append((cur, slice_count, "void", None, None, None, None))
+    return tuple(rows)
 
 
 def matches_target_state(state: ClusterState, target_state: ClusterState) -> bool:
@@ -334,7 +343,7 @@ def simulate_basic_fine_actions(
             "configure_full_template",
             "configure_partial_profile",
             "defer_remove_gpu",
-            "defer_remove_instance",
+            "defer_delete_instance",
             "defer_workload_change",
         }:
             continue
@@ -377,26 +386,12 @@ def simulate_basic_fine_actions(
         target_gpu = target_map.get(gpu_id)
         target_inst = get_inst_by_slot(target_gpu, slot) if slot else None
 
-        if action_type == "bridge_place_instance":
-            if cur_inst is not None:
-                cur_inst.workload = action.get("workload")
-                cur_inst.batch = action.get("batch")
-                cur_inst.model_key = action.get("modelKey") or action.get("model_key")
-                cur_inst.placement_group = (
-                    action.get("placementGroup")
-                    or action.get("placement_group")
-                    or cur_inst.model_key
-                )
-                cur_inst.mu = float(action.get("mu", 0.0))
-                cur_inst.preserved = False
-            continue
-
-        if action_type in {"update_batch", "place_instance", "workload_change"}:
+        if action_type in {"update_batch", "place_instance"}:
             if cur_inst is not None and target_inst is not None:
                 copy_inst_payload(cur_inst, target_inst)
             continue
 
-        if action_type == "remove_instance":
+        if action_type == "delete_instance":
             if cur_inst is not None:
                 copy_inst_payload(cur_inst, None)
             continue

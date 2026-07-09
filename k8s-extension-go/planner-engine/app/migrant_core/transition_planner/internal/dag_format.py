@@ -221,44 +221,38 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
         resources.add(f"slot:{action.get('gpu_id')}:{tuple(action['slot'])}")
     if action.get("queue_transfer_id") is not None:
         resources.add(f"queue-transfer:{action['queue_transfer_id']}")
-    if action_type in {"delete_pods", "delete_gpu_pods", "stop_gpu_traffic"}:
+    if action_type in {"delete_instance", "deactivate_instance_route"}:
         for slot in _slots_for_action(action):
-            if action_type in {"delete_pods", "delete_gpu_pods"}:
+            if action_type == "delete_instance":
                 resources.add(f"slot:{action.get('gpu_id')}:{slot}")
             resources.add(f"traffic-slot:{action.get('gpu_id')}:{slot}")
+    if action_type in {"clear_gpu_binding", "clear_template"}:
+        for slot in _slots_for_action(action):
+            resources.add(f"slot:{action.get('gpu_id')}:{slot}")
     if action_type in {
         "allocate_gpu",
         "configure_full_template",
         "configure_partial_profile",
         "register_mig_devices",
-        "deploy_target_workloads",
         "bind_target_gpu",
-        "delete_gpu_pods",
         "clear_gpu_binding",
         "clear_template",
         "return_gpu",
-        "stop_gpu_traffic",
     } and action.get("physical_gpu_id") is not None:
         resources.add(f"physical:{action['physical_gpu_id']}")
-    if action_type == "delete_pods" and action.get("physical_gpu_id") is not None:
-        slots = _slots_for_action(action)
-        if action.get("slot") is None or len(slots) != 1:
-            resources.add(f"physical:{action['physical_gpu_id']}")
     if action_type in {"observe_mig_devices", "register_mig_devices"} and action.get("gpu_id") is not None and action.get("physical_gpu_id") is not None:
         resources.add(f"mig-devices:{action['gpu_id']}:{action['physical_gpu_id']}")
     if action_type in {"clear_gpu_binding", "bind_target_gpu"} and action.get("gpu_id") is not None:
         resources.add(f"logical-binding:{action['gpu_id']}")
-    if action_type == "activate_serving_route" and action.get("physical_gpu_id") is not None and action.get("slot") is None:
-        resources.add(f"physical:{action['physical_gpu_id']}")
-    if action_type == "stop_gpu_traffic" and action.get("physical_gpu_id") is not None:
-        resources.add(f"traffic:{action['physical_gpu_id']}")
-    if action_type in {"stop_accepting_new", "mark_draining_instance"} and action.get("slot") is not None:
+    if action_type in {"deactivate_instance_route", "wait_instance_drain", "activate_instance_route"} and action.get("slot") is not None:
         resources.add(f"traffic-slot:{action.get('gpu_id')}:{tuple(action['slot'])}")
     return resources
 
 
 def _slots_for_action(action: dict[str, Any]) -> list[tuple[Any, ...]]:
     raw_slots = action.get("slots")
+    if raw_slots is None:
+        raw_slots = action.get("deleteSlots")
     if raw_slots is None and action.get("slot") is not None:
         raw_slots = [action.get("slot")]
     out = []
@@ -270,7 +264,7 @@ def _slots_for_action(action: dict[str, Any]) -> list[tuple[Any, ...]]:
 
 def _read_only_dependency_resources(action: dict[str, Any]) -> set[str]:
     action_type = str(action.get("type", ""))
-    if action_type in {"deploy_target_workloads", "place_instance", "bridge_place_instance", "workload_change"}:
+    if action_type == "place_instance":
         if action.get("preservedSlotUpdate"):
             return set()
         if action.get("gpu_id") is not None and action.get("physical_gpu_id") is not None:
@@ -284,11 +278,11 @@ def _operation_class(action: dict[str, Any]) -> str:
         return "mig-geometry"
     if action_type in {"bind_target_gpu", "mark_reconfig_target_prepared", "unbind_target_gpu", "clear_gpu_binding", "return_gpu"}:
         return "binding-state"
-    if action_type in {"stop_gpu_traffic", "stop_accepting_new", "mark_draining_instance", "activate_serving_route"}:
+    if action_type in {"deactivate_instance_route", "wait_instance_drain", "activate_instance_route"}:
         return "router-drain"
-    if action_type in {"place_instance", "bridge_place_instance", "update_batch", "patch_batch_config", "apply_batch", "verify_batch", "workload_change", "deploy_target_workloads"}:
+    if action_type in {"place_instance", "update_batch", "patch_batch_config", "apply_batch", "verify_batch"}:
         return "pod-lifecycle"
-    if action_type in {"delete_pods", "delete_gpu_pods", "remove_instance", "delete_bridge_pod", "clear_gpu", "clear_template"}:
+    if action_type in {"delete_instance", "clear_gpu", "clear_template"}:
         return "cleanup"
     if action_type.startswith("defer_"):
         return "blocked"

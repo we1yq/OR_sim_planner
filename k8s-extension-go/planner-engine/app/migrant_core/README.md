@@ -22,7 +22,7 @@ Runtime contents:
   arrival dictionaries, profile need counts, expanded demand IDs, and MILP
   instance multisets.
 - `target_materializer/templates.py`: notebook abstract templates, physical realizations, and
-  interval expansion helpers. It also includes the notebook's void-like rewrite
+  interval expansion helpers. It also includes the notebook's fragmentation-avoidance rewrite
   candidate data used before target-state materialization validation.
 - `target_materializer/preserve.py`: preserve checks, physical-layout scoring,
   and GPU ID rematching helpers used by target materialization.
@@ -30,7 +30,7 @@ Runtime contents:
   search, upgrade-aware candidate augmentation, GPU-id ordering, physical layout
   combination enumeration, and slot-list expansion.
 - `target_materializer/target_materialization.py`: assignment metrics, score
-  tuple, void-like layout legalization, exact/upgrade preserve preassignment,
+  tuple, fragmentation-avoidance layout legalization, exact/upgrade preserve preassignment,
   workload-aware greedy fill, move/swap local repair, and `ClusterState`
   materialization.
 - `target_materializer/target_builder.py`: public

@@ -15,6 +15,11 @@ data:
       "unit": "requests_per_second",
       "profileCatalogRef": "default",
       "currentAllocationRef": "physicalgpuregistry/default",
+      "sourceArrival": {
+        "llama": 0.0,
+        "gpt2": 0.0,
+        "resnet50": 0.0
+      },
       "registeredSLOMs": {
         "llama": 1500,
         "gpt2": 1000,
@@ -31,6 +36,11 @@ data:
             "llama": 0.04,
             "gpt2": 0.16,
             "resnet50": 0.0
+          },
+          "slo": {
+            "llama": {"demandRate": 0.04, "latencyMs": 1500},
+            "gpt2": {"demandRate": 0.16, "latencyMs": 1000},
+            "resnet50": {"demandRate": 0.0, "latencyMs": 500}
           }
         },
         {
@@ -40,6 +50,11 @@ data:
             "llama": 0.10,
             "gpt2": 0.22,
             "resnet50": 0.08
+          },
+          "slo": {
+            "llama": {"demandRate": 0.10, "latencyMs": 1500},
+            "gpt2": {"demandRate": 0.22, "latencyMs": 1000},
+            "resnet50": {"demandRate": 0.08, "latencyMs": 500}
           }
         },
         {
@@ -49,6 +64,11 @@ data:
             "llama": 0.0,
             "gpt2": 0.0,
             "resnet50": 0.0
+          },
+          "slo": {
+            "llama": {"demandRate": 0.0, "latencyMs": 1500},
+            "gpt2": {"demandRate": 0.0, "latencyMs": 1000},
+            "resnet50": {"demandRate": 0.0, "latencyMs": 500}
           }
         }
       ]

@@ -122,12 +122,25 @@ def _target_geometry_only_gpu(target_gpu: GPUState) -> GPUState:
     return gpu
 
 
-def _target_activation_actions(gpu_id: int, physical_id: str) -> list[dict[str, Any]]:
-    return [
-        _action("register_mig_devices", gpu_id=gpu_id, physical_gpu_id=physical_id),
-        _action("deploy_target_workloads", gpu_id=gpu_id, physical_gpu_id=physical_id),
-        _action("activate_serving_route", gpu_id=gpu_id, physical_gpu_id=physical_id),
-    ]
+def _target_activation_actions(
+    gpu_id: int,
+    physical_id: str,
+    target_gpu: GPUState,
+    slots: list[tuple[int, int, str]] | None = None,
+) -> list[dict[str, Any]]:
+    wanted_slots = {tuple(slot) for slot in slots or []}
+    actions = [_action("register_mig_devices", gpu_id=gpu_id, physical_gpu_id=physical_id)]
+    for inst in _nonfree_instances(target_gpu):
+        slot = (inst.start, inst.end, inst.profile)
+        if wanted_slots and slot not in wanted_slots:
+            continue
+        actions.extend(
+            [
+                _action("place_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=inst.workload, batch=inst.batch),
+                _action("activate_instance_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=inst.workload),
+            ]
+        )
+    return actions
 
 
 def _action(action_type: str, **kwargs: Any) -> dict[str, Any]:
@@ -155,17 +168,11 @@ def _abstract_action_label(action_type: str) -> str:
         "configure_partial_profile": "Partial Reconfiguration",
         "bind_target_gpu": "Bind GPU",
         "register_mig_devices": "Register MIG devices",
-        "deploy_target_workloads": "Deploy Pods",
-        "activate_serving_route": "Activate Route",
-        "stop_gpu_traffic": "Stop GPU Traffic",
-        "stop_accepting_new": "Stop Traffic",
-        "mark_draining_instance": "Wait Drain",
-        "delete_pods": "Delete Pods",
-        "delete_gpu_pods": "Delete Pods",
-        "remove_instance": "Delete Pod",
+        "activate_instance_route": "Activate Route",
+        "deactivate_instance_route": "Stop Traffic",
+        "wait_instance_drain": "Wait Drain",
+        "delete_instance": "Delete Instance",
         "place_instance": "Deploy Pod",
-        "bridge_place_instance": "Deploy Bridge Pod",
-        "delete_bridge_pod": "Delete Bridge Pod",
         "clear_gpu_binding": "Clear GPU Binding",
         "clear_template": "Clear Template",
         "return_gpu": "Return GPU",
@@ -253,7 +260,7 @@ def prepare_transition_runtime(
                 runtime["accepting_new"] = True
         elif change == "instance_diff" and src_gpu is not None and tgt_gpu is not None:
             for inst_action in diff_instances_within_same_template(src_gpu, tgt_gpu):
-                if inst_action["type"] in {"safe_remove_instance", "workload_change"} and inst_action.get("src") is not None:
+                if inst_action["type"] in {"safe_delete_instance", "workload_change"} and inst_action.get("src") is not None:
                     slot = inst_action["slot"]
                     runtime = _get_runtime_entry(state, gpu_id, slot)
                     runtime["queued"] = max(int(runtime.get("queued", 0)), int(default_queued))
@@ -466,19 +473,12 @@ def simulate_transition_actions(
             "verify_batch",
             "return_gpu",
             "defer_remove_gpu",
-            "defer_remove_instance",
+            "defer_delete_instance",
             "defer_workload_change",
         }:
             continue
 
-        if action_type == "stop_gpu_traffic":
-            gpu_id = int(action["gpu_id"])
-            for slot in list(action.get("slots", [])):
-                runtime = _get_runtime_entry(executed_state, gpu_id, tuple(slot))
-                runtime["accepting_new"] = False
-            continue
-
-        if action_type == "stop_accepting_new":
+        if action_type == "deactivate_instance_route":
             runtime = _get_runtime_entry(executed_state, int(action["gpu_id"]), tuple(action["slot"]))
             runtime["accepting_new"] = False
             if action.get("routerQueueRedispatch"):
@@ -486,7 +486,7 @@ def simulate_transition_actions(
                 runtime["rerouted_to"] = action.get("to")
             continue
 
-        if action_type == "mark_draining_instance":
+        if action_type == "wait_instance_drain":
             gpu_id = int(action["gpu_id"])
             slot = tuple(action["slot"])
             runtime = _get_runtime_entry(executed_state, gpu_id, slot)
@@ -542,6 +542,7 @@ def simulate_transition_actions(
                 if target_inst is None:
                     start, end, profile = slot
                     target_inst = MigInstance(start, end, profile)
+                _remove_overlapping_void_slots(cur_gpu, int(slot[0]), int(slot[1]))
                 cur_gpu.instances.append(copy.deepcopy(target_inst))
                 runtime = _get_runtime_entry(executed_state, gpu_id, slot)
                 runtime.setdefault("queued", 0)
@@ -577,31 +578,7 @@ def simulate_transition_actions(
             }
             continue
 
-        if action_type == "deploy_target_workloads":
-            gpu_id = int(action["gpu_id"])
-            physical_id = action["physical_gpu_id"]
-            if get_physical_id(executed_state, gpu_id) != physical_id and not bool(action.get("standby", False)):
-                continue
-            target_gpu = target_map.get(gpu_id)
-            if target_gpu is not None and get_physical_id(executed_state, gpu_id) == physical_id:
-                if not bool(action.get("partial", False)):
-                    replace_or_append_gpu(executed_state, copy.deepcopy(target_gpu))
-                    set_physical_id(executed_state, gpu_id, physical_id)
-                for inst in _instances_for_action_slots(target_gpu, action):
-                    slot = (inst.start, inst.end, inst.profile)
-                    runtime = _get_runtime_entry(executed_state, gpu_id, slot)
-                    runtime.setdefault("queued", 0)
-                    runtime.setdefault("inflight", 0)
-                    runtime["accepting_new"] = False
-            deployed = executed_state.metadata.setdefault("deployed_target_workloads", {})
-            deployed[str(gpu_id)] = {
-                "physical_gpu_id": physical_id,
-                "status": "ready",
-                "standby": bool(action.get("standby", False)),
-            }
-            continue
-
-        if action_type == "activate_serving_route":
+        if action_type == "activate_instance_route":
             gpu_id = int(action["gpu_id"])
             physical_id = action["physical_gpu_id"]
             if get_physical_id(executed_state, gpu_id) != physical_id:
@@ -625,20 +602,19 @@ def simulate_transition_actions(
             }
             continue
 
-        if action_type in {"delete_gpu_pods", "delete_pods"}:
+        if action_type == "delete_instance":
             gpu_id = int(action["gpu_id"])
             physical_id = action.get("physical_gpu_id")
             if physical_id is not None and get_physical_id(executed_state, gpu_id) != physical_id:
                 continue
             cur_gpu = get_gpu_by_id_mut(executed_state, gpu_id)
             if cur_gpu is not None:
-                wanted_slots = _slots_from_delete_pods_action(action)
+                wanted_slots = _slots_from_delete_instance_action(action)
                 for inst in list(cur_gpu.instances):
                     slot = (inst.start, inst.end, inst.profile)
                     if wanted_slots and slot not in wanted_slots:
                         continue
-                    if wanted_slots:
-                        copy_inst_payload(inst, None)
+                    copy_inst_payload(inst, None)
                     _clear_runtime_entry(executed_state, gpu_id, slot)
                     _clear_drain(executed_state, gpu_id, slot)
             continue
@@ -668,23 +644,7 @@ def simulate_transition_actions(
         target_gpu = target_map.get(gpu_id)
         target_inst = get_inst_by_slot(target_gpu, slot) if slot else None
 
-        if action_type == "bridge_place_instance":
-            if cur_inst is not None:
-                cur_inst.workload = action.get("workload")
-                cur_inst.batch = action.get("batch")
-                cur_inst.model_key = action.get("modelKey") or action.get("model_key")
-                cur_inst.placement_group = (
-                    action.get("placementGroup")
-                    or action.get("placement_group")
-                    or cur_inst.model_key
-                )
-                cur_inst.mu = float(action.get("mu", 0.0))
-                cur_inst.preserved = False
-                runtime = _get_runtime_entry(executed_state, gpu_id, slot)
-                runtime["accepting_new"] = True
-            continue
-
-        if action_type in {"update_batch", "apply_batch", "place_instance", "workload_change"}:
+        if action_type in {"update_batch", "apply_batch", "place_instance"}:
             if cur_inst is not None and target_inst is not None:
                 copy_inst_payload(cur_inst, target_inst)
                 runtime = _get_runtime_entry(executed_state, gpu_id, slot)
@@ -693,26 +653,12 @@ def simulate_transition_actions(
                 runtime["accepting_new"] = True
             continue
 
-        if action_type == "delete_bridge_pod":
-            if cur_inst is not None:
-                copy_inst_payload(cur_inst, None)
-            _clear_drain(executed_state, gpu_id, slot)
-            _clear_runtime_entry(executed_state, gpu_id, slot)
-            continue
-
-        if action_type == "remove_instance":
-            if cur_inst is not None:
-                copy_inst_payload(cur_inst, None)
-            _clear_drain(executed_state, gpu_id, slot)
-            _clear_runtime_entry(executed_state, gpu_id, slot)
-            continue
-
     executed_state.gpus = sorted(executed_state.real_gpus(), key=lambda x: x.gpu_id)
     executed_state.metadata["next_physical_idx"] = int(next_physical_idx)
     return executed_state
 
 
-def _slots_from_delete_pods_action(action: dict[str, Any]) -> set[tuple[int, int, str]]:
+def _slots_from_delete_instance_action(action: dict[str, Any]) -> set[tuple[int, int, str]]:
     raw_slots = action.get("slots")
     if raw_slots is None and action.get("slot") is not None:
         raw_slots = [action.get("slot")]
@@ -731,8 +677,17 @@ def _slots_from_action_field(action: dict[str, Any], field: str) -> set[tuple[in
     return out
 
 
+def _remove_overlapping_void_slots(gpu: GPUState, start: int, end: int) -> None:
+    for inst in list(gpu.instances):
+        if str(inst.profile) != "void":
+            continue
+        if int(inst.end) <= start or int(inst.start) >= end:
+            continue
+        gpu.instances.remove(inst)
+
+
 def _instances_for_action_slots(gpu: GPUState, action: dict[str, Any]) -> list[MigInstance]:
-    slots = _slots_from_delete_pods_action(action)
+    slots = _slots_from_delete_instance_action(action)
     if not slots:
         return _nonfree_instances(gpu)
     return [
@@ -820,10 +775,10 @@ def plan_full_action_plan(
                     }
                     phase = reroute_title
                 else:
-                    phase = "stop_accepting_new"
+                    phase = "deactivate_instance_route"
                 local_actions.append(
                     _action(
-                        "stop_accepting_new",
+                        "deactivate_instance_route",
                         gpu_id=gpu_id,
                         physical_gpu_id=physical_id,
                         slot=slot,
@@ -835,7 +790,7 @@ def plan_full_action_plan(
             if remaining is None and int(runtime.get("inflight", 0)) > 0:
                 local_actions.append(
                     _action(
-                        "mark_draining_instance",
+                        "wait_instance_drain",
                         gpu_id=gpu_id,
                         physical_gpu_id=physical_id,
                         slot=slot,
@@ -920,7 +875,7 @@ def plan_full_action_plan(
                         activeLogicalGpuId=gpu_id,
                         clearsPendingLogicalGpuId=True,
                     ),
-                    *_target_activation_actions(gpu_id, physical_id),
+                    *_target_activation_actions(gpu_id, physical_id, tgt_gpu),
                 ]
             )
             plan_items.append(
@@ -944,20 +899,7 @@ def plan_full_action_plan(
                 (inst.start, inst.end, inst.profile)
                 for inst in _nonfree_instances(src_gpu)
             ]
-            gpu_stop_added = any(
-                bool(_get_runtime_entry(source_state, gpu_id, slot).get("accepting_new", True))
-                for slot in gpu_slots
-            )
-            if gpu_stop_added:
-                phase_actions.append(
-                    _action(
-                        "stop_gpu_traffic",
-                        gpu_id=gpu_id,
-                        physical_gpu_id=physical_id,
-                        slots=gpu_slots,
-                        slotCount=len(gpu_slots),
-                    )
-                )
+            gpu_stop_added = False
             slot_blocked = False
             any_stop = False
             any_reroute = False
@@ -972,7 +914,7 @@ def plan_full_action_plan(
                     "remove_gpu_slot",
                     f"REMOVE_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}",
                     safe_after_drain=safe,
-                    stop_new=False,
+                    stop_new=True,
                 )
                 phase_actions.extend(acts)
                 any_stop = any_stop or gpu_stop_added
@@ -994,9 +936,19 @@ def plan_full_action_plan(
                     )
                 )
             else:
+                cleanup_delete_actions = [
+                    _action(
+                        "delete_instance",
+                        gpu_id=gpu_id,
+                        physical_gpu_id=physical_id,
+                        slot=(inst.start, inst.end, inst.profile),
+                        workload=inst.workload,
+                    )
+                    for inst in _nonfree_instances(src_gpu)
+                ]
                 cleanup_actions.extend(
                     [
-                        _action("delete_gpu_pods", gpu_id=gpu_id, physical_gpu_id=physical_id),
+                        *cleanup_delete_actions,
                         _action(
                             "clear_gpu_binding",
                             gpu_id=gpu_id,
@@ -1004,8 +956,14 @@ def plan_full_action_plan(
                             logical_gpu_id=gpu_id,
                             pendingLogicalGpuId=gpu_id,
                             clearsActiveLogicalGpuId=True,
+                            slots=[(inst.start, inst.end, inst.profile) for inst in _nonfree_instances(src_gpu)],
                         ),
-                        _action("clear_template", gpu_id=gpu_id, physical_gpu_id=physical_id),
+                        _action(
+                            "clear_template",
+                            gpu_id=gpu_id,
+                            physical_gpu_id=physical_id,
+                            deleteSlots=[(inst.start, inst.end, inst.profile) for inst in _nonfree_instances(src_gpu)],
+                        ),
                         _action(
                             "return_gpu",
                             gpu_id=gpu_id,
@@ -1100,18 +1058,7 @@ def plan_full_action_plan(
                 (inst.start, inst.end, inst.profile)
                 for inst in _nonfree_instances(src_gpu)
             ]
-            gpu_stop_added = any(
-                bool(_get_runtime_entry(source_state, gpu_id, slot).get("accepting_new", True))
-                for slot in gpu_slots
-            )
-            if gpu_stop_added:
-                stop_kwargs = {
-                    "gpu_id": gpu_id,
-                    "physical_gpu_id": old_physical_id,
-                    "slots": gpu_slots,
-                    "slotCount": len(gpu_slots),
-                }
-                phase_actions.append(_action("stop_gpu_traffic", **stop_kwargs))
+            gpu_stop_added = False
             for inst in _nonfree_instances(src_gpu):
                 slot = (inst.start, inst.end, inst.profile)
                 acts, phase, status, _ = add_slot_barrier(
@@ -1122,7 +1069,7 @@ def plan_full_action_plan(
                     "reconfiguration_slot",
                     f"RECONF_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}",
                     safe_after_drain=True,
-                    stop_new=False,
+                    stop_new=True,
                 )
                 phase_actions.extend(acts)
                 any_stop = any_stop or gpu_stop_added
@@ -1148,13 +1095,19 @@ def plan_full_action_plan(
                     )
                 )
             else:
+                cleanup_delete_actions = [
+                    _action(
+                        "delete_instance",
+                        gpu_id=gpu_id,
+                        physical_gpu_id=old_physical_id,
+                        slot=(inst.start, inst.end, inst.profile),
+                        workload=inst.workload,
+                    )
+                    for inst in _nonfree_instances(src_gpu)
+                ]
                 cleanup_actions.extend(
                     [
-                        _action(
-                            "delete_gpu_pods",
-                            gpu_id=gpu_id,
-                            physical_gpu_id=old_physical_id,
-                        ),
+                        *cleanup_delete_actions,
                         _action(
                             "clear_gpu_binding",
                             gpu_id=gpu_id,
@@ -1162,6 +1115,7 @@ def plan_full_action_plan(
                             logical_gpu_id=gpu_id,
                             pendingLogicalGpuId=gpu_id,
                             clearsActiveLogicalGpuId=True,
+                            slots=[(inst.start, inst.end, inst.profile) for inst in _nonfree_instances(src_gpu)],
                         ),
                     ]
                 )
@@ -1185,7 +1139,7 @@ def plan_full_action_plan(
                                 activeLogicalGpuId=gpu_id,
                                 clearsPendingLogicalGpuId=True,
                             ),
-                            *_target_activation_actions(gpu_id, old_physical_id),
+                            *_target_activation_actions(gpu_id, old_physical_id, tgt_gpu),
                         ]
                     )
                     plan_items.append(
@@ -1210,7 +1164,7 @@ def plan_full_action_plan(
                                 activeLogicalGpuId=gpu_id,
                                 clearsPendingLogicalGpuId=True,
                             ),
-                            *_target_activation_actions(gpu_id, new_physical_id),
+                            *_target_activation_actions(gpu_id, new_physical_id, tgt_gpu),
                             _action("clear_template", gpu_id=gpu_id, physical_gpu_id=old_physical_id),
                             _action(
                                 "return_gpu",
@@ -1287,7 +1241,7 @@ def plan_full_action_plan(
                     )
                     capacity_actions.append(
                         _action(
-                            "activate_serving_route",
+                            "activate_instance_route",
                             gpu_id=gpu_id,
                             physical_gpu_id=physical_id,
                             slot=slot,
@@ -1322,7 +1276,7 @@ def plan_full_action_plan(
                     )
                     capacity_actions.append(
                         _action(
-                            "activate_serving_route",
+                            "activate_instance_route",
                             gpu_id=gpu_id,
                             physical_gpu_id=physical_id,
                             slot=slot,
@@ -1344,14 +1298,14 @@ def plan_full_action_plan(
                         )
                     )
                     continue
-                if inst_action["type"] == "safe_remove_instance":
+                if inst_action["type"] == "safe_delete_instance":
                     safe = safe_after_removing_instance(source_state, inst_action["src"], required)
                     acts, phase, status, _ = add_slot_barrier(
                         gpu_id,
                         physical_id,
                         slot,
                         inst_action["src"].workload,
-                        "remove_instance",
+                        "delete_instance",
                         f"RM_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}",
                         safe_after_drain=safe,
                     )
@@ -1359,7 +1313,7 @@ def plan_full_action_plan(
                     if status == "ready":
                         cleanup_actions.append(
                             _action(
-                                "remove_instance",
+                                "delete_instance",
                                 gpu_id=gpu_id,
                                 physical_gpu_id=physical_id,
                                 slot=slot,
@@ -1372,7 +1326,7 @@ def plan_full_action_plan(
                     else:
                         blocked_actions.append(
                             {
-                                "type": "defer_remove_instance",
+                                "type": "defer_delete_instance",
                                 "gpu_id": gpu_id,
                                 "physical_gpu_id": physical_id,
                                 "slot": slot,
@@ -1398,7 +1352,7 @@ def plan_full_action_plan(
                         phase_actions.extend(
                             [
                                 _action(
-                                    "remove_instance",
+                                    "delete_instance",
                                     gpu_id=gpu_id,
                                     physical_gpu_id=physical_id,
                                     slot=slot,
@@ -1417,7 +1371,7 @@ def plan_full_action_plan(
                                     **affinity,
                                 ),
                                 _action(
-                                    "activate_serving_route",
+                                    "activate_instance_route",
                                     gpu_id=gpu_id,
                                     physical_gpu_id=physical_id,
                                     slot=slot,
@@ -1523,7 +1477,7 @@ def _unlock_count_score(items: list[dict[str, Any]], item: dict[str, Any]) -> in
         return sum(1 for other in items if other.get("blocked_by") == "no_reroute_destination_capacity")
     if item_type == "reconfiguration" and phase in {"clear_old_side", "in_place_reconfigure", "finalize_target_side"}:
         return sum(1 for other in items if other.get("status") == "blocked")
-    if item_type in {"remove_gpu", "remove_gpu_slot", "workload_change", "remove_instance"} and "drain" in phase:
+    if item_type in {"remove_gpu", "remove_gpu_slot", "workload_change", "delete_instance"} and "drain" in phase:
         return 1
     return 0
 
@@ -1535,7 +1489,7 @@ def _release_gpu_score(item: dict[str, Any]) -> int:
         return 3
     if item_type == "reconfiguration" and phase in {"clear_old_side", "in_place_reconfigure", "finalize_target_side"}:
         return 2
-    if item_type in {"workload_change", "remove_instance", "remove_gpu_slot", "reconfiguration_slot"} and phase == "post_drain_ready":
+    if item_type in {"workload_change", "delete_instance", "remove_gpu_slot", "reconfiguration_slot"} and phase == "post_drain_ready":
         return 1
     return 0
 

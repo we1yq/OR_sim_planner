@@ -16,7 +16,7 @@ from .preserve import (
 from ..state import ClusterState, GPUState, MigInstance, PROFILE_SIZE, assert_valid_cluster_state
 from .target_candidates import _make_slot_list_from_intervals_list, _prev_real_template_list
 from .templates import (
-    VOID_LIKE_REWRITE_CANDIDATES,
+    FRAGMENTATION_AVOIDANCE_REWRITE_CANDIDATES,
     candidate_priority_no_prev,
     physical_profiles_to_intervals,
 )
@@ -146,8 +146,45 @@ def _profiles_string_from_instances(instances: list[MigInstance]) -> str:
     return "+".join(
         str(PROFILE_SIZE[inst.profile])
         for inst in sorted(instances, key=lambda x: (x.start, x.end))
-        if inst.profile != "void"
+        if inst.profile not in {"void", "unusable"}
     )
+
+
+def _score_rewrite_assignment(
+    gpu_id: int,
+    inst: MigInstance,
+    slot: dict[str, Any],
+    prev_state: ClusterState | None,
+    prefer_first_1g_idle: bool,
+    old_map: dict[tuple[int, int, int, str], MigInstance],
+) -> tuple[int, ...]:
+    old = old_map.get((gpu_id, slot["start"], slot["end"], slot["profile"])) if prev_state is not None else None
+    exact_preserve = int(old is not None and old.workload == inst.workload and old.profile == inst.profile)
+    partition_preserve = int(old is not None and old.profile == slot["profile"])
+    exact_profile_fit = int(slot["profile"] == inst.profile)
+    size_waste = slot["size"] - PROFILE_SIZE[inst.profile]
+    first_1g_penalty = int(
+        prev_state is None
+        and prefer_first_1g_idle
+        and inst.profile == "1g"
+        and slot["profile"] == "1g"
+        and slot["oneg_rank"] == 1
+    )
+    movement = abs(int(slot["start"]) - int(inst.start)) + abs(int(slot["end"]) - int(inst.end))
+    return (
+        exact_preserve,
+        partition_preserve,
+        exact_profile_fit,
+        -size_waste,
+        -first_1g_penalty,
+        -movement,
+        -int(slot["start"]),
+        -int(slot["slot_idx"]),
+    )
+
+
+def _add_score(left: tuple[int, ...], right: tuple[int, ...]) -> tuple[int, ...]:
+    return tuple(a + b for a, b in zip(left, right))
 
 
 def _assign_instances_to_candidate_layout(
@@ -164,7 +201,7 @@ def _assign_instances_to_candidate_layout(
     candidate_slots = []
     oneg_rank = 0
     for start, end, profile in intervals:
-        if profile == "void":
+        if profile in {"void", "unusable"}:
             continue
         if profile == "1g":
             oneg_rank += 1
@@ -173,6 +210,7 @@ def _assign_instances_to_candidate_layout(
             rank = 0
         candidate_slots.append(
             {
+                "slot_idx": len(candidate_slots),
                 "start": start,
                 "end": end,
                 "profile": profile,
@@ -189,53 +227,51 @@ def _assign_instances_to_candidate_layout(
         )
         if inst.workload is not None
     ]
-    slot_used = [False] * len(candidate_slots)
-    new_instances = []
+    memo: dict[tuple[int, int], tuple[tuple[int, ...], list[tuple[MigInstance, int]]] | None] = {}
 
-    for inst in assigned_work:
-        compatible = []
+    def best_assignment(inst_idx: int, used_mask: int) -> tuple[tuple[int, ...], list[tuple[MigInstance, int]]] | None:
+        key = (inst_idx, used_mask)
+        if key in memo:
+            return memo[key]
+        if inst_idx >= len(assigned_work):
+            result = ((0, 0, 0, 0, 0, 0, 0, 0), [])
+            memo[key] = result
+            return result
+
+        inst = assigned_work[inst_idx]
+        best: tuple[tuple[int, ...], list[tuple[MigInstance, int]]] | None = None
         for idx, slot in enumerate(candidate_slots):
-            if slot_used[idx]:
+            if used_mask & (1 << idx):
                 continue
             if slot["size"] < PROFILE_SIZE[inst.profile]:
                 continue
-
-            preserve = 0
-            if prev_state is not None:
-                old = old_map.get((gpu_id, slot["start"], slot["end"], slot["profile"]))
-                if old is not None and old.workload == inst.workload and old.profile == inst.profile:
-                    preserve = 1
-
-            exact_profile_fit = int(slot["profile"] == inst.profile)
-            size_waste = slot["size"] - PROFILE_SIZE[inst.profile]
-
-            first_1g_penalty = 0
-            if (
-                prev_state is None
-                and prefer_first_1g_idle
-                and inst.profile == "1g"
-                and slot["profile"] == "1g"
-                and slot["oneg_rank"] == 1
-            ):
-                first_1g_penalty = 1
-
-            compatible.append(
-                (
-                    preserve,
-                    exact_profile_fit,
-                    -size_waste,
-                    -first_1g_penalty,
-                    -slot["start"],
-                    -idx,
-                    idx,
-                )
+            suffix = best_assignment(inst_idx + 1, used_mask | (1 << idx))
+            if suffix is None:
+                continue
+            local_score = _score_rewrite_assignment(
+                gpu_id=gpu_id,
+                inst=inst,
+                slot=slot,
+                prev_state=prev_state,
+                prefer_first_1g_idle=prefer_first_1g_idle,
+                old_map=old_map,
             )
+            score = _add_score(local_score, suffix[0])
+            assignment = [(inst, idx)] + suffix[1]
+            if best is None or score > best[0]:
+                best = (score, assignment)
 
-        if not compatible:
-            return None
+        memo[key] = best
+        return best
 
-        compatible.sort(reverse=True)
-        chosen_idx = compatible[0][-1]
+    result = best_assignment(0, 0)
+    if result is None:
+        return None
+
+    slot_used = [False] * len(candidate_slots)
+    new_instances = []
+
+    for inst, chosen_idx in result[1]:
         slot = candidate_slots[chosen_idx]
         slot_used[chosen_idx] = True
 
@@ -298,24 +334,24 @@ def _assign_instances_to_candidate_layout(
         )
 
     for inst in completed:
-        if inst.workload is None or inst.profile == "void":
+        if inst.workload is None or inst.profile in {"void", "unusable"}:
             inst.preserved = False
         else:
             inst.preserved = inst_preserve_match(inst, gpu_id, prev_state, old_map=old_map)
     return completed
 
 
-def _rewrite_void_like_layout_for_gpu(
+def _apply_fragmentation_avoidance_rewrite_for_gpu(
     gpu_id: int,
     instances: list[MigInstance],
     prev_state: ClusterState | None,
 ) -> list[MigInstance]:
     old_map = old_exact_slot_map(prev_state)
     current_template = _profiles_string_from_instances(instances)
-    if current_template not in VOID_LIKE_REWRITE_CANDIDATES:
+    if current_template not in FRAGMENTATION_AVOIDANCE_REWRITE_CANDIDATES:
         return sorted(instances, key=lambda x: (x.start, x.end))
 
-    candidates = VOID_LIKE_REWRITE_CANDIDATES[current_template]
+    candidates = FRAGMENTATION_AVOIDANCE_REWRITE_CANDIDATES[current_template]
     prev_intervals = get_prev_gpu_intervals_cached(prev_state, gpu_id)
 
     best = None
@@ -338,7 +374,7 @@ def _rewrite_void_like_layout_for_gpu(
             1
             for inst in rewritten
             if inst.workload is not None
-            and inst.profile != "void"
+            and inst.profile not in {"void", "unusable"}
             and inst_preserve_match(inst, gpu_id, prev_state, old_map=old_map)
         )
 
@@ -416,7 +452,7 @@ def _assignments_to_target(
 
     for gpu_id in gpu_ids:
         instances = sorted(by_gpu[gpu_id], key=lambda x: (x.start, x.end))
-        rewritten = _rewrite_void_like_layout_for_gpu(gpu_id, instances, prev_state)
+        rewritten = _apply_fragmentation_avoidance_rewrite_for_gpu(gpu_id, instances, prev_state)
         gpus.append(GPUState(gpu_id=gpu_id, source="real", instances=rewritten))
         actual_physical_templates.append(_profiles_string_from_instances(rewritten))
 
@@ -810,6 +846,146 @@ def _build_assignment_stats(
     return per_gpu_placement_count, placement_gpus, per_gpu_profiles
 
 
+class _RepairScoreTracker:
+    def __init__(
+        self,
+        slots: list[dict[str, Any]],
+        assigned: dict[int, dict[str, Any] | None],
+        ordered_abstract_templates: list[str],
+        ordered_physical_templates: list[str],
+        layout_preserve_score: tuple[int, int, int, int],
+        prev_state: ClusterState | None,
+        old_map: dict[tuple[int, int, int, str], MigInstance],
+    ) -> None:
+        self.slot_map = {slot["slot_id"]: slot for slot in slots}
+        self.layout_preserve_score = tuple(layout_preserve_score)
+        self.prev_mode = has_prev(prev_state)
+        self.old_map = old_map
+        self.template_match_count = _template_match_count(
+            ordered_abstract_templates,
+            ordered_physical_templates,
+            prev_state,
+        )
+        self.exact_preserve = 0
+        self.upgrade_preserve = 0
+        self.spread = 0
+        self.collocate_pairs = 0
+        self.mixed_gpu_count = 0
+        self.per_gpu_workload_count: dict[int, Counter] = defaultdict(Counter)
+        self.workload_gpu_count: Counter = Counter()
+        for slot_id, info in assigned.items():
+            if info is not None:
+                self.add(slot_id, info)
+
+    @staticmethod
+    def _pairs(count: int) -> int:
+        return count * (count - 1) // 2
+
+    def _is_exact(self, slot: dict[str, Any], info: dict[str, Any]) -> bool:
+        if info.get("placement_mode") == "upgrade_preserve":
+            return False
+        demand = info["demand"]
+        old = self.old_map.get((slot["gpu_id"], slot["start"], slot["end"], slot["profile"]))
+        return old is not None and old.workload == demand["workload"] and old.profile == demand["profile"]
+
+    def _score_tuple(self) -> tuple[int, ...]:
+        if self.prev_mode:
+            return (
+                self.exact_preserve,
+                self.upgrade_preserve,
+                -self.spread,
+                self.collocate_pairs,
+                -self.mixed_gpu_count,
+                self.layout_preserve_score[0],
+                self.layout_preserve_score[1],
+                self.template_match_count,
+            )
+        return (
+            -self.spread,
+            self.collocate_pairs,
+            -self.mixed_gpu_count,
+            self.layout_preserve_score[0],
+            self.template_match_count,
+        )
+
+    def score(self) -> tuple[int, ...]:
+        return self._score_tuple()
+
+    def remove(self, slot_id: int, info: dict[str, Any]) -> None:
+        slot = self.slot_map[slot_id]
+        demand = info["demand"]
+        workload = demand["workload"]
+        gpu_id = slot["gpu_id"]
+        if info.get("placement_mode") == "upgrade_preserve":
+            self.upgrade_preserve -= 1
+        elif self._is_exact(slot, info):
+            self.exact_preserve -= 1
+
+        counter = self.per_gpu_workload_count[gpu_id]
+        old_count = counter[workload]
+        old_kinds = sum(1 for count in counter.values() if count > 0)
+        old_mixed = int(old_kinds >= 2)
+        self.collocate_pairs += self._pairs(old_count - 1) - self._pairs(old_count)
+        counter[workload] -= 1
+        if counter[workload] == 0:
+            self.workload_gpu_count[workload] -= 1
+            self.spread -= 1
+        new_kinds = sum(1 for count in counter.values() if count > 0)
+        new_mixed = int(new_kinds >= 2)
+        self.mixed_gpu_count += new_mixed - old_mixed
+
+    def add(self, slot_id: int, info: dict[str, Any]) -> None:
+        slot = self.slot_map[slot_id]
+        demand = info["demand"]
+        workload = demand["workload"]
+        gpu_id = slot["gpu_id"]
+        if info.get("placement_mode") == "upgrade_preserve":
+            self.upgrade_preserve += 1
+        elif self._is_exact(slot, info):
+            self.exact_preserve += 1
+
+        counter = self.per_gpu_workload_count[gpu_id]
+        old_count = counter[workload]
+        old_kinds = sum(1 for count in counter.values() if count > 0)
+        old_mixed = int(old_kinds >= 2)
+        if old_count == 0:
+            self.workload_gpu_count[workload] += 1
+            self.spread += 1
+        counter[workload] += 1
+        self.collocate_pairs += self._pairs(old_count + 1) - self._pairs(old_count)
+        new_kinds = sum(1 for count in counter.values() if count > 0)
+        new_mixed = int(new_kinds >= 2)
+        self.mixed_gpu_count += new_mixed - old_mixed
+
+    def trial_move(self, src: int, dst: int, new_info: dict[str, Any], old_info: dict[str, Any]) -> tuple[int, ...]:
+        self.remove(src, old_info)
+        self.add(dst, new_info)
+        score = self.score()
+        self.remove(dst, new_info)
+        self.add(src, old_info)
+        return score
+
+    def trial_swap(
+        self,
+        slot_id_1: int,
+        slot_id_2: int,
+        info_1: dict[str, Any],
+        info_2: dict[str, Any],
+        new_info_1: dict[str, Any],
+        new_info_2: dict[str, Any],
+    ) -> tuple[int, ...]:
+        self.remove(slot_id_1, info_1)
+        self.remove(slot_id_2, info_2)
+        self.add(slot_id_1, new_info_1)
+        self.add(slot_id_2, new_info_2)
+        score = self.score()
+        self.remove(slot_id_2, new_info_2)
+        self.remove(slot_id_1, new_info_1)
+        self.add(slot_id_2, info_2)
+        self.add(slot_id_1, info_1)
+        return score
+
+
 def _greedy_incremental_rank(
     demand: dict[str, Any],
     slot: dict[str, Any],
@@ -953,7 +1129,9 @@ def _solve_target_with_greedy_repair(
             old_map=old_map,
         )
 
-    cur_metrics = _assignments_to_metrics(
+    slot_map = {slot["slot_id"]: slot for slot in slots}
+    slot_ids = [slot["slot_id"] for slot in slots]
+    tracker = _RepairScoreTracker(
         slots=slots,
         assigned=assigned,
         ordered_abstract_templates=ordered_abstract_templates,
@@ -962,16 +1140,12 @@ def _solve_target_with_greedy_repair(
         prev_state=prev_state,
         old_map=old_map,
     )
-    cur_score = _score_tuple(cur_metrics, prev_mode)
-
-    slot_map = {slot["slot_id"]: slot for slot in slots}
-    slot_ids = [slot["slot_id"] for slot in slots]
+    cur_score = tracker.score()
 
     for _ in range(repair_rounds):
         improved = False
-        best_assign = dict(assigned)
-        best_metrics = dict(cur_metrics)
         best_score = cur_score
+        best_op: tuple[Any, ...] | None = None
 
         for src in slot_ids:
             src_info = assigned[src]
@@ -985,28 +1159,15 @@ def _solve_target_with_greedy_repair(
                 if slot_map[dst]["profile"] != src_profile:
                     continue
 
-                trial = dict(assigned)
-                trial[dst] = {
+                moved_info = {
                     "slot": slot_map[dst],
-                    "demand": trial[src]["demand"],
-                    "placement_mode": trial[src].get("placement_mode", "greedy"),
+                    "demand": src_info["demand"],
+                    "placement_mode": src_info.get("placement_mode", "greedy"),
                 }
-                trial[src] = None
-
-                metrics = _assignments_to_metrics(
-                    slots=slots,
-                    assigned=trial,
-                    ordered_abstract_templates=ordered_abstract_templates,
-                    ordered_physical_templates=ordered_physical_templates,
-                    layout_preserve_score=layout_preserve_score,
-                    prev_state=prev_state,
-                    old_map=old_map,
-                )
-                score = _score_tuple(metrics, prev_mode)
+                score = tracker.trial_move(src, dst, moved_info, src_info)
                 if score > best_score:
                     best_score = score
-                    best_metrics = metrics
-                    best_assign = trial
+                    best_op = ("move", src, dst, moved_info)
                     improved = True
 
         for idx in range(len(slot_ids)):
@@ -1023,41 +1184,47 @@ def _solve_target_with_greedy_repair(
                 if info_1["slot"]["profile"] != info_2["slot"]["profile"]:
                     continue
 
-                trial = dict(assigned)
                 slot_1 = info_1["slot"]
                 slot_2 = info_2["slot"]
-                trial[slot_id_1] = {
+                new_info_1 = {
                     "slot": slot_1,
                     "demand": info_2["demand"],
                     "placement_mode": "greedy",
                 }
-                trial[slot_id_2] = {
+                new_info_2 = {
                     "slot": slot_2,
                     "demand": info_1["demand"],
                     "placement_mode": "greedy",
                 }
 
-                metrics = _assignments_to_metrics(
-                    slots=slots,
-                    assigned=trial,
-                    ordered_abstract_templates=ordered_abstract_templates,
-                    ordered_physical_templates=ordered_physical_templates,
-                    layout_preserve_score=layout_preserve_score,
-                    prev_state=prev_state,
-                    old_map=old_map,
-                )
-                score = _score_tuple(metrics, prev_mode)
+                score = tracker.trial_swap(slot_id_1, slot_id_2, info_1, info_2, new_info_1, new_info_2)
                 if score > best_score:
                     best_score = score
-                    best_metrics = metrics
-                    best_assign = trial
+                    best_op = ("swap", slot_id_1, slot_id_2, new_info_1, new_info_2)
                     improved = True
 
         if not improved:
             break
 
-        assigned = best_assign
-        cur_metrics = best_metrics
+        if best_op is None:
+            break
+        if best_op[0] == "move":
+            _, src, dst, moved_info = best_op
+            src_info = assigned[src]
+            tracker.remove(src, src_info)
+            tracker.add(dst, moved_info)
+            assigned[dst] = moved_info
+            assigned[src] = None
+        elif best_op[0] == "swap":
+            _, slot_id_1, slot_id_2, new_info_1, new_info_2 = best_op
+            info_1 = assigned[slot_id_1]
+            info_2 = assigned[slot_id_2]
+            tracker.remove(slot_id_1, info_1)
+            tracker.remove(slot_id_2, info_2)
+            tracker.add(slot_id_1, new_info_1)
+            tracker.add(slot_id_2, new_info_2)
+            assigned[slot_id_1] = new_info_1
+            assigned[slot_id_2] = new_info_2
         cur_score = best_score
 
     return _assignments_to_target(

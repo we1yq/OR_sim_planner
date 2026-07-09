@@ -50,7 +50,8 @@ def build_partial_reconfig_plan(src_gpu: GPUState, tgt_gpu: GPUState) -> Partial
     create = tuple(slot for slot in tgt_slots if slot not in set(preserve))
     if not delete and not create:
         return None
-    if any(not _slot_covered_by_union(slot, delete) for slot in create):
+    reusable_void = _gpu_void_slots(src_gpu)
+    if any(not _slot_covered_by_union(slot, delete + reusable_void) for slot in create):
         return None
 
     return PartialReconfigPlan(
@@ -108,7 +109,7 @@ def _gpu_from_intervals(intervals: list[Slot]) -> GPUState:
         instances=[
             MigInstance(start=start, end=end, profile=profile)
             for start, end, profile in intervals
-            if profile != "void"
+            if profile not in {"void", "unusable"}
         ],
     )
 
@@ -119,7 +120,20 @@ def _gpu_slots(gpu: GPUState) -> tuple[Slot, ...]:
             (
                 (int(inst.start), int(inst.end), str(inst.profile))
                 for inst in gpu.instances
-                if inst.profile != "void"
+                if inst.profile not in {"void", "unusable"}
+            ),
+            key=lambda slot: (slot[0], slot[1], slot[2]),
+        )
+    )
+
+
+def _gpu_void_slots(gpu: GPUState) -> tuple[Slot, ...]:
+    return tuple(
+        sorted(
+            (
+                (int(inst.start), int(inst.end), str(inst.profile))
+                for inst in gpu.instances
+                if inst.profile == "void"
             ),
             key=lambda slot: (slot[0], slot[1], slot[2]),
         )

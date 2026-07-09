@@ -308,7 +308,7 @@ def _make_slot_list_from_intervals_list(
     slot_id = 0
     for gpu_id, intervals in enumerate(intervals_list):
         for local_idx, (start, end, profile) in enumerate(intervals):
-            if profile == "void":
+            if profile in {"void", "unusable"}:
                 continue
             slots.append(
                 {

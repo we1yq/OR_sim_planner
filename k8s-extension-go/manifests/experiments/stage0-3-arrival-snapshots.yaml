@@ -16,6 +16,10 @@ spec:
   placement:
     nodes:
       - ampere
+  sourceArrival:
+    llama: 0
+    gpt2: 0
+    resnet50: 0
   targetArrival:
     llama: 0.05
     gpt2: 0.20
@@ -43,6 +47,10 @@ spec:
   placement:
     nodes:
       - ampere
+  sourceArrival:
+    llama: 0.05
+    gpt2: 0.20
+    resnet50: 0.30
   targetArrival:
     llama: 0.08
     gpt2: 0.30
@@ -70,6 +78,10 @@ spec:
   placement:
     nodes:
       - ampere
+  sourceArrival:
+    llama: 0.08
+    gpt2: 0.30
+    resnet50: 0.45
   targetArrival:
     llama: 0.04
     gpt2: 0.16
@@ -95,6 +107,10 @@ spec:
   placement:
     nodes:
       - ampere
+  sourceArrival:
+    llama: 0.04
+    gpt2: 0.16
+    resnet50: 0
   targetArrival:
     llama: 0.07
     gpt2: 0.25

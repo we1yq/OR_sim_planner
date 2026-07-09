@@ -97,20 +97,25 @@ func reconcile(client *kube.Client, router string, st *state) error {
 	if !open {
 		return nil
 	}
+	sourceArrival := copyFloatMap(st.lastArrival)
+	planner := env("PLANNER", env("PLANNER_SELECTOR", "ours"))
 	st.epoch++
 	st.lastSnapshot = time.Now()
-	st.lastArrival = current
+	st.lastArrival = copyFloatMap(current)
 	name := "runtime-epoch-" + strconv.Itoa(st.epoch)
 	spec := map[string]any{
 		"source":          "runtime-router",
 		"mode":            "observed",
+		"planner":         planner,
 		"epoch":           strconv.Itoa(st.epoch),
 		"windowSeconds":   int(demand.WindowSeconds),
 		"unit":            "requests_per_second",
 		"observedAt":      time.Now().Format(time.RFC3339Nano),
 		"triggerReason":   reason,
 		"registeredSLOMs": registeredSLOMs,
+		"sourceArrival":   sourceArrival,
 		"targetArrival":   current,
+		"slo":             sloFromArrival(current, sourceArrival, registeredSLOMs),
 		"requestCount":    requests,
 	}
 	return createArrivalSnapshot(client, name, "epoch-controller", spec)
@@ -158,32 +163,62 @@ func reconcileScheduledTrace(client *kube.Client) (bool, error) {
 	})
 	now := time.Now()
 	startedAt := scheduleStartedAt(schedule, now)
-	for _, rawStage := range stages {
+	prevTarget := firstNonEmptyMap(
+		asMap(schedule["sourceArrival"]),
+		asMap(schedule["currentDemand"]),
+		asMap(schedule["currentArrival"]),
+		demandRateMapFromSLO(asMap(schedule["slo"]), "sourceArrival", "currentDemandRate", "currentDemand", "sourceDemandRate", "sourceDemand"),
+	)
+	for stageIdx, rawStage := range stages {
 		stage := asMap(rawStage)
 		epoch := firstNonEmpty(asString(stage["epoch"]), asString(stage["name"]))
 		if epoch == "" {
 			continue
 		}
-		offset := time.Duration(intNumber(stage["offsetSeconds"])) * time.Second
+		targetArrival := firstNonEmptyMap(
+			asMap(stage["targetArrival"]),
+			asMap(stage["targetDemand"]),
+			demandRateMapFromSLO(asMap(stage["slo"]), "targetArrival", "demandRate", "targetDemandRate", "targetDemand"),
+		)
+		sourceArrival := firstNonEmptyMap(
+			asMap(stage["sourceArrival"]),
+			asMap(stage["currentDemand"]),
+			asMap(stage["currentArrival"]),
+			asMap(stage["sourceDemand"]),
+			demandRateMapFromSLO(asMap(stage["slo"]), "sourceArrival", "currentDemandRate", "currentDemand", "sourceDemandRate", "sourceDemand"),
+			prevTarget,
+		)
+		offset := scheduledStageOffset(schedule, stage, stageIdx)
 		if now.Before(startedAt.Add(offset)) {
-			continue
+			break
 		}
 		name := "scheduled-" + sanitize(epoch)
 		if status, _ := client.Get(kube.NamespacedResourceName(client.Namespace(), "arrivalsnapshots", name), nil); status == http.StatusOK {
+			if len(targetArrival) > 0 {
+				prevTarget = targetArrival
+			}
 			continue
+		}
+		slo := firstNonEmptyMap(asMap(stage["slo"]), asMap(schedule["slo"]))
+		if len(slo) == 0 {
+			slo = sloFromArrivalAny(targetArrival, sourceArrival, firstNonEmptyMap(asMap(stage["registeredSLOMs"]), asMap(schedule["registeredSLOMs"]), registeredSLOMs))
 		}
 		spec := map[string]any{
 			"source":               firstNonEmpty(asString(schedule["source"]), "trace"),
 			"mode":                 firstNonEmpty(asString(schedule["mode"]), "scheduled"),
+			"planner":              firstNonEmpty(asString(stage["planner"]), asString(stage["planningMethod"]), asString(stage["targetPlanner"]), asString(schedule["planner"]), asString(schedule["planningMethod"]), asString(schedule["targetPlanner"]), env("PLANNER", env("PLANNER_SELECTOR", "ours"))),
 			"epoch":                epoch,
 			"windowSeconds":        firstPositive(intNumber(stage["windowSeconds"]), intNumber(schedule["windowSeconds"]), 60),
 			"unit":                 firstNonEmpty(asString(schedule["unit"]), "requests_per_second"),
 			"observedAt":           now.Format(time.RFC3339Nano),
 			"triggerReason":        "scheduled_trace_window",
+			"scheduleOffsetSeconds": offset.Seconds(),
 			"profileCatalogRef":    firstNonEmpty(asString(stage["profileCatalogRef"]), asString(schedule["profileCatalogRef"]), "default"),
 			"currentAllocationRef": firstNonEmpty(asString(stage["currentAllocationRef"]), asString(schedule["currentAllocationRef"]), "physicalgpuregistry/default"),
 			"registeredSLOMs":      firstNonEmptyMap(asMap(stage["registeredSLOMs"]), asMap(schedule["registeredSLOMs"]), registeredSLOMs),
-			"targetArrival":        asMap(stage["targetArrival"]),
+			"sourceArrival":        sourceArrival,
+			"targetArrival":        targetArrival,
+			"slo":                  slo,
 			"notes": []string{
 				"scheduled/forecast epoch created from trace-derived request-rate vector",
 				"the predictor is external to this system; this ConfigMap supplies its output for experiments",
@@ -265,6 +300,31 @@ func scheduleStartedAt(schedule map[string]any, fallback time.Time) time.Time {
 		return fallback
 	}
 	return parsed
+}
+
+func scheduledStageOffset(schedule, stage map[string]any, stageIdx int) time.Duration {
+	if stageDuration := asFloat(firstNonZero(stage["stageDurationSeconds"], schedule["stageDurationSeconds"])); stageDuration > 0 {
+		return secondsDuration(float64(stageIdx) * stageDuration)
+	}
+	offsetSeconds := asFloat(stage["offsetSeconds"])
+	compression := asFloat(schedule["timeCompression"])
+	if compression <= 0 {
+		compression = 1
+	}
+	return secondsDuration(offsetSeconds / compression)
+}
+
+func firstNonZero(values ...any) any {
+	for _, value := range values {
+		if asFloat(value) != 0 {
+			return value
+		}
+	}
+	return nil
+}
+
+func secondsDuration(seconds float64) time.Duration {
+	return time.Duration(seconds * float64(time.Second))
 }
 
 func reconcileRepair(client *kube.Client, st *state) (bool, error) {
@@ -545,6 +605,110 @@ func firstNonEmptyMap(values ...any) map[string]any {
 		}
 	}
 	return map[string]any{}
+}
+
+func copyFloatMap(in map[string]float64) map[string]float64 {
+	out := map[string]float64{}
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func sloFromArrival(target, source map[string]float64, latency map[string]float64) map[string]any {
+	out := map[string]any{}
+	for model, demand := range target {
+		row := map[string]any{"demandRate": demand}
+		if sourceDemand, ok := source[model]; ok {
+			row["sourceDemandRate"] = sourceDemand
+		}
+		if latencyMs, ok := latency[model]; ok && latencyMs > 0 {
+			row["latencyMs"] = latencyMs
+		}
+		out[model] = row
+	}
+	for model, sourceDemand := range source {
+		if _, ok := out[model]; ok {
+			continue
+		}
+		row := map[string]any{"sourceDemandRate": sourceDemand}
+		if latencyMs, ok := latency[model]; ok && latencyMs > 0 {
+			row["latencyMs"] = latencyMs
+		}
+		out[model] = row
+	}
+	return out
+}
+
+func sloFromArrivalAny(target, source, latency map[string]any) map[string]any {
+	out := map[string]any{}
+	for model, rawDemand := range target {
+		row := map[string]any{"demandRate": rawDemand}
+		if sourceDemand, ok := source[model]; ok {
+			row["sourceDemandRate"] = sourceDemand
+		}
+		if latencyMs, ok := latency[model]; ok {
+			row["latencyMs"] = latencyMs
+		}
+		out[model] = row
+	}
+	for model, sourceDemand := range source {
+		if _, ok := out[model]; ok {
+			continue
+		}
+		row := map[string]any{"sourceDemandRate": sourceDemand}
+		if latencyMs, ok := latency[model]; ok {
+			row["latencyMs"] = latencyMs
+		}
+		out[model] = row
+	}
+	return out
+}
+
+func demandRateMapFromSLO(slo map[string]any, keys ...string) map[string]any {
+	for _, key := range keys {
+		if direct := asMap(slo[key]); len(direct) > 0 {
+			return direct
+		}
+	}
+	out := map[string]any{}
+	keySet := map[string]bool{}
+	for _, key := range keys {
+		keySet[key] = true
+	}
+	for model, raw := range slo {
+		modelSLO := asMap(raw)
+		for key := range keySet {
+			if n, ok := optionalFloat(modelSLO[key]); ok {
+				out[model] = n
+				break
+			}
+		}
+	}
+	return out
+}
+
+func asFloat(v any) float64 {
+	value, _ := optionalFloat(v)
+	return value
+}
+
+func optionalFloat(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case json.Number:
+		value, _ := n.Float64()
+		return value, true
+	default:
+		return 0, false
+	}
 }
 
 func sanitize(value string) string {

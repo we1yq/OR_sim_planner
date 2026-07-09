@@ -24,7 +24,7 @@ def old_exact_slot_map(prev_state: ClusterState | None) -> dict[tuple[int, int, 
     out = {}
     for gpu in prev_state.real_gpus():
         for inst in gpu.instances:
-            if inst.profile == "void":
+            if inst.profile in {"void", "unusable"}:
                 continue
             out[(gpu.gpu_id, inst.start, inst.end, inst.profile)] = inst
     _OLD_SLOT_MAP_CACHE[key] = out
@@ -147,7 +147,7 @@ def gpu_logical_template(gpu: GPUState) -> tuple[str, ...]:
     profiles = [
         inst.profile
         for inst in sorted(gpu.instances, key=lambda x: (x.start, x.end))
-        if inst.profile != "void"
+        if inst.profile not in {"void", "unusable"}
     ]
     return tuple(sorted(profiles, key=lambda p: (-PROFILE_SIZE[p], p)))
 
@@ -156,7 +156,7 @@ def gpu_physical_template(gpu: GPUState) -> tuple[str, ...]:
     return tuple(
         inst.profile
         for inst in sorted(gpu.instances, key=lambda x: (x.start, x.end))
-        if inst.profile != "void"
+        if inst.profile not in {"void", "unusable"}
     )
 
 
@@ -164,7 +164,7 @@ def gpu_interval_profile_list(gpu: GPUState) -> list[tuple[int, int, str]]:
     return [
         (inst.start, inst.end, inst.profile)
         for inst in sorted(gpu.instances, key=lambda x: (x.start, x.end))
-        if inst.profile != "void"
+        if inst.profile not in {"void", "unusable"}
     ]
 
 
@@ -199,12 +199,12 @@ def gpu_match_score(old_gpu: GPUState, new_gpu: GPUState) -> int:
     old_profile_workload = Counter(
         (inst.profile, getattr(inst, "workload", None))
         for inst in old_gpu.instances
-        if getattr(inst, "profile", None) not in (None, "void")
+        if getattr(inst, "profile", None) not in (None, "void", "unusable")
     )
     new_profile_workload = Counter(
         (inst.profile, getattr(inst, "workload", None))
         for inst in new_gpu.instances
-        if getattr(inst, "profile", None) not in (None, "void")
+        if getattr(inst, "profile", None) not in (None, "void", "unusable")
     )
 
     common_profile_workload = 0

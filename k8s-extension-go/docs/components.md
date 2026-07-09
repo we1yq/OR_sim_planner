@@ -226,6 +226,39 @@ ConfigMap arrival-trace-schedule watch
 The epoch-controller samples runtime-router HTTP metrics because demand is not a
 Kubernetes object event.
 
+`ArrivalSnapshot.spec.targetArrival` is the target request-rate vector for the
+next allocation. `ArrivalSnapshot.spec.sourceArrival` is the current committed
+request-rate vector at the start of the transition. The planner passes both to
+stage3; the transition planner uses `min(sourceArrival, targetArrival)` as the
+committed demand that must remain covered while moving between allocations.
+For newer experiment manifests, the same target demand can also be expressed as
+`spec.slo.<model>.demandRate`; `targetArrival` remains supported for older
+manifests.
+
+For fixed-rate experiments such as the 24h trace run, the request rate is an
+experiment input, not something inferred from random arrivals. The runtime-router
+still reports observed arrival rate for debugging, but marks demand-rate SLO as
+`fixed_input_not_observed`. During transition execution, transition-executor
+opens a router monitor window with `/control/monitor`; the router records
+per-model latency samples and exposes transition latency SLO results at
+`/metrics/slo`.
+
+The fixed input traffic is generated outside the router. For local or in-cluster
+experiments, run `tools/run_fixed_rate_router_traffic.py` against the same
+arrival schedule used by the epoch-controller. The driver reads each stage's
+`sourceArrival` and `targetArrival` vectors. While a transition is pending or the
+router monitor is active, it sends `min(sourceArrival, targetArrival)`; after the
+monitor finishes, it sends the stage's `targetArrival`. Fractional low request
+rates carry over across stages so the long-run request count matches the
+configured req/s.
+
+Only the demand epoch timeline is compressed. For example, a 24h trace with one
+new demand vector every 30 minutes can use `timeCompression: 6` or
+`stageDurationSeconds: 300` so epochs arrive every 5 minutes. The req/s values
+are not scaled, and transition execution itself is not compressed: drain,
+MIG reconfiguration, runtime creation, readiness waits, and route sync all run
+on real wall-clock time.
+
 ## Runtime Profile Correction
 
 The profile catalog supplied at model registration remains the source of truth.

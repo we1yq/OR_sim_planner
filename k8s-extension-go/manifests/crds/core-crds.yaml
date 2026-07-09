@@ -38,6 +38,12 @@ spec:
                   type: string
                 mode:
                   type: string
+                planner:
+                  type: string
+                planningMethod:
+                  type: string
+                targetPlanner:
+                  type: string
                 epoch:
                   type: string
                 triggerReason:
@@ -61,10 +67,32 @@ spec:
                   type: string
                 currentAllocationRef:
                   type: string
+                sourceArrival:
+                  type: object
+                  additionalProperties:
+                    type: number
+                currentDemand:
+                  type: object
+                  additionalProperties:
+                    type: number
+                currentArrival:
+                  type: object
+                  additionalProperties:
+                    type: number
+                sourceDemand:
+                  type: object
+                  additionalProperties:
+                    type: number
                 targetArrival:
                   type: object
                   additionalProperties:
                     type: number
+                targetDemand:
+                  type: object
+                  additionalProperties:
+                    type: number
+                transitionDemandPolicy:
+                  type: string
                 requestCount:
                   type: object
                   additionalProperties:

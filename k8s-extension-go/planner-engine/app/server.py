@@ -13,7 +13,8 @@ for path in (ROOT,):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from planning.k8s_adapter import plan_scenario_as_migplan_status  # noqa: E402
+from planning.jormungandr_adapter import plan_jormungandr_as_migplan_status  # noqa: E402
+from planning.k8s_adapter import build_feasible_option_dataframe, plan_scenario_as_migplan_status  # noqa: E402
 from scenario_loader import load_planning_scenario  # noqa: E402
 from models import PlanningScenario, ScenarioWorkloadDemand  # noqa: E402
 from migrant_core.state import ClusterState, GPUState, MigInstance  # noqa: E402
@@ -66,14 +67,27 @@ def plan(payload: dict[str, Any]) -> dict[str, Any]:
         scenario_path = ROOT / scenario_path
     scenario = apply_planning_input(load_planning_scenario(scenario_path), planning_input)
     current = current_allocation_to_cluster_state(dict(payload.get("currentAllocation", {})))
-    planned = plan_scenario_as_migplan_status(
-        scenario=scenario,
-        source_state_override=current,
-        runtime_profile_correction=dict(payload.get("runtimeProfileCorrection") or {}),
-        max_iters=int(payload.get("maxIters") or 20),
-        milp_time_limit_s=payload.get("milpTimeLimitSeconds"),
-        verbose=bool(payload.get("verbose", False)),
-    )
+    planner = normalize_planner_name(planning_input)
+    runtime_profile_correction = dict(payload.get("runtimeProfileCorrection") or {})
+    if planner == "jormungandr":
+        feasible_option_df = build_feasible_option_dataframe(
+            scenario,
+            runtime_profile_correction=runtime_profile_correction,
+        )
+        planned = plan_jormungandr_as_migplan_status(
+            scenario=scenario,
+            source_state=current,
+            feasible_option_df=feasible_option_df,
+        )
+    else:
+        planned = plan_scenario_as_migplan_status(
+            scenario=scenario,
+            source_state_override=current,
+            runtime_profile_correction=runtime_profile_correction,
+            max_iters=int(payload.get("maxIters") or 20),
+            milp_time_limit_s=payload.get("milpTimeLimitSeconds"),
+            verbose=bool(payload.get("verbose", False)),
+        )
     status = dict(planned["status"])
     target_state = dict(status.get("targetState", {}))
     actions = list(status.get("actions", []))
@@ -82,10 +96,21 @@ def plan(payload: dict[str, Any]) -> dict[str, Any]:
     transition = dict(planning_trace.get("transition", {}))
     action_dag = transition.get("phasedActionPlan") or transition.get("phasedActionPlanSummary") or {}
     desired_runtimes = desired_runtimes_from_target_state(target_state, planning_trace)
+    execution_runtimes = desired_runtimes_from_actions(actions, target_state)
+    planner_label = (
+        "jormungandr-exchange-and-compact-common-executor"
+        if planner == "jormungandr"
+        else "original-gurobi-milp-greedy-repair-effect-aware-dag"
+    )
+    objective = (
+        "Jormungandr utility-first target allocation and exchange-and-compact transition, lowered to the common executor DAG"
+        if planner == "jormungandr"
+        else "Gurobi MILP target allocation followed by target materialization greedy repair"
+    )
     return {
         "targetAllocationPlan": {
-            "planner": "placement.milp_enhanced + target.preserve_greedy",
-            "objective": "Gurobi MILP target allocation followed by target materialization greedy repair",
+            "planner": planner_label,
+            "objective": objective,
             "milp": status.get("milp", {}),
             "targetState": target_state,
             "desiredRuntimes": desired_runtimes,
@@ -99,13 +124,31 @@ def plan(payload: dict[str, Any]) -> dict[str, Any]:
             }
         },
         "desiredRuntimes": desired_runtimes,
+        "executionRuntimes": execution_runtimes,
         "metadata": {
-            "planner": "original-gurobi-milp-greedy-repair-effect-aware-dag",
+            "planner": planner_label,
+            "requestedPlanner": planner,
             "pipeline": planning_trace.get("pipeline"),
             "metrics": status.get("metrics", {}),
             "planningTrace": planning_trace,
         },
     }
+
+
+def normalize_planner_name(planning_input: dict[str, Any]) -> str:
+    raw = (
+        planning_input.get("planner")
+        or planning_input.get("planningMethod")
+        or planning_input.get("targetPlanner")
+        or planning_input.get("plannerSelector")
+        or "ours"
+    )
+    value = str(raw).strip().lower().replace("_", "-")
+    if value in {"jorm", "jormungandr", "jormungandr-baseline"}:
+        return "jormungandr"
+    if value in {"ours", "migrant", "migrant-ours", "default"}:
+        return "ours"
+    raise ValueError(f"unsupported planner selector: {raw}")
 
 
 def apply_canonical_physical_ids(target_state: dict[str, Any], planning_trace: dict[str, Any]) -> None:
@@ -121,13 +164,14 @@ def apply_canonical_physical_ids(target_state: dict[str, Any], planning_trace: d
 
 
 def apply_planning_input(scenario: PlanningScenario, planning_input: dict[str, Any]) -> PlanningScenario:
-    target = dict(planning_input.get("targetArrival", {}))
+    target = _arrival_map_from_planning_input(planning_input, source=False)
+    source = _arrival_map_from_planning_input(planning_input, source=True)
     workloads = []
     for workload in scenario.workloads:
         workloads.append(
             ScenarioWorkloadDemand(
                 name=workload.name,
-                source_arrival=workload.source_arrival,
+                source_arrival=float(source.get(workload.name, workload.source_arrival)),
                 target_arrival=float(target.get(workload.name, 0.0)),
                 workload_ref=workload.workload_ref,
                 profile_catalog_ref=workload.profile_catalog_ref,
@@ -136,11 +180,16 @@ def apply_planning_input(scenario: PlanningScenario, planning_input: dict[str, A
         )
     transition = dict(scenario.transition)
     transition["transitionPlanner"] = "effect_aware_dag"
+    transition["planner"] = normalize_planner_name(planning_input)
     transition["forceReplan"] = bool(planning_input.get("forceReplan", transition.get("forceReplan", False)))
+    if planning_input.get("transitionDemandPolicy"):
+        transition["transitionDemandPolicy"] = str(planning_input["transitionDemandPolicy"])
     transition["arrivalSnapshot"] = {
         "epoch": planning_input.get("epoch"),
         "source": planning_input.get("source", "runtime-router"),
         "triggerReason": planning_input.get("triggerReason"),
+        "sourceArrival": source,
+        "targetArrival": target,
     }
     return PlanningScenario(
         name=f"epoch-{planning_input.get('epoch') or scenario.name}",
@@ -152,6 +201,57 @@ def apply_planning_input(scenario: PlanningScenario, planning_input: dict[str, A
         workloads=workloads,
         transition=transition,
     )
+
+
+def _arrival_map_from_planning_input(planning_input: dict[str, Any], source: bool) -> dict[str, float]:
+    if source:
+        keys = ("sourceArrival", "currentDemand", "currentArrival", "sourceDemand")
+        slo_keys = ("sourceArrival", "currentDemandRate", "currentDemand", "sourceDemandRate", "sourceDemand")
+    else:
+        keys = ("targetArrival", "targetDemand")
+        slo_keys = ("targetArrival", "demandRate", "targetDemandRate", "targetDemand")
+    for key in keys:
+        out = _number_map(planning_input.get(key))
+        if out:
+            return out
+    return _demand_rate_map_from_slo(dict(planning_input.get("slo") or {}), slo_keys)
+
+
+def _demand_rate_map_from_slo(slo: dict[str, Any], keys: tuple[str, ...]) -> dict[str, float]:
+    for key in keys:
+        out = _number_map(slo.get(key))
+        if out:
+            return out
+    out: dict[str, float] = {}
+    for model, raw in slo.items():
+        if not isinstance(raw, dict):
+            continue
+        for key in keys:
+            value = _number(raw.get(key))
+            if value is not None:
+                out[str(model)] = value
+                break
+    return out
+
+
+def _number_map(raw: Any) -> dict[str, float]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, float] = {}
+    for key, value in raw.items():
+        parsed = _number(value)
+        if parsed is not None:
+            out[str(key)] = parsed
+    return out
+
+
+def _number(value: Any) -> float | None:
+    try:
+        if value is None or isinstance(value, bool):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def current_allocation_to_cluster_state(current: dict[str, Any]) -> ClusterState:

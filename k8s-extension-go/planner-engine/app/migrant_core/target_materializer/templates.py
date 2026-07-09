@@ -47,9 +47,9 @@ ABSTRACT_TO_PHYSICAL = {
     "4+3": [("4g", "3g")],
     "4+2+1": [("4g", "2g", "1g")],
     "4+1+1+1": [("4g", "1g", "1g", "1g")],
-    "3+3": [("3g", "3g")],
-    "3+2+1": [("3g", "2g", "1g")],
-    "3+1+1+1": [("3g", "1g", "1g", "1g")],
+    "3+3": [("3g", "unusable", "3g")],
+    "3+2+1": [("3g", "unusable", "2g", "1g")],
+    "3+1+1+1": [("3g", "unusable", "1g", "1g", "1g")],
     "2+2+3": [("2g", "2g", "3g")],
     "3+2+1+1": [
         ("2g", "1g", "1g", "3g"),
@@ -71,7 +71,7 @@ ABSTRACT_TO_PHYSICAL = {
 }
 
 
-VOID_LIKE_REWRITE_CANDIDATES = {
+FRAGMENTATION_AVOIDANCE_REWRITE_CANDIDATES = {
     "3+3": [("4g", "3g")],
     "3+2+1": [
         ("4g", "2g", "1g"),
@@ -104,7 +104,7 @@ def parts_to_profiles(parts: tuple[int, ...]) -> tuple[str, ...]:
 
 
 def physical_profiles_to_string(profiles: tuple[str, ...]) -> str:
-    return "+".join(str(PROFILE_SIZE[p]) for p in profiles)
+    return "+".join(str(PROFILE_SIZE[p]) for p in profiles if p != "unusable")
 
 
 def physical_profiles_to_intervals(
@@ -114,6 +114,10 @@ def physical_profiles_to_intervals(
     out = []
     cur = 0
     for profile in profiles:
+        if profile == "unusable":
+            out.append((cur, cur + 1, "unusable"))
+            cur += 1
+            continue
         size = PROFILE_SIZE[profile]
         out.append((cur, cur + size, profile))
         cur += size
@@ -147,7 +151,9 @@ def template_summary_dict() -> dict[str, Any]:
         "profileOrder": list(PROFILE_ORDER),
         "templateCount": len(TEMPLATES),
         "physicalRealizationCount": sum(len(v) for v in ABSTRACT_TO_PHYSICAL.values()),
-        "voidLikeRewriteCandidateCount": sum(len(v) for v in VOID_LIKE_REWRITE_CANDIDATES.values()),
+        "fragmentationAvoidanceRewriteCandidateCount": sum(
+            len(v) for v in FRAGMENTATION_AVOIDANCE_REWRITE_CANDIDATES.values()
+        ),
         "templates": [
             {
                 "name": name,

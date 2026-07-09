@@ -3,18 +3,22 @@ package system
 type PlanningInput struct {
 	Source                string             `json:"source"`
 	Mode                  string             `json:"mode"`
+	Planner               string             `json:"planner,omitempty"`
 	Epoch                 string             `json:"epoch"`
 	WindowSeconds         int                `json:"windowSeconds"`
 	Unit                  string             `json:"unit"`
 	ObservedAt            string             `json:"observedAt"`
 	TriggerReason         string             `json:"triggerReason"`
-	TargetArrival         map[string]float64 `json:"targetArrival"`
-	RegisteredSLOMs       map[string]float64 `json:"registeredSLOMs"`
-	RequestCount          map[string]int64   `json:"requestCount,omitempty"`
-	ProfileCatalogRef     string             `json:"profileCatalogRef"`
-	CalibrationOverlayRef string             `json:"calibrationOverlayRef"`
-	CurrentAllocationRef  string             `json:"currentAllocationRef"`
-	PlacementNodes        []string           `json:"placementNodes,omitempty"`
+	SourceArrival          map[string]float64 `json:"sourceArrival,omitempty"`
+	TargetArrival          map[string]float64 `json:"targetArrival"`
+	RegisteredSLOMs        map[string]float64 `json:"registeredSLOMs"`
+	SLO                    map[string]any     `json:"slo,omitempty"`
+	RequestCount           map[string]int64   `json:"requestCount,omitempty"`
+	TransitionDemandPolicy string             `json:"transitionDemandPolicy,omitempty"`
+	ProfileCatalogRef      string             `json:"profileCatalogRef"`
+	CalibrationOverlayRef  string             `json:"calibrationOverlayRef"`
+	CurrentAllocationRef   string             `json:"currentAllocationRef"`
+	PlacementNodes         []string           `json:"placementNodes,omitempty"`
 }
 
 type CurrentAllocation struct {

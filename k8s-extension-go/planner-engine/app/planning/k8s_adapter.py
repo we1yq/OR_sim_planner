@@ -418,6 +418,12 @@ def _migplan_status_from_results(
     milp_warm_start: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     actions = [_to_yamlable(action) for action in transition_res.get("executed_actions", [])]
+    stage1_elapsed_sec = float(milp_res.get("elapsed", 0.0))
+    stage2_elapsed_sec = float(
+        target_state.metadata.get("build_metrics", {}).get("elapsed_time_sec", 0.0)
+    )
+    stage3_elapsed_sec = float(transition_res.get("elapsed_sec", 0.0))
+    planner_makespan_sec = stage1_elapsed_sec + stage2_elapsed_sec + stage3_elapsed_sec
     metrics = {
         "gpuCount": int(milp_res.get("gpu_count", 0)),
         "iterationCount": int(transition_res.get("iteration_count", 0)),
@@ -426,10 +432,13 @@ def _migplan_status_from_results(
         "sourceActiveGpu": int(transition_res.get("source_active_gpu", 0)),
         "finalActiveGpu": int(transition_res.get("final_active_gpu", 0)),
         "elapsedSec": float(transition_res.get("elapsed_sec", 0.0)),
-        "milpElapsedSec": float(milp_res.get("elapsed", 0.0)),
-        "targetBuildElapsedSec": float(
-            target_state.metadata.get("build_metrics", {}).get("elapsed_time_sec", 0.0)
-        ),
+        "plannerMakespanSec": planner_makespan_sec,
+        "stage1ElapsedSec": stage1_elapsed_sec,
+        "stage2ElapsedSec": stage2_elapsed_sec,
+        "stage3ElapsedSec": stage3_elapsed_sec,
+        "milpElapsedSec": stage1_elapsed_sec,
+        "targetBuildElapsedSec": stage2_elapsed_sec,
+        "transitionPlanningElapsedSec": stage3_elapsed_sec,
         "feasibleOptionBuildElapsedSec": float(feasible_elapsed_sec),
     }
     planning_trace = _planning_trace(
@@ -524,8 +533,13 @@ def _status_from_current_state_noop(
                 "sourceActiveGpu": len(source_state.real_gpus()),
                 "finalActiveGpu": len(source_state.real_gpus()),
                 "elapsedSec": 0.0,
+                "plannerMakespanSec": 0.0,
+                "stage1ElapsedSec": 0.0,
+                "stage2ElapsedSec": 0.0,
+                "stage3ElapsedSec": 0.0,
                 "milpElapsedSec": 0.0,
                 "targetBuildElapsedSec": 0.0,
+                "transitionPlanningElapsedSec": 0.0,
                 "feasibleOptionBuildElapsedSec": 0.0,
                 "noOp": True,
             },
@@ -595,7 +609,15 @@ def _status_from_infeasible_milp(scenario: PlanningScenario, milp_res: dict[str,
             "reachedTarget": False,
             "message": f"MILP did not produce a feasible target: {milp_res.get('status')}",
             "actions": [],
-            "metrics": {"milpElapsedSec": float(milp_res.get("elapsed", 0.0))},
+            "metrics": {
+                "plannerMakespanSec": float(milp_res.get("elapsed", 0.0)),
+                "stage1ElapsedSec": float(milp_res.get("elapsed", 0.0)),
+                "stage2ElapsedSec": 0.0,
+                "stage3ElapsedSec": 0.0,
+                "milpElapsedSec": float(milp_res.get("elapsed", 0.0)),
+                "targetBuildElapsedSec": 0.0,
+                "transitionPlanningElapsedSec": 0.0,
+            },
             "planningTrace": {
                 "scenario": scenario.name,
                 "pipeline": "feasible-options -> milp",
@@ -637,6 +659,9 @@ def _planning_trace(
     milp_warm_start: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     build_metrics = dict(target_state.metadata.get("build_metrics", {}))
+    stage1_elapsed_sec = float(milp_res.get("elapsed", 0.0))
+    stage2_elapsed_sec = float(build_metrics.get("elapsed_time_sec", 0.0))
+    stage3_elapsed_sec = float(transition_res.get("elapsed_sec", 0.0))
     return {
         "scenario": scenario.name,
         "pipeline": (
@@ -667,6 +692,16 @@ def _planning_trace(
             feasible_option_df=feasible_option_df,
             elapsed_sec=feasible_elapsed_sec,
         ),
+        "plannerTiming": {
+            "plannerMakespanSec": stage1_elapsed_sec + stage2_elapsed_sec + stage3_elapsed_sec,
+            "stage1ElapsedSec": stage1_elapsed_sec,
+            "stage2ElapsedSec": stage2_elapsed_sec,
+            "stage3ElapsedSec": stage3_elapsed_sec,
+            "stage1Name": "target_allocation_milp",
+            "stage2Name": "target_materialization",
+            "stage3Name": str(transition_res.get("requested_transition_planner", "effect_aware_dag")),
+            "excludedCommonPreprocessingSec": float(feasible_elapsed_sec),
+        },
         "runtimeProfileCorrection": _runtime_profile_correction_summary(runtime_profile_correction),
         "currentStateFeasibility": current_feasibility,
         "milp": {
@@ -850,6 +885,10 @@ def _transition_runtime_kwargs(transition: dict[str, Any]) -> dict[str, Any]:
         kwargs["default_inflight"] = int(runtime["defaultInflight"])
     if "overrideExistingChangedSlots" in runtime:
         kwargs["override_existing_runtime_for_changed_slots"] = bool(runtime["overrideExistingChangedSlots"])
+    if "transitionDemandPolicy" in transition:
+        kwargs["transition_demand_policy"] = str(transition["transitionDemandPolicy"])
+    elif "transitionDemandPolicy" in runtime:
+        kwargs["transition_demand_policy"] = str(runtime["transitionDemandPolicy"])
     return kwargs
 
 

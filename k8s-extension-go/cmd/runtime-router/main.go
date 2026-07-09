@@ -39,13 +39,42 @@ type routeEndpoint struct {
 	Draining        bool    `json:"draining,omitempty"`
 }
 
+type latencySample struct {
+	At        time.Time
+	LatencyMs float64
+	Failed    bool
+}
+
 type modelMetrics struct {
 	mu           sync.Mutex
 	Arrivals     []time.Time
+	Latencies    []latencySample
 	Requests     int64
 	Errors       int64
 	Inflight     int64
 	TotalLatency float64
+}
+
+type monitorState struct {
+	PlanName      string
+	Active        bool
+	StartedAt     time.Time
+	FinishedAt    time.Time
+	SourceArrival map[string]float64
+	TargetArrival map[string]float64
+	LatencySLOMs  map[string]float64
+	Stats         map[string]*monitorStats
+}
+
+type monitorStats struct {
+	Requests                 int64
+	Errors                   int64
+	TotalLatencyMs           float64
+	MaxLatencyMs             float64
+	LatencyViolations        int64
+	LatencyViolationExcessMs float64
+	FirstViolationAt         time.Time
+	LastViolationAt          time.Time
 }
 
 type routerState struct {
@@ -53,6 +82,7 @@ type routerState struct {
 	routes          map[string][]routeEndpoint
 	metrics         map[string]*modelMetrics
 	endpointMetrics map[string]*modelMetrics
+	monitor         monitorState
 	window          time.Duration
 	http            *http.Client
 	kube            *kube.Client
@@ -86,6 +116,7 @@ func main() {
 		routes:          routes,
 		metrics:         map[string]*modelMetrics{},
 		endpointMetrics: map[string]*modelMetrics{},
+		monitor:         monitorState{Stats: map[string]*monitorStats{}},
 		window:          window,
 		http:            &http.Client{Timeout: 30 * time.Second},
 		kube:            kubeClient,
@@ -96,6 +127,10 @@ func main() {
 			log.Printf("runtime-router startup route persist failed: %v", err)
 		}
 	}
+	go state.routeGCLoop(
+		durationEnv("ROUTE_GC_INTERVAL", 30*time.Second),
+		durationEnv("ROUTE_GC_TIMEOUT", 500*time.Millisecond),
+	)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -104,7 +139,9 @@ func main() {
 	mux.HandleFunc("/infer/", state.handleInfer)
 	mux.HandleFunc("/routes", state.handleRouteSnapshot)
 	mux.HandleFunc("/control/routes", state.handleRoutes)
+	mux.HandleFunc("/control/monitor", state.handleMonitorControl)
 	mux.HandleFunc("/metrics/demand", state.handleDemand)
+	mux.HandleFunc("/metrics/slo", state.handleSLO)
 	mux.HandleFunc("/metrics/profile-observations", state.handleProfileObservations)
 
 	log.Printf("runtime-router listening on %s", addr)
@@ -142,8 +179,11 @@ func (s *routerState) handleInfer(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusBadGateway
 	var responseBody []byte
 	defer func() {
-		metrics.finish(time.Since(started), status >= 500)
-		endpointMetrics.finish(time.Since(started), status >= 500)
+		elapsed := time.Since(started)
+		failed := status >= 500
+		metrics.finish(elapsed, failed)
+		endpointMetrics.finish(elapsed, failed)
+		s.recordMonitorSample(model, elapsed, failed)
 	}()
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, endpoint+"/infer", bytes.NewReader(body))
@@ -239,6 +279,70 @@ func (s *routerState) handleRoutes(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"model": model, "runtimeId": runtimeID, "deleted": true})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "GET, PUT, POST, or DELETE required"})
+	}
+}
+
+func (s *routerState) handleMonitorControl(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.monitorSnapshot())
+	case http.MethodPost, http.MethodPut:
+		var input map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		phase := firstNonEmpty(asString(input["phase"]), asString(input["action"]))
+		now := time.Now()
+		s.mu.Lock()
+		switch phase {
+		case "start", "begin", "active":
+			s.monitor = monitorState{
+				PlanName:      asString(input["planName"]),
+				Active:        true,
+				StartedAt:     now,
+				SourceArrival: numberMap(input["sourceArrival"]),
+				TargetArrival: numberMap(input["targetArrival"]),
+				LatencySLOMs:  latencySLOMap(input),
+				Stats:         map[string]*monitorStats{},
+			}
+		case "finish", "end", "stop", "inactive":
+			s.monitor.Active = false
+			s.monitor.FinishedAt = now
+			if planName := asString(input["planName"]); planName != "" {
+				s.monitor.PlanName = planName
+			}
+		default:
+			if planName := asString(input["planName"]); planName != "" {
+				s.monitor.PlanName = planName
+			}
+			if source := numberMap(input["sourceArrival"]); len(source) > 0 {
+				s.monitor.SourceArrival = source
+			}
+			if target := numberMap(input["targetArrival"]); len(target) > 0 {
+				s.monitor.TargetArrival = target
+			}
+			if slo := latencySLOMap(input); len(slo) > 0 {
+				s.monitor.LatencySLOMs = slo
+			}
+			if active, ok := boolValue(input["active"]); ok {
+				s.monitor.Active = active
+				if active && s.monitor.StartedAt.IsZero() {
+					s.monitor.StartedAt = now
+				}
+				if !active {
+					s.monitor.FinishedAt = now
+				}
+			}
+			if s.monitor.Stats == nil {
+				s.monitor.Stats = map[string]*monitorStats{}
+			}
+		}
+		snapshot := s.monitorSnapshotLocked()
+		s.mu.Unlock()
+		writeJSON(w, http.StatusOK, snapshot)
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "GET, PUT, or POST required"})
 	}
 }
 
@@ -344,6 +448,14 @@ func (s *routerState) handleDemand(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+func (s *routerState) handleSLO(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "GET required"})
+		return
+	}
+	writeJSON(w, http.StatusOK, s.monitorSnapshot())
+}
+
 func (s *routerState) handleProfileObservations(w http.ResponseWriter, _ *http.Request) {
 	now := time.Now()
 	items := []map[string]any{}
@@ -394,6 +506,69 @@ func (s *routerState) runtimeMetrics(endpoint string) map[string]any {
 		}
 	}
 	return out
+}
+
+func (s *routerState) routeGCLoop(interval, timeout time.Duration) {
+	if interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		if removed, err := s.gcStaleRoutes(timeout); err != nil {
+			log.Printf("runtime-router route GC failed: %v", err)
+		} else if removed > 0 {
+			log.Printf("runtime-router route GC removed %d stale endpoint(s)", removed)
+		}
+	}
+}
+
+func (s *routerState) gcStaleRoutes(timeout time.Duration) (int, error) {
+	s.mu.RLock()
+	routes := s.copyRoutesLocked()
+	s.mu.RUnlock()
+	if len(routes) == 0 {
+		return 0, nil
+	}
+	client := http.Client{Timeout: timeout}
+	type staleEndpoint struct {
+		model     string
+		runtimeID string
+	}
+	stale := []staleEndpoint{}
+	for model, endpoints := range routes {
+		for _, endpoint := range endpoints {
+			if endpoint.RuntimeID == "" || endpoint.Endpoint == "" {
+				continue
+			}
+			resp, err := client.Get(strings.TrimRight(endpoint.Endpoint, "/") + "/healthz")
+			if err == nil && resp != nil {
+				_ = resp.Body.Close()
+			}
+			if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 500 {
+				stale = append(stale, staleEndpoint{model: model, runtimeID: endpoint.RuntimeID})
+			}
+		}
+	}
+	if len(stale) == 0 {
+		return 0, nil
+	}
+	s.mu.Lock()
+	removed := 0
+	for _, item := range stale {
+		before := len(s.routes[item.model])
+		s.routes[item.model] = deleteEndpoint(s.routes[item.model], item.runtimeID)
+		if len(s.routes[item.model]) == 0 {
+			delete(s.routes, item.model)
+		}
+		removed += before - len(s.routes[item.model])
+	}
+	updated := s.copyRoutesLocked()
+	s.mu.Unlock()
+	if removed == 0 {
+		return 0, nil
+	}
+	return removed, s.persistRoutes(updated)
 }
 
 func (s *routerState) routeFor(model string) (routeEndpoint, bool) {
@@ -495,7 +670,9 @@ func (m *modelMetrics) finish(latency time.Duration, failed bool) {
 	if failed {
 		m.Errors++
 	}
-	m.TotalLatency += float64(latency.Milliseconds())
+	latencyMs := float64(latency.Milliseconds())
+	m.TotalLatency += latencyMs
+	m.Latencies = append(m.Latencies, latencySample{At: time.Now(), LatencyMs: latencyMs, Failed: failed})
 }
 
 func (m *modelMetrics) snapshot(now time.Time, window time.Duration) modelMetrics {
@@ -509,29 +686,46 @@ func (m *modelMetrics) snapshot(now time.Time, window time.Duration) modelMetric
 		}
 	}
 	m.Arrivals = kept
+	keptLatencies := m.Latencies[:0]
+	for _, sample := range m.Latencies {
+		if sample.At.After(cutoff) {
+			keptLatencies = append(keptLatencies, sample)
+		}
+	}
+	m.Latencies = keptLatencies
 	cp := *m
 	cp.Arrivals = append([]time.Time(nil), kept...)
+	cp.Latencies = append([]latencySample(nil), keptLatencies...)
 	return cp
 }
 
 func metricsRow(model string, metrics modelMetrics, window time.Duration) map[string]any {
-	avgLatency := 0.0
-	if metrics.Requests > 0 {
-		avgLatency = metrics.TotalLatency / float64(metrics.Requests)
-	}
+	windowRequests := int64(len(metrics.Latencies))
+	windowErrors := int64(0)
 	errorRate := 0.0
-	if metrics.Requests > 0 {
-		errorRate = float64(metrics.Errors) / float64(metrics.Requests)
+	for _, sample := range metrics.Latencies {
+		if sample.Failed {
+			windowErrors++
+		}
+	}
+	if windowRequests > 0 {
+		errorRate = float64(windowErrors) / float64(windowRequests)
 	}
 	return map[string]any{
-		"model":        model,
-		"arrivalRate":  round(float64(len(metrics.Arrivals))/window.Seconds(), 4),
-		"requests":     metrics.Requests,
-		"errors":       metrics.Errors,
-		"errorRate":    round(errorRate, 4),
-		"inflight":     metrics.Inflight,
-		"queued":       0,
-		"avgLatencyMs": round(avgLatency, 3),
+		"model":              model,
+		"arrivalRate":        round(float64(len(metrics.Arrivals))/window.Seconds(), 4),
+		"requests":           metrics.Requests,
+		"errors":             metrics.Errors,
+		"windowRequests":     windowRequests,
+		"windowErrors":       windowErrors,
+		"errorRate":          round(errorRate, 4),
+		"inflight":           metrics.Inflight,
+		"queued":             0,
+		"avgLatencyMs":       round(avgLatency(metrics), 3),
+		"p95LatencyMs":       round(percentileLatency(metrics, 0.95), 3),
+		"maxLatencyMs":       round(maxLatency(metrics), 3),
+		"demandRatePolicy":   "fixed_input_not_observed",
+		"demandRateViolated": false,
 	}
 }
 
@@ -548,6 +742,93 @@ func confidence(samples int64) string {
 	}
 }
 
+func (s *routerState) recordMonitorSample(model string, latency time.Duration, failed bool) {
+	latencyMs := float64(latency.Milliseconds())
+	now := time.Now()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.monitor.Active {
+		return
+	}
+	if s.monitor.Stats == nil {
+		s.monitor.Stats = map[string]*monitorStats{}
+	}
+	stats := s.monitor.Stats[model]
+	if stats == nil {
+		stats = &monitorStats{}
+		s.monitor.Stats[model] = stats
+	}
+	stats.Requests++
+	if failed {
+		stats.Errors++
+	}
+	stats.TotalLatencyMs += latencyMs
+	if latencyMs > stats.MaxLatencyMs {
+		stats.MaxLatencyMs = latencyMs
+	}
+	if slo := s.monitor.LatencySLOMs[model]; slo > 0 && latencyMs > slo {
+		stats.LatencyViolations++
+		stats.LatencyViolationExcessMs += latencyMs - slo
+		if stats.FirstViolationAt.IsZero() {
+			stats.FirstViolationAt = now
+		}
+		stats.LastViolationAt = now
+	}
+}
+
+func (s *routerState) monitorSnapshot() map[string]any {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.monitorSnapshotLocked()
+}
+
+func (s *routerState) monitorSnapshotLocked() map[string]any {
+	models := map[string]any{}
+	for model, stats := range s.monitor.Stats {
+		avg := 0.0
+		if stats.Requests > 0 {
+			avg = stats.TotalLatencyMs / float64(stats.Requests)
+		}
+		row := map[string]any{
+			"requests":                    stats.Requests,
+			"errors":                      stats.Errors,
+			"avgLatencyMs":                round(avg, 3),
+			"maxLatencyMs":                round(stats.MaxLatencyMs, 3),
+			"latencySLOMs":                s.monitor.LatencySLOMs[model],
+			"latencyViolationCount":       stats.LatencyViolations,
+			"latencySLOViolationSeconds":  round(stats.LatencyViolationExcessMs/1000.0, 6),
+			"latencySLOViolated":          stats.LatencyViolations > 0,
+			"demandRate":                  s.monitor.TargetArrival[model],
+			"sourceDemandRate":            s.monitor.SourceArrival[model],
+			"demandRatePolicy":            "fixed_input_not_observed",
+			"demandRateSLOEvaluated":      false,
+			"demandRateSLOViolated":       false,
+		}
+		if !stats.FirstViolationAt.IsZero() {
+			row["firstViolationAt"] = stats.FirstViolationAt.Format(time.RFC3339Nano)
+			row["lastViolationAt"] = stats.LastViolationAt.Format(time.RFC3339Nano)
+		}
+		models[model] = row
+	}
+	out := map[string]any{
+		"planName":         s.monitor.PlanName,
+		"active":           s.monitor.Active,
+		"sourceArrival":    s.monitor.SourceArrival,
+		"targetArrival":    s.monitor.TargetArrival,
+		"latencySLOMs":     s.monitor.LatencySLOMs,
+		"models":           models,
+		"demandRatePolicy": "fixed_input_not_observed",
+		"generatedAt":      time.Now().Format(time.RFC3339Nano),
+	}
+	if !s.monitor.StartedAt.IsZero() {
+		out["startedAt"] = s.monitor.StartedAt.Format(time.RFC3339Nano)
+	}
+	if !s.monitor.FinishedAt.IsZero() {
+		out["finishedAt"] = s.monitor.FinishedAt.Format(time.RFC3339Nano)
+	}
+	return out
+}
+
 func writeJSON(w http.ResponseWriter, code int, payload any) {
 	raw, _ := json.Marshal(payload)
 	w.Header().Set("content-type", "application/json")
@@ -561,6 +842,19 @@ func envDefault(key, fallback string) string {
 		return fallback
 	}
 	return strings.TrimRight(value, "/")
+}
+
+func durationEnv(key string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		log.Printf("invalid %s=%q, using %s", key, value, fallback)
+		return fallback
+	}
+	return parsed
 }
 
 func initialRoutes() map[string][]routeEndpoint {
@@ -631,10 +925,43 @@ func round(value float64, digits int) float64 {
 }
 
 func avgLatency(metrics modelMetrics) float64 {
-	if metrics.Requests == 0 {
+	if len(metrics.Latencies) == 0 {
 		return 0
 	}
-	return metrics.TotalLatency / float64(metrics.Requests)
+	total := 0.0
+	for _, sample := range metrics.Latencies {
+		total += sample.LatencyMs
+	}
+	return total / float64(len(metrics.Latencies))
+}
+
+func maxLatency(metrics modelMetrics) float64 {
+	out := 0.0
+	for _, sample := range metrics.Latencies {
+		if sample.LatencyMs > out {
+			out = sample.LatencyMs
+		}
+	}
+	return out
+}
+
+func percentileLatency(metrics modelMetrics, p float64) float64 {
+	if len(metrics.Latencies) == 0 {
+		return 0
+	}
+	values := make([]float64, 0, len(metrics.Latencies))
+	for _, sample := range metrics.Latencies {
+		values = append(values, sample.LatencyMs)
+	}
+	sort.Float64s(values)
+	idx := int(math.Ceil(p*float64(len(values)))) - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(values) {
+		idx = len(values) - 1
+	}
+	return values[idx]
 }
 
 func normalizeEndpoint(endpoint routeEndpoint) routeEndpoint {
@@ -725,20 +1052,25 @@ func asMap(v any) map[string]any {
 }
 
 func asFloat(v any) float64 {
+	value, _ := optionalFloat(v)
+	return value
+}
+
+func optionalFloat(v any) (float64, bool) {
 	switch x := v.(type) {
 	case float64:
-		return x
+		return x, true
 	case float32:
-		return float64(x)
+		return float64(x), true
 	case int:
-		return float64(x)
+		return float64(x), true
 	case int64:
-		return float64(x)
+		return float64(x), true
 	case json.Number:
 		n, _ := x.Float64()
-		return n
+		return n, true
 	default:
-		return 0
+		return 0, false
 	}
 }
 
@@ -747,4 +1079,49 @@ func asString(v any) string {
 		return s
 	}
 	return ""
+}
+
+func numberMap(v any) map[string]float64 {
+	out := map[string]float64{}
+	for key, raw := range asMap(v) {
+		if value, ok := optionalFloat(raw); ok {
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func latencySLOMap(input map[string]any) map[string]float64 {
+	for _, key := range []string{"latencySLOMs", "registeredSLOMs"} {
+		if values := numberMap(input[key]); len(values) > 0 {
+			return values
+		}
+	}
+	slo := asMap(input["slo"])
+	out := map[string]float64{}
+	for model, raw := range slo {
+		row := asMap(raw)
+		for _, key := range []string{"latencyMs", "e2eMs", "sloMs", "latencySLOMs"} {
+			if value, ok := optionalFloat(row[key]); ok {
+				out[model] = value
+				break
+			}
+		}
+	}
+	return out
+}
+
+func boolValue(v any) (bool, bool) {
+	if b, ok := v.(bool); ok {
+		return b, true
+	}
+	if s, ok := v.(string); ok {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "true", "1", "yes", "active":
+			return true, true
+		case "false", "0", "no", "inactive":
+			return false, true
+		}
+	}
+	return false, false
 }

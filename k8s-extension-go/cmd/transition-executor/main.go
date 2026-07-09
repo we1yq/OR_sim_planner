@@ -8,6 +8,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -102,10 +103,16 @@ func reconcile(client *kube.Client, router string) error {
 		trace := newExecutionTrace()
 		trace.Mark("executorStartedAt")
 		patchExecutionStatus(client, name, "Executing", "transition execution started", trace, nil)
+		if snapshot, err := startRouterMonitor(router, name, spec); err != nil {
+			trace.SetMetric("routerMonitorStartError", err.Error())
+		} else {
+			trace.SetMetric("routerMonitor", snapshot)
+		}
 		runtimes := parseRuntimes(spec)
 		actions := parseActionNodes(spec)
 		if len(actions) == 0 {
 			trace.Mark("executorFinishedAt")
+			closeRouterMonitor(trace, router, name)
 			_, err = client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
 				"status": map[string]any{"phase": "Executed", "message": "empty action DAG; no-op plan", "transitionExecution": trace.Status(nil)},
 			}, nil)
@@ -114,8 +121,23 @@ func reconcile(client *kube.Client, router string) error {
 			}
 			continue
 		}
-		verification, actionStatuses, err := executeActionDAG(client, router, nodes, runtimes, actions, name, trace)
+		sourceGpuCount := intNumber(asMap(spec["summary"])["sourceGpuCount"])
+		targetGpuCount := firstNonZeroInt(intNumber(asMap(spec["summary"])["targetGpuCount"]), intNumber(spec["targetGpuCount"]))
+		trace.SetMetric("gpuCountBaseline", map[string]any{"source": sourceGpuCount, "target": targetGpuCount})
+		verification, actionStatuses, err := executeActionDAG(client, router, nodes, runtimes, actions, name, sourceGpuCount, trace)
 		trace.Mark("executorFinishedAt")
+		closeRouterMonitor(trace, router, name)
+		if err != nil {
+			_, patchErr := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
+				"status": map[string]any{"phase": "Failed", "message": err.Error(), "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
+			}, nil)
+			if patchErr != nil {
+				return patchErr
+			}
+			continue
+		}
+		finalVerification, err := validateFinalTargetAllocation(client, spec)
+		trace.SetMetric("finalValidation", finalVerification)
 		if err != nil {
 			_, patchErr := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
 				"status": map[string]any{"phase": "Failed", "message": err.Error(), "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
@@ -145,6 +167,7 @@ func reconcile(client *kube.Client, router string) error {
 }
 
 type executionTrace struct {
+	mu               sync.Mutex
 	start            time.Time
 	timestamps       map[string]time.Time
 	metrics          map[string]any
@@ -156,23 +179,52 @@ func newExecutionTrace() *executionTrace {
 }
 
 func (t *executionTrace) Mark(name string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.timestamps[name] = time.Now()
 }
 
 func (t *executionTrace) Has(name string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	_, ok := t.timestamps[name]
 	return ok
 }
 
 func (t *executionTrace) SetRuntimeReadiness(value map[string]any) {
-	t.runtimeReadiness = value
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.runtimeReadiness == nil {
+		t.runtimeReadiness = map[string]any{}
+	}
+	for key, item := range value {
+		t.runtimeReadiness[key] = item
+	}
 }
 
 func (t *executionTrace) SetMetric(name string, value any) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if existing, ok := t.metrics[name]; ok {
+		if items, ok := existing.([]any); ok {
+			t.metrics[name] = append(items, value)
+		} else {
+			t.metrics[name] = []any{existing, value}
+		}
+		return
+	}
 	t.metrics[name] = value
 }
 
+func (t *executionTrace) Timestamp(name string) time.Time {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.timestamps[name]
+}
+
 func (t *executionTrace) Status(verification map[string]any) map[string]any {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	out := map[string]any{
 		"timestamps":       map[string]any{},
 		"durationsSeconds": map[string]any{},
@@ -225,6 +277,45 @@ func patchExecutionStatus(client *kube.Client, planName, phase, message string, 
 	}
 }
 
+func startRouterMonitor(router, planName string, spec map[string]any) (map[string]any, error) {
+	planningInput := asMap(spec["planningInput"])
+	payload := map[string]any{
+		"phase":         "start",
+		"planName":      planName,
+		"sourceArrival": asMap(planningInput["sourceArrival"]),
+		"targetArrival": asMap(planningInput["targetArrival"]),
+		"registeredSLOMs": asMap(planningInput["registeredSLOMs"]),
+		"slo": asMap(planningInput["slo"]),
+	}
+	return postRouterMonitor(router, payload)
+}
+
+func closeRouterMonitor(trace *executionTrace, router, planName string) {
+	snapshot, err := postRouterMonitor(router, map[string]any{"phase": "finish", "planName": planName})
+	if err != nil {
+		trace.SetMetric("routerMonitorFinishError", err.Error())
+		return
+	}
+	trace.SetMetric("routerSLO", snapshot)
+}
+
+func postRouterMonitor(router string, payload map[string]any) (map[string]any, error) {
+	raw, _ := json.Marshal(payload)
+	resp, err := http.Post(strings.TrimRight(router, "/")+"/control/monitor", "application/json", bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var out map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return out, fmt.Errorf("router monitor returned %d: %v", resp.StatusCode, out)
+	}
+	return out, nil
+}
+
 type actionNode struct {
 	ID        string
 	Type      string
@@ -234,13 +325,22 @@ type actionNode struct {
 	Action    map[string]any
 }
 
-func executeActionDAG(client *kube.Client, router string, nodes map[string]string, runtimes []system.ModelRuntimeSpec, actions []actionNode, planName string, trace *executionTrace) (map[string]any, []map[string]any, error) {
+type actionRunResult struct {
+	node   actionNode
+	status map[string]any
+	err    error
+}
+
+func executeActionDAG(client *kube.Client, router string, nodes map[string]string, runtimes []system.ModelRuntimeSpec, actions []actionNode, planName string, initialActiveGPUCount int, trace *executionTrace) (map[string]any, []map[string]any, error) {
 	verified := map[string]any{}
+	var verifiedMu sync.Mutex
 	statuses := []map[string]any{}
 	pending := map[string]actionNode{}
 	known := map[string]bool{}
 	completed := map[string]bool{}
 	blockedOrFailed := map[string]string{}
+	done := make(chan actionRunResult, len(actions))
+	running := 0
 	for _, node := range actions {
 		if node.ID == "" {
 			return verified, statuses, fmt.Errorf("action DAG contains a node without id")
@@ -252,14 +352,15 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 		known[node.ID] = true
 	}
 	var firstErr error
-	for len(pending) > 0 {
+
+	launchReady := func() bool {
 		progress := false
 		ready := readyActionIDs(pending)
 		for _, id := range ready {
 			node := pending[id]
 			blockReason := blockedDependencyReason(node, known, completed, blockedOrFailed)
 			if blockReason != "" {
-				statuses = append(statuses, actionStatus(node, "blocked", 0, blockReason))
+				statuses = append(statuses, actionStatus(node, "blocked", time.Time{}, time.Time{}, trace.start, runtimes, blockReason))
 				blockedOrFailed[id] = blockReason
 				delete(pending, id)
 				progress = true
@@ -268,38 +369,80 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 			if !dependenciesCompleted(node, completed) {
 				continue
 			}
-			start := time.Now()
-			if err := executeAction(client, router, nodes, runtimes, node, verified, planName, trace); err != nil {
-				duration := time.Since(start).Seconds()
-				statuses = append(statuses, actionStatus(node, "failed", duration, err.Error()))
-				blockedOrFailed[id] = err.Error()
-				if firstErr == nil {
-					firstErr = fmt.Errorf("action %s (%s) failed: %w", node.ID, node.Type, err)
-				}
-			} else {
-				statuses = append(statuses, actionStatus(node, "completed", time.Since(start).Seconds(), ""))
-				completed[id] = true
-			}
 			delete(pending, id)
+			running++
 			progress = true
+			go func(node actionNode) {
+				start := time.Now()
+				err := executeAction(client, router, nodes, runtimes, node, verified, &verifiedMu, planName, trace)
+				finished := time.Now()
+				status := "completed"
+				message := ""
+				if err != nil {
+					status = "failed"
+					message = err.Error()
+				}
+				done <- actionRunResult{
+					node:   node,
+					status: actionStatus(node, status, start, finished, trace.start, runtimes, message),
+					err:    err,
+				}
+			}(node)
 		}
-		if progress {
-			continue
-		}
-		for _, id := range readyActionIDs(pending) {
-			node := pending[id]
-			reason := "blocked by unresolved dependency cycle"
-			if blockReason := blockedDependencyReason(node, known, completed, blockedOrFailed); blockReason != "" {
-				reason = blockReason
+		return progress
+	}
+
+	for len(pending) > 0 || running > 0 {
+		progress := launchReady()
+		if running == 0 {
+			if progress {
+				continue
 			}
-			statuses = append(statuses, actionStatus(node, "blocked", 0, reason))
-			blockedOrFailed[id] = reason
-			delete(pending, id)
+			for _, id := range readyActionIDs(pending) {
+				node := pending[id]
+				reason := "blocked by unresolved dependency cycle"
+				if blockReason := blockedDependencyReason(node, known, completed, blockedOrFailed); blockReason != "" {
+					reason = blockReason
+				}
+				statuses = append(statuses, actionStatus(node, "blocked", time.Time{}, time.Time{}, trace.start, runtimes, reason))
+				blockedOrFailed[id] = reason
+				delete(pending, id)
+			}
+			if firstErr == nil {
+				firstErr = fmt.Errorf("action DAG could not make progress; remaining actions were blocked")
+			}
+			break
 		}
-		if firstErr == nil {
-			firstErr = fmt.Errorf("action DAG could not make progress; remaining actions were blocked")
+
+		result := <-done
+		running--
+		statuses = append(statuses, result.status)
+		if result.err != nil {
+			blockedOrFailed[result.node.ID] = result.err.Error()
+			if firstErr == nil {
+				firstErr = fmt.Errorf("action %s (%s) failed: %w", result.node.ID, result.node.Type, result.err)
+			}
+		} else {
+			completed[result.node.ID] = true
 		}
 	}
+	sort.Slice(statuses, func(i, j int) bool {
+		aStart, bStart := asFloat(statuses[i]["relativeStartSeconds"]), asFloat(statuses[j]["relativeStartSeconds"])
+		if aStart != bStart {
+			return aStart < bStart
+		}
+		aEnd, bEnd := asFloat(statuses[i]["relativeEndSeconds"]), asFloat(statuses[j]["relativeEndSeconds"])
+		if aEnd != bEnd {
+			return aEnd < bEnd
+		}
+		return asString(statuses[i]["id"]) < asString(statuses[j]["id"])
+	})
+	trace.SetMetric("actionScheduler", map[string]any{
+		"policy":        "event_driven_dag",
+		"dependencyKey": "dependsOn",
+		"phaseBarrier":  false,
+	})
+	trace.SetMetric("actionSummary", summarizeActionStatuses(statuses, initialActiveGPUCount))
 	if firstErr != nil {
 		return verified, statuses, firstErr
 	}
@@ -348,10 +491,46 @@ func blockedDependencyReason(node actionNode, known, completed map[string]bool, 
 	return ""
 }
 
-func actionStatus(node actionNode, status string, duration float64, message string) map[string]any {
+func actionStatus(node actionNode, status string, startedAt, finishedAt, origin time.Time, runtimes []system.ModelRuntimeSpec, message string) map[string]any {
 	out := map[string]any{
 		"id": node.ID, "type": node.Type, "phase": node.Phase,
-		"status": status, "durationSeconds": duration,
+		"status": status, "durationSeconds": 0,
+		"category": actionCategory(node.Type),
+	}
+	if !startedAt.IsZero() {
+		out["startedAt"] = startedAt.Format(time.RFC3339Nano)
+		out["relativeStartSeconds"] = round(startedAt.Sub(origin).Seconds(), 6)
+	}
+	if !finishedAt.IsZero() {
+		out["finishedAt"] = finishedAt.Format(time.RFC3339Nano)
+		out["relativeEndSeconds"] = round(finishedAt.Sub(origin).Seconds(), 6)
+	}
+	if !startedAt.IsZero() && !finishedAt.IsZero() {
+		out["durationSeconds"] = round(finishedAt.Sub(startedAt).Seconds(), 6)
+	}
+	if physicalID := physicalIDFromAction(node.Action); physicalID != "" {
+		out["physicalGpuId"] = physicalID
+	}
+	if logicalID := logicalIDFromAction(node.Action); logicalID != "" {
+		out["logicalGpuId"] = logicalID
+	}
+	if model := modelFromAction(node.Action); model != "" {
+		out["model"] = model
+	}
+	if count := affectedInstanceCount(node, runtimes); count > 0 {
+		out["affectedInstanceCount"] = count
+		switch actionCategory(node.Type) {
+		case "create_instance":
+			out["createdInstanceCount"] = count
+		case "delete_instance":
+			out["deletedInstanceCount"] = count
+		}
+	}
+	if count := migCreateSlotCount(node.Action); count > 0 {
+		out["migCreateSlotCount"] = count
+	}
+	if count := migDeleteSlotCount(node.Action); count > 0 {
+		out["migDeleteSlotCount"] = count
 	}
 	if len(node.DependsOn) > 0 {
 		out["dependsOn"] = node.DependsOn
@@ -362,7 +541,145 @@ func actionStatus(node actionNode, status string, duration float64, message stri
 	return out
 }
 
-func executeAction(client *kube.Client, router string, nodes map[string]string, runtimes []system.ModelRuntimeSpec, node actionNode, verified map[string]any, planName string, trace *executionTrace) error {
+func summarizeActionStatuses(statuses []map[string]any, initialActiveGPUCount int) map[string]any {
+	byType := map[string]int{}
+	byCategory := map[string]int{}
+	completed := 0
+	failed := 0
+	blocked := 0
+	createdInstances := 0
+	deletedInstances := 0
+	createdMIGSlots := 0
+	deletedMIGSlots := 0
+	activeGPUCount := initialActiveGPUCount
+	activeGPUEvents := []map[string]any{
+		{"relativeSeconds": 0, "activeGpuCount": activeGPUCount, "reason": "source_allocation"},
+	}
+	for _, status := range statuses {
+		actionType := asString(status["type"])
+		category := asString(status["category"])
+		byType[actionType]++
+		byCategory[category]++
+		switch asString(status["status"]) {
+		case "completed":
+			completed++
+		case "failed":
+			failed++
+		case "blocked":
+			blocked++
+		}
+		createdInstances += intNumber(status["createdInstanceCount"])
+		deletedInstances += intNumber(status["deletedInstanceCount"])
+		createdMIGSlots += intNumber(status["migCreateSlotCount"])
+		deletedMIGSlots += intNumber(status["migDeleteSlotCount"])
+		if asString(status["status"]) != "completed" {
+			continue
+		}
+		delta := 0
+		switch actionType {
+		case "allocate_gpu":
+			delta = 1
+		case "return_gpu":
+			delta = -1
+		}
+		if delta == 0 {
+			continue
+		}
+		activeGPUCount += delta
+		activeGPUEvents = append(activeGPUEvents, map[string]any{
+			"relativeSeconds": asFloat(status["relativeEndSeconds"]),
+			"activeGpuCount":  activeGPUCount,
+			"delta":           delta,
+			"actionId":        status["id"],
+			"actionType":      actionType,
+			"physicalGpuId":   status["physicalGpuId"],
+		})
+	}
+	return map[string]any{
+		"totalDagNodes":            len(statuses),
+		"completedDagNodes":        completed,
+		"failedDagNodes":           failed,
+		"blockedDagNodes":          blocked,
+		"byType":                   byType,
+		"byCategory":               byCategory,
+		"reconfigurationNodes":     byCategory["reconfiguration"],
+		"createInstanceNodes":      byCategory["create_instance"],
+		"deleteInstanceNodes":      byCategory["delete_instance"],
+		"createdInstanceCount":     createdInstances,
+		"deletedInstanceCount":     deletedInstances,
+		"createdMIGSlotCount":      createdMIGSlots,
+		"deletedMIGSlotCount":      deletedMIGSlots,
+		"activeGpuCountOverTime":   activeGPUEvents,
+		"finalActiveGPUCountEvent": activeGPUCount,
+	}
+}
+
+func actionCategory(actionType string) string {
+	switch actionType {
+	case "configure_full_template", "apply_slots", "configure_partial_profile", "patch_slots", "clear_full_template", "clear_gpu", "clear_template", "clear_gpu_binding":
+		return "reconfiguration"
+	case "place_instance":
+		return "create_instance"
+	case "delete_instance":
+		return "delete_instance"
+	case "patch_batch_config", "apply_batch", "verify_batch":
+		return "instance_update"
+	case "allocate_gpu":
+		return "gpu_acquire"
+	case "return_gpu":
+		return "gpu_release"
+	case "deactivate_instance_route", "activate_instance_route":
+		return "routing"
+	case "wait_instance_drain":
+		return "drain"
+	default:
+		return "other"
+	}
+}
+
+func affectedInstanceCount(node actionNode, runtimes []system.ModelRuntimeSpec) int {
+	if modelFromAction(node.Action) != "" {
+		return 1
+	}
+	if physicalID := physicalIDFromAction(node.Action); physicalID != "" {
+		return len(runtimesForGPU(runtimes, physicalID))
+	}
+	return 0
+}
+
+func migCreateSlotCount(action map[string]any) int {
+	actionType := asString(action["type"])
+	switch actionType {
+	case "configure_full_template", "apply_slots", "configure_partial_profile", "patch_slots":
+		return firstNonZeroInt(len(asSlice(action["createSlots"])), slotSpecCount(asString(action["createSpec"])), len(asSlice(action["slots"])))
+	default:
+		return 0
+	}
+}
+
+func migDeleteSlotCount(action map[string]any) int {
+	actionType := asString(action["type"])
+	switch actionType {
+	case "configure_partial_profile", "patch_slots":
+		return firstNonZeroInt(len(asSlice(action["deleteSlots"])), slotSpecCount(asString(action["deleteSpec"])))
+	case "clear_full_template", "clear_gpu", "clear_template":
+		return firstNonZeroInt(len(asSlice(action["deleteSlots"])), slotSpecCount(asString(action["deleteSpec"])), len(asSlice(action["slots"])))
+	default:
+		return 0
+	}
+}
+
+func slotSpecCount(spec string) int {
+	count := 0
+	for _, part := range strings.Split(spec, ",") {
+		if strings.TrimSpace(part) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func executeAction(client *kube.Client, router string, nodes map[string]string, runtimes []system.ModelRuntimeSpec, node actionNode, verified map[string]any, verifiedMu *sync.Mutex, planName string, trace *executionTrace) error {
 	action := node.Action
 	actionType := node.Type
 	physicalID := firstNonEmpty(asString(action["physical_gpu_id"]), asString(action["physicalGpuId"]), asString(action["gpu"]))
@@ -374,30 +691,25 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 		return updateLogicalBinding(client, planName, action, "active")
 	case "keep_gpu_layout", "keep_runtime", "validate_target_allocation":
 		return nil
-	case "stop_accepting_new", "stop_gpu_traffic", "deactivate_route":
-		return deleteRoute(router, modelFromAction(action))
-	case "wait_drain", "drain_runtime", "mark_draining_instance":
+	case "deactivate_instance_route":
+		return markRouteDrainingForAction(router, action)
+	case "wait_instance_drain":
 		trace.Mark("drainWaitStartedAt")
-		err := waitDrain(router, action, 60*time.Second)
+		err := waitInstanceDrain(router, action, 60*time.Second)
 		trace.Mark("drainWaitFinishedAt")
 		return err
-	case "delete_pods", "delete_runtime":
-		model := asString(action["workload"])
-		if model == "" {
-			model = asString(action["model"])
+	case "delete_instance":
+		runtimeIDs, err := deleteRuntimeDeploymentForAction(client, action)
+		if err != nil {
+			return err
 		}
-		if model != "" {
-			if err := deleteRuntimeDeployment(client, model); err != nil {
-				return err
-			}
-			return waitForRuntimeModelPodsGone(client, model, 120*time.Second)
-		} else if physicalID != "" {
-			if err := deleteRuntimeDeploymentsForGPU(client, physicalID); err != nil {
-				return err
-			}
-			return waitForRuntimePodsGone(client, map[string]bool{nodeNameFromPhysicalGPU(physicalID) + "|" + physicalID: true}, 120*time.Second)
+		if len(runtimeIDs) == 0 {
+			runtimeIDs = routeRuntimeIDsForAction(router, action)
 		}
-		return nil
+		if err := waitForRuntimeIDsGone(client, runtimeIDs, 120*time.Second); err != nil {
+			return err
+		}
+		return deleteRouteEndpoints(router, modelFromAction(action), runtimeIDs)
 	case "clear_full_template", "clear_gpu", "clear_template":
 		trace.Mark("clearStartedAt")
 		err := clearGPUs(nodes, map[string]bool{nodeNameFromPhysicalGPU(physicalID) + "|" + physicalID: true})
@@ -460,8 +772,12 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 			return nil
 		}
 		return err
-	case "deploy_target_workloads", "place_instance", "bridge_place_instance", "workload_change", "create_runtime":
-		resolved, err := resolveRuntimeDeviceBindings(nodes, gpuRuntimes)
+	case "place_instance":
+		target, err := targetRuntimeForAction(action, runtimes)
+		if err != nil {
+			return err
+		}
+		resolved, err := resolveRuntimeDeviceBindings(nodes, []system.ModelRuntimeSpec{target})
 		if err != nil {
 			return err
 		}
@@ -469,29 +785,39 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 		err = syncRuntimes(client, resolved)
 		trace.Mark("runtimeDeploymentCreatedAt")
 		return err
-	case "activate_serving_route", "sync_route", "verify_cuda_binding":
+	case "activate_instance_route":
 		if !trace.Has("runtimeDeploymentCreatedAt") {
 			trace.Mark("runtimeDeploymentCreatedAt")
 		}
-		resolved, err := resolveRuntimeDeviceBindings(nodes, gpuRuntimes)
+		if physicalIDFromAction(action) == "" {
+			return fmt.Errorf("activate_instance_route requires physical_gpu_id")
+		}
+		if _, ok := actionSlot(action); !ok {
+			return fmt.Errorf("activate_instance_route requires slot")
+		}
+		target, err := targetRuntimeForAction(action, runtimes)
 		if err != nil {
 			return err
 		}
-		perGPUVerification, readiness, err := waitForRuntimeReadyAndCUDA(client, nodes, resolved, trace.timestamps["runtimeDeploymentCreatedAt"], 180*time.Second)
+		resolved, err := resolveRuntimeDeviceBindings(nodes, []system.ModelRuntimeSpec{target})
+		if err != nil {
+			return err
+		}
+		perGPUVerification, readiness, err := waitForRuntimeReadyAndCUDA(client, nodes, resolved, trace.Timestamp("runtimeDeploymentCreatedAt"), 180*time.Second)
 		if err != nil {
 			return err
 		}
 		trace.SetRuntimeReadiness(readiness)
+		verifiedMu.Lock()
 		for key, value := range perGPUVerification {
 			verified[key] = value
 		}
+		verifiedMu.Unlock()
 		trace.Mark("runtimeReadyAndCUDAVerifiedAt")
-		if actionType != "verify_cuda_binding" {
-			if err := syncRoutes(router, resolved, nodes); err != nil {
-				return err
-			}
-			trace.Mark("routeSyncedAt")
+		if err := upsertRoutes(router, resolved, nodes); err != nil {
+			return err
 		}
+		trace.Mark("routeSyncedAt")
 		return nil
 	case "patch_batch_config":
 		target, err := batchTarget(action, runtimes)
@@ -506,7 +832,7 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 			return err
 		}
 		trace.Mark("batchApplyStartedAt")
-		err = applyBatch(router, target)
+		err = applyBatch(router, action, target)
 		trace.Mark("batchApplyFinishedAt")
 		return err
 	case "verify_batch":
@@ -515,7 +841,7 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 			return err
 		}
 		trace.Mark("batchVerifyStartedAt")
-		err = verifyBatch(router, target, 30*time.Second)
+		err = verifyBatch(router, action, target, 30*time.Second)
 		trace.Mark("batchVerifyFinishedAt")
 		return err
 	case "return_gpu":
@@ -545,8 +871,12 @@ func modelFromAction(action map[string]any) string {
 	return firstNonEmpty(asString(action["workload"]), asString(action["model"]), asString(action["runtime"]), asString(action["target"]))
 }
 
+func physicalIDFromAction(action map[string]any) string {
+	return firstNonEmpty(asString(action["physical_gpu_id"]), asString(action["physicalGpuId"]), asString(action["gpu"]))
+}
+
 func updateLogicalBinding(client *kube.Client, planName string, action map[string]any, phase string) error {
-	physicalID := firstNonEmpty(asString(action["physical_gpu_id"]), asString(action["physicalGpuId"]), asString(action["gpu"]))
+	physicalID := physicalIDFromAction(action)
 	if physicalID == "" {
 		return fmt.Errorf("%s binding action requires physical_gpu_id", phase)
 	}
@@ -655,6 +985,190 @@ func finalPhysicalIDMap(spec map[string]any) map[string]string {
 	return stringMap(asMap(planningTrace["canonicalization"]), "canonicalPhysicalIds")
 }
 
+func validateFinalTargetAllocation(client *kube.Client, spec map[string]any) (map[string]any, error) {
+	deadline := time.Now().Add(90 * time.Second)
+	var last map[string]any
+	var lastErr error
+	for {
+		out, err := validateFinalTargetAllocationOnce(client, spec)
+		if err == nil || asBool(out["skipped"]) {
+			return out, err
+		}
+		last, lastErr = out, err
+		if time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if last == nil {
+		last = map[string]any{"ok": false}
+	}
+	last["timedOut"] = true
+	return last, lastErr
+}
+
+func validateFinalTargetAllocationOnce(client *kube.Client, spec map[string]any) (map[string]any, error) {
+	targetPlan := asMap(asMap(spec["validationTargets"])["targetAllocationPlan"])
+	targetState := asMap(targetPlan["targetState"])
+	if len(targetState) == 0 {
+		return map[string]any{"skipped": true, "reason": "missing targetState"}, nil
+	}
+	expectedMIG := expectedMIGSlotsFromTargetState(targetState)
+	expectedRuntimes := expectedRuntimeBindingsFromTargetPlan(targetPlan)
+	expectedPhysical := map[string]bool{}
+	for key := range expectedMIG {
+		expectedPhysical[strings.SplitN(key, "|", 2)[0]] = true
+	}
+	for key := range expectedRuntimes {
+		expectedPhysical[strings.SplitN(key, "|", 2)[0]] = true
+	}
+
+	var registry map[string]any
+	status, err := client.Get(kube.NamespacedResourceName(client.Namespace(), "physicalgpuregistries", "default"), &registry)
+	if err != nil {
+		return map[string]any{"ok": false, "error": err.Error()}, err
+	}
+	if status != http.StatusOK {
+		err := fmt.Errorf("final target validation could not read PhysicalGpuRegistry/default: status %d", status)
+		return map[string]any{"ok": false, "status": status}, err
+	}
+	bindings := asMap(asMap(registry["status"])["bindings"])
+	if canonicalGPUs := asMap(asMap(asMap(registry["status"])["currentAllocation"])["gpus"]); len(canonicalGPUs) > 0 {
+		bindings = canonicalGPUs
+	}
+	actualMIG := map[string]bool{}
+	actualRuntimes := map[string]bool{}
+	for physicalID, raw := range bindings {
+		gpu := asMap(raw)
+		for _, rawDevice := range asSlice(gpu["migDevices"]) {
+			device := asMap(rawDevice)
+			start := intNumber(device["start"])
+			end := intNumber(device["end"])
+			profile := asString(device["profile"])
+			if profile == "" || end <= start {
+				continue
+			}
+			key := migSlotKey(physicalID, start, end, profile)
+			actualMIG[key] = true
+		}
+		for _, rawRuntime := range asSlice(gpu["runtimeBindings"]) {
+			rt := asMap(rawRuntime)
+			model := asString(rt["model"])
+			slotResource := asString(rt["slotResource"])
+			if model == "" || slotResource == "" {
+				continue
+			}
+			actualRuntimes[runtimeBindingKey(physicalID, slotResource, model)] = true
+		}
+		if !expectedPhysical[physicalID] && (len(asSlice(gpu["migDevices"])) > 0 || len(asSlice(gpu["runtimeBindings"])) > 0) {
+			actualMIG["unexpected-gpu|"+physicalID] = true
+		}
+	}
+
+	missingMIG, extraMIG := diffStringSets(expectedMIG, actualMIG)
+	missingRuntime, extraRuntime := diffStringSets(expectedRuntimes, actualRuntimes)
+	out := map[string]any{
+		"ok":                    len(missingMIG) == 0 && len(extraMIG) == 0 && len(missingRuntime) == 0 && len(extraRuntime) == 0,
+		"expectedMigSlotCount":  len(expectedMIG),
+		"actualMigSlotCount":    len(actualMIG),
+		"expectedRuntimeCount":  len(expectedRuntimes),
+		"actualRuntimeCount":    len(actualRuntimes),
+		"missingMigSlots":       missingMIG,
+		"extraMigSlots":         extraMIG,
+		"missingRuntimeBindings": missingRuntime,
+		"extraRuntimeBindings":   extraRuntime,
+	}
+	if !asBool(out["ok"]) {
+		return out, fmt.Errorf("final target validation failed: missingMig=%d extraMig=%d missingRuntime=%d extraRuntime=%d", len(missingMIG), len(extraMIG), len(missingRuntime), len(extraRuntime))
+	}
+	return out, nil
+}
+
+func expectedMIGSlotsFromTargetState(targetState map[string]any) map[string]bool {
+	physicalByLogical := stringMap(asMap(targetState["metadata"]), "physical_id_map")
+	out := map[string]bool{}
+	for _, rawGPU := range asSlice(targetState["gpus"]) {
+		gpu := asMap(rawGPU)
+		logicalID := asString(gpu["gpuId"])
+		if logicalID == "" {
+			if id, ok := intString(gpu["gpuId"]); ok {
+				logicalID = id
+			}
+		}
+		physicalID := physicalByLogical[logicalID]
+		if physicalID == "" {
+			continue
+		}
+		for _, rawInst := range asSlice(gpu["instances"]) {
+			inst := asMap(rawInst)
+			profile := asString(inst["profile"])
+			if profile == "" || profile == "void" || asString(inst["workload"]) == "" {
+				continue
+			}
+			start := intNumber(inst["start"])
+			end := start + placementProfileSize(profile, intNumber(inst["end"])-start)
+			out[migSlotKey(physicalID, start, end, profile)] = true
+		}
+	}
+	return out
+}
+
+func expectedRuntimeBindingsFromTargetPlan(targetPlan map[string]any) map[string]bool {
+	out := map[string]bool{}
+	for _, raw := range asSlice(targetPlan["desiredRuntimes"]) {
+		rt := asMap(raw)
+		model := asString(rt["model"])
+		physicalID := asString(rt["gpu"])
+		slotResource := asString(rt["slotResource"])
+		if model == "" || physicalID == "" || slotResource == "" {
+			continue
+		}
+		out[runtimeBindingKey(physicalID, slotResource, model)] = true
+	}
+	return out
+}
+
+func migSlotKey(physicalID string, start, end int, profile string) string {
+	return physicalID + "|" + strconv.Itoa(start) + "|" + strconv.Itoa(end) + "|" + profile
+}
+
+func runtimeBindingKey(physicalID, slotResource, model string) string {
+	return physicalID + "|" + slotResource + "|" + model
+}
+
+func placementProfileSize(profile string, fallback int) int {
+	switch profile {
+	case "7g":
+		return 8
+	case "4g", "3g":
+		return 4
+	case "2g":
+		return 2
+	case "1g":
+		return 1
+	default:
+		return fallback
+	}
+}
+
+func diffStringSets(expected, actual map[string]bool) ([]string, []string) {
+	missing := []string{}
+	extra := []string{}
+	for key := range expected {
+		if !actual[key] {
+			missing = append(missing, key)
+		}
+	}
+	for key := range actual {
+		if !expected[key] {
+			extra = append(extra, key)
+		}
+	}
+	sort.Strings(missing)
+	sort.Strings(extra)
+	return missing, extra
+}
+
 func stringMap(parent map[string]any, key string) map[string]string {
 	out := map[string]string{}
 	for logicalID, rawPhysicalID := range asMap(parent[key]) {
@@ -715,39 +1229,97 @@ func configMapPath(ns, name string) string {
 	return "/api/v1/namespaces/" + ns + "/configmaps/" + name
 }
 
-func waitDrain(router string, action map[string]any, timeout time.Duration) error {
-	model := modelFromAction(action)
+func markRouteDrainingForAction(router string, action map[string]any) error {
+	route, err := routeEndpointForAction(router, action)
+	if err != nil {
+		return err
+	}
+	route["acceptingNew"] = false
+	route["draining"] = true
+	route["active"] = true
+	return postRouteEndpoint(router, route)
+}
+
+func waitInstanceDrain(router string, action map[string]any, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		routes, err := routeSnapshots(router)
+		route, err := routeEndpointForAction(router, action)
 		if err != nil {
-			return err
+			return nil
 		}
-		found := false
-		draining := []string{}
-		for _, route := range routes {
-			if model != "" && asString(route["model"]) != model {
-				continue
-			}
-			found = true
-			if intNumber(route["inflight"]) > 0 || intNumber(route["queued"]) > 0 {
-				draining = append(draining, fmt.Sprintf("%s(inflight=%d,queued=%d)", asString(route["model"]), intNumber(route["inflight"]), intNumber(route["queued"])))
-			}
-		}
-		if !found || len(draining) == 0 {
+		inflight := firstNonZeroInt(intNumber(route["endpointInflight"]), intNumber(route["inflight"]))
+		queued := firstNonZeroInt(intNumber(route["endpointQueued"]), intNumber(route["queued"]))
+		if inflight == 0 && queued == 0 {
 			return nil
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	return fmt.Errorf("timed out waiting for drain of %s", firstNonEmpty(model, "all routed runtimes"))
+	return fmt.Errorf("timed out waiting for drain of %s", routeActionLabel(action))
+}
+
+func routeEndpointForAction(router string, action map[string]any) (map[string]any, error) {
+	model := modelFromAction(action)
+	if model == "" {
+		return nil, fmt.Errorf("%s requires workload/model", asString(action["type"]))
+	}
+	if physicalIDFromAction(action) == "" {
+		return nil, fmt.Errorf("%s requires physical_gpu_id", asString(action["type"]))
+	}
+	if _, ok := actionSlot(action); !ok {
+		return nil, fmt.Errorf("%s requires slot", asString(action["type"]))
+	}
+	routes, err := routeSnapshots(router)
+	if err != nil {
+		return nil, err
+	}
+	matches := []map[string]any{}
+	for _, route := range routes {
+		if routeMatchesAction(route, action) {
+			matches = append(matches, route)
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("route not found for %s", routeActionLabel(action))
+	}
+	return nil, fmt.Errorf("route ambiguous for %s: %d matches", routeActionLabel(action), len(matches))
+}
+
+func routeRuntimeIDsForAction(router string, action map[string]any) []string {
+	route, err := routeEndpointForAction(router, action)
+	if err != nil {
+		return nil
+	}
+	if runtimeID := asString(route["runtimeId"]); runtimeID != "" {
+		return []string{runtimeID}
+	}
+	return nil
+}
+
+func routeMatchesAction(route, action map[string]any) bool {
+	model := modelFromAction(action)
+	if model != "" && asString(route["model"]) != model {
+		return false
+	}
+	physicalID := physicalIDFromAction(action)
+	if physicalID != "" && asString(route["gpu"]) != physicalID {
+		return false
+	}
+	slot, ok := actionSlot(action)
+	if !ok {
+		return false
+	}
+	expected := fmt.Sprintf("%s-s%d-%d-%s", physicalID, slot.Start, slot.End, slot.Profile)
+	return strings.HasSuffix(asString(route["slotResource"]), expected)
+}
+
+func routeActionLabel(action map[string]any) string {
+	return fmt.Sprintf("model=%q gpu=%q slot=%v", modelFromAction(action), physicalIDFromAction(action), action["slot"])
 }
 
 func clearGPUBinding(client *kube.Client, router, physicalID string, action map[string]any) error {
-	if model := modelFromAction(action); model != "" {
-		if err := deleteRoute(router, model); err != nil {
-			return err
-		}
-	}
 	if physicalID == "" {
 		return nil
 	}
@@ -765,29 +1337,74 @@ func clearGPUBinding(client *kube.Client, router, physicalID string, action map[
 }
 
 func batchTarget(action map[string]any, runtimes []system.ModelRuntimeSpec) (system.ModelRuntimeSpec, error) {
-	model := modelFromAction(action)
+	target, err := targetRuntimeForAction(action, runtimes)
+	if err != nil {
+		return system.ModelRuntimeSpec{}, err
+	}
 	batch := intNumber(firstNonNil(action["batchSize"], action["targetBatchSize"], action["newBatchSize"]))
+	if batch > 0 {
+		target.BatchSize = batch
+	}
+	if target.BatchSize <= 0 {
+		return target, fmt.Errorf("batch action for %s has no positive target batchSize", target.Model)
+	}
+	return target, nil
+}
+
+func targetRuntimeForAction(action map[string]any, runtimes []system.ModelRuntimeSpec) (system.ModelRuntimeSpec, error) {
+	model := modelFromAction(action)
+	physicalID := physicalIDFromAction(action)
+	slot, hasSlot := actionSlot(action)
+	matches := []system.ModelRuntimeSpec{}
 	for _, rt := range runtimes {
 		if model != "" && rt.Model != model {
 			continue
 		}
-		target := rt
-		if batch > 0 {
-			target.BatchSize = batch
+		if physicalID != "" && rt.GPU != physicalID {
+			continue
 		}
-		if target.BatchSize <= 0 {
-			return target, fmt.Errorf("batch action for %s has no positive target batchSize", target.Model)
+		if hasSlot {
+			rtSlot, err := parseSlotRequest(rt)
+			if err != nil {
+				continue
+			}
+			if rtSlot.Start != slot.Start || rtSlot.End != slot.End || rtSlot.Profile != slot.Profile {
+				continue
+			}
 		}
-		return target, nil
+		matches = append(matches, rt)
 	}
-	if model == "" {
-		return system.ModelRuntimeSpec{}, fmt.Errorf("batch action requires workload/model when plan has no runtime target")
+	if len(matches) == 1 {
+		return matches[0], nil
 	}
-	return system.ModelRuntimeSpec{}, fmt.Errorf("batch action target runtime %q not found in plan", model)
+	if len(matches) == 0 {
+		return system.ModelRuntimeSpec{}, fmt.Errorf("target runtime not found for action %s model=%q gpu=%q slot=%v", asString(action["type"]), model, physicalID, action["slot"])
+	}
+	return system.ModelRuntimeSpec{}, fmt.Errorf("target runtime ambiguous for action %s model=%q gpu=%q slot=%v: %d matches", asString(action["type"]), model, physicalID, action["slot"], len(matches))
 }
 
-func applyBatch(router string, target system.ModelRuntimeSpec) error {
-	endpoint, err := routeEndpoint(router, target.Model)
+func actionSlot(action map[string]any) (slotRequest, bool) {
+	values := asSlice(action["slot"])
+	if len(values) < 3 {
+		return slotRequest{}, false
+	}
+	start := intNumber(values[0])
+	end := intNumber(values[1])
+	profile := asString(values[2])
+	if end <= start || profile == "" {
+		return slotRequest{}, false
+	}
+	gpuIndex := 0
+	if physicalID := physicalIDFromAction(action); physicalID != "" {
+		if parsed, err := gpuIndexFromID(physicalID); err == nil {
+			gpuIndex = parsed
+		}
+	}
+	return slotRequest{GPUIndex: gpuIndex, Start: start, End: end, Profile: profile}, true
+}
+
+func applyBatch(router string, action map[string]any, target system.ModelRuntimeSpec) error {
+	endpoint, err := routeEndpointForBatchAction(router, action)
 	if err != nil {
 		return err
 	}
@@ -803,8 +1420,8 @@ func applyBatch(router string, target system.ModelRuntimeSpec) error {
 	return nil
 }
 
-func verifyBatch(router string, target system.ModelRuntimeSpec, timeout time.Duration) error {
-	endpoint, err := routeEndpoint(router, target.Model)
+func verifyBatch(router string, action map[string]any, target system.ModelRuntimeSpec, timeout time.Duration) error {
+	endpoint, err := routeEndpointForBatchAction(router, action)
 	if err != nil {
 		return err
 	}
@@ -819,21 +1436,16 @@ func verifyBatch(router string, target system.ModelRuntimeSpec, timeout time.Dur
 	return fmt.Errorf("timed out verifying batchSize=%d for %s", target.BatchSize, target.Model)
 }
 
-func routeEndpoint(router, model string) (string, error) {
-	routes, err := routeSnapshots(router)
+func routeEndpointForBatchAction(router string, action map[string]any) (string, error) {
+	route, err := routeEndpointForAction(router, action)
 	if err != nil {
 		return "", err
 	}
-	for _, route := range routes {
-		if asString(route["model"]) == model {
-			endpoint := strings.TrimRight(asString(route["endpoint"]), "/")
-			if endpoint == "" {
-				return "", fmt.Errorf("route for %s has empty endpoint", model)
-			}
-			return endpoint, nil
-		}
+	endpoint := strings.TrimRight(asString(route["endpoint"]), "/")
+	if endpoint == "" {
+		return "", fmt.Errorf("route for %s has empty endpoint", routeActionLabel(action))
 	}
-	return "", fmt.Errorf("route for %s not found", model)
+	return endpoint, nil
 }
 
 func routeSnapshots(router string) ([]map[string]any, error) {
@@ -901,27 +1513,57 @@ func runtimeDeploymentsForGPU(client *kube.Client, gpu string) ([]string, error)
 	return out, nil
 }
 
-func deleteRuntimeDeployment(client *kube.Client, model string) error {
-	if model == "" {
-		return nil
-	}
+func deleteRuntimeDeploymentForAction(client *kube.Client, action map[string]any) ([]string, error) {
 	var list map[string]any
 	if _, err := client.Get(kube.Deployments(client.Namespace()), &list); err != nil {
-		return err
+		return nil, err
 	}
+	model := modelFromAction(action)
+	physicalID := physicalIDFromAction(action)
+	slot, hasSlot := actionSlot(action)
+	deleted := []string{}
 	for _, item := range asSlice(list["items"]) {
 		dep := asMap(item)
 		meta := asMap(dep["metadata"])
 		labels := asMap(meta["labels"])
-		if asString(labels["app.kubernetes.io/name"]) != "migrant-model-runtime" || asString(labels["migrant.io/model"]) != model {
+		if asString(labels["app.kubernetes.io/name"]) != "migrant-model-runtime" {
+			continue
+		}
+		if model != "" && asString(labels["migrant.io/model"]) != model {
+			continue
+		}
+		if physicalID != "" && asString(labels["migrant.io/gpu"]) != physicalID {
+			continue
+		}
+		if hasSlot && !deploymentMatchesSlot(dep, physicalID, slot) {
 			continue
 		}
 		name := asString(meta["name"])
 		if status, err := client.Delete(kube.Deployment(client.Namespace(), name)); err != nil && status != http.StatusNotFound {
-			return err
+			return nil, err
+		}
+		if runtimeID := asString(labels["migrant.io/runtime-id"]); runtimeID != "" {
+			deleted = append(deleted, runtimeID)
 		}
 	}
-	return nil
+	return deleted, nil
+}
+
+func deploymentMatchesSlot(dep map[string]any, physicalID string, slot slotRequest) bool {
+	spec := asMap(dep["spec"])
+	template := asMap(spec["template"])
+	meta := asMap(template["metadata"])
+	annotations := asMap(meta["annotations"])
+	slotResource := asString(annotations["migrant.io/slot-resource"])
+	if slotResource == "" {
+		return false
+	}
+	if physicalID == "" {
+		labels := asMap(asMap(dep["metadata"])["labels"])
+		physicalID = asString(labels["migrant.io/gpu"])
+	}
+	expected := fmt.Sprintf("%s-s%d-%d-%s", physicalID, slot.Start, slot.End, slot.Profile)
+	return strings.HasSuffix(slotResource, expected)
 }
 
 func deleteRuntimeDeploymentsForGPU(client *kube.Client, gpu string) error {
@@ -1194,9 +1836,15 @@ func waitForRuntimePodsGone(client *kube.Client, gpus map[string]bool, timeout t
 	return fmt.Errorf("timed out waiting for runtime pods to leave GPUs %v", gpus)
 }
 
-func waitForRuntimeModelPodsGone(client *kube.Client, model string, timeout time.Duration) error {
-	if model == "" {
+func waitForRuntimeIDsGone(client *kube.Client, runtimeIDs []string, timeout time.Duration) error {
+	if len(runtimeIDs) == 0 {
 		return nil
+	}
+	wanted := map[string]bool{}
+	for _, runtimeID := range runtimeIDs {
+		if runtimeID != "" {
+			wanted[runtimeID] = true
+		}
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -1209,7 +1857,7 @@ func waitForRuntimeModelPodsGone(client *kube.Client, model string, timeout time
 			pod := asMap(item)
 			meta := asMap(pod["metadata"])
 			labels := asMap(meta["labels"])
-			if asString(labels["app.kubernetes.io/name"]) == "migrant-model-runtime" && asString(labels["migrant.io/model"]) == model {
+			if asString(labels["app.kubernetes.io/name"]) == "migrant-model-runtime" && wanted[asString(labels["migrant.io/runtime-id"])] {
 				found = true
 				break
 			}
@@ -1219,7 +1867,7 @@ func waitForRuntimeModelPodsGone(client *kube.Client, model string, timeout time
 		}
 		time.Sleep(2 * time.Second)
 	}
-	return fmt.Errorf("timed out waiting for runtime pods for model %s to terminate", model)
+	return fmt.Errorf("timed out waiting for runtime pods %v to terminate", runtimeIDs)
 }
 
 func clearGPUs(nodes map[string]string, gpus map[string]bool) error {
@@ -1805,17 +2453,7 @@ func deleteStaleRuntimes(client *kube.Client, desired []system.ModelRuntimeSpec)
 	return deleted, nil
 }
 
-func syncRoutes(router string, runtimes []system.ModelRuntimeSpec, nodes map[string]string) error {
-	cleared := map[string]bool{}
-	for _, rt := range runtimes {
-		if rt.Model == "" || cleared[rt.Model] {
-			continue
-		}
-		if err := deleteRoute(router, rt.Model); err != nil {
-			return err
-		}
-		cleared[rt.Model] = true
-	}
+func upsertRoutes(router string, runtimes []system.ModelRuntimeSpec, nodes map[string]string) error {
 	for _, rt := range runtimes {
 		ip := nodes[rt.Node]
 		if ip == "" {
@@ -1836,23 +2474,50 @@ func syncRoutes(router string, runtimes []system.ModelRuntimeSpec, nodes map[str
 			"active":          true,
 			"acceptingNew":    true,
 		})
-		resp, err := http.Post(router+"/control/routes", "application/json", bytes.NewReader(raw))
-		if err != nil {
+		if err := postRouteRaw(router, raw, rt.Model); err != nil {
 			return err
-		}
-		resp.Body.Close()
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return fmt.Errorf("route update for %s returned %d", rt.Model, resp.StatusCode)
 		}
 	}
 	return nil
 }
 
-func deleteRoute(router, model string) error {
+func postRouteEndpoint(router string, route map[string]any) error {
+	raw, _ := json.Marshal(route)
+	return postRouteRaw(router, raw, asString(route["model"]))
+}
+
+func postRouteRaw(router string, raw []byte, label string) error {
+	resp, err := http.Post(strings.TrimRight(router, "/")+"/control/routes", "application/json", bytes.NewReader(raw))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("route update for %s returned %d", label, resp.StatusCode)
+	}
+	return nil
+}
+
+func deleteRouteEndpoints(router, model string, runtimeIDs []string) error {
 	if model == "" {
 		return nil
 	}
-	req, err := http.NewRequest(http.MethodDelete, router+"/control/routes?model="+model, nil)
+	for _, runtimeID := range runtimeIDs {
+		if runtimeID == "" {
+			continue
+		}
+		if err := deleteRouteEndpoint(router, model, runtimeID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteRouteEndpoint(router, model, runtimeID string) error {
+	query := url.Values{}
+	query.Set("model", model)
+	query.Set("runtimeId", runtimeID)
+	req, err := http.NewRequest(http.MethodDelete, strings.TrimRight(router, "/")+"/control/routes?"+query.Encode(), nil)
 	if err != nil {
 		return err
 	}
@@ -1862,7 +2527,7 @@ func deleteRoute(router, model string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("route delete for %s returned %d", model, resp.StatusCode)
+		return fmt.Errorf("route endpoint delete for %s/%s returned %d", model, runtimeID, resp.StatusCode)
 	}
 	return nil
 }
@@ -2102,6 +2767,15 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+func firstNonZeroInt(values ...int) int {
+	for _, value := range values {
+		if value != 0 {
+			return value
+		}
+	}
+	return 0
+}
+
 func firstNonNil(values ...any) any {
 	for _, value := range values {
 		if value != nil {
@@ -2204,6 +2878,11 @@ func asFloat(v any) float64 {
 		}
 	}
 	return 0
+}
+
+func round(value float64, digits int) float64 {
+	scale := math.Pow(10, float64(digits))
+	return math.Round(value*scale) / scale
 }
 
 func intNumber(v any) int {
