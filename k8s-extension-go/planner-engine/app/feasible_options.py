@@ -7,12 +7,41 @@ from models import ProfileOption, WorkloadRequest
 
 def profile_catalog_from_yaml(obj: dict) -> list[ProfileOption]:
     options = []
+    metadata = dict(obj.get("metadata", {}) or {})
     for raw in obj.get("options", []):
+        model_key = _first_present(
+            raw,
+            metadata,
+            ("modelKey", "model_key", "modelMatch", "model", "baseModel"),
+        )
+        placement_group = _first_present(
+            raw,
+            metadata,
+            ("placementGroup", "placement_group", "modelKey", "model_key", "modelMatch"),
+        )
         metrics = {
             k: v
             for k, v in raw.items()
-            if k not in {"workload", "family", "batch", "profile", "mu", "fit"}
+            if k
+            not in {
+                "workload",
+                "family",
+                "batch",
+                "profile",
+                "mu",
+                "fit",
+                "modelKey",
+                "model_key",
+                "modelMatch",
+                "model",
+                "baseModel",
+                "placementGroup",
+                "placement_group",
+            }
         }
+        for key in ("requestClass", "requestShape", "slo"):
+            if key not in metrics and key in metadata:
+                metrics[key] = metadata[key]
         options.append(
             ProfileOption(
                 workload=str(raw["workload"]),
@@ -21,6 +50,14 @@ def profile_catalog_from_yaml(obj: dict) -> list[ProfileOption]:
                 profile=str(raw["profile"]),
                 mu=float(raw["mu"]),
                 fit=bool(raw.get("fit", False)),
+                model_key=str(model_key) if model_key is not None else str(raw["workload"]),
+                placement_group=(
+                    str(placement_group)
+                    if placement_group is not None
+                    else str(model_key)
+                    if model_key is not None
+                    else str(raw["workload"])
+                ),
                 metrics=metrics,
             )
         )
@@ -119,6 +156,8 @@ def apply_runtime_profile_correction(
                     profile=option.profile,
                     mu=float(new_mu),
                     fit=option.fit,
+                    model_key=option.model_key,
+                    placement_group=option.placement_group,
                     metrics=new_metrics,
                 )
             )
@@ -135,19 +174,28 @@ def apply_runtime_profile_correction(
 
 
 def _slo_matches(request: WorkloadRequest, option: ProfileOption) -> bool:
-    slo_to_metric = {
-        "e2eMs": "e2eMs",
-        "ttftMs": "ttftMs",
-        "tpotMs": "tpotMs",
+    slo_to_metrics = {
+        "latencyMs": ("latencyMsP95", "latencyMs", "serviceTimeMs", "timeMsP95"),
+        "e2eMs": ("e2eMsP95", "e2eMs"),
+        "ttftMs": ("ttftMsP95", "ttftMs"),
+        "tpotMs": ("tpotMsP95", "tpotMs"),
     }
-    for slo_key, metric_key in slo_to_metric.items():
+    for slo_key, metric_keys in slo_to_metrics.items():
         if slo_key not in request.slo:
             continue
-        if metric_key not in option.metrics:
+        metric_value = _first_metric_value(option.metrics, metric_keys)
+        if metric_value is None:
             continue
-        if float(option.metrics[metric_key]) > float(request.slo[slo_key]):
+        if float(metric_value) > float(request.slo[slo_key]):
             return False
     return True
+
+
+def _first_metric_value(metrics: dict, keys: tuple[str, ...]) -> object | None:
+    for key in keys:
+        if key in metrics and metrics[key] is not None:
+            return metrics[key]
+    return None
 
 
 def _normalize_observation(raw: dict) -> dict:
@@ -191,3 +239,13 @@ def _best_observation_for_option(option: ProfileOption, observations: list[dict]
             int(obs.get("sampleCount", 0) or 0),
         ),
     )
+
+
+def _first_present(raw: dict, metadata: dict, keys: tuple[str, ...]) -> object | None:
+    for key in keys:
+        if key in raw and raw[key] is not None:
+            return raw[key]
+    for key in keys:
+        if key in metadata and metadata[key] is not None:
+            return metadata[key]
+    return None

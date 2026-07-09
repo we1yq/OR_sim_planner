@@ -278,6 +278,8 @@ def instances_from_current_gpu(gpu: dict[str, Any]) -> list[MigInstance]:
                 profile=profile,
                 workload=binding.get("model"),
                 batch=int(binding.get("batchSize") or binding.get("batch") or 1),
+                model_key=binding.get("modelKey") or binding.get("model_key"),
+                placement_group=binding.get("placementGroup") or binding.get("placement_group"),
                 mu=float(binding.get("mu") or 0.0),
             )
         )
@@ -347,11 +349,17 @@ def desired_runtimes_from_target_state(target_state: dict[str, Any], planning_tr
                 continue
             start, end = int(inst["start"]), int(inst["end"])
             model = str(workload)
+            model_key = str(inst.get("modelKey") or inst.get("model_key") or model)
+            placement_group = str(
+                inst.get("placementGroup") or inst.get("placement_group") or model_key
+            )
             runtime_id = runtime_id_for(model, physical_id, start, end, profile)
             mu = float(inst.get("mu") or 0.0)
             runtimes.append(
                 {
                     "model": model,
+                    "modelKey": model_key,
+                    "placementGroup": placement_group,
                     "runtimeId": runtime_id,
                     "batchSize": int(inst.get("batch") or 1),
                     "node": node,
@@ -383,10 +391,16 @@ def desired_runtimes_from_actions(actions: list[dict[str, Any]], target_state: d
                 continue
             start, end, profile = int(slot[0]), int(slot[1]), str(slot[2])
             model = str(workload)
+            model_key = str(record.get("modelKey") or record.get("model_key") or model)
+            placement_group = str(
+                record.get("placementGroup") or record.get("placement_group") or model_key
+            )
             runtime_id = runtime_id_for(model, physical_id, start, end, profile)
             mu = float(record.get("mu") or 0.0)
             by_key[(model, physical_id, start, end, profile)] = {
                 "model": model,
+                "modelKey": model_key,
+                "placementGroup": placement_group,
                 "runtimeId": runtime_id,
                 "batchSize": int(record.get("batch") or 1),
                 "node": node,

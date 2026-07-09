@@ -34,6 +34,17 @@ NAME = "transition.action_builder"
 _REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS = 5.0
 
 
+def _model_affinity_fields(inst: MigInstance) -> dict[str, Any]:
+    return {
+        "modelKey": getattr(inst, "model_key", None) or inst.workload,
+        "placementGroup": (
+            getattr(inst, "placement_group", None)
+            or getattr(inst, "model_key", None)
+            or inst.workload
+        ),
+    }
+
+
 def run(
     *,
     source_state: Any,
@@ -721,13 +732,14 @@ def _append_instance_diff_actions(
             continue
         if change_type == "place_instance":
             tgt = inst_action["tgt"]
+            affinity = _model_affinity_fields(tgt)
             actions.extend(
                 [
-                    _action("place_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, batch=tgt.batch, **common),
-                    _action("activate_serving_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **common),
+                    _action("place_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, batch=tgt.batch, **affinity, **common),
+                    _action("activate_serving_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **affinity, **common),
                 ]
             )
-            plan_items.append(_plan_item(root, "place_instance", gpu_id, physical_id, slot=slot, workload=tgt.workload))
+            plan_items.append(_plan_item(root, "place_instance", gpu_id, physical_id, slot=slot, workload=tgt.workload, **affinity))
             continue
         if change_type == "safe_remove_instance":
             src = inst_action["src"]
@@ -769,15 +781,16 @@ def _append_workload_replacement_actions(
     safe = safe_after_removing_instance(source_state, src, required)
     candidates = _reroute_destination_candidates(source_state, target_state, src.workload, exclude_gpu_id=gpu_id, exclude_slot=slot)
     if safe or candidates:
+        affinity = _model_affinity_fields(tgt)
         actions.extend(_queue_and_drain_actions(source_state, target_state, gpu_id, physical_id, src, required, common))
         actions.extend(
             [
                 _action("delete_pods", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, slots=[slot], workload=src.workload, **common),
-                _action("place_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, batch=tgt.batch, **common),
-                _action("activate_serving_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **common),
+                _action("place_instance", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, batch=tgt.batch, **affinity, **common),
+                _action("activate_serving_route", gpu_id=gpu_id, physical_gpu_id=physical_id, slot=slot, workload=tgt.workload, **affinity, **common),
             ]
         )
-        plan_items.append(_plan_item(root, "workload_replacement", gpu_id, physical_id, slot=slot, workload=src.workload))
+        plan_items.append(_plan_item(root, "workload_replacement", gpu_id, physical_id, slot=slot, workload=src.workload, **affinity))
         return
 
     actions.extend(_queue_and_drain_actions(source_state, target_state, gpu_id, physical_id, src, required, common))

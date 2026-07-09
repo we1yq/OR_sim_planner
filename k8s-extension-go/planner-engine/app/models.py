@@ -21,6 +21,10 @@ class WorkloadRequest:
     model: str
     family: str | None
     arrival_rate: float
+    model_key: str | None = None
+    placement_group: str | None = None
+    request_class: str | None = None
+    request_shape: dict[str, Any] = field(default_factory=dict)
     allowed_batches: list[int] = field(default_factory=list)
     priority: str = "normal"
     slo: dict[str, float] = field(default_factory=dict)
@@ -34,6 +38,8 @@ class ProfileOption:
     profile: str
     mu: float
     fit: bool
+    model_key: str | None = None
+    placement_group: str | None = None
     metrics: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -53,6 +59,8 @@ class MigInstance:
     profile: str
     workload: str | None = None
     batch: int | None = None
+    model_key: str | None = None
+    placement_group: str | None = None
 
     @property
     def size(self) -> int:

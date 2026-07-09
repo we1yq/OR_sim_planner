@@ -244,6 +244,8 @@ def state_semantic_signature(state: ClusterState) -> tuple:
                     int(inst.end),
                     inst.profile,
                     inst.workload,
+                    getattr(inst, "model_key", None),
+                    getattr(inst, "placement_group", None),
                     None if inst.batch is None else int(inst.batch),
                 )
             )
@@ -262,6 +264,8 @@ def gpu_semantic_signature(gpu: GPUState | None) -> tuple | None:
                 int(inst.end),
                 inst.profile,
                 inst.workload,
+                getattr(inst, "model_key", None),
+                getattr(inst, "placement_group", None),
                 None if inst.batch is None else int(inst.batch),
             )
         )
@@ -303,6 +307,8 @@ def target_geometry_only_gpu(target_gpu: GPUState) -> GPUState:
     for inst in gpu.instances:
         inst.workload = None
         inst.batch = None
+        inst.model_key = None
+        inst.placement_group = None
         inst.mu = 0.0
         inst.preserved = False
     return gpu
@@ -375,6 +381,12 @@ def simulate_basic_fine_actions(
             if cur_inst is not None:
                 cur_inst.workload = action.get("workload")
                 cur_inst.batch = action.get("batch")
+                cur_inst.model_key = action.get("modelKey") or action.get("model_key")
+                cur_inst.placement_group = (
+                    action.get("placementGroup")
+                    or action.get("placement_group")
+                    or cur_inst.model_key
+                )
                 cur_inst.mu = float(action.get("mu", 0.0))
                 cur_inst.preserved = False
             continue

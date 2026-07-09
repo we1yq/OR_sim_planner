@@ -22,6 +22,8 @@ class MigInstance:
     profile: str
     workload: str | None = None
     batch: int | None = None
+    model_key: str | None = None
+    placement_group: str | None = None
     mu: float = 0.0
     preserved: bool = False
 
@@ -94,11 +96,15 @@ def copy_inst_payload(dst_inst: MigInstance, src_inst: MigInstance | None) -> No
     if src_inst is None:
         dst_inst.workload = None
         dst_inst.batch = None
+        dst_inst.model_key = None
+        dst_inst.placement_group = None
         dst_inst.mu = 0.0
         dst_inst.preserved = False
         return
     dst_inst.workload = src_inst.workload
     dst_inst.batch = src_inst.batch
+    dst_inst.model_key = src_inst.model_key
+    dst_inst.placement_group = src_inst.placement_group
     dst_inst.mu = float(src_inst.mu)
     dst_inst.preserved = bool(getattr(src_inst, "preserved", False))
 
@@ -109,4 +115,3 @@ def replace_or_append_gpu(state: ClusterState, gpu: GPUState) -> None:
             state.gpus[idx] = gpu
             return
     state.gpus.append(gpu)
-

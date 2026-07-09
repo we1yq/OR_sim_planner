@@ -213,11 +213,24 @@ def build_feasible_option_dataframe(
                 "opt_idx": opt_idx,
                 "w_idx": w_idx,
                 "workload": workload.name,
+                "modelKey": option.model_key or request.model_key or request.model or workload.name,
+                "placementGroup": (
+                    option.placement_group
+                    or request.placement_group
+                    or option.model_key
+                    or request.model_key
+                    or request.model
+                    or workload.name
+                ),
                 "family": option.family,
                 "batch": int(option.batch),
                 "profile": option.profile,
                 "mu": float(option.mu),
             }
+            if request.request_class is not None:
+                row["requestClass"] = request.request_class
+            if request.request_shape:
+                row["requestShape"] = dict(request.request_shape)
             row.update(option.metrics)
             if correction_summary.get("appliedCount", 0) > 0:
                 row["_runtimeProfileCorrection"] = correction_summary
@@ -321,6 +334,8 @@ def cluster_state_from_mock_yaml(obj: dict[str, Any]) -> ClusterState:
                 profile=inst.profile,
                 workload=inst.workload,
                 batch=inst.batch,
+                model_key=getattr(inst, "model_key", None),
+                placement_group=getattr(inst, "placement_group", None),
             )
             for inst in raw_gpu.instances
         ]
@@ -344,6 +359,8 @@ def cluster_state_from_dict(obj: dict[str, Any]) -> ClusterState:
                 profile=str(inst["profile"]),
                 workload=inst.get("workload"),
                 batch=(int(inst["batch"]) if inst.get("batch") is not None else None),
+                model_key=inst.get("modelKey") or inst.get("model_key"),
+                placement_group=inst.get("placementGroup") or inst.get("placement_group"),
                 mu=float(inst.get("mu", 0.0)),
                 preserved=bool(inst.get("preserved", False)),
             )
@@ -374,6 +391,8 @@ def cluster_state_to_dict(state: ClusterState) -> dict[str, Any]:
                         "profile": inst.profile,
                         "workload": inst.workload,
                         "batch": inst.batch,
+                        "modelKey": getattr(inst, "model_key", None),
+                        "placementGroup": getattr(inst, "placement_group", None),
                         "mu": float(getattr(inst, "mu", 0.0)),
                         "preserved": bool(getattr(inst, "preserved", False)),
                     }

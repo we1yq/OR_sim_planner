@@ -22,6 +22,22 @@ from .templates import (
 )
 
 
+def _placement_key(demand_or_inst: Any) -> str:
+    if isinstance(demand_or_inst, dict):
+        return str(
+            demand_or_inst.get("placementGroup")
+            or demand_or_inst.get("modelKey")
+            or demand_or_inst.get("workload")
+            or ""
+        )
+    return str(
+        getattr(demand_or_inst, "placement_group", None)
+        or getattr(demand_or_inst, "model_key", None)
+        or getattr(demand_or_inst, "workload", None)
+        or ""
+    )
+
+
 def _template_match_count(
     ordered_abstract_templates: list[str],
     ordered_physical_templates: list[str],
@@ -54,16 +70,17 @@ def _assignments_to_metrics(
 
     exact_preserve = 0
     upgrade_preserve = 0
-    workload_gpus = defaultdict(set)
-    per_gpu_workload_count = defaultdict(Counter)
+    placement_gpus = defaultdict(set)
+    per_gpu_placement_count = defaultdict(Counter)
 
     for slot in slots:
         info = assigned.get(slot["slot_id"], None)
         if info is None:
             continue
         demand = info["demand"]
-        workload_gpus[demand["workload"]].add(slot["gpu_id"])
-        per_gpu_workload_count[slot["gpu_id"]][demand["workload"]] += 1
+        placement_key = _placement_key(demand)
+        placement_gpus[placement_key].add(slot["gpu_id"])
+        per_gpu_placement_count[slot["gpu_id"]][placement_key] += 1
 
         if info.get("placement_mode") == "upgrade_preserve":
             upgrade_preserve += 1
@@ -73,15 +90,15 @@ def _assignments_to_metrics(
         if old is not None and old.workload == demand["workload"] and old.profile == demand["profile"]:
             exact_preserve += 1
 
-    spread = sum(len(gpus) for gpus in workload_gpus.values())
+    spread = sum(len(gpus) for gpus in placement_gpus.values())
 
     collocate_pairs = 0
     mixed_gpu_count = 0
-    for _, count_by_workload in per_gpu_workload_count.items():
-        kinds = sum(1 for _, count in count_by_workload.items() if count > 0)
+    for _, count_by_placement in per_gpu_placement_count.items():
+        kinds = sum(1 for _, count in count_by_placement.items() if count > 0)
         if kinds >= 2:
             mixed_gpu_count += 1
-        for _, count in count_by_workload.items():
+        for _, count in count_by_placement.items():
             collocate_pairs += count * (count - 1) // 2
 
     return {
@@ -363,6 +380,8 @@ def _assignments_to_target(
         info = assigned.get(slot["slot_id"], None)
         workload = None
         batch = None
+        model_key = None
+        placement_group = None
         mu = 0.0
         preserved = False
 
@@ -370,6 +389,8 @@ def _assignments_to_target(
             demand = info["demand"]
             workload = demand["workload"]
             batch = int(demand["batch"])
+            model_key = demand.get("modelKey") or workload
+            placement_group = demand.get("placementGroup") or model_key
             mu = float(demand["mu"])
             preserved = slot_preserve_match(slot, demand, prev_state, old_map=old_map) or (
                 info.get("placement_mode") == "upgrade_preserve"
@@ -382,6 +403,8 @@ def _assignments_to_target(
                 profile=slot["profile"],
                 workload=workload,
                 batch=batch,
+                model_key=model_key,
+                placement_group=placement_group,
                 mu=mu,
                 preserved=preserved,
             )
@@ -512,21 +535,21 @@ def _exact_preserve_preassign_exact_only(
 class _BeamNode:
     assigned: dict[int, dict[str, Any] | None]
     used_slots: set[int]
-    workload_gpus: dict[str, set[int]]
-    per_gpu_workload_count: dict[int, Counter]
+    placement_gpus: dict[str, set[int]]
+    per_gpu_placement_count: dict[int, Counter]
 
     def clone(self) -> "_BeamNode":
         return _BeamNode(
             assigned=dict(self.assigned),
             used_slots=set(self.used_slots),
-            workload_gpus=defaultdict(set, {key: set(value) for key, value in self.workload_gpus.items()}),
-            per_gpu_workload_count=defaultdict(Counter, {key: Counter(value) for key, value in self.per_gpu_workload_count.items()}),
+            placement_gpus=defaultdict(set, {key: set(value) for key, value in self.placement_gpus.items()}),
+            per_gpu_placement_count=defaultdict(Counter, {key: Counter(value) for key, value in self.per_gpu_placement_count.items()}),
         )
 
 
 def _beam_seed_from_preassign(assigned: dict[int, dict[str, Any] | None]) -> _BeamNode:
-    workload_gpus = defaultdict(set)
-    per_gpu_workload_count = defaultdict(Counter)
+    placement_gpus = defaultdict(set)
+    per_gpu_placement_count = defaultdict(Counter)
     used = set()
     for slot_id, info in assigned.items():
         if info is None:
@@ -534,13 +557,14 @@ def _beam_seed_from_preassign(assigned: dict[int, dict[str, Any] | None]) -> _Be
         slot = info["slot"]
         demand = info["demand"]
         used.add(slot_id)
-        workload_gpus[demand["workload"]].add(slot["gpu_id"])
-        per_gpu_workload_count[slot["gpu_id"]][demand["workload"]] += 1
+        placement_key = _placement_key(demand)
+        placement_gpus[placement_key].add(slot["gpu_id"])
+        per_gpu_placement_count[slot["gpu_id"]][placement_key] += 1
     return _BeamNode(
         assigned=dict(assigned),
         used_slots=used,
-        workload_gpus=workload_gpus,
-        per_gpu_workload_count=per_gpu_workload_count,
+        placement_gpus=placement_gpus,
+        per_gpu_placement_count=per_gpu_placement_count,
     )
 
 
@@ -568,6 +592,7 @@ def _order_residual_demands_for_beam(
             key=lambda demand: (
                 -preserve_candidates(demand),
                 -PROFILE_SIZE[demand["profile"]],
+                _placement_key(demand),
                 demand["workload"],
                 int(demand["batch"]),
                 int(demand["demand_id"]),
@@ -576,6 +601,7 @@ def _order_residual_demands_for_beam(
     else:
         ordered.sort(
             key=lambda demand: (
+                _placement_key(demand),
                 demand["workload"],
                 -PROFILE_SIZE[demand["profile"]],
                 int(demand["batch"]),
@@ -592,15 +618,15 @@ def _beam_slot_local_rank(
     prev_state: ClusterState | None,
 ) -> tuple[int, ...]:
     gpu_id = slot["gpu_id"]
-    workload = demand["workload"]
-    same_workload = node.per_gpu_workload_count[gpu_id][workload]
-    new_touch = 1 if gpu_id not in node.workload_gpus[workload] else 0
-    distinct_before = len(node.per_gpu_workload_count[gpu_id])
-    mixed_penalty = 1 if distinct_before >= 1 and same_workload == 0 else 0
+    placement_key = _placement_key(demand)
+    same_placement = node.per_gpu_placement_count[gpu_id][placement_key]
+    new_touch = 1 if gpu_id not in node.placement_gpus[placement_key] else 0
+    distinct_before = len(node.per_gpu_placement_count[gpu_id])
+    mixed_penalty = 1 if distinct_before >= 1 and same_placement == 0 else 0
     preserve_bonus = 1 if slot_preserve_match(slot, demand, prev_state) else 0
     return (
         preserve_bonus,
-        same_workload,
+        same_placement,
         -new_touch,
         -mixed_penalty,
         -slot["slot_idx"],
@@ -666,8 +692,9 @@ def _solve_target_with_preserve_first_beam(
                     "placement_mode": "beam",
                 }
                 child.used_slots.add(slot_id)
-                child.workload_gpus[demand["workload"]].add(slot["gpu_id"])
-                child.per_gpu_workload_count[slot["gpu_id"]][demand["workload"]] += 1
+                placement_key = _placement_key(demand)
+                child.placement_gpus[placement_key].add(slot["gpu_id"])
+                child.per_gpu_placement_count[slot["gpu_id"]][placement_key] += 1
                 next_beam.append(child)
 
         if not next_beam:
@@ -730,6 +757,7 @@ def _order_residual_demands_for_greedy(
             key=lambda demand: (
                 -preserve_candidates(demand)[0],
                 -preserve_candidates(demand)[1],
+                _placement_key(demand),
                 demand["workload"],
                 -PROFILE_SIZE[demand["profile"]],
                 int(demand["batch"]),
@@ -739,6 +767,7 @@ def _order_residual_demands_for_greedy(
     else:
         ordered.sort(
             key=lambda demand: (
+                _placement_key(demand),
                 demand["workload"],
                 -PROFILE_SIZE[demand["profile"]],
                 int(demand["batch"]),
@@ -754,8 +783,8 @@ def _template_combo_bonus(
     per_gpu_profiles: dict[int, dict[str, set[str]]],
 ) -> int:
     gpu_id = slot["gpu_id"]
-    workload = demand["workload"]
-    existing_profiles = per_gpu_profiles[gpu_id].get(workload, set())
+    placement_key = _placement_key(demand)
+    existing_profiles = per_gpu_profiles[gpu_id].get(placement_key, set())
     if len(existing_profiles) == 0:
         return 0
     profile = demand["profile"]
@@ -765,8 +794,8 @@ def _template_combo_bonus(
 def _build_assignment_stats(
     assigned: dict[int, dict[str, Any] | None],
 ) -> tuple[dict[int, Counter], dict[str, set[int]], dict[int, dict[str, set[str]]]]:
-    per_gpu_workload_count = defaultdict(Counter)
-    workload_gpus = defaultdict(set)
+    per_gpu_placement_count = defaultdict(Counter)
+    placement_gpus = defaultdict(set)
     per_gpu_profiles = defaultdict(lambda: defaultdict(set))
     for _, info in assigned.items():
         if info is None:
@@ -774,11 +803,11 @@ def _build_assignment_stats(
         slot = info["slot"]
         demand = info["demand"]
         gpu_id = slot["gpu_id"]
-        workload = demand["workload"]
-        per_gpu_workload_count[gpu_id][workload] += 1
-        workload_gpus[workload].add(gpu_id)
-        per_gpu_profiles[gpu_id][workload].add(demand["profile"])
-    return per_gpu_workload_count, workload_gpus, per_gpu_profiles
+        placement_key = _placement_key(demand)
+        per_gpu_placement_count[gpu_id][placement_key] += 1
+        placement_gpus[placement_key].add(gpu_id)
+        per_gpu_profiles[gpu_id][placement_key].add(demand["profile"])
+    return per_gpu_placement_count, placement_gpus, per_gpu_profiles
 
 
 def _greedy_incremental_rank(
@@ -790,18 +819,18 @@ def _greedy_incremental_rank(
     old_map: dict[tuple[int, int, int, str], MigInstance] | None = None,
 ) -> tuple[int, ...]:
     if stats is None:
-        per_gpu_workload_count, workload_gpus, per_gpu_profiles = _build_assignment_stats(assigned)
+        per_gpu_placement_count, placement_gpus, per_gpu_profiles = _build_assignment_stats(assigned)
     else:
-        per_gpu_workload_count, workload_gpus, per_gpu_profiles = stats
+        per_gpu_placement_count, placement_gpus, per_gpu_profiles = stats
     if old_map is None:
         old_map = old_exact_slot_map(prev_state)
 
     gpu_id = slot["gpu_id"]
-    workload = demand["workload"]
-    same_workload = per_gpu_workload_count[gpu_id][workload]
-    new_touch = 1 if gpu_id not in workload_gpus[workload] else 0
-    distinct_before = len(per_gpu_workload_count[gpu_id])
-    mixed_penalty = 1 if distinct_before >= 1 and same_workload == 0 else 0
+    placement_key = _placement_key(demand)
+    same_placement = per_gpu_placement_count[gpu_id][placement_key]
+    new_touch = 1 if gpu_id not in placement_gpus[placement_key] else 0
+    distinct_before = len(per_gpu_placement_count[gpu_id])
+    mixed_penalty = 1 if distinct_before >= 1 and same_placement == 0 else 0
     preserve_bonus = 1 if slot_preserve_match(slot, demand, prev_state, old_map=old_map) else 0
     upgrade_bonus = 1 if slot_upgrade_preserve_match(slot, demand, prev_state, old_map=old_map) else 0
     combo_bonus = _template_combo_bonus(demand, slot, per_gpu_profiles)
@@ -810,14 +839,14 @@ def _greedy_incremental_rank(
         return (
             preserve_bonus,
             upgrade_bonus,
-            same_workload,
+            same_placement,
             -new_touch,
             combo_bonus,
             -mixed_penalty,
             -slot["slot_idx"],
         )
     return (
-        same_workload,
+        same_placement,
         -new_touch,
         combo_bonus,
         -mixed_penalty,
@@ -844,7 +873,7 @@ def _solve_target_with_greedy_repair(
         free_by_profile[slot["profile"]].append(slot)
 
     residual = _order_residual_demands_for_greedy(residual, slots, prev_state)
-    per_gpu_workload_count, workload_gpus, per_gpu_profiles = _build_assignment_stats(assigned)
+    per_gpu_placement_count, placement_gpus, per_gpu_profiles = _build_assignment_stats(assigned)
 
     total_4g_slots = len(free_by_profile["4g"])
     used_upgrade = sum(
@@ -882,7 +911,7 @@ def _solve_target_with_greedy_repair(
                 f"({demand['workload']}, {demand['profile']}, B{demand['batch']})"
             )
 
-        stats = (per_gpu_workload_count, workload_gpus, per_gpu_profiles)
+        stats = (per_gpu_placement_count, placement_gpus, per_gpu_profiles)
         candidates.sort(
             key=lambda slot: _greedy_incremental_rank(
                 demand,
@@ -907,10 +936,10 @@ def _solve_target_with_greedy_repair(
             "placement_mode": placement_mode,
         }
         gpu_id = best["gpu_id"]
-        workload = demand["workload"]
-        per_gpu_workload_count[gpu_id][workload] += 1
-        workload_gpus[workload].add(gpu_id)
-        per_gpu_profiles[gpu_id][workload].add(demand["profile"])
+        placement_key = _placement_key(demand)
+        per_gpu_placement_count[gpu_id][placement_key] += 1
+        placement_gpus[placement_key].add(gpu_id)
+        per_gpu_profiles[gpu_id][placement_key].add(demand["profile"])
 
     prev_mode = has_prev(prev_state)
 

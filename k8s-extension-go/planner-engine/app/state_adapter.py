@@ -19,6 +19,20 @@ def workload_request_from_k8s_object(obj: dict) -> WorkloadRequest:
         model=str(spec["model"]),
         family=spec.get("family"),
         arrival_rate=float(spec["arrivalRate"]),
+        model_key=(
+            str(spec.get("modelKey"))
+            if spec.get("modelKey") is not None
+            else str(spec["model"])
+        ),
+        placement_group=(
+            str(spec.get("placementGroup"))
+            if spec.get("placementGroup") is not None
+            else str(spec.get("modelKey"))
+            if spec.get("modelKey") is not None
+            else str(spec["model"])
+        ),
+        request_class=(str(spec.get("requestClass")) if spec.get("requestClass") is not None else None),
+        request_shape=dict(spec.get("requestShape", {}) or {}),
         allowed_batches=[int(x) for x in spec.get("allowedBatches", [])],
         priority=str(spec.get("priority", "normal")),
         slo={k: float(v) for k, v in dict(spec.get("slo", {})).items()},
@@ -47,4 +61,3 @@ def gpu_state_from_mock_yaml(obj: dict) -> GpuMigState:
             )
         )
     return GpuMigState(gpus=gpus)
-

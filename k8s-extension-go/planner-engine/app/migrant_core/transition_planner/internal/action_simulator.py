@@ -115,6 +115,8 @@ def _target_geometry_only_gpu(target_gpu: GPUState) -> GPUState:
     for inst in gpu.instances:
         inst.workload = None
         inst.batch = None
+        inst.model_key = None
+        inst.placement_group = None
         inst.mu = 0.0
         inst.preserved = False
     return gpu
@@ -133,6 +135,17 @@ def _action(action_type: str, **kwargs: Any) -> dict[str, Any]:
     out.update(kwargs)
     out["abstractAction"] = _abstract_action_label(action_type)
     return out
+
+
+def _model_affinity_fields(inst: MigInstance) -> dict[str, Any]:
+    return {
+        "modelKey": getattr(inst, "model_key", None) or inst.workload,
+        "placementGroup": (
+            getattr(inst, "placement_group", None)
+            or getattr(inst, "model_key", None)
+            or inst.workload
+        ),
+    }
 
 
 def _abstract_action_label(action_type: str) -> str:
@@ -659,6 +672,12 @@ def simulate_transition_actions(
             if cur_inst is not None:
                 cur_inst.workload = action.get("workload")
                 cur_inst.batch = action.get("batch")
+                cur_inst.model_key = action.get("modelKey") or action.get("model_key")
+                cur_inst.placement_group = (
+                    action.get("placementGroup")
+                    or action.get("placement_group")
+                    or cur_inst.model_key
+                )
                 cur_inst.mu = float(action.get("mu", 0.0))
                 cur_inst.preserved = False
                 runtime = _get_runtime_entry(executed_state, gpu_id, slot)
@@ -1289,6 +1308,7 @@ def plan_full_action_plan(
                     )
                     continue
                 if inst_action["type"] == "place_instance":
+                    affinity = _model_affinity_fields(inst_action["tgt"])
                     capacity_actions.append(
                         _action(
                             "place_instance",
@@ -1297,6 +1317,7 @@ def plan_full_action_plan(
                             slot=slot,
                             workload=inst_action["tgt"].workload,
                             batch=inst_action["tgt"].batch,
+                            **affinity,
                         )
                     )
                     capacity_actions.append(
@@ -1306,6 +1327,7 @@ def plan_full_action_plan(
                             physical_gpu_id=physical_id,
                             slot=slot,
                             workload=inst_action["tgt"].workload,
+                            **affinity,
                         )
                     )
                     plan_items.append(
@@ -1318,6 +1340,7 @@ def plan_full_action_plan(
                             physical_gpu_id=physical_id,
                             slot=slot,
                             workload=inst_action["tgt"].workload,
+                            **affinity,
                         )
                     )
                     continue
@@ -1371,6 +1394,7 @@ def plan_full_action_plan(
                     )
                     phase_actions.extend(acts)
                     if status == "ready":
+                        affinity = _model_affinity_fields(inst_action["tgt"])
                         phase_actions.extend(
                             [
                                 _action(
@@ -1390,6 +1414,7 @@ def plan_full_action_plan(
                                     workload=inst_action["tgt"].workload,
                                     batch=inst_action["tgt"].batch,
                                     after_drain=True,
+                                    **affinity,
                                 ),
                                 _action(
                                     "activate_serving_route",
@@ -1397,6 +1422,7 @@ def plan_full_action_plan(
                                     physical_gpu_id=physical_id,
                                     slot=slot,
                                     workload=inst_action["tgt"].workload,
+                                    **affinity,
                                 ),
                             ]
                         )

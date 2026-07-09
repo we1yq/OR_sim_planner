@@ -57,7 +57,7 @@ def extract_instance_demands_from_milp(
     if missing_opt_idxs:
         raise ValueError(f"Option dataframe is missing x_sol opt_idx values: {missing_opt_idxs}")
 
-    agg = defaultdict(lambda: {"count": 0, "mu": None})
+    agg = defaultdict(lambda: {"count": 0, "mu": None, "modelKey": None, "placementGroup": None})
     for _, row in chosen.iterrows():
         opt_idx = int(row["opt_idx"])
         cnt = int(x_sol.get(opt_idx, 0))
@@ -66,12 +66,18 @@ def extract_instance_demands_from_milp(
         key = (str(row["workload"]), str(row["profile"]), int(row["batch"]))
         agg[key]["count"] += cnt
         agg[key]["mu"] = float(row["mu"])
+        agg[key]["modelKey"] = str(row.get("modelKey") or row["workload"])
+        agg[key]["placementGroup"] = str(
+            row.get("placementGroup") or row.get("modelKey") or row["workload"]
+        )
 
     out = []
     for (workload, profile, batch), info in sorted(agg.items()):
         out.append(
             {
                 "workload": workload,
+                "modelKey": info.get("modelKey") or workload,
+                "placementGroup": info.get("placementGroup") or info.get("modelKey") or workload,
                 "profile": profile,
                 "batch": int(batch),
                 "count": int(info["count"]),
@@ -127,6 +133,12 @@ def _expand_demands_with_ids(instance_demands: list[dict[str, Any]]) -> list[dic
                 {
                     "demand_id": demand_id,
                     "workload": demand["workload"],
+                    "modelKey": demand.get("modelKey") or demand["workload"],
+                    "placementGroup": (
+                        demand.get("placementGroup")
+                        or demand.get("modelKey")
+                        or demand["workload"]
+                    ),
                     "profile": demand["profile"],
                     "batch": int(demand["batch"]),
                     "mu": float(demand["mu"]),

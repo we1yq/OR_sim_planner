@@ -910,6 +910,13 @@ def _action_slots(action: dict[str, Any]) -> list[tuple[int, int, str]]:
 def _capacity_record(inst: MigInstance) -> dict[str, Any]:
     return {
         "workload": inst.workload,
+        "modelKey": getattr(inst, "model_key", None) or inst.workload,
+        "placementGroup": (
+            getattr(inst, "placement_group", None)
+            or getattr(inst, "model_key", None)
+            or inst.workload
+        ),
+        "batch": int(inst.batch) if inst.batch is not None else None,
         "mu": float(inst.mu),
         "slot": [int(inst.start), int(inst.end), str(inst.profile)],
     }
