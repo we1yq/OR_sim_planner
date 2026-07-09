@@ -732,16 +732,32 @@ def _same_physical_gpu(left: dict[str, Any], right: dict[str, Any]) -> bool:
 
 
 def _same_physical_capacity_dependency_allowed(consumer: dict[str, Any], producer: dict[str, Any]) -> bool:
-    """Same-GPU capacity can only protect partial-compatible transitions.
+    """Return whether same-GPU produced capacity can protect a removal.
 
     Full in-place reconfiguration cannot use capacity produced on the same
     physical GPU to justify deleting the old side: the old side must be gone
     before that new capacity exists. Partial reconfiguration is different
     because preserved slots and locally-created slots can coexist after the
     partial patch, as long as the dependency does not form a structural cycle.
+
+    Plain instance-diff transitions on an unchanged MIG template are also safe
+    when the producer and consumer slots do not overlap. In that case the target
+    instance can be placed and routed before the old instance is drained.
     """
 
-    return _partial_capacity_context(consumer) and _partial_capacity_context(producer)
+    if _partial_capacity_context(consumer) and _partial_capacity_context(producer):
+        return True
+    return not _action_slots_overlap(consumer, producer)
+
+
+def _action_slots_overlap(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    for left_slot in _action_slots(left):
+        for right_slot in _action_slots(right):
+            if str(left_slot[2]) != str(right_slot[2]):
+                continue
+            if max(int(left_slot[0]), int(right_slot[0])) < min(int(left_slot[1]), int(right_slot[1])):
+                return True
+    return False
 
 
 def _partial_capacity_context(action: dict[str, Any]) -> bool:
