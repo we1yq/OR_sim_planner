@@ -1,0 +1,1162 @@
+
+
+===== PAGE 1 =====
+An Online Fragmentation-Aware GPU Scheduler for
+Multi-Tenant MIG-based Clouds
+Marco Zambianco∗, Lorenzo Fasol∗, Roberto Doriguzzi-Corin∗
+∗Fondazione Bruno Kessler (FBK), Trento, Italy
+Email: mzambianco, lfasol, rdoriguzzi@fbk.eu
+Abstract—The explosive growth of AI applications has created
+unprecedented demand for GPU resources. Cloud providers
+meet this demand through GPU-as-a-Service platforms that offer
+rentable GPU resources for running AI workloads. In this
+context, the sharing of GPU resources between different tenants is
+essential to maximize the number of scheduled workloads. Among
+the various GPU sharing technologies, NVIDIA’s Multi-Instance
+GPU (MIG) stands out by partitioning GPUs at hardware
+level into isolated slices with dedicated compute and memory,
+ensuring strong tenant isolation, preventing resource contention,
+and enhancing security. Despite these advantages, MIG’s fixed
+partitioning introduces scheduling rigidity, leading to severe GPU
+fragmentation in multi-tenant environments, where workloads
+are continuously deployed and terminated. Fragmentation leaves
+GPUs underutilized, limiting the number of workloads that can
+be accommodated. To overcome this challenge, we propose a
+novel scheduling framework for MIG-based clouds that maxi-
+mizes workload acceptance while mitigating fragmentation in an
+online, workload-agnostic setting. We introduce a fragmentation
+metric to quantify resource inefficiency and guide allocation de-
+cisions. Building on this metric, our greedy scheduling algorithm
+selects GPUs and MIG slices that minimize fragmentation growth
+for each incoming workload. We evaluate our approach against
+multiple baseline strategies under diverse workload distributions.
+Results demonstrate that our method consistently achieves higher
+workload acceptance rates, leading to an average 10% increase
+in the number of scheduled workloads in heavy load conditions,
+while using approximately the same number of GPUs as the
+benchmark methods.
+Index Terms—Multi-instance GPU, GPU fragmentation, re-
+source allocation
+I. INTRODUCTION
+The rapid proliferation of AI applications has created an
+unprecedented demand for GPUs capable of provisioning
+a wide range of services (i.e., chatbots, computer vision
+tasks, recommendation systems, etc.) [1]. To streamline the
+deployment process of these applications and reduce capital
+expenditure sustained by service providers to buy the neces-
+sary GPU hardware, cloud providers offers GPU-as-services
+platforms which enable the renting of GPU resources based
+on a pay-per-use business model. In this scenario, GPU sharing
+techniques are often used to multiplex applications of various
+tenants within the same GPU hardware, improving the re-
+source utilization efficiency and thus boosting renting revenues
+for the cloud provider [2]. In contrast to traditional compute
+resources (e.g., CPU, memory, and storage), which can be
+readily shared among co-located workloads, GPUs necessitate
+specialized techniques such as time slicing [3], multi-process
+service (MPS) [4], and GPU virtualization (vGPU) to sup-
+port concurrent sharing. Among these, NVIDIA’s proprietary
+Multi-Instance GPU (MIG) feature, which is increasingly
+supported by new generation graphic cards, distinguishes itself
+by allowing a spatial partition of a GPU in multiple slices
+with dedicated compute and memory resources [5]. In multi-
+tenants environment, this sharing strategy is an appealing
+2g
+20gb
+1g
+10gb
+2g
+20gb
+Workload 
+Tenant A
+GPU
+2g
+20gb
+2g
+20gb
+1g
+10gb
+2g
+20gb
+Workload
+Tenant B
+GPU
+t = 1
+t = 0
+(a) GPU fragmentation caused by workload arrival.
+1g
+10gb
+2g
+20gb
+1g
+10gb
+4g
+40gb
+2g
+20gb
+1g
+10gb
+GPU
+GPU
+Workload 
+Tenant A
+Workload 
+Tenant B
+t = 0
+t = 1
+(b) GPU fragmentation caused by workload termination.
+Fig. 1: Examples of GPU fragmentation caused by workload
+arrival and termination. Fragmentation is represented by red
+hatched rectangles.
+option compared to logical sharing techniques performed at
+software-level as it makes it possible to fully isolate ten-
+ants allocated on the same GPU. Specifically, hardware-level
+isolation prevents resource contention between workloads [6]
+and improves security by shielding them from side-channel
+and denial-of-service attacks initiated by co-located malicious
+applications [7]. However, these benefits come at the cost of
+scheduling flexibility since partition options are restricted to
+predetermined profiles which identify specific compute and
+memory slices of the GPU. As a result, finding strategies to
+effectively allocate workloads according to these constraints
+becomes fundamental to maximize the number of accommo-
+dated applications.
+In this context, the research activity has proposed different
+solutions to improve the resource utilization of MIG-based
+deployments such as the computation of the optimal partition
+size that minimize resource waste and the adoption of logical
+slicing to access unused resources within each MIG partition
+[8], [9], [10]. These techniques assume a single-tenant setup,
+where one service provider controls both the life cycle of its AI
+services and the resources of underlying GPU infrastructure.
+In this setting, the provider can combine several of the earlier
+solutions to work around MIG limitations. However, in a
+multi-tenant environment, the cloud provider that schedules
+applications on shared GPUs usually has little insight into each
+workload’s behavior or lifespan. Consequently, such solutions
+cannot be safely applied without risking disruptions to the
+availability of running applications. Moreover, the constant de-
+ployment and termination of workloads, combined with MIG’s
+rigid scheduling rules, leads to heavy fragmentation of GPU
+arXiv:2511.18906v1  [cs.DC]  24 Nov 2025
+
+
+===== PAGE 2 =====
+resources. The effect of fragmentation reduces the number
+of schedulable workloads on a GPU because the available
+MIG slices do not comply with the partition constraints and
+cannot be utilized. To better illustrate this aspect, we provide a
+pictorial representation in Fig. 1 of the fragmentation dynamic
+when new workloads are scheduled (Fig. 1a) and when they
+are terminated (Fig. 1b). Building on these observations, we
+aim to adapt MIG-based deployments to multi-tenant scenarios
+while addressing the issue of GPU resource fragmentation.
+To this end, we approach fragmentation mitigation from a re-
+source allocation perspective and design an online scheduling
+algorithm for MIG profiles that effectively reduces GPU frag-
+mentation, without prior knowledge about workload resource
+distribution. As a result, by improving the GPU utilization, a
+greater number of workloads can be successfully scheduled,
+thereby increasing the potential renting revenue for the cloud
+provider. In detail, the main contribution of this work are as
+follows:
+• We design a metric to analytically measure the fragmen-
+tation severity experienced by GPUs shared using MIG.
+This metric makes it possible to compare fragmentation
+levels across GPUs based on their currently allocated
+MIG profiles and can be used to support more informed
+decisions about future workload placements.
+• We design a scheduling algorithm based on a greedy
+approach that leverages the proposed fragmentation met-
+ric to maximize the workload acceptance rate. For each
+workload to schedule, which requests GPU resources in
+the form of a MIG profile, the algorithm evaluates the
+current fragmentation severity of the available GPUs and
+select the GPU and related MIG slices that minimize the
+fragmentation growth.
+• We evaluate the performance of the proposed scheduling
+solution with respect to several benchmark schemes using
+different strategies to select GPUs and related MIG slices.
+The results show that our approach outperforms the base-
+lines in all metrics and provides consistent performance
+regardless of the workload MIG profile distribution.
+The remainder of the paper is organized as follows. In
+Section II, we discuss the related work. Section III provides
+some background information on the main concepts of MIG.
+Section IV describes the considered system model. Section
+V presents the fragmentation-aware algorithm for MIG-based
+deployments. In Section VI, we discuss the obtained results.
+Finally, we draw the conclusion in Section VII.
+II. RELATED WORK
+The problem of scheduling of AI workload on multi-tenant
+GPU clusters has been broadly investigated in the recent years.
+An overview of the main concepts and related challenges can
+be found in [11] and [12].
+The authors of [13] tackles MIG slice under-utilization
+using MPS to estimate appropriate resource needs and select
+optimal MIG partitions to improve AI service performance.
+Similarly, [14] and [15] integrate MIG with MPS to boost
+utilization in underutilized slices while controlling resource
+contention caused by logical slicing. In contrast, [16] employs
+a reinforcement learning agent to minimize the makespan
+of AI workloads on MIG by modeling workload dynamics.
+Different from these studies, we focus on MIG-based workload
+allocation from a cloud provider’s perspective, designing a
+fragmentation-aware scheduling algorithm that improves GPU
+1 SM
+1 SM
+1 SM
+1 SM
+1 SM
+1 SM
+10GB
+10GB
+10GB
+10GB
+10GB
+10GB
+10GB
+Slice 3
+Slice 6
+Profile 1g.20gb
+Index 6
+Profile 2g.20gb
+Index 2
+Compute
+Memory
+Index
+0
+4
+5
+6
+3
+2
+1
+1 SM
+10GB
+Fig. 2: A100 MIG-based representation of slices and profiles.
+cluster utilization without relying on external information
+about workload type and service performance.
+The authors of [17] analyze the problem of fragmentation
+in GPU clusters and propose a fragmentation metric for GPU
+nodes in order to design a fragmentation-aware allocation
+algorithm. Similarly, the authors of [18] and [19] extend
+this fragmentation-aware approach to online settings where
+workload arrival is distributed in time and by including the
+minimization of GPU power consumption, respectively. Al-
+though these solutions address the problem of GPU fragmenta-
+tion, the proposed fragmentation metrics assume a MPS-based
+GPU sharing, leaving the MIG-based sharing uncovered. We
+instead propose a fragmentation metric tailored to MIG which
+quantifies the fragmentation severity by evaluating the amount
+of unschedulable MIG profiles.
+Finally, [20], [21] tackle the problem of resource efficiency
+in MIG-based deployments designing rescheduling and ad-
+mission control schemes, respectively, to reduce GPU frag-
+mentation and increase the amount of successfully allocated
+workloads. However, [20] uses a static, periodic rescheduling
+approach, whereas [21] relies on prior knowledge of MIG
+profile distributions to guide its admission control policy.
+In contrast, our algorithm serves workload requests online,
+continuously mitigating fragmentation without any a-priori
+assumptions about the statistic of the requested MIG profiles.
+III. MULTI-INSTANCE GPU (MIG) BACKGROUND
+MIG is a feature introduced with NVIDIA’s Ampere ar-
+chitecture, and now available on the latest GPUs, that allows
+multiple jobs to securely share a single GPU without com-
+peting for the same resources [22]. By partitioning a physical
+GPU into up to seven fully isolated instances, each with its
+own compute and memory resources, MIG allows for efficient
+multi-tenant usage. It is particularly effective for AI inference
+workloads, multi-tenant cloud environments, and scenarios
+where individual jobs do not fully utilize GPU capacity.
+The partitioning mechanism is based on fundamental build-
+ing blocks called slices. GPU memory is divided into eight
+memory slices, each representing 1/8 of the total memory ca-
+pacity. Similarly, streaming multiprocessors (SMs) are divided
+into seven SM slices, each containing roughly 1/7 of the total
+compute units. Typically, a GPU slice is formed by pairing
+one memory slice with one SM slice, except for the last GPU
+slice, which combines one SM slice with two memory slices.
+To standardize and simplify the GPU partitioning, NVIDIA
+defines several MIG profiles, which describe valid combina-
+tions of compute and memory resources that can be exclusive
+accessed, ensuring complete hardware-level isolation through
+separate memory pathways. Each MIG profile specifies the
+size of the compute and memory slices, using the naming
+
+
+===== PAGE 3 =====
+TABLE I: MIG specifications for A100 GPU
+Profile
+Slice
+No. Instances
+Index
+7g.80gb
+7
+1
+{0}
+4g.40gb
+4
+1
+{0}
+3g.40gb
+4
+2
+{0, 4}
+2g.20gb
+2
+3
+{0, 2, 4}
+1g.20gb
+2
+4
+{0, 2, 4, 6}
+1g.10gb
+1
+7
+{0, 1, 2, 3, 4, 5, 6}
+convention <g>g.<mem>gb. For example, as depicted in Fig.
+2, on an A100-80GB GPU, a 2g.20gb instance profile allocates
+two SM slices and two 10GB slices, while a 1g.20gb instance
+profile uses one SM slices and two 10GB of memory. Note that
+this procedure can be extended to any GPU model supporting
+MIG. Placement indexes determine the physical location on
+the GPU where each profile is mapped on the hardware,
+ensuring that the assigned slices are contiguous. We resume
+all possible feasible profile configurations for the A100 model
+in Tab. I. This contiguity requirement implies that not all
+combinations of instance profiles can coexist simultaneously,
+as available slices must be assigned in contiguous blocks
+without gaps. The adoption of placement indexes introduces
+additional constraints on configuration flexibility during the
+creation and removal of dynamic instances. Consequently,
+this leads to an optimization problem focused on maximizing
+resource utilization and minimizing fragmentation, in order to
+reduce inefficiency and resource wastage.
+IV. SYSTEM MODEL
+We consider a homogeneous GPU cluster composed of the
+same hardware model (e.g. A100, H100, etc) that support
+MIG. The infrastructure is owned and managed by a cloud
+provider which offers a GPU-as-a-Service platform that allows
+external users to rent GPUs resources based on a pay-per-
+use billing model. We assume that MIG is employed as GPU
+sharing technology so each tenant can request fractional GPU
+resources tailored to run his AI applications in an isolated
+multi-tenant environment. Formally, we indicate the set of
+GPUs in the cluster as M, where each GPU m is composed by
+Sm slices identified by the set of indexes I = {0, ..., Sm −1}.
+The amount of supported MIG profiles is indicated by the set
+P = {1g.10gb, ..., 4g.40gb, 7g.80gb} and the related set of
+feasible indexes as Ip ⊆I, p ∈P. Similarly, we define the
+set of workloads to schedule as W, where each workload w
+requests a MIG profile p ∈P which corresponds to a specific
+amount of compute and memory GPU resources rw(p) =
+⟨rcomp, rmem⟩, ∀w ∈W. Workload arrivals are distributed
+in time and are served by the infrastructure scheduler in an
+online fashion following a First-In First-Out queue policy. We
+indicate the amount of allocated slices in each GPU using the
+indicator variable xm,i, m ∈M, i ∈I, which assumes value
+1 if slice i of GPU m is allocated, 0 otherwise. To counteract
+the natural increase of resource fragmentation caused by the
+continuous arrival and termination of workloads which is
+further exacerbated by MIG, the scheduling logic is designed
+to individually accommodate each workload request in com-
+pliance with MIG constraints while mitigating the resource
+fragmentation. The benefit of this strategy allows to increase
+the number of accepted workload requests, thereby generating
+higher rental revenues for the cloud provider. In this context,
+we design a fragmentation-aware scheduling algorithm based
+on the following assumptions:
+• Unknown workload statistics: the cloud provider is
+agnostic of both the statistic of the requested MIG profiles
+and lifespan duration. Therefore, the designed scheduler
+should provide reliable scheduling decisions regardless of
+the MIG profile requests distribution, hence it works in
+an online setting by adapting the scheduling decision to
+the current state of the GPU cluster.
+• Dynamic GPU partition reconfiguration: MIG par-
+titions are automatically created at runtime based on
+workload requirements by dynamically aggregating MIG
+slices. This capability, introduced in recent MIG driver
+versions and leveraged by real-world GPU schedulers1,
+enhances resource flexibility as it eliminates the need to
+pre-configure partitions on the available GPUs.
+• No workload rescheduling: although beneficial for de-
+fragmenting resources, re-scheduling workloads across
+GPUs may cause service disruption during the migra-
+tion process, affecting tenants’ applications performance.
+Therefore, we assume that the scheduler exclusively allo-
+cates workloads based on the current availability of MIG
+slices without the possibility to modify the allocation in
+the future (we are going to consider rescheduling in a
+future work to augment the proposed scheduling logic).
+Our approach adopts a heuristic scheduling strategy, as
+opposed to an exact optimal formulation, to ensure practical
+applicability and scalability. This choice is motivated by
+the online nature of the scheduling problem, which would
+otherwise require prior knowledge of future workload arrivals
+and lifespans to globally optimize the workload allocations.
+Furthermore, the maximization of the number of allocated
+workloads can be viewed as a variant of the bin packing
+problem where items (i.e., MIG profiles) are subject to po-
+sition constraints within bins (i.e., GPUs), as demonstrated
+in similar MIG scheduling studies [20][21]. As a result, the
+combinatorial complexity makes the computation of optimal
+solutions impractical for real-world deployments.
+V. FRAGMENTATION-AWARE SCHEDULING FOR MIG
+In this section we describe the proposed scheduling algo-
+rithm mitigating GPU fragmentation when using MIG. First
+we define a fragmentation measure for MIG deployments
+which quantifies the fragmentation severity on GPUs. Then,
+we leverage this formulation to design a fragmentation-aware
+allocation scheme of MIG profiles.
+A. The impact of MIG fragmentation on scheduling decisions
+Fragmented GPUs can severely alter the scheduling perfor-
+mance by causing unexpected workload rejection. Therefore,
+the definition of a fragmentation metric tailored to MIG covers
+an essential role to drive the design of an effective scheduling
+algorithm overcoming this issue. To highlight the significance
+of this requirement, Fig. 3 presents two examples demon-
+strating how fragmentation-agnostic scheduling strategies fail
+to allocate workloads on MIG-based clusters. Specifically,
+the considered scheduling schemes employ opposite criteria
+for GPU selection, illustrating this behavior under different
+scheduling scenarios. One scheme is based on a best-fit logic
+which selects the GPU minimizing the waste of MIG slices
+(Fig. 3a), the other employs a load-balancing approach and
+selects the GPU with the least amount of allocated MIG slices
+1https://www.theriseunion.com/en/blog/HAMi-2-5-0.html
+
+
+===== PAGE 4 =====
+2g
+20gb
+3g
+40gb
+1g
+10gb
+GPU 2
+Workload
+GPU utilization (43%)
+Scheduling decision:
+GPU 2
+Index 4
+MIG compute slices
+GPU 1
+GPU utilization (30%)
+MIG compute slices
+1g
+10gb
+1g
+10gb
+(a) Example of workload rejection using best-fit scheduling
+Scheduling decision:
+GPU 1
+Index 0
+GPU 1
+GPU utilization (30%)
+MIG compute slices
+1g
+10gb
+1g
+10gb
+2g
+20gb
+3g
+40gb
+1g
+10gb
+GPU 2
+Workload
+GPU utilization (43%)
+MIG compute slices
+(b) Example of workload rejection using load-balance scheduling
+Fig. 3: Examples of workload rejections using different scheduling strategies. Although enough resource are available in both
+scenarios, the workload cannot be scheduled due to resource fragmentation reducing the amount of allocable MIG slices.
+(Fig. 3b). Both schemes select the MIG slices indexes by
+searching the first available index which can accommodate the
+profile. We observe that, although both schemes can identify a
+GPU with sufficient resources for the workload, the allocation
+still fails because the available indexes on the selected GPU
+are incompatible with the requested MIG profile. This problem
+arises from fragmentation of MIG slices, which reduces the
+number of effectively schedulable MIG profiles on that GPU.
+B. Characterizing fragmentation in MIG
+Resource fragmentation typically refers to the inefficient
+use of computational resources caused by their non-contiguous
+allocation. While contiguity is necessary, it alone is not suffi-
+cient to determine whether a GPU is fragmented when using
+MIG, due to various index constraints that limit scheduling
+options. Consequently, we need to refine the definition of
+fragmentation to account for these constraints, enabling the
+creation of a reliable metric that can quantitatively guide
+scheduling decisions. To this end, we address the following
+two key questions:
+1) Under what conditions can a GPU employing MIG-
+based sharing be considered fragmented?
+2) Once fragmentation occurs, how can we quantify its
+severity?
+To answer question 1, we argue that the definition of
+fragmented GPU using MIG is a relative concept that in fact
+depends on the combination of the MIG profile that is being
+scheduled and the available indexes. Referring to Fig. 3a,
+workloads requesting the 1g.10gb and 2g.20gb profiles can
+be successfully scheduled on GPU 2, as sufficient resources
+and feasible indexes are available, even though some allo-
+cated slices are not contiguous. In contrast, the 3g.40gb and
+4g.40gb profiles are rejected despite an adequate number of
+available slices due to feasible indexes being already assigned
+to other profiles. (see Table I). Based on this observation, let
+∆Sm = Sm −P
+i∈I xm,i be the amount of unused slices on
+GPU m:
+Definition. GPU m ∈M is fragmented with respect to
+MIG profile p requested by workload w if rw(p) ≤∆Sm and
+P
+i∈{¯i,¯i+1,...,¯i+rw(p)−1} xm,i > 0, ∀¯i ∈Ip.
+In other words, a GPU is fragmented with respect to profile
+p if the latter cannot be scheduled although a sufficient amount
+of slice is available. This definition of fragmentation makes
+it possible to contextualize its behavior with respect to the
+scheduling of workloads and can be used to further elaborate
+a fragmentation measure by answering to question 2. As a
+matter of fact, the proposed definition of fragmentation is too
+Algorithm 1 Fragmentation score computation
+1: Input: GPU m ∈M
+2: Output: F(m)
+3: for each profile p in Pm do
+4:
+Assume that workload w requests MIG profile p
+5:
+if rw(p) ≤∆Sm then
+6:
+for each ¯i ∈Ip do
+7:
+if P
+i∈{¯i,¯i+1,...,¯i+rw(p)−1} xm,i > 0 then
+8:
+F(m) ←F(m) + rmem
+9:
+end if
+10:
+end for
+11:
+end if
+12: end for
+coarse and does not allow to discriminate between different
+levels of fragmentation severity since a single misplaced MIG
+profile on an empty GPU would make the GPU fragmented.
+For example, scheduling profile 1g.10gb on MIG slice at index
+1 prevents the allocation of MIG profile 4g.40gb. To overcome
+this limitation, we augment the notion of GPU fragmentation
+by introducing the concept of fragmentation score, referred to
+as F(m), m ∈M, which allows to differentiate various level
+of fragmentation by assessing the scheduling feasibility of the
+supported MIG profiles. We report pseudo-code to compute
+the fragmentation score in Algorithm 1. In detail, given a
+GPU m, we assume that a hypothetical workload w requesting
+profile p is scheduled. Then, we evaluate the feasible allocation
+configurations of profile p assessing whether the hypothetical
+allocation of profile p at index i ∈Ip is feasible (lines 6-7).
+For each unfeasible allocation, we increment the fragmentation
+score F(m) by the number of MIG memory slices composing
+the profile p (line 8). This procedure is repeated for each
+supported profile p ∈Pm. Intuitively, the fragmentation score
+associated to a GPU depends on the total number of unfeasible
+MIG profile configurations weighted by the number of MIG
+memory slices composing the profile. Note that we consider
+memory slices in order to account for the misalignment be-
+tween compute and memory slices, as the latter are more likely
+to be fragmented when allocating profiles requiring unequal
+memory and compute slices such as 1g.20gb and 3g.40gb. The
+higher the value, the lower is the amount of allocable MIG
+slices. As a result, it is possible to compare the fragmentation
+severity produced by different MIG allocations. For example,
+the fragmentation score of GPU 2 in Fig. 3a, would be
+computed as follows. For each of profile, we compute the
+number of unfeasible allocations: profile 1g.20gb requires 2
+
+
+===== PAGE 5 =====
+MIG slices (see Table I) and cannot be allocated on index 4
+since the second memory slice is allocated to profile 1g.10gb.
+As a result, GPU 2 has a partial fragmentation score of 2 (1
+unfeasible allocation for a profile composed of 2 MIG memory
+slices). By repeating this computation for all remaining profiles
+{2g.20gb, 3.40gb, 4.40gb}, the resulting fragmentation score
+for GPU 2 is F(2) = 2 + 2 + 8 + 4 = 16. Following the same
+procedure, the fragmentation score for GPU 1 is F(1) = 8.
+Therefore, by comparing the fragmentation scores of the two
+GPUs, we conclude that GPU 2 is more fragmented than
+GPU 1. This information allows to analytically compare MIG
+allocations across GPUs and links resource utilization with the
+scheduling policy.
+C. Minimum Fragmentation Increment (MFI) algorithm
+We leverage the definition of fragmentation score to design a
+fragmentation-aware scheduling algorithm that maximizes the
+number of successfully scheduled workloads (in other words,
+the number of scheduled MIG profiles that comply with MIG
+allocation constraints). In an online scenario, where workloads
+are distributed over time and scheduling decisions depend on
+the current allocation of GPU resources, fragmentation scores
+can vary considerably across scheduling intervals. This varia-
+tion is primarily caused by the limited placement flexibility of
+certain MIG profiles (e.g., 4g.40gb and 3g.40gb) and by the
+termination of deployed workloads, which may release GPU
+resources consisting of non-contiguous MIG slices. Following
+this observation, inspired by the allocation strategy proposed
+by authors of [17], we schedule workloads in order to counter-
+act the fragmentation score growth that is bound to naturally
+increase over time. Intuitively, this strategy has the effect of
+reducing the fragmentation and thus increasing the workload
+scheduling success rate. We implement this idea by designing
+a scheduling algorithm, named as Minimum Fragmentation
+Increment (MFI), which adopts a greedy logic to select the
+GPU and related MIG slices minimizing the increment of
+fragmentation score. Operationally, the algorithm performs
+dry-run allocations on each GPU to estimate the variation
+in fragmentation score performance prior to committing the
+final scheduling decision. We report the algorithm steps in
+Algorithm 2. The algorithm performs the following steps for
+each workload to schedule w. We initialize the fragmentation
+score variation, ∆F(m), for each GPU m which is going to
+be used to assess the impact on fragmentation caused by the
+allocation of workload w (line 3). For each GPU m that can
+accommodate the requested profile p, we compute the current
+fragmentation score F(m) (line 6). Then, we perform dry-run
+allocations for each feasible profile index i of profile p and
+we store the variation of fragmentation score by computing
+the difference between the hypothetical fragmentation score,
+F (i)(m), that would be obtained assigning profile p at slice
+index i and the original fragmentation score F(m) (lines 7-11).
+Finally, if there are candidate GPUs, we schedule workload w
+by allocating profile p to GPU m at index i such that the
+variation in fragmentation score is minimum (14-19).
+The computational complexity required to compute the
+scheduling decision for a workload mainly scales with num-
+ber of GPUs in the cluster. In detail, the algorithm iterates
+throughout all GPUs in linear time O(kM), where k is a
+constant accounting for the time required to compute frag-
+mentation scores. Each computation depends on the number
+of profiles |P| and MIG slice indexes |Ip| supported by
+Algorithm 2 Minimum Fragmentation Increment (MFI)
+1: Input: GPU cluster M, workload w with MIG profile p
+2: Output: Allocation ⟨m, i⟩, m ∈M, i ∈Ip of workload w
+3: Initialize the list ∆F (i)(m) = {}, ∀m ∈M
+4: for each GPU m ∈M do
+5:
+if rw(p) ≤∆Sm then
+6:
+Compute frag. score F(m)
+7:
+for each i ∈Ip do
+8:
+Dry-run allocation of p on index i of GPU m
+9:
+Compute the hypothetical frag. score F (i)(m)
+10:
+Store ∆F (i)(m)←F (i)(m) −F(m)
+11:
+end for
+12:
+end if
+13: end for
+14: if |∆F (i)(m)| ̸= {ϕ} then
+15:
+Select GPU m∗and index i∗s.t. argmin{∆F (i)(m)}
+16:
+Schedule w by allocating profile p to ⟨m∗, i∗⟩
+17: else
+18:
+Reject workload w
+19: end if
+TABLE II: MIG profile distributions
+MIG profile
+uniform
+skew-small
+skew-big
+bimodal
+7g.80gb
+1/6
+0.05
+0.30
+0.30
+4g.40gb
+1/6
+0.10
+0.25
+0.15
+3g.40gb
+1/6
+0.10
+0.20
+0.05
+2g.20gb
+1/6
+0.20
+0.10
+0.05
+1g.20gb
+1/6
+0.25
+0.10
+0.15
+1g.10gb
+1/6
+0.30
+0.05
+0.30
+the GPU hardware and it is not influenced by the number
+of GPUs. Similarly, computing the GPU that minimizes the
+fragmentation variation can be done in O(M) if the list of
+∆F (i)(m) values is maintained in sorted order as it is updated.
+Consequently, the overall complexity is O(kM) + O(M),
+which asymptotically simplifies to O(kM).
+VI. PERFORMANCE EVALUATION
+We assess the performance of MFI algorithm throughout
+Monte Carlo simulations. In detail, we simulate the scheduling
+of workloads on an empty cluster of M = 100 A100 GPUs
+that is progressively loaded up to its maximum capacity.
+To synchronize the workload duration with the scheduling
+procedure, we express the workload duration in terms of
+scheduling slots by randomly sampling a value between [1, T],
+where T correspond to the number of scheduling slots required
+to saturate the cluster capacity (in other words, when the
+total amount of requested GPU resources corresponds to the
+amount of resources provided by the cluster). This approach
+allows us to simulate the dynamics of a multi-tenant GPU
+cluster under varying load conditions, with workloads that
+have heterogeneous lifespans and arrival times. Moreover, due
+to the lack of real world dataset collecting scheduling statistics
+of MIG-based deployments, we analyze the performance of
+MFI with respect to different synthetically-generated distri-
+butions of MIG profiles to investigate their impact on the
+scheduling outcome. Specifically, we consider the following
+profile distributions, whose probability density functions are
+reported in Table II:
+• Uniform: every profile is equally likely. This distribution
+serves as baseline for testing the scheduling performance
+in a general scenario.
+
+
+===== PAGE 6 =====
+0
+20 40 60 80 100
+0
+20
+40
+60
+80
+100
+Total GPU Demand (%)
+No. of workloads (%)
+(a) Scheduled workloads
+0
+20 40 60 80 100
+0
+0.2
+0.4
+0.6
+0.8
+1
+Total GPU Demand (%)
+Probability
+MFI
+BF-BI
+WF-BI
+FF
+RR
+(b) Acceptance Rate
+0
+20 40 60 80 100
+0
+20
+40
+60
+80
+100
+Total GPU Demand (%)
+Res. utilization (%)
+(c) Cluster resource utilization
+0
+20 40 60 80 100
+0
+20
+40
+60
+80
+100
+Total GPU Demand (%)
+No. of GPUs (%)
+(d) Active GPUs
+Fig. 4: Scheduling performance in different load conditions when MIG profile requests are uniformly distributed.
+• Skew-small: small profiles are more frequent than large
+ones. This distribution is likely to cause severe GPU
+fragmentation due to the allocation of many small pro-
+files reserving non-contiguous MIG slices which possibly
+deny the allocation of large profiles.
+• Skew-big: large profiles are more frequent than small
+ones. This distribution constrains scheduling flexibility,
+as large profiles can be placed only on a limited num-
+ber of feasible MIG slice configurations. Consequently,
+the benefit of a fragmentation-aware scheduling policy
+are modest, given the inherent rigidity of the available
+scheduling options.
+• Bimodal: mixture of large and small profiles. This dis-
+tribution highlights the scheduling performance when
+profiles with different amount of scheduling constraints
+and fragmentation generation potential are dominant.
+We compare MFI algorithm with respect to various schedul-
+ing schemes using different strategies to maximize the number
+of scheduled MIG profiles. In particular, to better highlight the
+impact of MIG scheduling over traditional scheduling tech-
+niques, we divide the benchmarks in MIG-agnostic schemes,
+that schedule MIG profiles based only on resource availability
+on the GPUs, and MIG-aware schemes, that employ a pre-
+determined preference policy to select MIG slices indexes. In
+particular, we use the solution proposed by the authors of [21]
+and we prioritize the allocation of MIG profiles on indexes that
+do not restrict the placement of profiles with fewer scheduling
+options. For instance, the 1g.10gb profile is assigned to index
+6 instead of index 0 whenever possible, thereby reserving
+index 0 for the 4g.40gb profile, which can only be scheduled
+there. Based on these considerations, we define the following
+benchmark schemes:
+• First Fit (FF): this scheme is MIG-agnostic and schedule
+MIG profiles on the first GPU with enough available
+resources. Profiles are assigned to the first available index.
+• Round Robin (RR): this scheme is MIG-agnostic and
+sequentially distributes MIG profiles on the available
+GPUs. Profiles are assigned to the first available index.
+• Best Fit Best Index (BF-BI): this scheme is MIG-aware
+and follows a bin-packing approach which schedules
+MIG profiles on the GPUs minimizing the amount of
+available resources after the allocation.
+• Worst Fit Best Index (WF-BI): this scheme is MIG-
+aware and follows a load-balancing approach which
+schedules MIG profiles on the GPUs maximizing the
+amount of available resources after the allocation.
+We quantify the performance of MFI with respect to the
+proposed baselines according to the following metrics:
+• Acceptance rate: this is the probability to successfully
+schedule a workload on the available GPUs according
+to the MIG constraints. We assume that unscheduled
+workloads are rejected and are no longer rescheduled
+during the simulation. Although we acknowledge this is
+not realistic, this approach allows to better analyzing the
+performance gap between the various schemes.
+• Allocated workloads: this represents the total number
+of successfully scheduled workloads in the GPU cluster
+and, together with the acceptance rate, characterizes the
+primary goal of the scheduling objective.
+• Active GPUs: this represents the total number of GPUs
+required to accommodate the scheduled workloads. A
+GPU is considered active if it is hosting at least one
+workload.
+• Resource utilization: this is the total amount of allocated
+slices in each GPU required to accommodate the various
+MIG profiles. Together with the number of active GPUs,
+this metric allows to assess the resource utilization effi-
+ciency of the various schemes.
+• Fragmentation severity: this is the average fragmenta-
+tion score of the cluster computed as
+1
+M
+P
+m∈M F(m).
+We performed 500 independent scheduling simulation for each
+distribution and averaging the obtained results. All metrics are
+normalized with respect to their maximum value in order to
+facilitate the comparison between different schemes and MIG
+profile distributions.
+We initially discuss the results by analyzing the performance
+of the various schemes when MIG profile requests are uni-
+formly distributed. In Fig. 4, we report the considered metrics
+as the number of requested resources to the GPU cluster
+increases. For example, a GPU demand of 50% corresponds
+to the scenario where the total amount of workloads arrived
+between slot 0 and slot t requires 50% of GPU resources
+of the cluster in order to be accommodated. Note that this
+value does not account for workloads termination freeing
+up resources, hence the actual resource utilization of the
+cluster is lower. We observe that MFI achieves the highest
+number of scheduled workloads (Fig. 4a) by maintaining an
+acceptance rate close to 100% regardless of the cluster load
+(Fig. 4b). This is because it adapts the allocation of MIG
+profiles to counteract the increase of fragmentation caused by
+the combination of rigid MIG constraints and elastic resource
+availability. Conversely, the various baselines have visibly
+worse performance. In particular, the MIG-agnostic schemes
+
+
+===== PAGE 7 =====
+skew-small
+skew-big
+bimodal
+0
+20
+40
+60
+80
+100
+No. of workloads (%)
+(a) Scheduled workloads
+skew-small
+skew-big
+bimodal
+0
+0.2
+0.4
+0.6
+0.8
+1
+Probability
+(b) Acceptance Rate
+skew-small
+skew-big
+bimodal
+0
+20
+40
+60
+80
+100
+Res. utilization (%)
+MFI
+BF-BI
+WF-BI
+FF
+RR
+(c) Cluster resource utilization
+skew-small
+skew-big
+bimodal
+0
+20
+40
+60
+80
+100
+No. of GPUs (%)
+(d) Active GPUs
+Fig. 5: Scheduling performance for different distributions of MIG profiles when the amount of requested GPU resources is
+85% of the cluster capacity.
+FF and RR perform worst due to the allocation of MIG
+profiles on unfeasible indexes. This effect is less severe for low
+resource loads since more scheduling options are available,
+hence it favors RR scheme which spreads profiles on unused
+GPUs. However its performance sharply deteriorates as the
+cluster utilization increases, exacerbating the effect of frag-
+mentation and making the successful allocation of workloads
+more challenging. In this condition, FF performs better due its
+higher bin-packing capability, ensuring a higher acceptance
+rate in heavy load conditions. MIG-aware schemes behave
+similar to the MIG-agnostic counterparts, but provide better
+results, confirming that the preference-based index policy is
+an effective mechanism to handle MIG constraints. However,
+although this strategy aids the fragmentation mitigation, the
+static nature of the policy makes the scheduling strategy unable
+to adapt to the different fragmentation scenarios caused by the
+continuous workload arrival/termination. In regard of resource
+efficiency, we observe that MFI achieves the highest resource
+utilization (Fig. 4c) employing a proportionate number of
+GPUs (Fig. 4d) as the cluster load increases. In contrast, RR
+and WF-BI quickly saturate the available GPUs due to their
+spreading strategy, which helps satisfying MIG constraints
+but also requires a higher number of GPUs. Conversely, FF
+and BF-BI pack MIG profile requests more efficiently, with
+BF-BI achieving greater improvements thanks to its MIG-
+aware scheduling. However, the smaller number of GPUs they
+employ is not utilized effectively because higher fragmentation
+reduces overall resource usage. This stands in contrast to MFI,
+which achieves higher utilization by limiting fragmentation.
+We extend the results analysis by showing the performance
+obtained with different distributions of MIG profile requests.
+In Fig. 5, we provide a snapshot of the performance on a heavy
+load scenario corresponding to resource request that is 85% of
+the cluster capacity. We observe that MFI outperforms the con-
+sidered baselines regardless of the MIG profile distribution and
+provides consistent results. In detail, on average, the perfor-
+mance gap is wider when MIG profiles follows the skew-small
+distribution. The high number of small profiles creates frequent
+non-contiguous allocation of MIG profiles, thus leading to
+severe fragmentation. Bin packing strategies like BF-BI and
+FF are most affected as they prioritize the allocation of most
+utilized GPUs which are also likely to be the most fragmented.
+In this context, the fixed index selection policy used by BF-BI
+provides limited benefit since big profiles are rarely scheduled.
+As results, the number of scheduled workloads (Fig. 5a) and
+acceptance rate (Fig. 5b) are considerably lower than other
+baselines strategies which instead distribute workloads across
+GPUs, delaying the fragmentation growth. In contrast, the
+performance gap with respect to MFI is smaller when profiles
+are distributed according to skew-big. The prevalence of big
+MIG profile requests reduces the fragmentation chances due
+to the limited number of scheduling options that essentially
+force the workload allocation (for example, 7.80gb requires
+a full GPU and 4g.40gb can only be allocated on index
+0). Therefore, contrary to the previous case, FF and BF-BI
+achieve a better resource utilization (Fig. 5c) compared RR
+and WF-BI schemes using a lower amount of GPUs (Fig. 5d).
+Finally, when MIG profiles follows a bimodal distribution, the
+combination of small and big profiles increases the scheduling
+complexity due to the presence of conflicting MIG constraints,
+which hinder the workload acceptance rate performance of
+all baselines. Nonetheless, MFI provides steady performance
+thanks to its proactive scheduling approach which suppresses
+the fragmentation growth, achieving higher acceptance rates
+with a limited number of GPUs.
+This analysis demonstrates that the proposed fragmentation
+score metric can be used to consistently drive the workload
+scheduling process towards a resource-efficient utilization of
+
+
+===== PAGE 8 =====
+uniform
+skew-small
+skew-big
+bimodal
+0
+2
+4
+6
+8
+Fragmentation score
+MFI
+BF-BI
+WF-BI
+FF
+RR
+Fig. 6: Average fragmentation score obtained by different
+scheduling strategies and MIG profiles distributions.
+GPU resources regardless of the MIG profiles distribution.
+To further validate this argument, in Fig. 6, we show the
+average fragmentation score obtained by the various schemes
+for each considered profile distribution. As expected, the
+improved performance achieved with MFI corresponds to
+lower fragmentation score values. Similarly, the fragmentation
+scores for the other baselines are consistent with their respec-
+tive performance: lower acceptance rates and lower resource
+utilization correspond to higher fragmentation scores, and vice
+versa.
+VII. CONCLUSION
+We addressed the problem of GPU resource fragmentation
+arising from the rigid constraints imposed by MIG and the
+continuous allocation and release of GPU resources over time.
+This phenomenon significantly reduces the scheduling effi-
+ciency of multi-tenant GPU clusters, where workload isolation
+is essential to guarantee both quality of service and security
+of co-located tenants. In this context, we proposed a fragmen-
+tation metric tailored for MIG to quantify the fragmentation
+severity of GPUs and we leveraged this information to drive
+the scheduling decision of incoming workloads. In detail, the
+designed fragmentation-aware scheduling algorithm operates
+in an online manner, without any a-priori knowledge of the
+workload distribution. It adopts a proactive allocation strat-
+egy to suppress the fragmentation growth on GPUs, making
+possible to increase the number of successfully allocated
+workloads through more efficient resource utilization. We
+evaluated the proposed solution against multiple baselines
+implementing both MIG-agnostic and MIG-aware scheduling
+policies, as well as across various MIG profile distributions to
+assess performance sensitivity. Results reveal that our scheme
+consistently achieves the highest workload acceptance rate
+under different load conditions while ensuring an efficient use
+of GPU resources.
+ACKNOWLEDGMENT
+This work was supported by Ministero delle Imprese e del
+Made in Italy (IPCEI Cloud DM 27 giugno 2022 - IPCEI-CL-
+0000007) and European Union (Next Generation EU).
+REFERENCES
+[1] X. Miao, G. Oliaro, Z. Zhang, X. Cheng, H. Jin, T. Chen, and Z. Jia,
+“Towards efficient generative large language model serving: A survey
+from algorithms to systems,” ACM Computing Surveys, vol. 58, no. 1,
+pp. 1–37, 2025.
+[2] S. Choi, S. Lee, Y. Kim, J. Park, Y. Kwon, and J. Huh, “Serving het-
+erogeneous machine learning models on multi-gpu servers with spatio-
+temporal sharing,” in USENIX Annual Technical Conference, 2022, pp.
+199–216.
+[3] S. Garg, K. Kothapalli, and S. Purini, “Share-a-gpu: Providing simple
+and effective time-sharing on gpus,” in IEEE International Conference
+on High Performance Computing (HiPC).
+IEEE, 2018, pp. 294–303.
+[4] A. Dhakal, S. G. Kulkarni, and K. Ramakrishnan, “Gslice: controlled
+spatial sharing of gpus for a scalable inference platform,” in ACM
+Symposium on Cloud Computing, 2020, pp. 492–506.
+[5] C. Zhao, W. Gao, F. Nie, and H. Zhou, “A survey of gpu multitasking
+methods supported by hardware architecture,” IEEE Transactions on
+Parallel and Distributed Systems, vol. 33, no. 6, pp. 1451–1463, 2021.
+[6] B. Li, V. Gadepally, S. Samsi, and D. Tiwari, “Characterizing multi-
+instance gpu for machine learning workloads,” in IEEE International
+Parallel and Distributed Processing Symposium Workshops (IPDPSW).
+IEEE, 2022, pp. 724–731.
+[7] M. Pavlidakis, G. Vasiliadis, S. Mavridis, A. Argyros, A. Chazapis, and
+A. Bilas, “Guardian: Safe gpu sharing in multi-tenant environments,” in
+International Middleware Conference, 2024, pp. 313–326.
+[8] X. Wei, Z. Li, and C. Tan, “Optimizing gpu sharing for container-based
+dnn serving with multi-instance gpus,” in ACM International Systems
+and Storage Conference, 2024, pp. 68–82.
+[9] Y. Zhu, C. Wang, M. Calman, R. Nakazawa, and E. K. Lee, “Optimizing
+gpu multiplexing for efficient and cost-effective access to diverse large
+language models in gpu clusters,” in International Conference on
+Modeling, Analysis and Simulation of Computer and Telecommunication
+Systems (MASCOTS).
+IEEE, 2024, pp. 1–8.
+[10] J. Qi, W. Xiao, M. Li, C. Yang, Y. Li, W. Lin, H. Yang, Z. Luan,
+and D. Qian, “Elasticbatch: A learning-augmented elastic scheduling
+system for batch inference on mig,” IEEE Transactions on Parallel and
+Distributed Systems, 2024.
+[11] T. Fu, Z. Yang, Z. Ye, C. Ma, Y. Han, Y. Luo, X. Wang, and Z. Wang,
+“A survey on the scheduling of dl and llm training jobs in gpu clusters,”
+Chinese Journal of Electronics, vol. 34, no. 3, pp. 881–905, 2025.
+[12] Z. Ye, W. Gao, Q. Hu, P. Sun, X. Wang, Y. Luo, T. Zhang, and Y. Wen,
+“Deep learning workload scheduling in gpu datacenters: A survey,” ACM
+Computing Surveys, vol. 56, no. 6, pp. 1–38, 2024.
+[13] B. Li, T. Patel, S. Samsi, V. Gadepally, and D. Tiwari, “Miso: exploiting
+multi-instance gpu capability on multi-tenant gpu clusters,” in Sympo-
+sium on Cloud Computing, 2022, pp. 173–189.
+[14] B. Zhang, S. Li, and Z. Li, “Miger: Integrating multi-instance gpu
+and multi-process service for deep learning clusters,” in International
+Conference on Parallel Processing, 2024, pp. 504–513.
+[15] M. Lee, S. Seong, M. Kang, J. Lee, G.-J. Na, I.-G. Chun, D. Nikolopou-
+los, and C.-H. Hong, “Parvagpu: Efficient spatial gpu sharing for large-
+scale dnn inference in cloud environments,” in International Conference
+for High Performance Computing, Networking, Storage and Analysis.
+IEEE, 2024, pp. 1–14.
+[16] J. Villarrubia, L. Costero, F. D. Igual, and K. Olcoz, “Solving the
+task scheduling and gpu reconfiguration problem on mig devices via
+deep reinforcement learning,” Future Generation Computer Systems, p.
+108145, 2025.
+[17] Q. Weng, L. Yang, Y. Yu, W. Wang, X. Tang, G. Yang, and L. Zhang,
+“Beware of fragmentation: Scheduling {GPU-Sharing} workloads with
+fragmentation gradient descent,” in USENIX Annual Technical Confer-
+ence, 2023, pp. 995–1008.
+[18] H. Lao, R. Xu, L. Chen, and J. Zhang, “Cafgd: Reduce fragmentation
+in large-scale multi-tenant clusters for gpu sharing workloads,” in IEEE
+International Conference on Distributed Computing Systems (ICDCS).
+IEEE, 2025, pp. 133–143.
+[19] F. Lettich, E. Carlini, F. M. Nardini, R. Perego, and S. Trani, “Power-and
+fragmentation-aware online scheduling for gpu datacenters,” in IEEE
+International Symposium on Cluster, Cloud and Internet Computing
+(CCGrid).
+IEEE, 2025, pp. 43–52.
+[20] A. Siavashi and M. Momtazpour, “A multi-objective framework for
+optimizing gpu-enabled vm placement in cloud data centers with multi-
+instance gpu technology,” arXiv preprint arXiv:2502.01909, 2025.
+[21] B.
+Turkkan,
+P.
+Murali,
+P.
+Harsha,
+R.
+Arora,
+G.
+Vanloo,
+and
+C. Narayanaswami, “Optimal workload placement on multi-instance
+gpus,” arXiv preprint arXiv:2409.06646, 2024.
+[22] NVIDIA, “Nvidia multi-instance gpu, seven independent instances in
+a single gpu,” 2025. [Online]. Available: https://www.nvidia.com/en-
+us/technologies/multi-instance-gpu/

@@ -1,0 +1,4605 @@
+
+
+===== PAGE 1 =====
+Serving DNN Models with Multi-Instance GPUs:
+A Case of the Reconﬁgurable Machine Scheduling Problem
+Cheng Tan†⋆, Zhichao Li†, Jian Zhang†⋆, Yu Cao†◦, Sikai Qi†, Zherui Liu†, Yibo Zhu†, Chuanxiong Guo†
+†ByteDance Inc.
+⋆Northeastern University
+◦New York University
+Abstract
+Multi-Instance GPU (MIG) is a new feature introduced by
+NVIDIA A100 GPUs that partitions one physical GPU into
+multiple GPU instances. With MIG, A100 can be the most cost-
+eﬃcient GPU ever for serving Deep Neural Networks (DNNs).
+However, discovering the most eﬃcient GPU partitions is chal-
+lenging. The underlying problem is NP-hard; moreover, it is a
+new abstract problem, which we deﬁne as the Reconﬁgurable
+Machine Scheduling Problem (RMS).
+This paper studies serving DNNs with MIG, a new case
+of RMS. We further propose a solution, MIG-serving. MIG-
+serving is an algorithm pipeline that blends a variety of newly
+designed algorithms and customized classic algorithms, includ-
+ing a heuristic greedy algorithm, Genetic Algorithm (GA), and
+Monte Carlo Tree Search algorithm (MCTS). We implement
+MIG-serving on Kubernetes. Our experiments show that com-
+pared to using A100 as-is, MIG-serving can save up to 40%
+GPUs while providing the same throughput.
+1
+Introduction
+NVIDIA A100 [10] is the latest and the most powerful GPU
+launched in 2020. Seemingly, A100 is not cost-eﬃcient for
+DNN serving (inference) because serving may not fully utilize
+GPU resources. However, we argue that, equipped with a new
+feature—Multi-Instance GPU—A100 can be the most cost-
+eﬃcient GPU ever for DNN serving.
+Multi-Instance GPU (MIG) is a new hardware feature intro-
+duced by A100. MIG allows people to partition one physical
+GPU into some number of GPU instances (or instance for
+short) that are hardware isolated. For example, an A100 can
+be partitioned up to 7 instances, and each instance has its own
+processors, memory, L2 cache, and bus bandwidth. Moreover,
+small instances can be merged into larger instances, for exam-
+ple,two of the 7 instances in A100 (which we call 1/7 instances)
+can merge to a 2/7 instance with twice the resources.
+To understand the serving costs (in dollars) on diﬀerent
+GPUs, we calculate how much one needs to pay for serving
+one request using varied GPUs on AWS [3–5], including V100,
+T4, and A100—in which A100 is conﬁgured into two variants:
+using A100 as a whole (A100-7/7) and partitioning A100 into
+ResNet-50
+ResNet-50v1.5
+BERT-BASE
+BERT-LARGE
+models
+0
+0.2
+0.4
+0.6
+0.8
+1.0
+normalized dollar per req
+(lower is better)
+V100(⋆⋆
+T4
+A100-7/7
+A100-7x1/7
+Figure 1: Normalized cost per request for diﬀerent DNN models (batch
+size 8, INT8, TensorRT 7.2) on diﬀerent GPUs. The cost is calculated
+based on model serving performance from NVIDIA inference bench-
+marks [12] and the price from AWS [3–5].
+(⋆): NVIDIA does not provide inference performance of INT8 for
+the three leftmost models on V100 [12]; they provide (and we use)
+“Mixed” precision instead.
+seven 1/7 instances (A100-7×1/7). 1 Figure 1 shows the result:
+A100-7×1/7 is the most cost-eﬃcient setup for all models.
+Can we do better than A100-7×1/7? The answer is yes. We
+observe that diﬀerent models have diﬀerent preferences about
+instance sizes (§2.2), thus we can improve inference perfor-
+mance by leveraging A100’s heterogeneity; namely, partition-
+ing an A100 into diﬀerent sized instances, for example, a 4/7
+instance, a 2/7 instance, and a 1/7 instance.
+Meanwhile, however, heterogeneity improve eﬃciency at the
+cost of simplicity. It raises many questions (also opportunities),
+just to name a few: how to partition GPUs regarding instances
+of diﬀerent sizes? Should we mix diﬀerent models in a GPU,
+and which ones to mix? DNN service deployers have diﬀer-
+ent throughput and latency requirements for diﬀerent models
+(deﬁned as service level objectives, SLOs). Consequently, the
+GPU conﬁguration that has the highest throughput per resource
+is not necessarily the best choice. How can we reﬂect SLOs in
+the GPU conﬁgurations?
+All these questions lead to our core question, how to con-
+ﬁgure MIG-enabled GPUs to most eﬃciently meet SLOs? By
+“most eﬃciently”, we mean that GPUs serving DNN models
+(called services) can satisfy SLOs with the minimum num-
+ber of GPUs. Our problem has three characteristics which in
+combination make the problem novel and challenging.
+First, diﬀerent DNNs have diﬀerent performance per re-
+1Note that we haven’t considered A30 (another MIG-enabled GPU) yet
+because no cloud deploys A30 [7] hence we are unable to compare price fairly.
+1
+arXiv:2109.11067v1  [cs.DC]  18 Sep 2021
+
+
+===== PAGE 2 =====
+source on diﬀerent sized instances (§2.2). This means that
+we cannot simply assume that two 1/7 instances equal one
+2/7 instance and assign resources by total amounts, which is
+a common assumption used by traditional resource allocation
+algorithms (like allocating CPU cores).
+Second, instance allocation is restricted: partitioning GPUs
+follows speciﬁc and (arguably) peculiar rules. These rules may
+reject seemingly valid partitions. For example, an A100 cannot
+allocate a 3/7 instance when having a running 4/7 instance,
+even if it has three free units of resources. This “no 4/7+3/7”
+is a hard-coded rule (§2.1), which has something to do with
+the hardware overhead of MIG [11]. These rules break an as-
+sumption made by many resource allocators (like memory and
+disk allocators) that having n units of free resources indicates
+one can always allocate a chunk of n resources (by some rear-
+rangements, if needed).
+Third, MIG supports partial reconﬁguration [45]: a subset
+of a GPU’s instances can be repartitioned on-the-ﬂy, without
+aﬀecting other working instances on the same GPU. Partial
+reconﬁguration diﬀers from classic reconﬁgurable setup (like
+RMTs [31]) because the amount of resources involved in one
+reconﬁguration is a variable, whereas classic reconﬁgurable
+devices, like RMTs, have a basic reconﬁgurable unit which is
+ﬁxed in size.
+We deﬁne an abstract problem, the Reconﬁgurable Machine
+Scheduling Problem, that captures and formally speciﬁes the
+above three characteristics. The problem is NP-hard (§3.3).
+Despite being computationally expensive to solve, the problem
+is crucial for deep learning tasks running on MIG-enabled
+GPUs, as the potential of MIG is enormous. In our experiments,
+we can save up to 40% GPUs by carefully conﬁguring MIG
+instead of ignoring MIG and using GPUs as a whole (§8).
+This paper describes a system called MIG-serving, which
+aims at serving DNNs with MIG. MIG-serving takes DNN
+models and their SLOs as inputs, and produces a set of GPU
+partitions and service assignments, called a deployment, that
+satisﬁes all SLOs and uses as few GPUs as possible.
+MIG-serving consists of two main components: optimizer
+and controller. Optimizer is responsible for generating and
+optimizing deployments. Speciﬁcally, it can generate a valid
+deployment quickly (in minutes); while if more time and com-
+puting resources are available, optimizer can gradually im-
+prove the result. Controller is in charge of actually applying
+the deployment to GPU clusters. In the this process, controller
+ensures that end users will not experience service interruptions.
+The contributions of this paper are as follows:
+• A study of model serving performance with MIG (§2.2,
+Appendix B). We study 49 trained models from PyTorch
+Hub [14] and TensorFlow Hub [15], and evaluate their per-
+formances on diﬀerent sized instances. We observe that the
+throughput of most models does not grow linearly with the
+increase of resources.
+• Deﬁnition of the Reconﬁgurable Machine Scheduling Prob-
+lem (§3). We deﬁne the problem in theoretical terms to
+highlight the fundamental diﬃculties and the relationship
+to other classic scheduling problems.
+• An algorithm pipeline for serving DNNs with MIG (§5, §6).
+We design a two-step pipeline that explores GPU conﬁgura-
+tions and searches for cost-eﬃcient deployments, including:
+1. Optimizer: balancing two conﬂicting requirements (§5).
+Optimizer needs to search for a deployment that satisﬁes
+SLOs. Except being computationally expensive, this
+search has two conﬂicting requirements in practice: (a)
+discovering a valid deployment quickly and (b) pursuing
+the most eﬃcient deployment. We tackle this challenge
+by a two-phase algorithm that combines two “template
+algorithms”—a fast algorithm and a slow algorithm—
+through a tailored Genetic Algorithm (GA).
+2. Controller: transparent deployment transition (§6).
+From time to time, services get updated and optimizer
+produces new deployments to reﬂect the changes. Con-
+troller is required to execute the deployment transitions
+transparently—without aﬀecting user experiences. To
+achieve such transparency, controller uses an algorithm,
+exchange-and-compact, which guarantees that during
+transitions, service throughputs are always greater than
+the required throughputs of the new or old deployments,
+whichever is smaller.
+• A built system and experimental evaluation (§7, §8). We
+implement MIG-serving on Kubernetes and experiment
+with it on a 24 A100 GPU cluster. MIG-serving can save
+up to 40% of GPUs compared to using A100 disabling MIG
+(§8.1). Also, MIG-serving is able to ﬁnish deployment
+transitions between two real-world workloads within half
+an hour (§8.2).
+2
+Multi-Instance GPU
+This section introduces MIG in detail (§2.1) and studies the per-
+formance characteristics of DNN models running on diﬀerent
+sized instances (§2.2). We further describe two straightforward
+approaches to use MIG for DNN inferences (§2.3), which will
+serve as baselines in our experiments (§8).
+2.1
+NVIDIA A100 MIG
+MIG is a hardware feature that allows users to partition a GPU
+into multiple GPU instances (or instance for short). Each in-
+stance functions as a traditional GPU. Current A100 GPU
+implementation has 7 slices of resources2 and people can orga-
+nize these resources in many ways with diverse sized instances.
+2The description of “7 slices” is a simpliﬁcation; in fact, diﬀerent resource
+categories are assigned diﬀerently. For example, a 1/7 instance has 1/7 proces-
+sor resources, but only 1/8 memory of A100. See A100 whitepaper [11] for
+more information.
+2
+
+
+===== PAGE 3 =====
+7/7 instance
+1/7 
+1/7 
+1/7 
+1/7 
+1/7 
+1/7 
+1/7 
+2/7 instance 
+2/7 instance 
+2/7 instance 
+4/7 instance 
+3/7 instance 
+instance
+choosing
+Figure 2: Instance allocation rules, borrowed from NVIDIA’s blog [9,
+Figure 1]. A legal A100 partition picks instances top-down. If an
+instance is chosen (for example, the shaded 4/7 instance), then all the
+instances beneath it are unavailable. As an example, the shaded boxes
+represents a legal partition with a 4/7, a 2/7, and a 1/7 instance.
+For example, a GPU can be partitioned into three instances
+with 1/7, 2/7, and 4/7 of the total resources respectively. In the
+rest of the paper, we call an instance with 1/7 of total resources
+as a 1/7 instance (similarly for instances of other sizes).
+Diﬀerent from resource sharing like MPS (Multi-Process
+Service), MIG’s instances do not share computational re-
+sources: instances have separate streaming multiprocessors
+(SM), GPU memory, and L1/L2 cache. In addition, instances
+provide fault and performance isolation by having dedicated
+on-chip crossbar ports, L2 cache banks, memory controllers,
+and DRAM address buses. Essentially, an instance is a full-
+ﬂedged GPU, except some of them are packed in the same
+“metal box” (an A100).
+As mentioned earlier (§1), MIG’s instance allocation follows
+speciﬁc rules; hence having n units of free resources does not
+imply that a GPU is able to allocate an n/7 instance. On the
+one hand, resources can only be grouped into speciﬁc sized
+instances—1/7, 2/7, 3/7, 4/7, 7/7 instances, whereas others
+(5/7 and 6/7 instances) are not allowed. On the other hand,
+the occupied resources also inﬂuence the possible allocations.
+As an example, for a GPU with two running 3/7 instances,
+allocating a 1/7 instance is prohibited.
+Figure 2 depicts the basic MIG allocation rules. But, there
+are several exceptions. For example, “3/7 + 4/7” is permitted in
+the ﬁgure but prohibited in practice and “3/7 + 3/7” is possible
+but not shown in the ﬁgure. In total, there are 18 distinct legal
+instance combinations in one A100 GPU (see the full list in
+NVIDIA’s document [13]).
+Note that the challenge of allocating a larger-than-1/7 in-
+stance is diﬀerent from allocating a chunk of consecutive re-
+sources, like memory. If there are n free pages, a memory
+allocator can always allocate a chunk of consecutive n pages
+by a series of memory copies. Nevertheless, even a GPU has
+three available slices, it cannot allocate a 3/7 instance if a 4/7
+instance has been allocated, which is a hard-coded rule.
+2.2
+A study of serving performance with MIG
+To understand the serving performance on diﬀerent sized in-
+stances, we conduct a study of 49 trained DNNs, in which 24
+models are from PyTorch Hub [14] and 25 are from TensorFlow
+Hub [15] (see Appendix B for all the models). The models are
+with precision of FP32. We run models on 1/7, 2/7, 3/7, 4/7,
+and 7/7 instances each for 5 minutes, and collect their through-
+puts and 90%-tile latencies. Figure 3 shows the results of two
+PyTorch models—densenet121 and xlnet-large-cased—
+which represent two categories of models. We use them as
+illustrative examples below.
+By analyzing the throughput and latency trends in Figure 3,
+we have three main observations:
+Observation 1 (Figure 3a): the growth of inference through-
+put is non-linear relative to the increase in resources
+(i.e., from 1/7 to 7/7 instances).
+Some models (like
+densenet121) has sub-linear throughput growth, while oth-
+ers (like xlnet-large-cased) have super-linear throughput
+growth. Of course, there are models whose throughputs grow
+linearly (see examples in Appendix B). But the point is, models
+scale diﬀerently, hence a unit of resource contributes diﬀerently
+for diﬀerent models and instances.
+Observation 2 (Figure 3b): for the same DNN model, a GPU
+with diﬀerent partitions has diverse performance, in terms of
+throughput and latency. As shown in Figure 3b, with the same
+resources (an A100 GPU) but diﬀerent partitions, throughputs
+may diﬀer by up to 4× (for densenet121); the latencies vary
+up to 8× (for xlnet-large-cased).
+Observation 3 (Figure 3a, 3b): The performance characteris-
+tics of diﬀerent DNN models are diﬀerent. By pairwise com-
+paring the performance of the two models in Figure 3, we
+see that models have diﬀerent performance patterns, and they
+prefer diﬀerent GPU partitions. For example, densenet121
+prefers small instances, as 1/7 instance has the highest per-unit-
+throughput without sacriﬁcing too much on the latency—a
+20ms latency increase versus an 7/7 instance. On the contrary,
+xlnet-large-cased should prioritize large instances because
+they have higher per-unit-throughput and lower latency than
+smaller instances.
+Model performance classiﬁcation. To understand the perfor-
+mance characteristics across models, we classify models into
+three categories, based on their throughput growth trends: (1)
+linear models whose throughputs grow linearly with the in-
+crease of computational resources,(2) sub-linear models whose
+throughputs grow sub-linearly, and (3) super-linear models
+whose throughputs grow super-linearly.
+We classify a model into the three categories as follows. For
+a model M, we calculate a per-unit-throughput for the smallest
+instance that can run M (usually 1/7 instance, but sometimes
+2/7 or 3/7 instance if M is large). Then, we calculate the ratio
+of 7/7 instance’s throughput and the above per-unit-throughput.
+If the ratio is within [6.5,7.5], we call M a linear model; if the
+ratio is smaller than 6.5, M is a sub-linear model; or else, M is
+a super-linear model.
+Figure 4 depicts the classiﬁcation of all 49 models on diﬀer-
+ent batch sizes. We learn that non-linear models are prevalent,
+3
+
+
+===== PAGE 4 =====
+1
+2
+3
+4
+5
+6
+7
+#slices
+0
+500
+1000
+1500
+throughput (req/s)
+densenet121 (batch=8)
+0
+20
+40
+latency (ms)
+1
+2
+3
+4
+5
+6
+7
+#slices
+0
+200
+400
+throughput (req/s)
+xlnet-large-cased (batch=16)
+0
+200
+400
+latency (ms)
+(a) Model throughputs and latencies of instances of diﬀerent sizes. The x-axis is
+the instance sizes, where “1” represents a 1/7 instance, and so on. Bars represent
+throughputs of the corresponding instances; the solid line represents the 90%-
+tile latencies. The dashed and dotted lines indicate the throughputs and latencies
+if the model’s inference performance grows linearly.
+7
+3-3
+1-2-4
+1-2-3
+1-1-1-4
+1-1-1-3
+2-2-3
+1-1-2-3
+1-1-1-1-3
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+densenet121 (batch=8)
+0
+20
+40
+weighted avg latency (ms)
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-3
+1-1-1-2-2
+1-2-3
+1-1-1-1-3
+1-1-1-4
+1-2-2-2
+7
+1-1-2-3
+1-2-4
+3-3
+2-2-3
+GPU partition
+0
+200
+400
+throughput (req/s)
+xlnet-large-cased (batch=16)
+0
+200
+400
+weighted avg latency (ms)
+(b) Model throughputs and latencies for diﬀerent GPU partitions. The x-axis is
+GPU partitions, sorted by throughputs. In x-ticks, digits represent instance sizes,
+for example, “3-3” represents two 3/7 instances. Bars represent throughputs
+and lines represent the weighted latencies which is the averages latencies from
+diﬀerent instances weighted by their throughputs.
+Figure 3: Throughputs and 90%-tile latencies for two PyTorch models, densenet121 and xlnet-large-cased, on diﬀerent sized instances
+(Figure 3a) and diﬀerent GPU partitions (Figure 3b).
+1
+8
+16
+32
+batch sizes
+0
+10
+20
+30
+40
+50
+#models in one category
+subL
+L
+supL
+Figure 4: Model classiﬁcations. “subL”/“L”/“supL” indicate sub-
+linear/linear/super-linear models, respectively.
+which account for majority of the cases. In general, we should
+assume that a unit of resource contributes diﬀerently in dif-
+ferent sized instances for most models. Another takeaway is
+that, when the batch size increases, models are more likely to
+behave as linear or super-linear. This is intuitive because the
+larger the batch, the heavier the computation, thus models can
+saturate (or over-occupy) the hardware resources.
+Admittedly, our classiﬁcation is rudimentary. Comprehen-
+sively understanding DNN performance requires further re-
+search. Nevertheless, this basic classiﬁcation sheds some light
+on interpreting DNN model performance with MIG. Indeed,
+based on the above observations and classiﬁcations, we invent
+some heuristics which help the performance of our scheduling
+algorithms (§5.3).
+2.3
+Strawman approaches: homogeneous par-
+tition and static partition
+At a high level, serving DNNs with MIG requires ﬁrst parti-
+tioning GPUs into a collection of instances, and then assigning
+models to instances running as services which respond end user
+requests. A straightforward approach is to statically partition
+the GPUs and treat the service assignments as a classic schedul-
+ing problem. By whether having heterogeneous instances, we
+have two baselines as follows.
+First, GPUs are partitioned into homogeneous instances (ei-
+ther 1/7 or 7/7 instances), then the problem of scheduling DNN
+services on instances becomes the Identical Parallel Machine
+Scheduling Problem [34]. Second, GPUs are partitioned to het-
+erogeneous instances (a mix of multiple instance sizes), thus
+the problem reduces to the problem of scheduling jobs in a
+heterogeneous cluster, namely the Unrelated Parallel Machine
+Scheduling Problem [30,40].
+The two baselines are not ideal as they ignore MIG’s dy-
+namic reconﬁgurability. Our goal is to design a system that
+automatically partitions (and re-partitions) GPUs and assigns
+DNN services to the best suited instances. It turns out that the
+general problem we face is a new abstract problem, which we
+deﬁne formally in the next section. And, serving DNNs with
+MIG is a case of this abstract problem. We will circle back
+with a rigorous problem statement in section 3.3.
+3
+The Reconﬁgurable Machine Scheduling
+Problem
+We ﬁrst deﬁnes the Reconﬁgurable Machine Scheduling Prob-
+lem (short as RMS) in section 3.1, then highlights the dif-
+ferences between RMS and related scheduling problems in
+section 3.2. Finally, section 3.3 describes in detail the problem
+that this paper targets—serving DNNs with MIG.
+3.1
+Problem deﬁnition
+We have a set of jobs and a set of machines. Each machine can
+process one job at a time. Diﬀerent machines have diﬀerent pro-
+cessing time for diﬀerent jobs. Machines are reconﬁgurable: a
+set of machines can be rearranged to a diﬀerent set of machines,
+under some pre-deﬁned reconﬁguration rules (deﬁned below).
+And the goal is to ﬁnd a sequence of scheduling and reconﬁg-
+uration operations that minimizes (or maximizes) some given
+objective, for example, minimizing cost subject to SLOs [35].
+Formally, the problem is deﬁned as follows. There is a set of
+jobs J and a set of initial machines M0, where M0 ⊆UM and
+4
+
+
+===== PAGE 5 =====
+UM is the universe of all possible machines. The processing
+time of job j on machine i is denoted as pij. We assume that all
+jobs are known ahead of time and machines do not fail.
+A reconﬁguration operation (opreconf ) replaces some ma-
+chines (say mset) in the current machines (denoted as Mk)
+by another set of machines (say mset′). The opreconf does not
+aﬀect jobs running on machines other than mset, which is
+{mj|mj ∈Mk ∧mj ̸∈mset}. We call the available machines
+after a reconﬁguration Mk+1 and Mk+1 = (Mk \mset)∪mset′
+because mset′ replaces mset.
+Reconﬁguration rules (denoted as rulereconf ) specify
+whether an opreconf is legal. For example, whether two ma-
+chines can be merged into a larger machine (an analogy to the
+rule of merging two consecutive 1/7 instances, Figure 2). Note
+that the contents of rulereconf are speciﬁc to problems and are
+not part of the RMS deﬁnition. As an example, for serving
+DNNs with MIG, reconﬁguration rules follow MIG partition
+rules. The deﬁnition of rulereconf is:
+rulereconf (mset,mset′,Mk) →Boolean,
+where mset ⊆Mk ∧mset,mset′ ⊆UM
+We say a reconﬁguration operation opreconf (mset,mset′) is le-
+gal, if and only if rulereconf (mset,mset′,Mk) returns True.
+Fitting into the scheduling framework. RMS can be de-
+scribed by the classic scheduling framework [40], as a triplet
+( α | β | γ ). The α, β, and γ are three pieces of information
+characterizing a scheduling problem:
+• α indicates the machine environment. For example, unre-
+lated machine in parallel (Rm) is one type of α in which
+machines run in parallel and diﬀerent machines process
+diﬀerent jobs at diﬀerent speeds.
+• β describes processing characteristics and constraints, for
+example, preemption.
+• γ represents the objective to minimize (or maximize), for
+example, minimizing total cost regarding SLOs (Costmin).
+We see machine reconﬁgurability (opreconf and rulereconf ) as a
+member of β ﬁeld, and we denote it as reconf. Thus, RMS can
+be simply read as:
+( Rm | reconf | ∗).
+The above asterisk ("∗") indicates that RMS’s objectives
+are subjective to change for diﬀerent problems. For exam-
+ple, with γ = Costmin, the problem becomes searching for
+a series of scheduling and reconﬁguration operations that
+minimizes the cost while preserving SLOs. This problem
+(Rm|reconf|Costmin) is the focus of this paper (detailed de-
+scription in §3.3)
+3.2
+Related scheduling problems
+Scheduling is a broad topic that has been intensively studied.
+There are prior scheduling problem variants that consider re-
+conﬁguration in several forms [16,23,27,28,31,33,48], but
+none of them fully captures the characteristics of MIG. We
+elaborate the most relevant ones below (see more in §9).
+A recent work that is closely related to our problem (RMS) is
+FJSSP-CDST [33] (Flexible Job Shop Scheduling Problem with
+machine Conﬁguration-Dependent Setup Times). This is a prob-
+lem combining a classic scheduling problem FJSSP [39,40]
+and a module named RMTs [31] (Reconﬁgurable Machine
+Tools). An RMT is a ﬁxed group of machines that can be de-
+ployed with diﬀerent conﬁgurations to serve multiple manu-
+facturing purposes.
+RMS diﬀers from FJSSP-CDST in the way how reconﬁgu-
+rations behave. FJSSP-CDST has a basic reconﬁgurable unit
+(an RMT) which contains a ﬁxed group of machines. During a
+reconﬁguration, all machines in this unit have to stop. This is
+a restriction to our (hence MIG’s) reconﬁgurability because
+we do not dictate which machines have to be reconﬁgured at
+the same time; for example, an A100 GPU can merge two 1/7
+instances without aﬀecting other instances.
+Other related scheduling problems include DCSP [23,28]
+(Discrete-Continuous Scheduling Problem) and UPM [30,40]
+(Unrelated Parallel Machine Scheduling Problem). The former,
+DCSP, studies the continuously divisible resources (for exam-
+ple, power), whereas resources in GPUs are discrete (organized
+and exposed in instances) and are constrained in allocation—
+for example, allocating a 3/7 instance requires no 4/7 instance
+in the same GPU. For the latter, RMS shares the same machine
+environment (Rm) with UPM, but UPM does not consider ma-
+chine reconﬁgurations.
+3.3
+A case of RMS: serving DNNs with MIG
+This paper focuses on a variant of RMS—serving DNNs on
+GPUs with MIG. In this problem, machines are GPU instances;
+jobs are DNN services; diﬀerent services have diﬀerent per-
+formance on diﬀerent sized instances (DNNs’ non-linear per-
+formance, §2.2). A set of instances in one GPU can be re-
+partitioned to another set of instances (a reconﬁguration), with-
+out aﬀecting other running instances on the same GPU. Our
+goal is to ﬁnd the most eﬃcient GPU partitions and service
+assignments that minimizes the number of GPUs used.
+A reconﬁguration is valid when it follows the MIG partition
+rules (§2.1), deﬁned below.
+rulereconf (mset,mset′,Mk) ≜
+∀m ∈mset ∪mset′, m is in the same GPUi
+∧Mk|GPUi ∈legal A100 partitions
+∧Mk|GPUi \mset ∪mset′ ∈legal A100 partitions
+In the above deﬁnition, mset and mset′ are GPU instances be-
+fore and after the reconﬁguration. The reconﬁguration succeeds
+iﬀall instances in mset and mset′ are from the same GPUi, and
+the GPU partitions before and after reconﬁguration (Mk|GPUi
+and Mk|GPUi \mset ∪mset′) are legal A100 partitions.
+5
+
+
+===== PAGE 6 =====
+GPU cluster
+service 
+deployer
+ (           , SLOs)
+optimizer
+controller
+MIG-serving
+deployment
+services
+GPU partitions + 
+service assignments
+GPU0
+GPU1
+GPU2
+Figure 5: MIG-serving’s architecture.
+One characteristic of serving DNNs is that jobs (services)
+are “long-running”: they do not ﬁnish until a shutdown or an
+update. This is a simpliﬁcation compared to the general RMS
+because it spares the decisions on job scheduling timing. In
+particular, we do not have to consider when to schedule a job
+(service) because they all need to be deployed in the beginning
+and are long-running.
+Serving DNNs with MIG is an NP-hard problem because
+an NP-hard problem, Cutting Stock Problem [6], reduces to it.
+The cutting stock problem studies how to cut standard-sized
+paper rolls into certain numbers of speciﬁed-sized pieces while
+minimizing wasted material. This problem can reduce to our
+problem by treating the paper rolls as GPUs, speciﬁed-sized
+pieces as diﬀerent sized instances for services, and the required
+piece numbers as SLOs. If one can ﬁnd the minimum GPUs for
+our problem, we know the minimum paper rolls for the original
+problem, which minimizes the wasted materials.
+4
+System overview
+To serve DNNs with MIG eﬃciently, we design and implement
+a system, MIG-serving, which automatically partitions GPUs
+and assign services. This section introduces MIG-serving’s
+design and its main components: optimizer and controller.
+Workﬂow. Figure 5 depicts MIG-serving’s architecture.
+A service deployer speciﬁes what services (DNN models)
+to run and their service-level objectives (SLOs) which include
+required throughputs and expected latencies.
+MIG-serving takes in the services (models) and their SLOs
+as inputs, and is responsible to produce a deployment—a com-
+bination of GPU partitions and service assignments. A deploy-
+ment is valid if it satisﬁes SLOs: for each service, (i) the sum
+of throughputs from all instances is greater than the required
+throughput, and (ii) the 90%-tile latency of each instance is
+smaller than what required by SLOs.
+MIG-serving then generates a transition plan which trans-
+fers GPU clusters from the current deployment to the newly
+generated one. Finally, MIG-serving executes this transition
+plan on GPU clusters. The entire transition process is transpar-
+ent to end users; they do not experience service interruptions.
+MIG-serving has two main components, optimizer and con-
+troller. At a high level, optimizer designs a valid deployment
+for the given SLOs, and controller implements this deployment
+transparently. Next, we brieﬂy introduce these two components.
+Optimizer. Optimizer tackles the optimization problem of
+serving DNNs with MIG (§3.3): ﬁnding a valid deployment
+that uses as few GPUs as possible. Optimizer runs a two-phase
+algorithm which blends a heuristic greedy algorithm, a Genetic
+Algorithm (GA), and a Monte Carlo Tree Search algorithm
+(MCTS). The ﬁrst phase aims at ﬁnding a candidate deploy-
+ment which is valid but suboptimal in terms of GPU usage
+eﬃciency. The second phase improves the candidate deploy-
+ment via a combination of custom-designed GA and MCTS.
+This two-phase design is crucial in practice because it bal-
+ances two important but conﬂicting requirements: (i) getting
+a valid deployment quickly and (ii) taking full advantage of
+every single GPU. The two requirements are at odds because
+we need to quickly have at least some plan that satisﬁes the
+SLOs in case of urgent changes, but exploring conﬁguration
+possibilities takes a lot of time.
+Optimizer’s ﬁrst phase runs a fast algorithm (the heuristic
+greedy algorithm) in O(n2m) where n and m is the number
+of services and GPUs, which can produce results in minutes;
+whereas the second phase is expensive and runs continuously
+and massively in parallel. Note that the second phase is on-
+demand. People can decide how much time and how many
+computational resources they are willing to devote.
+Controller. Controller receives two inputs, the new deploy-
+ment (from optimizer) and the current deployment on GPU
+clusters. Controller’s duty is to (i) plan a series of actions
+(called a transition plan) that switch GPUs from the current
+conﬁgurations to the new version, and (ii) execute the transition
+plan without aﬀecting user experiences.
+To achieve the above goals, controller runs an algorithm,
+called exchange-and-compact. At a high level, the algorithm
+ﬁrst changes current service instances to the wanted sized in-
+stances while maintaining the required throughputs during this
+process, with the help of extra GPUs; it then repartitions GPUs
+and packs the services into the planned number of GPUs.
+During a deployment transition, controller has four types
+of actions: instance creation, deletion, migration, and GPU
+repartition. These actions are implemented in Kubernetes (§7),
+and controller issues actions according to the transition plan,
+and some actions are issued in parallel (§6).
+5
+Optimizer algorithm
+This section describes how MIG-serving solves an optimiza-
+tion problem of minimizing number of GPUs used while satis-
+fying SLOs. Section 5.1 encodes this optimization problem;
+section 5.2 depicts the overall algorithm pipeline of MIG-
+serving’s optimizer; and section 5.3 introduces the two con-
+crete algorithms optimizer uses.
+6
+
+
+===== PAGE 7 =====
+5.1
+Deﬁning optimizer procedure
+As mentioned (§4), optimizer is obligated to generate valid
+deployments that fulﬁll SLOs. Next, we deﬁne this procedure,
+which provides a basic framework for diﬀerent algorithms.
+Optimizer’s inputs are (1) service performance (through-
+put and latency) on diﬀerent sized GPU instances (1/7–7/7
+instances), and (2) SLOs which include required throughputs
+and latencies for each service. Optimizer’s output is a deploy-
+ment that consists of GPU partitions and service assignments.
+We deﬁne completion rates for a deployment to represent the
+deployment’s progress of satisfying SLOs. Completion rates
+is a vector of percentage numbers; each number represents the
+percentage of a service’s current throughput to the required
+throughput in SLOs. For example, a deployment has comple-
+tion rates of [0%,100%,···] means that the deployment does
+not run service0 on any GPUs while service1 is fully satisﬁed.
+For a service running on an instance, we calculate a utility
+which indicates how much this instance contributes to the ser-
+vice’s total throughput requirement. For example, if service0
+requires 1000 req/s and a 1/7 instance has a throughput of 50
+req/s for service0, then we say service0 on 1/7 instance has
+a utility of [+5%,0%,···] (we use “+” to distinguish utility
+from completion rates). With the utilities of all services, we
+can calculate the utility for a GPU by adding up the utilities of
+all instances in this GPU: for the same example of service0, if
+a GPU has seven 1/7 instances running service0, it has a utility
+of [+35%,0%,···] (35% = 7×5%).
+Note that the utility space forall possible GPU conﬁgurations
+is enormous. A loose upper bound is O(n7) where n is the
+number of services, because a GPU has at most 7 instances and
+each instance can run one of n services. Of course, the actual
+size is much smaller than this bound. Nevertheless, it is still
+huge; the number of possible GPU conﬁgurations (utilities) is
+157.8k and 234.7k when n is 12 and 13, respectively.
+Finally, we deﬁne an optimizer procedure as follows. Given
+(i) utilities for all service on all sized instances and (ii) comple-
+tion rates, an optimizer procedure should produce a set of GPU
+conﬁgurations, such that the sum of all GPU conﬁguration
+utilities and the completion rates must be greater than or equal
+to [100%,100%,...] (with respect to vector comparison). Note
+that the given completion rates is not necessarily all zeros.
+5.2
+Two-phase algorithm and GA
+MIG-serving’s optimizer runs a two-phase algorithm, which is
+outlined in Figure 6. It has two “template” algorithms, namely
+the fast algorithm and the slow algorithm. Both template al-
+gorithms must be an optimizer procedure (§5.1), and the fast
+algorithm is supposed to run (relatively speaking) fast. The
+two algorithms are connected by the two-phase design and a
+custom-designed Genetic Algorithm (GA for short). In the rest
+of the section, we ﬁrst introduce the properties of the fast and
+the slow algorithms, and then describe the custom GA and its
+Genetic
+Algorithm
+fast algorithm
+slow 
+algorithm
+crossover
+selection
+mutation
+continue?
+a deployment
+No
+Yes
+service performance and SLOs
+phase 1
+phase 2
+pick
+the best
+Figure 6: MIG-serving’s two-phase algorithm. The fast algorithm
+and the slow algorithm are optimizer procedures (§5.1).
+two main pieces, crossover and mutation.
+Fast and slow algorithms. In our design, we require the fast
+algorithm (i) to be a legal optimizer procedure, and (ii) running
+fast—the algorithm’s time complexity must be polynomial with
+respect to the number of services and GPUs. In practice, we
+require the algorithm to ﬁnish in minutes.
+For the slow algorithm, we only require it to be a legal opti-
+mizer procedure. Nevertheless, we expect the slow algorithm
+to discover better solutions than the fast algorithm (hopefully
+in high probability). This expectation ought to be possible as
+the slow algorithm is given more time budgets.
+In MIG-serving, we use a heuristic greedy algorithm as the
+fast algorithm, and Monte Carlo Tree Search (MCTS) as the
+slow algorithm (§5.3). Of course, they are changeable.
+GA overview. GA is a heuristic algorithm framework inspired
+by nature gene evolution. We tailor GA to our context: a chro-
+mosome is a deployment, and genes are GPU conﬁgurations.
+To evolve, a chromosome (deployment) conducts crossovers
+and mutations. A crossover erases some GPU conﬁgurations in
+a deployment and ﬁlls in with new GPU conﬁgurations gener-
+ated by the slow algorithm. A mutation swaps services running
+on instances in a deployment.
+GA runs in rounds. In each round, we select the best de-
+ployments in the last round, and let them attend the coming
+crossovers and mutations. GA stops when time out, or the best
+deployment stops improving in the past ten rounds. Note that
+GA keeps the original deployments in each round’s compari-
+son, so that the best candidate only improves over time.
+Crossover. A crossover applies to a (valid) deployment, which
+contains two steps. First, we randomly erase some GPU conﬁg-
+urations, which decreases the overall throughputs and makes
+some services unsatisﬁed. As a result, we have completion
+rates that are not all-100%. Second, we run the slow algorithm
+against the current completion rates and get a deployment that
+makes up for the previously erased GPUs. The ﬁgure below is
+an illustrative example. Each rectangle represents an instance;
+and diﬀerent colored symbols (e.g., stars, triangles, squares)
+7
+
+
+===== PAGE 8 =====
+represent diﬀerent services.
+➀
+➁
+The insights behind this crossover approach are twofold.
+First, a crossover mixes solutions from the slow algorithm and
+the fast algorithm, thereby providing diversity. Second, the
+problem size of crossovers is much smaller than the original
+one, hence the slow algorithm can ﬁnish in reasonable time.
+Mutation. Mutation is based on an observation that DNN
+inference does not have aﬃnity requirements (diﬀerent from
+DNN training); that is, instances of the same size are identical
+for inference. A mutation randomly picks some instance pairs;
+each pair contains two instances that are the same in size but
+run diﬀerent services. The Mutation then swaps the services
+in each pair. The ﬁgure below depicts this process.
+The idea of mutation is to explore diﬀerent combinations of
+services on one GPU. Mutations themselves do not improve
+deployments. But they create diverse service mixing on GPUs
+which helps crossovers explore combining diﬀerent services.
+5.3
+Algorithm, fast and slow
+In this section, we introduce the fast and the slow algorithms
+used in MIG-serving. The two algorithms are chosen from a
+pool of candidate algorithms. It is possible that we may ﬁnd
+better algorithms in the future. MIG-serving is designed to
+be able to switch algorithms easily.
+Fast algorithm: heuristic score and greedy algorithm.
+MIG-serving develops a greedy algorithm as the fast algo-
+rithm, which chooses the “best” GPU conﬁgurations according
+to a heuristic score. This score represents how well a GPU
+conﬁguration serves the current service requirements, that is
+the complementary to the current completion rates (namely,
+1−completion rates, where 1 is an all-1 vector).
+The greedy algorithm works as follows. First, it ranks the
+known GPU conﬁgurations by their scores and picks the one
+with the highest score. The algorithm then updates the comple-
+tion rates and repeats the above step until all service through-
+puts reach or exceed SLOs. (Appendix A.1 describes this
+heuristic greedy algorithm in detail.)
+The heuristic score of a GPU conﬁguration is based on two
+factors: the current completion rates (a vector of percentages,
+§5.1) and the GPU conﬁguration’s utility (a vector of percent-
+ages, §5.1). Below is the score’s deﬁnition, where ci and ui are
+C0
+C0 = [0%, 0%, …]
+C3 = [5%, 0%, …]
+...
+Cm
+C1
+C2
+Cm = [100%, 100%, …]
+U0
+C3
+ [+5%, 0%, …]
+Figure 7: An example tree for the problem of serving DNNs with MIG.
+The nodes (denoted as Ci) represent completion rates, and Cm is a leaf
+node. Edges (denoted as Uj) represent utilities of GPU conﬁgurations.
+the ith number in the completion rates and the utility, respec-
+tively; 1 is an all-1 vector; n is the number of services.
+score(conﬁg) = ∑(1−completion rates)⊙conﬁg’s utility
+=
+n−1
+∑
+0
+(1−ci)×ui
+The idea behind the score is to balance a GPU’s overall
+throughputs and the current service needs. On the one hand,
+higherthroughputs are likely to have higherscores. On the other
+hand, the GPU conﬁgurations which contribute to services
+with low completion rates are likely to have higher scores.
+For example, if a conﬁguration conﬁga has higher throughputs
+than conﬁgb, then conﬁga has a higher score. However, if all
+services that conﬁga contributes to are fully satisﬁed, then the
+throughputs don’t count and conﬁga’s score is 0.
+Slow algorithm: MCTS. MIG-serving tailors the Monte
+Carlo Tree Search (MCTS) as the slow algorithm. We choose
+MCTS because the problem of allocating MIGs can be nat-
+urally encoded to a tree search problem; hence MCTS, as a
+well-studied tree search algorithm, is a good candidate.
+Figure 7 depicts an example of the tree search problem.
+Nodes represents completion rates. Edges represents GPU con-
+ﬁguration’s utilities. A transition from a parent node to a child
+represents the MIG-serving picking a GPU conﬁguration (in-
+dicated by the edge). Leaf nodes are nodes whose completion
+rates are all-100% (or larger than 100%), meaning that all ser-
+vices are satisﬁed. The goal is to ﬁnd the shortest path from
+the tree root (the initial completion rates) to a leaf node. This
+shortest path is the deployment that uses the minimal number
+of GPUs (the length of the path).
+MCTS is designed to search heuristically and ﬁnd a good
+solution. However, vanilla MCTS doesn’t work in our problem,
+for two reasons. First, each node has too many children: the
+number of children equals the number of edges, which equals
+the number of GPU conﬁgurations. As mentioned earlier (§5.1),
+the conﬁguration space is huge. Second, the classic MCTS
+estimation procedure (also known as simulation, playout, or
+rollout) is slow and inaccurate. The original estimation is to ﬁnd
+a random path to some leaf node which is used to estimate the
+depth of a subtree. However,our problem requires an estimation
+of the shortest path instead of a random path, which leads to
+8
+
+
+===== PAGE 9 =====
+an extremely inaccurate estimation.
+To address the above two problems, MIG-serving cus-
+tomizes MCTS by (i) cutting the children of each node into the
+nodes with the top-K heuristic scores (K=10 by default) and
+(ii) using a fast-and-accurate estimation via memoization and
+randomization. The details of the custom MCTS are described
+in Appendix A.2.
+6
+Controller algorithm
+MIG-serving targets the real-world serving environment, in
+which SLOs change from time to time, for example, a shift from
+daytime to night. In addition, services get updated as well—
+adding/removing services and upgrading DNN models. In the
+above cases, MIG-serving needs to recalculate deployments
+to adapt to the new requirements, and transfer GPU clusters
+from the old deployment to the new one. We call this process
+a deployment transition.
+In MIG-serving, controller is responsible for designing and
+implementing deployment transitions (see Figure 5). A straight-
+forward transition approach is to shut down all services, reparti-
+tion underlying GPUs, and then reboot the services. Of course,
+this method is unacceptable in practice because services are
+unavailable during transitions.
+The goal of controller is to ﬁnish a transition without in-
+terrupting user experiences and ﬁnish it quickly. Controller
+introduces an algorithm, exchange-and-compact, which uses
+two phases to achieve the aforementioned goals.
+Exchange phase. Two deployments diﬀer in two factors: in-
+stance sizes for services and GPU partitions. Exchange phase
+addresses the ﬁrst factor by creating and deleting diﬀerent sized
+instances. First, controller calculates the instance diﬀerences
+between the old and the new deployments for each service.
+We denote the diﬀerence as ∆i for servicei, which contains the
+“diﬀ” of servicei’s instances. For example,a ∆i = [+4/7,−2/7]
+means that servicei requires a new 4/7 instance and has an un-
+needed 2/7 instance.
+For each service, controller pairs every new instance (for
+example, “+4/7”) with some unneeded instances (for example,
+“−2/7”) such that the throughputs of the new instance is equal
+to or larger than the unneeded instances. Note that pairing an
+unneeded instance which has larger throughputs is not allowed
+(for example, pairing “+1/7” and “−7/7”) because that may
+fail providing the adequate throughputs hence aﬀecting user
+experiences. Finally, controller has a set of new-unneeded in-
+stance pairs and a list of unneeded instances that cannot pair
+with any new instances.
+Controller executes each new-unneeded instance pair by cre-
+ating the new instance ﬁrst (using extra GPUs if needed) and
+then deleting the unneeded instances. After ﬁnishing all pairs,
+controller deletes instances in the unneeded list. During the
+entire process, controller guarantees that services have enough
+capacity to handle the expected volume of user requests.
+Compact phase. After the exchange phase, all services have
+the wanted sized instances in the new deployment. But the GPU
+partitions haven’t been changed yet, and controller uses more
+GPUs (i.e.,extra GPUs) than expected because of GPU instance
+fragmentation. In the compact phase, controller defragments
+GPUs by repartitioning GPUs and migrating instances.
+At the beginning of this phase, controller creates a list of
+GPUs which are not fully occupied (having unused instances),
+denoted as S. If S is not empty, controller picks a GPUi ∈S,
+and gathers some running instances from other GPUs in S
+such that these instances together can fully occupy GPUi; con-
+troller repartitions GPUi (if needed), migrates these instances
+to GPUi, and removes GPUi from S (the GPUi is now fully uti-
+lized). Controller continues the above process until achieving
+the new deployment.
+Optimizations. Controller adopts several optimizations. We
+list two below. First, controller is locality-aware—it prioritizes
+local instance migrations over cross-machine migrations. In
+our GPU clusters, each machine has 8 A100 GPUs; migrating
+instances within a machine is much cheaper than migrating
+across machines. Second, actions can run in parallel if the
+aﬀected GPUs are separate. Controller analyzes the dependen-
+cies between actions and executes the non-conﬂicting ones
+simultaneously.
+Note that the exchange-and-compact algorithm can happen
+in diﬀerent granularities, depending on how many extra GPUs
+available. If there are many, controller can run exchange-and-
+compact once for all services. However, if only few extra GPUs
+are available, controller will run exchange-and-compact in mul-
+tiple rounds; in each round, controller only targets a small
+number of services.
+7
+Implementation
+MIG-serving is implemented in Python and Kubernetes (k8s).
+Figure 8 lists the components of MIG-serving implementa-
+tion. For optimizer, we implement the optimizer procedure
+(§5.1) as an abstract class that the fast and the slow algorithms
+extend. MIG-serving can easily switch to other algorithms by
+implementing them under the same abstract class.
+We implement controller by extending k8s controller [8].
+MIG-serving’s actions—instance creation, deletion, migra-
+tion, and GPU partition—are wrappers of k8s operations. For
+example, a remote instance migration from machine A to B
+is a sequence of operations: creating an instance on machine
+B, checking if the instance on B is successfully launched, and
+deleting the instance on machine A.
+MIG-serving always chooses the largest batch sizes possi-
+ble, as far as the inference latency is smaller than what required
+by SLOs. This may result in a service with diﬀerent batch sizes
+for diﬀerent instances. MIG-serving relies on load balancing
+systems to dispatch user requests accordingly.
+9
+
+
+===== PAGE 10 =====
+MIG-serving component
+LOC
+Optimizer
+data structures
+2674
+fast algorithm (greedy)
+135
+slow algorithm (MCTS)
+398
+Genetic Algorithm (GA)
+330
+Controller
+k8s controller
+1318
+exchange-and-compact algorithm
+319
+Figure 8: Components of MIG-serving implementation.
+8
+Experimental evaluation
+In this section, we answer three questions:
+• How many GPUs does MIG-serving save,versus baselines?
+• How long does MIG-serving take to complete a deploy-
+ment transition, and what components cost the most?
+• Do MIG-serving’s deployments meet SLOs in practice?
+Baselines and workloads. We have three baselines with static
+GPU partitions: (1) A100-7×1/7, partitioning GPUs into 1/7
+instances, (2) A100-7/7, using A100 GPUs as-is, and (3) A100-
+MIX, partitioning all A100 into “4-2-1” (a combination of
+4/7, 2/7, and 1/7 instances) and scheduling one service on one
+GPU. A100-7×1/7 is the most cost-eﬃcient setup as shown
+in Figure 1. A100-7/7 uses GPU the traditional way (ignoring
+MIG). A100-MIX represents heterogeneous setup but ignoring
+the characteristics of workloads.
+To see how well MIG-serving performs compared to the op-
+timal solution (which is computationally expensive to have), we
+calculate an approximate optimality—a lower bound of GPU
+usage by ignoring MIG’s hardware constraints. In particular,
+we assume that any combination of instance is possible, and the
+minimal number of GPUs can be calculated by always using
+the most cost-eﬃcient instance. Notice that the lower bound
+is likely impossible to achieve due to ignoring the hardware
+constraints.
+We uses two sets of workloads in the following experiments:
+• Simulation workloads (requiring hundreds of GPUs): we
+generate four workloads for 24 DNN models. In each work-
+load, models’ SLO throughputs are generated from either
+normal distributions (for two workloads) or lognormal dis-
+tributions (for the other two workloads). The latencies in
+SLOs are set to 100ms, which is an acceptable waiting time
+under most scenarios.
+• Real-world workloads (requiring up to 16 GPUs): we build
+two real-world workloads for ﬁve DDN models running in
+our GPU clusters. We collect 24-hr production throughputs
+of the ﬁve models and construct the workloads: one work-
+load represents the peak throughputs (called daytime work-
+load),and the other workload represents the low throughputs
+(called night workload). Note that we scale down models’
+throughputs to ﬁt into our testbed which has 24 A100 GPUs,
+while preserving throughputs’ relative amounts.
+normal-1
+normal-2
+lognormal-1
+lognormal-2
+workloads
+0
+0.2
+0.4
+0.6
+0.8
+1.0
+normalized #GPUs
+(lower is better)
+139
+184
+268
+218
+A100-7/7
+A100-7x1/7
+A100-MIX
+greedy
+MIG-serving
+lower-bound
+Figure 9: Number of GPUs used by algorithms for diﬀerent workloads.
+The numbers are normalized clusterwise for each workload. MIG-
+serving’s absolute numbers of GPUs used are given. “A100-7/7”,
+“A100-7×1/7”,and “A100-MIX” are the three baselines; “greedy” rep-
+resents MIG-serving’s fast algorithm (§5.3); “MIG-serving” repre-
+sents optimizer’s two-phase algorithm; “lower-bound” is the minimal
+number of GPUs ignoring MIG’s hardware constraints.
+We run MIG-serving on a 104-core machine with 750G
+memory running Debian 9.13. To test real-world workloads,
+we have a three-machine GPU cluster with 24 A100 GPU cards
+(8-GPU for each machine). The ﬁve DNN models for the real-
+world workloads are robert-large, bert-base-uncased,
+albert-large-v2, resnet101, and resnet50.
+8.1
+Optimizer algorithms
+In this section, we study how many GPUs MIG-serving saves
+compared to baselines. The workloads used are the four simu-
+lation workloads generated from normal and lognormal distri-
+butions, denoted as normal-1, normal-2, lognormal-1, and
+lognormal-2. We design the four workloads to use several
+hundreds of GPUs, representing a median-sized GPU cluster.
+GPU saved. We run MIG-serving and the baselines on the
+simulation workloads and count the number of GPUs they use.
+Figure 9 shows the results. MIG-serving uses fewer GPUs
+than other baselines. It saves up to 40% GPUs compared to
+A100-7/7. Moreover, MIG-serving is close to the optimal
+allocation—MIG-serving uses <3% more GPUs than the
+GPU lower bound (the “lower-bound” in Figure 9). One thing
+to clarify is that A100-7×1/7 does not perform as well as in
+Figure 1 because solutions now consider latencies, hence some
+models cannot use large batch sizes on 1/7 instances.
+Note that this experiment does not consider the running time
+of algorithms. Thus, it is not an entirely fair comparison be-
+cause baselines ﬁnish in seconds, whereas MIG-serving’s fast
+algorithm ﬁnishes in minutes and the optimizer’s two-phase
+algorithm ﬁnishes in hours (MIG-serving runs 10 rounds of
+GA for the four workloads and ﬁnishes in 3hr, 5hr, 6.5hr, and
+6hr). But in practice, the service and SLO updates are relatively
+infrequent (for example, twice a day), thus we can aﬀord to run
+optimizer’s two-phase algorithm. In addition, the deployment
+can be reused if models and their SLOs are not changed.
+Cost versus T4. To compare the cost-eﬃciency with other
+GPU types, we evaluate how many T4 GPUs the simulation
+workloads need to satisfy their SLOs. We choose T4 because
+10
+
+
+===== PAGE 11 =====
+normal-1
+normal-2
+lognormal-1
+lognormal-2
+workloads
+0
+0.2
+0.4
+0.6
+0.8
+1.0
+normalized cost in dollar
+(lower is better)
+A100-7/7
+A100-7x1/7
+T4
+MIG-serving
+Figure 10: Normalized costs for satisfying SLOs of diﬀerent work-
+loads. “A100-7/7” and “A100-7x1/7” are the two baselines (with
+A100); “T4” represents using T4 GPUs; “MIG-Serving” repreesnts
+the two-phase algorithm with A100. We use the price from AWS GPU
+machines [3,5].
+normal-1
+normal-2
+lognormal-1
+lognormal-2
+normal-1
+normal-2
+lognormal-1
+lognormal-2
+normal-1
+normal-2
+lognormal-1
+lognormal-2
+NO MPS                      MPS=2                      MPS=4
+0.0
+0.1
+0.2
+0.3
+0.4
+0.5
+#GPU saved (%) compared to
+A100-7/7 (higher is better)
+MIG-serving
+lower-bound
+Figure 11: The ratio of GPU saved compared to using A100 as-is
+(“A100-7/7”) with diﬀerent MPS conﬁgurations. The left four bar
+clusters represent the GPUs saved with no MPS; the middle four
+represent the conﬁguration with at most two MPS processes in each
+instance; and the last four with at maximum four MPS processes.
+it is the most cost-eﬃcient GPU type for DNN serving before
+A100. Figure 10 shows the results. MIG-serving is the most
+cost-eﬃcient conﬁguration for all workloads.
+Combining MIG and MPS. MIG and Multi-process service
+(MPS) are orthogonal techniques that can be used together.
+With MPS, multiple processes can share the same GPU, which
+applies to GPU instances generated by MIG. We combine MIG
+and MPS by running up to N processes of the same model in one
+GPU instance (e.g., 1/7 instance). In our experiments, we use
+N = 2, 4 because we experienced out-of-memory exceptions
+when N > 4.
+Figure 11 shows the ratio of GPU saved compared to the
+baseline A100-7×1/7. By using MPS, multiple processes share
+GPU resources, and the GPU utilization increases. Hence, the
+baseline, A100-7×1/7, has better performance and the GPUs
+saved by MIG-serving are not as many. When using four MPS
+processes, MIG-serving saves about 10% GPUs. Nevertheless,
+MPS increases GPU utilization at the cost of tail latency stabil-
+ity and failure isolation. Since MPS has no memory and failure
+isolation, using it may cause unexpected high tail latency and
+correlated failures among model processes. Deciding whether
+to use MPS and how many processes to run is a trade-oﬀthat
+users need to make.
+0
+2
+4
+6
+8
+#rounds
+0.975
+0.980
+0.985
+0.990
+0.995
+1.000
+normalized #GPUs
+normal-1
+normal-2
+lognormal-1
+lognormal-2
+Figure 12: The improvement of the slow algorithm (MCTS) over
+the fast algorithm (heuristic greedy) on each GA round. Each line
+represents a simulation workload. The number of GPUs required is
+normalized to the original deployment (round 0 of the fast algorithm).
+Notice that the y-axis starts at 0.97.
+Slow algorithm improvement. We study how the slow algo-
+rithm improves over the fast algorithm by running 10 rounds of
+GA and MCTS. Figure 12 depicts the improvements for each
+round. We can see that MCTS improves the solutions of the
+heuristic greedy algorithm by saving 1–3% GPUs, which is
+much minor than we expected. However, it is still worthwhile:
+we can save several to dozens of GPUs by spending multiple
+CPU hours. One of our near future work is to tune GA and
+MCTS to further improve the deployments.
+8.2
+Deployment transition
+We run MIG-serving on our testbed for the two real-world
+workloads (the daytime and night workloads), and experiment
+with deployment transitions between the two workloads. In par-
+ticular, we ﬁrst deploy the ﬁve services from the daytime work-
+load, which uses 16 GPUs. Then, we instruct MIG-serving
+to switch the deployment to the night workload, which uses 5
+GPUs for the same services. We call this transition, day2night.
+Likewise, we call the other way around, night2day.
+End-to-end transition runtime. We measure the wall-clock
+time of MIG-serving’s two deployment transitions, day2night
+and night2day. Figure 13a shows the results. The transition of
+day2night is faster than night2day because the former is mostly
+shrinking services and reducing the number of GPUs, whereas
+the latter requires expanding services and increasing GPUs.
+We further decompose each transition runtime into time
+spent on diﬀerent components: k8s, GPU partition, and the
+exchange-and-compact algorithm. We ﬁnd that k8s takes the
+majority of the time. By proﬁling, it turns out that most of k8s’
+runtime is spent on bootstrapping an instance (a k8s pod) on
+certain GPUs. We believe DNN context switch techniques, like
+Pipeswitch [17], can signiﬁcantly reduce this overhead.
+A closer look at transitions. To understand the details of the
+two transitions, we record the actions issued by MIG-serving
+during day2night and night2day, and summarize them in in
+Figure 13b. The day2night transition issues more instance
+deletions, while night2day has more instance creations. This is
+because the deployment during daytime requires more through-
+11
+
+
+===== PAGE 12 =====
+day2night
+night2day
+workloads
+0
+200
+400
+600
+800
+1000
+1200
+1400
+1600
+runtime (seconds)
+k8s
+GPU repartition
+algorithm & others
+(a) End-to-end runtime of deployment transitions
+and time spent on diﬀerent components.
+day2night
+night2day
+workloads
+0
+10
+20
+30
+40
+50
+60
+70
+action counts
+creation
+deletion
+repartition
+migration
+(b) Number of actions during transitions.
+creation
+deletion
+migration
+(remote)
+migration
+(local)
+GPU
+partition
+controller actions
+0
+10
+20
+30
+40
+50
+runtime (seconds)
+(c) Runtime of (synchronous) MIG-serving actions.
+Bars are average runtime of 10 runs. Error bars in-
+dicate the maximum and minimum runtime.
+Figure 13
+puts (hence instances) than the deployment during night. Also,
+night2day has more GPU partition actions because this tran-
+sition involves more GPUs, which need to be conﬁgured into
+the planned partitions.
+Controller actions. As mentioned earlier (§4), controller has
+four types of actions, instance creation, deletion, migration
+(local and remote),and GPU partition. We measure each of their
+runtime and show results in Figure 13c. Note that we run these
+actions in a synchronous manner—we issue an action and wait
+until it ﬁnishes. In practice, all these actions are asynchronous
+and issued in parallel. MIG-serving only has to wait when the
+actions have dependencies, for example, creating a replacement
+instance before deleting an old instance.
+8.3
+Serving requests in practice
+To understand whether MIG-serving’s deployments satisfy
+SLOs, we run the two deployments across models, under the
+two real-world workloads, on our testbed and measure their
+throughputs in practice. For each deployment, we run multiple
+inference clients that continuously issue requests to DNN ser-
+vices deployed by MIG-serving. To saturate DNN services,
+clients gradually increase the number of requests per second
+until the throughput reaches its maximum. In the following,
+what we report is the maximum throughputs. Clients and DNN
+services run on diﬀerent machines which are connected by
+10Gbps datacenter networks.
+Figure 14 shows the throughputs required by SLOs and the
+throughputs provided by MIG-serving, for diﬀerent services.
+In general, MIG-serving achieves >95% satisfaction rate for
+the required throughputs. The <5% diﬀerence is due to the
+slight performance variance between the model performance
+proﬁling (§2.2, Appendix B) and the performance of serving
+frameworks (e.g., Tensorﬂow-serving [36]). This can be im-
+proved by collecting model performance in production and
+gradually updating proﬁling data used in MIG-serving’s algo-
+rithms.
+9
+Related work
+Scheduling problems. Scheduling problems [40] have been
+well-studied by multiple communities. The Reconﬁgurable Ma-
+daytime
+night
+workloads
+0
+20
+40
+60
+80
+100
+SLO satisfaction (%)
+all
+robert-large
+bert-base
+albert-large
+resnet101
+resnet50
+Figure 14: Throughputs required by SLOs versus throughputs pro-
+vided by MIG-serving for the two real-world workloads. “all” rep-
+resents the sum throughputs of all ﬁve models. The y-axis is the
+“SLO satisfaction” (in percentage), which is the throughput provided
+by MIG-serving divided by the throughput required by SLOs. The
+dotted line represents 100% SLO ssatisfaction.
+chine Scheduling Problem is an instance (Rm|reconf|∗) that
+captures DNNs and MIG’s characteristics: (a) model through-
+puts do not grow linearly with additional resources, (b) MIG-
+enabled GPUs follow speciﬁc reconﬁguration rules, and (c)
+support partial reconﬁguration.
+The problem UPM [40] (Unrelated Parallel Machine
+Scheduling Problem) tackles (a), but it requires a ﬁxed set of
+machines and does not capture MIG’s reconﬁgurability. Prob-
+lems with RMTs [31] (Reconﬁgurable Machine Tools) address
+(b) and potentially (a). Examples are FJSSP-CDST [33] and
+permutation ﬂow shop plus RMTs [16]. But they do not sup-
+port partial reconﬁguration because RMTs have ﬁxed-sized
+reconﬁgurable units. The problem DCSP [23, 28] (Discrete-
+Continuous Scheduling Problem) supports (a) and (c), but the
+resources (in our case, GPU slices) have to be continuous (like
+power). But on the contrary, our problem has discrete resources
+and their allocation is restricted, as indicated by (b).
+Partial reconﬁguration. Similar to MIG-enabled GPUs,
+FPGA also supports partial reconﬁguration [2]. A classic re-
+conﬁgurable device model is the 2D resource model [45,46]
+which abstracts a job with two constraints, width and height,
+representing the runtime and spatial constraints. The 2D model
+targets a similar but diﬀerent problem: a job in the model has
+a ﬁxed width and height, which in our context means that a
+service can use one ﬁxed-sized GPU instance.
+AmorphOS [29] is a system that manages and shares re-
+12
+
+
+===== PAGE 13 =====
+conﬁgurable fabric (i.e., FPGA), and leverages FPGA partial
+reconﬁgurations. AmorphOS has multiple innovations. The
+one related to MIG-serving is AmorphOS’s scheduler which
+uses a two-mode approach (called low-latency mode and high-
+throughput mode) to schedule jobs based on the current work-
+loads and FPGA status. In the context of the Reconﬁgurable
+Machine Scheduling Problem, this approach is a rule-based
+best-eﬀort scheduling algorithm. Instead of being best-eﬀort,
+MIG-serving’s algorithms consider wholistically and search
+in a large conﬁguration space.
+DNN serving systems. Traditional DNN serving systems—
+for example, Tensorﬂow-serving [36], TorchServe [1], Clip-
+per [20]—mainly focus on optimizing the performance for
+a single service instance, whereas MIG-serving works on a
+layer below their abstraction: MIG-serving targets planning
+GPU instances hence is complementary to them; these serving
+frameworks can run within instances created by MIG-serving.
+Another thread of DNN serving systems [18,22,25,42,43]
+aims at diﬀerent workloads or speciﬁc DNN models. Though,
+conceptually, MIG-serving are complementary to these sys-
+tems and can run beneath them, it requires further research to
+unleash the full potential of both systems. For example, Batch-
+Maker [22] improves RNN’s inference performance by cellular
+batching. Similarly, Nexus [43] accelerates DNN serving by
+batching requests partially across diﬀerent DNN models. Be-
+cause the acceleration of these systems depends on how much
+portion of requests can be batched, serving performance varies
+with workloads. This is a challenge for MIG-serving as our
+algorithms require stable performance as inputs. Likewise,
+Clockwork [25] requires the full control over the execution
+stack to achieve predicable inference latency, whose schedul-
+ing decisions may conﬂict with MIG-serving controller’s.
+DNN training scheduler. Scheduling DNN training, espe-
+cially distributed training, has been intensively studied [19,24,
+32,37,38,47,49]. Though the Reconﬁgurable Machine Schedul-
+ing Problem covers the problem of DNN training scheduling,
+MIG-serving only tackles DNN serving. As stated in sec-
+tion 3.3, the problem of scheduling DNN inference services is
+simpler because DNN services are long-running. How to apply
+MIG-serving’s techniques to training is our future work.
+Though having diﬀerent contexts, some training systems
+use related techniques to MIG-serving. Gavel [35] encodes
+the problem of training DNNs on heterogeneous GPUs into
+an integer programming problem, and uses a solver to solve
+the problem. Likewise, MIG-serving’s problem can also be
+expressed in mixed integer programming. We’ve tried this,
+but our implementation (in Z3 [21]) does not meet our per-
+formance requirement—it solves a 5-GPU problem in 20min.
+Pollux [41] uses Genetic Algorithms (GA) to optimize cluster-
+wide “goodput” (a combination of training throughput and
+eﬃciency) by dynamically re-assigning resources to diﬀerent
+jobs. MIG-serving also uses GA, but the similarity stops here;
+the two systems have diﬀerent targets and the contents of GA
+operations are diﬀerent.
+Heuristic algorithms. Many real-world problems are NP-
+complete, and in practice people use heuristic algorithms to
+“solve” them. Our work MIG-serving shares the same spirit
+and is indebted to many prior algorithms and systems. For
+example, AlphaGo [44] inspires MIG-serving’s customized
+MCTS algorithm (§5.3). Similarly, SwapAdvisor [26] enlight-
+ens us to use the Genetic Algorithm in MIG-serving.
+10
+Summary and future work
+This paper studies a new hardware feature, MIG, introduced by
+NVIDIA A100 GPUs. To capture the characteristics of MIG
+and DNN models running on it, we introduce a new abstract
+problem, the Reconﬁgurable Machine Scheduling Problem.
+Further, we design and implement a system, MIG-serving,
+which addresses the problem of serving DNN models with
+MIG. Evaluation shows that MIG-serving can save up to 40%
+GPUs versus using A100 as a whole.
+MIG is a new hardware feature, and there are many future
+works to explore, just name a few: ﬁrst, MIG-serving only
+focuses on serving. How to apply MIG-serving’s techniques
+to training is our future work. Second, MIG-serving’s cur-
+rent slow algorithm—MCTS—needs improvement (§8.1). We
+plan to ﬁne-tune MCTS, or replace MCTS with other heuris-
+tic algorithms, or use (SMT or MIP) solvers to improve the
+slow algorithm. Third, the Reconﬁgurable Machine Schedul-
+ing Problem (RMS) is a new abstract problem, which has the
+potential to extend to other reconﬁgurable devices, such as
+FPGA. One of our future work is to comprehensively study
+what devices can be abstracted by the RMS and how would
+our algorithms help in those scenarios.
+References
+[1] TorchServe. https://pytorch.org/serve/.
+[2] Vivado Design Suite User Guide Partial Reconﬁguration.
+https://www.xilinx.com/support/documentation/sw_manuals/
+xilinx2018_1/ug909-vivado-partial-reconfiguration.pdf,
+2018.
+[3] Amazon EC2 G4 Instances.
+https://aws.amazon.com/ec2/instance-types/g4/, 2021.
+[4] Amazon EC2 P3 Instances.
+https://aws.amazon.com/ec2/instance-types/p3/, 2021.
+[5] Amazon EC2 P4d Instances.
+https://aws.amazon.com/ec2/instance-types/p4/, 2021.
+[6] Cutting stock problem.
+https://en.wikipedia.org/wiki/Cutting_stock_problem, 2021.
+[7] GPU cloud computing solution. https:
+//www.nvidia.com/en-us/data-center/gpu-cloud-computing/,
+2021.
+[8] Kubernetes Controllers. https:
+//kubernetes.io/docs/concepts/architecture/controller/,
+2021.
+[9] Minimizing Deep Learning Inference Latency with NVIDIA
+Multi-Instance GPU. https://developer.nvidia.com/blog/
+minimizing-dl-inference-latency-with-mig/, 2021.
+13
+
+
+===== PAGE 14 =====
+[10] NVIDIA A100.
+https://www.nvidia.com/en-us/data-center/a100/, 2021.
+[11] NVIDIA A100 Tensor Core GPU Architecture.
+https://www.nvidia.com/content/dam/en-zz/Solutions/Data-
+Center/nvidia-ampere-architecture-whitepaper.pdf, 2021.
+[12] NVIDIA Data Center Deep Learning Product Performance.
+https://developer.nvidia.com/deep-learning-performance-
+training-inference, 2021.
+[13] NVIDIA Multi-Instance GPU User Guide.
+https://docs.nvidia.com/datacenter/tesla/pdf/
+NVIDIA_MIG_User_Guide.pdf, 2021.
+[14] PyTorch Hub. https://pytorch.org/hub/, 2021.
+[15] TensorFlow Hub. https://tfhub.dev/, 2021.
+[16] A. Azab and B. Naderi. Modelling the problem of production
+scheduling for reconﬁgurable manufacturing systems. Procedia CIRP,
+33:76–80, 2015.
+[17] Z. Bai, Z. Zhang, Y. Zhu, and X. Jin. Pipeswitch: Fast pipelined context
+switching for deep learning applications. In 14th {USENIX} Symposium
+on Operating Systems Design and Implementation ({OSDI} 20), 2020.
+[18] A. Balasubramanian, A. Kumar, Y. Liu, H. Cao, S. Venkataraman, and
+A. Akella. Accelerating deep learning inference via learned caches.
+arXiv preprint arXiv:2101.07344, 2021.
+[19] S. Chaudhary, R. Ramjee, M. Sivathanu, N. Kwatra, and S. Viswanatha.
+Balancing eﬃciency and fairness in heterogeneous gpu clusters for deep
+learning. In Proceedings of the Fifteenth European Conference on
+Computer Systems, 2020.
+[20] D. Crankshaw, X. Wang, G. Zhou, M. J. Franklin, J. E. Gonzalez, and
+I. Stoica. Clipper: A low-latency online prediction serving system. In
+14th {USENIX} Symposium on Networked Systems Design and
+Implementation ({NSDI} 17), 2017.
+[21] L. De Moura and N. Bjørner. Z3: An eﬃcient smt solver. In
+International conference on Tools and Algorithms for the Construction
+and Analysis of Systems, pages 337–340. Springer, 2008.
+[22] P. Gao, L. Yu, Y. Wu, and J. Li. Low latency rnn inference with cellular
+batching. In Proceedings of the Thirteenth EuroSys Conference, 2018.
+[23] M. Gorczyca, A. Janiak, and W. Janiak. The discrete part of the
+discrete-continuous scheduling problems-new properties. IFAC
+Proceedings Volumes, 42(13):244–249, 2009.
+[24] J. Gu, M. Chowdhury, K. G. Shin, Y. Zhu, M. Jeon, J. Qian, H. Liu, and
+C. Guo. Tiresias: A {GPU} cluster manager for distributed deep
+learning. In 16th {USENIX} Symposium on Networked Systems Design
+and Implementation ({NSDI} 19), pages 485–500, 2019.
+[25] A. Gujarati, R. Karimi, S. Alzayat, W. Hao, A. Kaufmann, Y. Vigfusson,
+and J. Mace. Serving dnns like clockwork: Performance predictability
+from the bottom up. In 14th {USENIX} Symposium on Operating
+Systems Design and Implementation ({OSDI} 20), 2020.
+[26] C.-C. Huang, G. Jin, and J. Li. Swapadvisor: Pushing deep learning
+beyond the gpu memory limit via smart swapping. In Proceedings of
+the Twenty-Fifth International Conference on Architectural Support for
+Programming Languages and Operating Systems, pages 1341–1355,
+2020.
+[27] K. Jansen, A. Lassota, and M. Maack. Approximation algorithms for
+scheduling with class constraints. In Proceedings of the 32nd ACM
+Symposium on Parallelism in Algorithms and Architectures, pages
+349–357, 2020.
+[28] J. Józefowska, M. Mika, R. Różycki, G. Waligóra, and J. Węglarz.
+Solving discrete-continuous scheduling problems by tabu search. In 4th
+Metaheuristics International Conference MIC, pages 16–20, 2001.
+[29] A. Khawaja, J. Landgraf, R. Prakash, M. Wei, E. Schkufza, and C. J.
+Rossbach. Sharing, protection, and compatibility for reconﬁgurable
+fabric with amorphos. In 13th {USENIX} Symposium on Operating
+Systems Design and Implementation ({OSDI} 18), pages 107–127,
+2018.
+[30] D.-W. Kim, K.-H. Kim, W. Jang, and F. F. Chen. Unrelated parallel
+machine scheduling with setup times using simulated annealing.
+Robotics and Computer-Integrated Manufacturing, 18(3-4):223–231,
+2002.
+[31] R. G. Landers, B.-K. Min, and Y. Koren. Reconﬁgurable machine tools.
+CIRP Annals, 50(1):269–274, 2001.
+[32] K. Mahajan, A. Balasubramanian, A. Singhvi, S. Venkataraman,
+A. Akella, A. Phanishayee, and S. Chawla. Themis: Fair and eﬃcient
+{GPU} cluster scheduling. In 17th {USENIX} Symposium on
+Networked Systems Design and Implementation ({NSDI} 20), 2020.
+[33] M. Mahmoodjanloo, R. Tavakkoli-Moghaddam, A. Baboli, and
+A. Bozorgi-Amiri. Flexible job shop scheduling problem with
+reconﬁgurable machine tools: An improved diﬀerential evolution
+algorithm. Applied Soft Computing, 94:106416, 2020.
+[34] L. Min and W. Cheng. A genetic algorithm for minimizing the
+makespan in the case of scheduling identical parallel machines.
+Artiﬁcial Intelligence in Engineering, 13(4):399–403, 1999.
+[35] D. Narayanan, K. Santhanam, F. Kazhamiaka, A. Phanishayee, and
+M. Zaharia. Heterogeneity-aware cluster scheduling policies for deep
+learning workloads. In 14th {USENIX} Symposium on Operating
+Systems Design and Implementation ({OSDI} 20), pages 481–498,
+2020.
+[36] C. Olston, N. Fiedel, K. Gorovoy, J. Harmsen, L. Lao, F. Li,
+V. Rajashekhar, S. Ramesh, and J. Soyke. Tensorﬂow-serving: Flexible,
+high-performance ml serving. arXiv preprint arXiv:1712.06139, 2017.
+[37] Y. Peng, Y. Bao, Y. Chen, C. Wu, and C. Guo. Optimus: an eﬃcient
+dynamic resource scheduler for deep learning clusters. In Proceedings
+of the Thirteenth EuroSys Conference, pages 1–14, 2018.
+[38] Y. Peng, Y. Zhu, Y. Chen, Y. Bao, B. Yi, C. Lan, C. Wu, and C. Guo. A
+generic communication scheduler for distributed dnn training
+acceleration. In Proceedings of the 27th ACM Symposium on Operating
+Systems Principles, pages 16–29, 2019.
+[39] F. Pezzella, G. Morganti, and G. Ciaschetti. A genetic algorithm for the
+ﬂexible job-shop scheduling problem. Computers & Operations
+Research, 35(10):3202–3212, 2008.
+[40] M. Pinedo. Scheduling, volume 29. Springer, 2012.
+[41] A. Qiao, W. Neiswanger, Q. Ho, H. Zhang, G. R. Ganger, and E. P.
+Xing. Pollux: Co-adaptive cluster scheduling for goodput-optimized
+deep learning. arXiv preprint arXiv:2008.12260, 2020.
+[42] F. Romero, Q. Li, N. J. Yadwadkar, and C. Kozyrakis. Infaas: A
+model-less inference serving system. arXiv preprint arXiv:1905.13348,
+2019.
+[43] H. Shen, L. Chen, Y. Jin, L. Zhao, B. Kong, M. Philipose,
+A. Krishnamurthy, and R. Sundaram. Nexus: a gpu cluster engine for
+accelerating dnn-based video analysis. In Proceedings of the 27th ACM
+Symposium on Operating Systems Principles, 2019.
+[44] D. Silver, J. Schrittwieser, K. Simonyan, I. Antonoglou, A. Huang,
+A. Guez, T. Hubert, L. Baker, M. Lai, A. Bolton, et al. Mastering the
+game of go without human knowledge. nature, 550(7676):354–359,
+2017.
+[45] C. Steiger, H. Walder, and M. Platzner. Operating systems for
+reconﬁgurable embedded platforms: Online scheduling of real-time
+tasks. IEEE Transactions on computers, 53(11):1393–1407, 2004.
+[46] Z. Wang, Q. Tang, B. Guo, J.-B. Wei, and L. Wang. Resource
+partitioning and application scheduling with module merging on
+dynamically and partially reconﬁgurable fpgas. Electronics, 9(9):1461,
+2020.
+[47] W. Xiao, R. Bhardwaj, R. Ramjee, M. Sivathanu, N. Kwatra, Z. Han,
+P. Patel, X. Peng, H. Zhao, Q. Zhang, et al. Gandiva: Introspective
+cluster scheduling for deep learning. In 13th {USENIX} Symposium on
+Operating Systems Design and Implementation ({OSDI} 18), 2018.
+14
+
+
+===== PAGE 15 =====
+[48] W. Xing and J. Zhang. Parallel machine scheduling with splitting jobs.
+Discrete Applied Mathematics, 103(1-3):259–269, 2000.
+[49] H. Zhao, Z. Han, Z. Yang, Q. Zhang, F. Yang, L. Zhou, M. Yang, F. C.
+Lau, Y. Wang, Y. Xiong, et al. Hived: Sharing a {GPU} cluster for deep
+learning with guarantees. In 14th {USENIX} Symposium on Operating
+Systems Design and Implementation ({OSDI} 20), pages 515–532,
+2020.
+15
+
+
+===== PAGE 16 =====
+A
+MIG-serving algorithms
+A.1
+Heuristic greedy algorithm
+As mentioned in section 5.3, MIG-serving uses a greedy algo-
+rithm as the fast algorithm which is based on a heuristic score.
+Figure 15 describes this greedy algorithm in detail.
+In section 5.3, we deliberately omitted some technicalities
+for simplicity. Speciﬁcally, in order to keep the each round of
+search manageable, the algorithm only consider mixing two
+services in one GPU (Line 2, Figure 15). But, when all services
+are about to be fully satisﬁed, the algorithm changes its behav-
+ior by mixing more services in one GPU (Line 20, Figure 15).
+This is because two services can no longer saturate a GPU, and
+the algorithm needs to pack more services.
+A.2
+Customized MCTS
+As stated in section 5.3, vanilla MCTS does not work for our
+problem because of two challenges: (i) tree node has too many
+children and (ii) the classic MCTS estimation procedure is slow
+and inaccurate. We elaborate how MIG-serving addresses
+these two challenges below.
+For the ﬁrst challenge, MIG-serving cuts the space by only
+having the conﬁgurations with top-K scores for a node. Specif-
+ically, for each node (i.e., completion rates), MIG-serving
+randomly picks ﬁve services which are not fully satisﬁed and
+calculates scores (§5.3) for the GPU conﬁgurations having
+these services. Then MIG-serving chooses the top-K conﬁgu-
+rations (K=10 by default) as edges to this node and generates
+the corresponding child nodes.
+For the second challenge, MIG-serving develops a fast and
+accurate estimation by memoization and randomization. In par-
+ticular, MIG-serving’s estimation pre-calculates and caches
+some good candidates for diﬀerent types of completion rates.
+During the estimation procedure, MIG-serving maps the cur-
+rent node to a type of completion rates (roughly), and randomly
+chooses a child node from the pool of good candidates. It re-
+peats this step until reaches some leaf node. Our experiments
+show that this estimation approach is about two to three orders
+of magnitude faster than the classic estimation and is accurate.
+B
+A study of serving performance with MIG
+As mentioned in section 2.2, to understand inference perfor-
+mance on diﬀerent sized instances, we experiment with 49 open
+sourced models in PyTorch Hub [14] and TensorFlow Hub [15],
+and collect model inference throughputs and latencies. This
+section describes the experiment details and provides results
+from more models than the two in section 2.2.
+Experimental setup. Our testbed is a machine with AMD
+EPYC 7742 CPU with 64 cores, 1.96 TB memory, running
+Debian 9 (stretch) OS,CUDA 11.0.207,NVIDIA driver version
+450.80.02.
+1: procedure FastAlgo(comp_rates)
+2:
+conf_set ←all GPU conﬁgs mixing at most 2 services
+3:
+ret ←empty list
+4:
+while True:
+5:
+max_score ←0
+6:
+best_conf ←None
+7:
+8:
+for conf ∈conf_set:
+// ﬁnd the best conﬁg
+9:
+score ←calculate score for conf
+//§5.3
+10:
+if score > max_score:
+11:
+max_score←score
+12:
+best_conf ←conf
+13:
+14:
+ret+ = best_conf
+15:
+update comp_rates according to best_conf ’s utility
+16:
+if comp_rates >= [100%]∗len(comp_rates):
+17:
+return ret
+18:
+19:
+for servicei in all services:
+20:
+if servicei is almost satisﬁed:
+21:
+confs ←mixing servicei with more services
+22:
+conf_set+ = confs
+Figure 15: MIG-serving’s fast algorithm (§5.3).
+In our experiments, we do not use the serving frameworks
+like TensorFlow serving or TorchServe because we want to
+evaluate inference throughputs and latencies of GPUs only,
+without queueing eﬀects or the overheads from these serving
+frameworks. Therefore, we develop our own benchmarking
+tool which prepares the inputs in memory and directly call
+models’ inference functions. The latencies collected by the
+tool are the running time of model inference on GPUs, which
+do not include overheads from inter-process communication
+or network costs.
+PyTorch. We run PyTorch 1.9.0. Models are fetched from Py-
+torch Hub. Figure 16 shows the single instance throughputs
+and latencies for 8 models that exist in both PyTorch’s and
+TensorFlow’s model hub (resnet50, vgg19, densenet121,
+inceptionv3, bert-base-uncased, gpt2, roberta-large,
+and albert-large-v2) of four batch sizes (1, 8, 16, 32). Fig-
+ure 17 shows the throughputs and latencies for diﬀerent GPU
+partitions of the same 8 models.
+TensorFlow. We run TensorFlow 2.4.1. Models are fetched
+from tensorﬂow.keras.applications module and transformers
+4.5.1 which is a popular Python library for natural language
+processing. Figure 18 shows the single instance throughputs
+and latencies for the same 8 models as PyTorch’s above and in
+four batch sizes (1, 8, 16, 32). Figure 19 shows the throughputs
+and latencies for diﬀerent GPU partitions of the same 8 models.
+16
+
+
+===== PAGE 17 =====
+#slices
+0
+200
+400
+600
+800
+throughput (req/s)
+resnet50 [batch=1]
+#slices
+0
+250
+500
+750
+1000
+1250
+1500
+1750
+throughput (req/s)
+resnet50 [batch=8]
+#slices
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+resnet50 [batch=16]
+#slices
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+resnet50 [batch=32]
+#slices
+0
+100
+200
+300
+400
+500
+600
+700
+throughput (req/s)
+vgg19 [batch=1]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+throughput (req/s)
+vgg19 [batch=8]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+1400
+throughput (req/s)
+vgg19 [batch=16]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+1400
+throughput (req/s)
+vgg19 [batch=32]
+#slices
+0
+100
+200
+300
+400
+throughput (req/s)
+densenet121 [batch=1]
+#slices
+0
+250
+500
+750
+1000
+1250
+1500
+throughput (req/s)
+densenet121 [batch=8]
+#slices
+0
+250
+500
+750
+1000
+1250
+1500
+1750
+throughput (req/s)
+densenet121 [batch=16]
+#slices
+0
+250
+500
+750
+1000
+1250
+1500
+1750
+throughput (req/s)
+densenet121 [batch=32]
+#slices
+0
+100
+200
+300
+400
+500
+throughput (req/s)
+inceptionv3 [batch=1]
+#slices
+0
+500
+1000
+1500
+2000
+2500
+throughput (req/s)
+inceptionv3 [batch=8]
+#slices
+0
+500
+1000
+1500
+2000
+2500
+3000
+throughput (req/s)
+inceptionv3 [batch=16]
+#slices
+0
+500
+1000
+1500
+2000
+2500
+3000
+3500
+throughput (req/s)
+inceptionv3 [batch=32]
+#slices
+0
+200
+400
+600
+800
+throughput (req/s)
+bert-base-uncased [batch=1]
+#slices
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+bert-base-uncased [batch=8]
+#slices
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+bert-base-uncased [batch=16]
+#slices
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+bert-base-uncased [batch=32]
+#slices
+0
+200
+400
+600
+800
+throughput (req/s)
+gpt2 [batch=1]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+throughput (req/s)
+gpt2 [batch=8]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+1400
+throughput (req/s)
+gpt2 [batch=16]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+1400
+throughput (req/s)
+gpt2 [batch=32]
+#slices
+0
+100
+200
+300
+400
+throughput (req/s)
+roberta-large [batch=1]
+#slices
+0
+100
+200
+300
+400
+500
+600
+throughput (req/s)
+roberta-large [batch=8]
+#slices
+0
+100
+200
+300
+400
+500
+600
+throughput (req/s)
+roberta-large [batch=16]
+#slices
+0
+100
+200
+300
+400
+500
+600
+700
+throughput (req/s)
+roberta-large [batch=32]
+1
+2
+3
+4
+5
+6
+7
+#slices
+0
+50
+100
+150
+200
+250
+300
+throughput (req/s)
+albert-large-v2 [batch=1]
+1
+2
+3
+4
+5
+6
+7
+#slices
+0
+100
+200
+300
+400
+throughput (req/s)
+albert-large-v2 [batch=8]
+1
+2
+3
+4
+5
+6
+7
+#slices
+0
+100
+200
+300
+400
+throughput (req/s)
+albert-large-v2 [batch=16]
+1
+2
+3
+4
+5
+6
+7
+#slices
+0
+100
+200
+300
+400
+500
+throughput (req/s)
+albert-large-v2 [batch=32]
+0
+2
+4
+6
+8
+latency (ms)
+0
+5
+10
+15
+20
+25
+30
+35
+latency (ms)
+0
+10
+20
+30
+40
+50
+60
+latency (ms)
+0
+20
+40
+60
+80
+100
+120
+latency (ms)
+0
+2
+4
+6
+8
+10
+12
+latency (ms)
+0
+10
+20
+30
+40
+50
+latency (ms)
+0
+20
+40
+60
+80
+latency (ms)
+0
+25
+50
+75
+100
+125
+150
+175
+latency (ms)
+0
+5
+10
+15
+20
+latency (ms)
+0
+10
+20
+30
+40
+latency (ms)
+0
+10
+20
+30
+40
+50
+60
+70
+latency (ms)
+0
+20
+40
+60
+80
+100
+120
+140
+latency (ms)
+0.0
+2.5
+5.0
+7.5
+10.0
+12.5
+15.0
+latency (ms)
+0
+5
+10
+15
+20
+25
+latency (ms)
+0
+10
+20
+30
+40
+latency (ms)
+0
+10
+20
+30
+40
+50
+60
+70
+latency (ms)
+0
+2
+4
+6
+8
+10
+latency (ms)
+0
+5
+10
+15
+20
+25
+30
+35
+latency (ms)
+0
+10
+20
+30
+40
+50
+60
+latency (ms)
+0
+20
+40
+60
+80
+100
+120
+latency (ms)
+0
+2
+4
+6
+8
+latency (ms)
+0
+10
+20
+30
+40
+50
+latency (ms)
+0
+20
+40
+60
+80
+100
+latency (ms)
+0
+25
+50
+75
+100
+125
+150
+175
+latency (ms)
+0
+5
+10
+15
+20
+latency (ms)
+0
+20
+40
+60
+80
+100
+latency (ms)
+0
+50
+100
+150
+200
+latency (ms)
+0
+100
+200
+300
+400
+latency (ms)
+0
+5
+10
+15
+20
+25
+latency (ms)
+0
+20
+40
+60
+80
+100
+120
+140
+latency (ms)
+0
+50
+100
+150
+200
+250
+300
+latency (ms)
+0
+100
+200
+300
+400
+500
+600
+latency (ms)
+Figure 16: PyTorch model inference throughputs and latencies for 1/7–7/7 instances.
+17
+
+
+===== PAGE 18 =====
+7
+3-3
+1-2-4
+1-2-3
+2-2-3
+1-1-1-4
+1-1-1-3
+1-1-2-3
+1-2-2-2
+1-1-1-1-3
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+200
+400
+600
+800
+throughput (req/s)
+resnet50 [batch=1]
+7
+1-1-1-3
+1-2-3
+3-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-2-2-2
+1-1-1-4
+1-2-4
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+resnet50 [batch=8]
+1-1-1-3
+1-2-3
+7
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+3-3
+1-2-2-2
+1-1-1-4
+1-2-4
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+resnet50 [batch=16]
+1-1-1-3
+1-2-3
+7
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-1-1-4
+1-2-2-2
+1-2-4
+3-3
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+1000
+2000
+throughput (req/s)
+resnet50 [batch=32]
+7
+1-1-1-3
+1-2-3
+3-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-2-2-2
+1-1-1-4
+1-2-4
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+200
+400
+600
+throughput (req/s)
+vgg19 [batch=1]
+1-2-3
+1-1-1-3
+3-3
+7
+1-2-2-2
+1-2-4
+1-1-1-2-2
+1-1-1-4
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+2-2-3
+1-1-2-3
+1-1-1-1-3
+GPU partition
+0
+500
+1000
+throughput (req/s)
+vgg19 [batch=8]
+1-1-1-3
+1-2-3
+3-3
+1-1-1-4
+1-1-1-1-1-1-1
+1-2-4
+1-1-1-1-1-2
+1-1-1-2-2
+1-2-2-2
+7
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+vgg19 [batch=16]
+1-2-3
+1-1-1-3
+3-3
+1-2-2-2
+1-1-1-2-2
+1-2-4
+1-1-1-1-1-2
+1-1-1-4
+1-1-1-1-1-1-1
+7
+2-2-3
+1-1-2-3
+1-1-1-1-3
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+vgg19 [batch=32]
+7
+3-3
+2-2-3
+1-2-4
+1-2-3
+1-2-2-2
+1-1-2-3
+1-1-1-4
+1-1-1-3
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+100
+200
+300
+400
+throughput (req/s)
+densenet121 [batch=1]
+7
+3-3
+1-2-4
+1-2-3
+1-1-1-4
+1-1-1-3
+2-2-3
+1-1-2-3
+1-1-1-1-3
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+densenet121 [batch=8]
+7
+1-2-3
+1-1-1-3
+1-2-4
+1-1-1-4
+3-3
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+2-2-3
+1-1-2-3
+1-1-1-1-3
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+densenet121 [batch=16]
+1-2-3
+1-1-1-3
+7
+1-2-4
+1-2-2-2
+1-1-1-4
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+3-3
+2-2-3
+1-1-2-3
+1-1-1-1-3
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+densenet121 [batch=32]
+7
+3-3
+2-2-3
+1-2-4
+1-2-3
+1-2-2-2
+1-1-2-3
+1-1-1-4
+1-1-1-3
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+200
+400
+throughput (req/s)
+inceptionv3 [batch=1]
+7
+3-3
+1-2-4
+1-2-3
+1-1-1-4
+1-1-1-3
+2-2-3
+1-1-2-3
+1-1-1-1-3
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+1000
+2000
+throughput (req/s)
+inceptionv3 [batch=8]
+7
+3-3
+1-2-3
+1-2-4
+1-1-1-3
+1-1-1-4
+2-2-3
+1-1-2-3
+1-1-1-1-3
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+1000
+2000
+3000
+throughput (req/s)
+inceptionv3 [batch=16]
+7
+1-1-1-3
+1-2-3
+3-3
+1-1-1-4
+1-2-4
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-2-2-2
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+1000
+2000
+3000
+throughput (req/s)
+inceptionv3 [batch=32]
+7
+3-3
+1-2-4
+2-2-3
+1-2-3
+1-1-1-4
+1-2-2-2
+1-1-2-3
+1-1-1-3
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+200
+400
+600
+800
+throughput (req/s)
+bert-base-uncased [batch=1]
+7
+1-1-1-3
+3-3
+1-2-3
+1-1-1-4
+1-2-4
+1-1-1-1-1-1-1
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-2-3
+1-1-1-2-2
+2-2-3
+1-2-2-2
+GPU partition
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+bert-base-uncased [batch=8]
+1-1-1-3
+1-2-3
+3-3
+1-1-1-1-1-1-1
+7
+1-1-1-1-1-2
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-4
+1-2-2-2
+1-1-2-3
+1-2-4
+2-2-3
+GPU partition
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+bert-base-uncased [batch=16]
+1-1-1-3
+1-2-3
+3-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-2-2-2
+1-1-1-4
+1-2-4
+1-1-1-1-3
+1-1-2-3
+2-2-3
+7
+GPU partition
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+bert-base-uncased [batch=32]
+7
+3-3
+1-2-4
+1-2-3
+2-2-3
+1-1-1-4
+1-1-1-3
+1-2-2-2
+1-1-2-3
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+200
+400
+600
+800
+throughput (req/s)
+gpt2 [batch=1]
+7
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-2-2-2
+3-3
+1-1-1-4
+1-2-4
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+gpt2 [batch=8]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-1-1-4
+1-2-2-2
+1-2-4
+3-3
+7
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+gpt2 [batch=16]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-4
+1-1-1-2-2
+1-2-4
+1-2-2-2
+3-3
+7
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+gpt2 [batch=32]
+7
+3-3
+1-2-4
+1-2-3
+2-2-3
+1-1-1-4
+1-2-2-2
+1-1-1-3
+1-1-2-3
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+100
+200
+300
+400
+throughput (req/s)
+roberta-large [batch=1]
+7
+1-1-1-3
+1-2-3
+3-3
+1-1-1-1-1-1-1
+1-1-1-4
+1-1-1-1-1-2
+1-2-4
+1-1-1-2-2
+1-1-1-1-3
+1-2-2-2
+1-1-2-3
+2-2-3
+GPU partition
+0
+200
+400
+600
+throughput (req/s)
+roberta-large [batch=8]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+3-3
+1-1-1-1-1-2
+7
+1-1-1-4
+1-1-1-1-3
+1-1-1-2-2
+1-2-4
+1-1-2-3
+1-2-2-2
+2-2-3
+GPU partition
+0
+200
+400
+600
+throughput (req/s)
+roberta-large [batch=16]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+3-3
+1-1-1-2-2
+1-1-1-4
+1-2-2-2
+1-1-1-1-3
+1-2-4
+1-1-2-3
+7
+2-2-3
+GPU partition
+0
+200
+400
+600
+throughput (req/s)
+roberta-large [batch=32]
+7
+3-3
+1-2-4
+1-2-3
+2-2-3
+1-1-1-4
+1-1-1-3
+1-1-2-3
+1-2-2-2
+1-1-1-1-3
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+100
+200
+300
+throughput (req/s)
+albert-large-v2 [batch=1]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-4
+3-3
+1-1-1-1-1-2
+7
+1-2-4
+1-1-1-2-2
+1-2-2-2
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+100
+200
+300
+400
+throughput (req/s)
+albert-large-v2 [batch=8]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-4
+1-1-1-2-2
+3-3
+7
+1-2-4
+1-2-2-2
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+200
+400
+throughput (req/s)
+albert-large-v2 [batch=16]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-1-1-4
+1-2-2-2
+1-2-4
+3-3
+1-1-1-1-3
+7
+1-1-2-3
+2-2-3
+GPU partition
+0
+200
+400
+throughput (req/s)
+albert-large-v2 [batch=32]
+0
+2
+4
+6
+8
+weighted avg latency (ms)
+0
+10
+20
+30
+weighted avg latency (ms)
+0
+20
+40
+60
+weighted avg latency (ms)
+0
+25
+50
+75
+100
+weighted avg latency (ms)
+0
+5
+10
+weighted avg latency (ms)
+0
+20
+40
+weighted avg latency (ms)
+0
+20
+40
+60
+80
+weighted avg latency (ms)
+0
+50
+100
+150
+weighted avg latency (ms)
+0
+5
+10
+15
+20
+weighted avg latency (ms)
+0
+10
+20
+30
+40
+weighted avg latency (ms)
+0
+20
+40
+60
+weighted avg latency (ms)
+0
+50
+100
+150
+weighted avg latency (ms)
+0
+5
+10
+15
+weighted avg latency (ms)
+0
+10
+20
+weighted avg latency (ms)
+0
+10
+20
+30
+40
+weighted avg latency (ms)
+0
+20
+40
+60
+weighted avg latency (ms)
+0.0
+2.5
+5.0
+7.5
+10.0
+weighted avg latency (ms)
+0
+10
+20
+30
+weighted avg latency (ms)
+0
+20
+40
+60
+weighted avg latency (ms)
+0
+50
+100
+weighted avg latency (ms)
+0
+2
+4
+6
+8
+weighted avg latency (ms)
+0
+20
+40
+weighted avg latency (ms)
+0
+25
+50
+75
+100
+weighted avg latency (ms)
+0
+50
+100
+150
+weighted avg latency (ms)
+0
+5
+10
+15
+20
+weighted avg latency (ms)
+0
+25
+50
+75
+100
+weighted avg latency (ms)
+0
+50
+100
+150
+200
+weighted avg latency (ms)
+0
+100
+200
+300
+400
+weighted avg latency (ms)
+0
+10
+20
+weighted avg latency (ms)
+0
+50
+100
+150
+weighted avg latency (ms)
+0
+100
+200
+300
+weighted avg latency (ms)
+0
+200
+400
+600
+weighted avg latency (ms)
+Figure 17: PyTorch model inference throughputs and latencies for distinct GPU partitions.
+18
+
+
+===== PAGE 19 =====
+#slices
+0
+100
+200
+300
+400
+500
+600
+700
+throughput (req/s)
+resnet50 [batch=1]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+throughput (req/s)
+resnet50 [batch=8]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+throughput (req/s)
+resnet50 [batch=16]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+1400
+throughput (req/s)
+resnet50 [batch=32]
+#slices
+0
+100
+200
+300
+400
+throughput (req/s)
+vgg19 [batch=1]
+#slices
+0
+100
+200
+300
+400
+500
+600
+throughput (req/s)
+vgg19 [batch=8]
+#slices
+0
+200
+400
+600
+800
+1000
+throughput (req/s)
+vgg19 [batch=16]
+#slices
+0
+200
+400
+600
+800
+1000
+throughput (req/s)
+vgg19 [batch=32]
+#slices
+0
+100
+200
+300
+400
+500
+600
+throughput (req/s)
+densenet121 [batch=1]
+#slices
+0
+250
+500
+750
+1000
+1250
+1500
+throughput (req/s)
+densenet121 [batch=8]
+#slices
+0
+250
+500
+750
+1000
+1250
+1500
+throughput (req/s)
+densenet121 [batch=16]
+#slices
+0
+250
+500
+750
+1000
+1250
+1500
+1750
+throughput (req/s)
+densenet121 [batch=32]
+#slices
+0
+100
+200
+300
+400
+500
+600
+throughput (req/s)
+inceptionv3 [batch=1]
+#slices
+0
+250
+500
+750
+1000
+1250
+1500
+throughput (req/s)
+inceptionv3 [batch=8]
+#slices
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+inceptionv3 [batch=16]
+#slices
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+inceptionv3 [batch=32]
+#slices
+0
+200
+400
+600
+800
+1000
+throughput (req/s)
+bert-base-uncased [batch=1]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+throughput (req/s)
+bert-base-uncased [batch=8]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+1400
+throughput (req/s)
+bert-base-uncased [batch=16]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+1400
+throughput (req/s)
+bert-base-uncased [batch=32]
+#slices
+0
+200
+400
+600
+800
+throughput (req/s)
+gpt2 [batch=1]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+throughput (req/s)
+gpt2 [batch=8]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+throughput (req/s)
+gpt2 [batch=16]
+#slices
+0
+200
+400
+600
+800
+1000
+1200
+throughput (req/s)
+gpt2 [batch=32]
+#slices
+0
+50
+100
+150
+200
+250
+300
+throughput (req/s)
+roberta-large [batch=1]
+#slices
+0
+100
+200
+300
+400
+throughput (req/s)
+roberta-large [batch=8]
+#slices
+0
+100
+200
+300
+400
+throughput (req/s)
+roberta-large [batch=16]
+#slices
+0
+100
+200
+300
+400
+throughput (req/s)
+roberta-large [batch=32]
+1
+2
+3
+4
+5
+6
+7
+#slices
+0
+50
+100
+150
+200
+250
+300
+throughput (req/s)
+albert-large-v2 [batch=1]
+1
+2
+3
+4
+5
+6
+7
+#slices
+0
+100
+200
+300
+400
+throughput (req/s)
+albert-large-v2 [batch=8]
+1
+2
+3
+4
+5
+6
+7
+#slices
+0
+50
+100
+150
+200
+250
+300
+350
+throughput (req/s)
+albert-large-v2 [batch=16]
+1
+2
+3
+4
+5
+6
+7
+#slices
+0
+100
+200
+300
+400
+throughput (req/s)
+albert-large-v2 [batch=32]
+0
+2
+4
+6
+8
+10
+latency (ms)
+0
+10
+20
+30
+40
+50
+latency (ms)
+0
+20
+40
+60
+80
+100
+latency (ms)
+0
+25
+50
+75
+100
+125
+150
+175
+latency (ms)
+0
+5
+10
+15
+20
+latency (ms)
+0
+20
+40
+60
+80
+100
+latency (ms)
+0
+20
+40
+60
+80
+100
+120
+latency (ms)
+0
+50
+100
+150
+200
+250
+latency (ms)
+0
+2
+4
+6
+8
+10
+12
+latency (ms)
+0
+10
+20
+30
+40
+latency (ms)
+0
+20
+40
+60
+80
+latency (ms)
+0
+25
+50
+75
+100
+125
+150
+latency (ms)
+0
+2
+4
+6
+8
+10
+12
+latency (ms)
+0
+10
+20
+30
+40
+latency (ms)
+0
+10
+20
+30
+40
+50
+60
+latency (ms)
+0
+20
+40
+60
+80
+100
+latency (ms)
+0
+2
+4
+6
+8
+latency (ms)
+0
+10
+20
+30
+40
+50
+latency (ms)
+0
+20
+40
+60
+80
+100
+latency (ms)
+0
+50
+100
+150
+200
+latency (ms)
+0
+2
+4
+6
+8
+latency (ms)
+0
+10
+20
+30
+40
+50
+latency (ms)
+0
+20
+40
+60
+80
+100
+latency (ms)
+0
+50
+100
+150
+200
+latency (ms)
+0
+5
+10
+15
+20
+25
+latency (ms)
+0
+25
+50
+75
+100
+125
+150
+latency (ms)
+0
+50
+100
+150
+200
+250
+300
+latency (ms)
+0
+100
+200
+300
+400
+500
+600
+latency (ms)
+0
+5
+10
+15
+20
+25
+latency (ms)
+0
+25
+50
+75
+100
+125
+150
+175
+latency (ms)
+0
+50
+100
+150
+200
+250
+300
+350
+latency (ms)
+0
+100
+200
+300
+400
+500
+600
+700
+latency (ms)
+Figure 18: TensorFlow model inference throughputs and latencies for 1/7–7/7 instances.
+19
+
+
+===== PAGE 20 =====
+7
+3-3
+1-2-4
+1-2-3
+1-1-1-4
+1-1-1-3
+2-2-3
+1-1-2-3
+1-1-1-1-3
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+200
+400
+600
+throughput (req/s)
+resnet50 [batch=1]
+7
+3-3
+1-2-3
+1-1-1-3
+1-2-4
+1-1-1-4
+2-2-3
+1-1-2-3
+1-2-2-2
+1-1-1-1-3
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+250
+500
+750
+1000
+throughput (req/s)
+resnet50 [batch=8]
+7
+1-2-3
+1-1-1-3
+3-3
+1-2-4
+1-1-1-4
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+2-2-3
+1-1-1-1-1-1-1
+1-1-2-3
+1-1-1-1-3
+GPU partition
+0
+500
+1000
+throughput (req/s)
+resnet50 [batch=16]
+1-2-3
+1-1-1-3
+3-3
+7
+1-2-4
+1-1-1-4
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+2-2-3
+1-1-1-1-1-1-1
+1-1-2-3
+1-1-1-1-3
+GPU partition
+0
+500
+1000
+throughput (req/s)
+resnet50 [batch=32]
+7
+3-3
+1-2-3
+1-1-1-3
+1-2-4
+1-1-1-4
+2-2-3
+1-2-2-2
+1-1-2-3
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+100
+200
+300
+400
+throughput (req/s)
+vgg19 [batch=1]
+1-1-1-3
+1-2-3
+3-3
+7
+1-1-1-1-1-1-1
+1-1-1-4
+1-1-1-1-1-2
+1-1-1-1-3
+1-2-4
+1-1-1-2-2
+1-1-2-3
+1-2-2-2
+2-2-3
+GPU partition
+0
+200
+400
+600
+throughput (req/s)
+vgg19 [batch=8]
+1-2-3
+1-1-1-3
+3-3
+7
+1-2-4
+1-1-1-4
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+2-2-3
+1-1-2-3
+1-1-1-1-3
+GPU partition
+0
+250
+500
+750
+1000
+throughput (req/s)
+vgg19 [batch=16]
+1-2-3
+1-1-1-3
+3-3
+7
+1-2-4
+1-1-1-4
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+2-2-3
+1-1-2-3
+1-1-1-1-3
+GPU partition
+0
+250
+500
+750
+1000
+throughput (req/s)
+vgg19 [batch=32]
+7
+3-3
+1-2-4
+1-2-3
+2-2-3
+1-1-1-4
+1-1-1-3
+1-2-2-2
+1-1-2-3
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+200
+400
+600
+throughput (req/s)
+densenet121 [batch=1]
+7
+3-3
+1-2-3
+1-1-1-3
+1-2-4
+1-1-1-4
+2-2-3
+1-1-2-3
+1-2-2-2
+1-1-1-1-3
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+densenet121 [batch=8]
+7
+3-3
+1-2-3
+1-1-1-3
+1-2-4
+1-1-1-4
+2-2-3
+1-1-2-3
+1-2-2-2
+1-1-1-1-3
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+densenet121 [batch=16]
+7
+3-3
+1-2-3
+1-1-1-3
+1-2-4
+1-1-1-4
+2-2-3
+1-2-2-2
+1-1-2-3
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+densenet121 [batch=32]
+7
+3-3
+1-2-4
+1-2-3
+2-2-3
+1-1-1-4
+1-1-1-3
+1-1-2-3
+1-2-2-2
+1-1-1-1-3
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+200
+400
+600
+throughput (req/s)
+inceptionv3 [batch=1]
+7
+3-3
+1-2-3
+1-1-1-3
+1-2-4
+1-1-1-4
+2-2-3
+1-1-2-3
+1-2-2-2
+1-1-1-1-3
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+500
+1000
+1500
+throughput (req/s)
+inceptionv3 [batch=8]
+7
+3-3
+1-2-3
+1-1-1-3
+1-2-4
+1-1-1-4
+2-2-3
+1-2-2-2
+1-1-2-3
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+inceptionv3 [batch=16]
+7
+3-3
+1-2-3
+1-1-1-3
+1-2-4
+1-1-1-4
+2-2-3
+1-2-2-2
+1-1-2-3
+1-1-1-2-2
+1-1-1-1-3
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+500
+1000
+1500
+2000
+throughput (req/s)
+inceptionv3 [batch=32]
+7
+3-3
+1-2-4
+1-2-3
+2-2-3
+1-1-1-4
+1-1-1-3
+1-1-2-3
+1-2-2-2
+1-1-1-1-3
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+250
+500
+750
+1000
+throughput (req/s)
+bert-base-uncased [batch=1]
+7
+1-1-1-3
+1-2-3
+3-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-1-1-4
+1-2-2-2
+1-1-1-1-3
+1-2-4
+1-1-2-3
+2-2-3
+GPU partition
+0
+500
+1000
+throughput (req/s)
+bert-base-uncased [batch=8]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-1-1-4
+1-2-2-2
+3-3
+1-2-4
+1-1-1-1-3
+1-1-2-3
+7
+2-2-3
+GPU partition
+0
+500
+1000
+throughput (req/s)
+bert-base-uncased [batch=16]
+1-2-3
+1-1-1-3
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+1-2-4
+1-1-1-4
+3-3
+2-2-3
+7
+1-1-2-3
+1-1-1-1-3
+GPU partition
+0
+500
+1000
+throughput (req/s)
+bert-base-uncased [batch=32]
+7
+3-3
+1-2-3
+1-2-4
+2-2-3
+1-1-1-3
+1-1-1-4
+1-1-2-3
+1-2-2-2
+1-1-1-1-3
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+200
+400
+600
+800
+throughput (req/s)
+gpt2 [batch=1]
+7
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-2-2-2
+1-1-1-4
+3-3
+1-2-4
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+500
+1000
+throughput (req/s)
+gpt2 [batch=8]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-1-1-4
+1-2-2-2
+1-2-4
+3-3
+1-1-1-1-3
+1-1-2-3
+7
+2-2-3
+GPU partition
+0
+500
+1000
+throughput (req/s)
+gpt2 [batch=16]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-2-2-2
+1-1-1-4
+1-2-4
+3-3
+1-1-1-1-3
+1-1-2-3
+7
+2-2-3
+GPU partition
+0
+500
+1000
+throughput (req/s)
+gpt2 [batch=32]
+7
+3-3
+1-2-4
+1-2-3
+1-1-1-4
+1-1-1-3
+2-2-3
+1-1-2-3
+1-1-1-1-3
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+100
+200
+300
+throughput (req/s)
+roberta-large [batch=1]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+7
+1-1-1-1-1-2
+1-1-1-2-2
+1-1-1-4
+1-2-2-2
+1-2-4
+3-3
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+100
+200
+300
+400
+throughput (req/s)
+roberta-large [batch=8]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-1-1-4
+3-3
+7
+1-2-2-2
+1-2-4
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+100
+200
+300
+400
+throughput (req/s)
+roberta-large [batch=16]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+3-3
+1-1-1-2-2
+1-1-1-4
+1-2-2-2
+1-2-4
+7
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+100
+200
+300
+400
+throughput (req/s)
+roberta-large [batch=32]
+7
+3-3
+1-2-4
+1-2-3
+1-1-1-4
+1-1-1-3
+2-2-3
+1-1-2-3
+1-1-1-1-3
+1-2-2-2
+1-1-1-2-2
+1-1-1-1-1-2
+1-1-1-1-1-1-1
+GPU partition
+0
+100
+200
+300
+throughput (req/s)
+albert-large-v2 [batch=1]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+7
+1-2-2-2
+1-1-1-4
+1-2-4
+3-3
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+100
+200
+300
+400
+throughput (req/s)
+albert-large-v2 [batch=8]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-2-2
+1-1-1-4
+3-3
+7
+1-2-2-2
+1-2-4
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+100
+200
+300
+400
+throughput (req/s)
+albert-large-v2 [batch=16]
+1-1-1-3
+1-2-3
+1-1-1-1-1-1-1
+1-1-1-1-1-2
+1-1-1-4
+1-1-1-2-2
+3-3
+1-2-4
+1-2-2-2
+7
+1-1-1-1-3
+1-1-2-3
+2-2-3
+GPU partition
+0
+100
+200
+300
+400
+throughput (req/s)
+albert-large-v2 [batch=32]
+0.0
+2.5
+5.0
+7.5
+10.0
+weighted avg latency (ms)
+0
+20
+40
+weighted avg latency (ms)
+0
+25
+50
+75
+100
+weighted avg latency (ms)
+0
+50
+100
+150
+weighted avg latency (ms)
+0
+5
+10
+15
+20
+weighted avg latency (ms)
+0
+25
+50
+75
+100
+weighted avg latency (ms)
+0
+50
+100
+weighted avg latency (ms)
+0
+100
+200
+weighted avg latency (ms)
+0
+5
+10
+weighted avg latency (ms)
+0
+10
+20
+30
+40
+weighted avg latency (ms)
+0
+20
+40
+60
+80
+weighted avg latency (ms)
+0
+50
+100
+150
+weighted avg latency (ms)
+0
+5
+10
+weighted avg latency (ms)
+0
+10
+20
+30
+40
+weighted avg latency (ms)
+0
+20
+40
+60
+weighted avg latency (ms)
+0
+25
+50
+75
+100
+weighted avg latency (ms)
+0
+2
+4
+6
+8
+weighted avg latency (ms)
+0
+20
+40
+weighted avg latency (ms)
+0
+25
+50
+75
+100
+weighted avg latency (ms)
+0
+50
+100
+150
+200
+weighted avg latency (ms)
+0
+2
+4
+6
+8
+weighted avg latency (ms)
+0
+20
+40
+weighted avg latency (ms)
+0
+25
+50
+75
+100
+weighted avg latency (ms)
+0
+50
+100
+150
+200
+weighted avg latency (ms)
+0
+10
+20
+weighted avg latency (ms)
+0
+50
+100
+150
+weighted avg latency (ms)
+0
+100
+200
+300
+weighted avg latency (ms)
+0
+200
+400
+600
+weighted avg latency (ms)
+0
+10
+20
+weighted avg latency (ms)
+0
+50
+100
+150
+weighted avg latency (ms)
+0
+100
+200
+300
+weighted avg latency (ms)
+0
+200
+400
+600
+weighted avg latency (ms)
+Figure 19: TensorFlow model inference throughputs and latencies for distinct GPU partitions.
+20

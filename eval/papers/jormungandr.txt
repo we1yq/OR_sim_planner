@@ -1,0 +1,1750 @@
+
+
+===== PAGE 1 =====
+Optimizing GPU Sharing for Container-Based DNN
+Serving with Multi-Instance GPUs
+Xinpeng Wei
+Georgia Institute of Technology
+Zhichao Li
+ByteDance Inc.
+Cheng Tan
+Northeastern University
+ABSTRACT
+The trade-off of throughput versus latency is important in
+serving deep neural networks (DNNs) on GPUs. A hardware
+feature—Multi-Instance GPU (MIG)—provides an additional
+dimension to this trade-off. This paper studies the GPU sharing
+problem for serving DNNs with MIG. We propose a system
+Jormungandr that allocates MIG-enabled GPUs to optimize
+a user-define utility function, and places DNN serving con-
+tainers on heterogeneous MIG instances. Jormungandr in-
+troduces a utility-first search that yields efficient solutions in
+practice. Additionally, it presents a robust transition protocol
+that guarantees a seamless switch between two GPU-cluster
+configurations, minimizing throughput fluctuations. We imple-
+ment Jormungandr on Kubernetes. Our experiments show
+that Jormungandr provides near-optimal solutions, using
+< 6% more GPUs than the optimal solutions.
+CCS CONCEPTS
+• Computing methodologies →Machine learning.
+KEYWORDS
+Machine learning systems, Multi-Instance GPUs
+1
+INTRODUCTION
+Throughput versus latency is a fundamental trade-off in com-
+puter systems. People have intensively studied this trade-off
+in many systems [23, 38, 41]. Serving deep neural networks
+(also called DNN model inferences) is one of them. Serving
+DNNs is a process of using trained models to make predictions
+against unseen inputs. Unlike deep learning training, serving
+DNN models is often a part of user-facing applications and
+cares about throughput-latency trade-off.
+Permission to make digital or hard copies of all or part of this work for
+personal or classroom use is granted without fee provided that copies are not
+made or distributed for profit or commercial advantage and that copies bear
+this notice and the full citation on the first page. Copyrights for components
+of this work owned by others than the author(s) must be honored. Abstracting
+with credit is permitted. To copy otherwise, or republish, to post on servers or
+to redistribute to lists, requires prior specific permission and/or a fee. Request
+permissions from permissions@acm.org.
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+© 2024 Copyright held by the owner/author(s). Publication rights licensed to
+ACM.
+ACM ISBN 979-8-4007-1181-7/24/09...$15.00
+https://doi.org/10.1145/3688351.3689156
+GPU sharing plays a vital role in this trade-off: using ded-
+icated GPUs provides minimal and stable latencies, but it
+comes at the cost of low GPU utilization and low throughputs;
+sharing GPUs increases GPU utilization and throughputs, but
+with long and unpredictable tail latencies [32].
+In the current cloud native environment (e.g., Machine
+Learning as a Service), DNN services often run within contain-
+ers [9, 12]. Then, GPU sharing can be framed as a resource al-
+location problem: how to allocate (shared) GPUs to containers
+that serve different DNN models. Note that resource allocation
+is different from, but complementary to, scheduling. Resource
+allocation systems—for example, HiveD [55], GSLICE [22],
+Morphling [49]—make strategic, long-term decisions regard-
+ing resource configurations for multiple services; whereas
+DNN serving scheduling systems, like Clipper [21], Clock-
+work [27], and Reef [29], focus on quick responses to workload
+fluctuations like request spikes.
+In this paper, we study DNN models that can benefit from
+GPU sharing; for models that already exhaust GPU resources,
+such as Large Language Models (LLMs), GPU sharing is not
+advisable and therefore they are not the focus of this paper.
+Resource allocation for serving GPU-shared DNN models
+was easy, for two reasons.
+(1) Model inference has stable and predictable performance.
+This is observed by Gujarati et al. [27], and we confirmed
+(§8). Serving a DNN model is a computational heavy task
+and there is little non-determinism. In addition, serving
+tasks usually solely occupies GPUs without worrying be-
+ing interrupted by other tasks. Thus, profiling model per-
+formance in the same environment is accurate to predict
+model throughputs and latencies in production.
+(2) People have few parameters to tune the trade-off. For a
+model running on a given hardware and software setup,
+people often use two approaches to trade off latencies
+for higher throughputs: batching user requests and using
+NVIDIA’s Multi-Process Service (MPS) [11], which en-
+ables running multiple model instances simultaneously
+on a GPU. Therefore, the search space is small; by de-
+ciding the batch size and the number of MPS instances
+(i.e., ⟨batch size, MPS⟩), the DNN model’s throughput
+and latencies are determined.
+Sharing GPUs has more choices when NVIDIA introduced
+a hardware feature—Multi-Instance GPUs (MIG) [8]. MIG
+allows developers to partition one GPU into multiple MIG
+68
+
+
+===== PAGE 2 =====
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+Xinpeng Wei, Zhichao Li, and Cheng Tan
+instances. Unlike MPS instances, different MIG instances are
+hardware isolated in both performance and errors. For exam-
+ple, NVIDIA A100 GPUs implement MIG, and one A100 can
+be partitioned into as many as 7 MIG instances; each instance
+accounts for 1/7 of the total resources. People can also parti-
+tion A100 into heterogeneous instances, for example, three
+instances with 1/7, 2/7, and 4/7 resources. MIG supports dy-
+namic reconfiguration—one can partially re-partition a GPU
+without having to stop other running instances. Section 2 in-
+troduces MIG in more detail.
+MIG adds a new trade-off dimension to the throughput-
+latency trade-off, which brings the opportunity to improve the
+“best trade-off points”—Pareto efficient solutions. Figure 1
+9.5%
+Figure 1: Pareto curves of a DNN
+model, with and without MIG.
+describes two Pareto
+curves for running a
+model on an A100
+GPU, one with MIG
+and one without MIG.
+We try all possible con-
+figurations and log the
+throughput and average
+latency of each configu-
+ration. We can see that
+(a) MIG provides many
+more points on the Pareto curve, and (b) the Pareto efficient
+solutions with MIG produce better throughputs than ones
+without MIG: given similar latencies, the highest-throughput
+point with MIG surpasses the non-MIG point by 9.5%. Fur-
+thermore, the MIG-enabled configurations offer a superior
+highest throughput (5% higher than non-MIG) owing to the
+hardware performance isolation of MIG, which mitigates con-
+tentions on GPU cache and bandwidth.
+However, these improvements come at the cost of compli-
+cating the resource allocation problem. In fact, MIG funda-
+mentally changes the complexity of the problem. It turns out
+that allocating MIG-enabled resources is a new abstract prob-
+lem that we define as the Reconfigurable Machine Allocation
+Problem (RMAP). RMAP is an NP-hard problem (§3.3).
+Beyond theory, RMAP is also hard in practice. First, MIG
+increases the search space exponentially, hence simple search
+approaches no longer work. Consider a simple example of
+serving one model on one GPU with MIG=[4/7,2/7,1/7] (this
+is short for a GPU partition with a 4/7 instance, a 2/7 instance,
+and a 1/7 instance). If the number of ⟨batch size, MPS⟩config-
+urations is 𝑁, then it is 𝑁3 with MIG=[4/7,2/7,1/7]. Moreover,
+these are heterogeneous MIG instances; thus, one likely re-
+quires different configurations for different MIG instances.
+Also, notice that MIG=[4/7,2/7,1/7] is one of 19 MIG parti-
+tions [8], and this is just serving a single model on a single
+GPU. Second, allocating MIG instances follow specific rules
+and classic resource allocation policies (e.g., allocating CPUs,
+memory, disk) are not applicable. For example, A100 does not
+allow allocating 5/7 or 6/7 instances, and certain combinations
+are prohibited such as MIG=[3/7,3/7,1/7]. Section 2 describes
+these constraints.
+In this paper, we introduce Jormungandr, a system that
+allocates MIG-enabled GPUs for DNN serving containers.
+Our goal is to help model owners explore the vast GPU con-
+figurations and make the wanted throughput-latency trade-off.
+In particular, users of our system can specify their objectives,
+for example, having vgg19 throughput ≥1000 req/s while
+keeping 99%-tile latency < 30ms. Then, Jormungandr au-
+tomatically partitions GPUs and allocates MIG instances to
+model containers to satisfy user objectives (called a deploy-
+ment). When containers or user performance objectives get
+updated, Jormungandr re-plans GPU configurations and is-
+sues a robust transition, switching from the old configurations
+to the new one. By “robust”, we mean that the transition will
+never violate the performance constraints in users’ objectives
+(e.g., the throughput of vgg19 should always be ≥1000 req/s).
+Jormungandr consists of two main components: an alloca-
+tor and a deployer. The allocator is responsible for generating
+and optimizing GPU configurations. We introduce a utility-
+first search algorithm that runs fast and can produce efficient
+GPU configurations in practice. In our experiments (§8.2),
+the utility-first search generates near-optimal solutions (using
+< 6% more resources than the optimal solutions).
+The deployer is in charge of applying the planned configu-
+rations to GPUs. When the allocator produces a new deploy-
+ment to incorporate changes, the deployer need to transition
+GPU configurations without violating performance require-
+ments. The deployer achieve this by running an exchange-
+and-compact procedure. The exchange-and-compact splits
+the transition into two phases—an exchange phase to update
+each model’s MIG instances and a compact phase to repar-
+tition GPUs—which detangles GPU partitioning and model
+placement. The deployer also guarantees that during transi-
+tions, model throughputs are always no less than either the
+old deployment or the new deployment, whichever is smaller.
+The contributions of this paper are as follows:
+• A utility-first search to address a new GPU sharing problem
+(§3, §4). We study the problem of allocating MIG-enabled
+GPUs and define the problem in theoretical terms (§3). In
+addition, we design a novel algorithm, utility-first search,
+that runs fast and can produce efficient solutions in practice.
+• A robust transition by exchange-and-compact (§6). We
+design a solution to switch deployments that guarantees to
+satisfy performance requirements.
+• A built system and experimental evaluation (§6, §7, §8).
+We implement Jormungandr on Kubernetes and address
+multiple implementation challenges due to deficiency of
+today’s tooling (§7). Further, we experiment with Jor-
+mungandr on an eight A100 GPU cluster. Jormungandr
+69
+
+
+===== PAGE 3 =====
+Optimizing GPU Sharing for Container-Based DNN Serving with Multi-Instance GPUs
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+can save 30% of GPUs compared to using A100 disabling
+MIG. Also, Jormungandr is able to finish deployment
+transitions on real-world workloads within 1–2 minutes.
+As a resource allocator, Jormungandr is applicable to
+cloud native environments with multiple MIG-enabled GPUs.
+For example, companies that run on-premises DNN models
+can use Jormungandr to manage their GPU resources. When
+deploying DNN models, deployers specify their objectives,
+then Jormungandr automatically orchestrates containers on
+the company’s shared GPUs. Another example is cloud Ma-
+chine Learning as a Service (MLaaS). In this scenario, MLaaS
+users upload or choose DNN models that run on cloud’s con-
+tainers. The cloud provider then runs Jormungandr to opti-
+mize GPU utilization meanwhile maintaining service QoS.
+2
+BACKGROUND: GPU SHARING
+GPU sharing, also known as GPU multiplexing or spatial shar-
+ing [20, 22], indicates the concurrent utilization of a physical
+GPU by multiple DNN serving processes. In a container-based
+setup, these processes can be distributed across multiple con-
+tainers. Next, we introduce the two major GPU sharing meth-
+ods, Multi-Instance GPU [8] and Multi-Process Service [11].
+Multi-Instance GPU (MIG). MIG is a hardware feature that
+allows users to partition a GPU into multiple instances. Each
+MIG instance functions as a full-fledged GPU. This paper
+targets A100 GPUs, which can be partitioned at maximum
+into 7 instances of the same size. Other MIG-enabled GPUs
+are NVIDIA A30, H100, and H200.
+A100s allow heterogeneous partitions. For example, a GPU
+can be partitioned into three instances with 1/7, 2/7, and 4/7
+of the total resources each. In the rest of the paper, we call an
+instance with 1/7 of total resources as a 1/7 instance (similarly
+for instances of other sizes).
+MIG is a hardware-based GPU sharing solution: instances
+have separate streaming multiprocessors, GPU memory, and
+L1/L2 cache. In addition, instances provide fault and perfor-
+mance isolation by having dedicated on-chip crossbar ports,
+memory controllers, and DRAM address buses. Essentially,
+MIG instances are full-fledged GPUs, which are packed in the
+same “metal box”.
+Different from traditional resources, such as CPUs, disks,
+and memory, MIG’s allocation follows specific rules. Having𝑛
+units of free resources does not imply being able to allocate an
+𝑛/7 instance. On the one hand, resources can only be grouped
+into specific sized instances—1/7, 2/7, 3/7, 4/7, 7/7 instances,
+whereas others (5/7 and 6/7 instances) are not allowed. On the
+other hand, the existing instances also influence the possible
+allocations. As an example, for a GPU with two running 3/7
+instances, allocating a 1/7 instance is prohibited.
+Figure 2 depicts the basic MIG allocation rules. But, there
+are several exceptions. For example, “3/7 + 3/7” is possible
+7/7 instance
+1/7 
+1/7 
+1/7 
+1/7 
+1/7 
+1/7 
+1/7 
+2/7 instance 
+2/7 instance 
+2/7 instance 
+4/7 instance 
+3/7 instance 
+instance
+choosing
+Figure 2: Instance allocation rules, borrowed from NVIDIA’s
+blog [7, Figure 1]. A legal A100 partition picks instances top-
+down. If an instance is chosen (for example, the shaded 4/7 in-
+stance), then all the instances beneath it are unavailable. As an
+example, the shaded boxes represents a legal partition with a 4/7,
+a 2/7, and a 1/7 instance.
+in practice but is not shown in the figure. In total, there are
+19 legal instance combinations for an A100 GPU (see the full
+list in NVIDIA’s document [8]).
+Multi-Process Service (MPS). NVIDIA MPS [11] serves as
+a software solution to enable GPU sharing. It allows multiple
+processes to transparently share a GPU without modifying
+the applications. With MPS, developers have control over
+computational resources at software level, allowing them to
+configure the allocation of computation percentages to indi-
+vidual processes. While MPS provides memory protection by
+containing software exceptions, the protection is limited: fatal
+GPU exceptions or errors in the MPS daemon will impact
+all MPS processes on the same GPU, potentially crashing all
+MPS processes on the GPU. Furthermore, MPS lacks the capa-
+bility to set memory usage limits for different MPS processes
+or isolate performance interference (e.g., contentions on GPU
+cache and bandwidth).
+3
+MIG-ENABLED RESOURCE
+ALLOCATION PROBLEM
+Problem statement. In this paper, we assume a container-
+based environment, in which all DNN serving processes run
+within containers. Each container will be assigned a GPU (i.e.,
+one MIG instance) and uses MPS to share the GPU across
+multiple DNN serving processes. These processes will serve
+end-user requests by running model serving software, such as
+TensorFlow Serving [40], TorchServe [2], NVIDIA Triton [1].
+To reduce the configuration space, we use homogeneous MPS
+processes in a container: all MPS processes are dedicated to
+serve one DNN model, and they use the same batch size. The
+problem we study is to allocate GPU resources to containers,
+such that they satisfy the required service-level objects.
+Allocating MIG-enabled resources for serving DNN mod-
+els is a new problem (formally defined in §3.3). It combines
+partitioning MIG-enabled GPUs and allocating heterogeneous
+MIG instances to containers. Moreover, the partitioning and
+allocating are not isolated but intertwined; one have to solve
+70
+
+
+===== PAGE 4 =====
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+Xinpeng Wei, Zhichao Li, and Cheng Tan
+the two together to get efficient GPU configurations. Given
+the problem (partitioning and allocating), our target is to op-
+timize objectives that model deployers specify, for example,
+maximizing throughputs while keeping tail latencies smaller
+than a threshold. Model deployers use a utility function to
+describe their objectives, which we discuss later (§4.2).
+As a preview, this problem is computationally challenging
+and is NP-Complete. Next, we discuss the challenges, from a
+toy setup to more realistic ones.
+3.1
+Single GPU, Single Model
+This is the simplest case where we serve only one DNN model
+on one A100 GPU. There are three parameters: (a) MIG (i.e.,
+how GPU is partitioned), (b) MPS (i.e., how many MPS in-
+stances in each container), and (c) serving batch sizes. Batch
+sizes define the maximum requests to serve at the same time,
+which trade off latency for throughput; namely, the larger the
+batch size, the higher the throughput and the longer the latency.
+Because we use homogeneous MPS processes, batches sizes
+within one container are the same.
+Defining GPU configuration. In our problem, we define GPU
+configuration as a tuple of the above three parameters. For ex-
+ample, ⟨MIG=[3/7,3/7], MPS=[1,2], batch=[8,16]⟩is a GPU
+configuration, meaning that the GPU allocates two 3/7 in-
+stances; the first 3/7 instance container runs one MPS instance
+with a batch size of 8; the second 3/7 instance container has
+two MPS instances, both of which use 16 as the batch size.
+For each GPU configuration, we can profile model perfor-
+mance and record its throughput and a series of latencies (e.g.,
+average, mean, 90%tile, 95%tile, 99%tile latencies).
+Challenge 1: the number of GPU configurations is enormous
+and searching for a desired GPU configuration is non-trivial.
+For example, assume we limit MPS options to {1,2,4} and
+batch sizes in {1,2,4,8,16,32} (we discuss the candidate batch
+sizes in §10). Then, for a MIG=[2/7,2/7,1/7,1/7,1/7], the num-
+ber of possible GPU configurations is (3 ∗6)5 ≈1.9Million.
+The “3” and “6” are possible MPS options and batch sizes,
+respectively; the “5” is the number of MIG instances. Notice
+that MIG=[2/7,2/7,1/7,1/7,1/7] is one of 19 MIG partitions.
+3.2
+Multiple GPUs, Multiple Models
+Next, we consider serving multiple models on a single GPU,
+which we will later extend to multiple GPUs. The first diffi-
+culty is that simple metrics (e.g., throughput) are uncompa-
+rable across models. For example, a 1/7 instance can serve
+vgg19 with 175 requests per second, while it can serve 400
+requests for bert-base-cased (both with MPS=1 and batch
+size of 8). The 175 req/s and 400 req/s are not comparable
+because they are from different models.
+Defining in-demand throughput. To compare across models,
+we define a normalized throughput, called in-demand through-
+put. In-demand throughput for a container (say with 1/7 in-
+stance) is the throughput produced by the instance over the
+demanded throughput. For example, if users require 2K req/s
+for vgg19 and 8K req/s for bert-base-cased, then we say 1/7
+instance can provide 0.0875 (=175/2K) in-demand throughput
+for vgg19 or 0.05 (=400/8K) for bert-base-cased. So, we
+prefer to run vgg19 on 1/7 instance because 0.0875 > 0.05.
+Challenge 2: efficient GPU sharing across multiple models re-
+quires accommodating different models’ performance charac-
+teristics. For example, some model prefer small MIG instances,
+while others prefer larger ones. For example, considering two
+GPU configurations (assuming MPS=1 and batch size of 8):
+(a) Config-1 allocates MIG=[1/7,2/7,4/7] with the 1/7 in-
+stance running vgg19 and others running bert-base-cased;
+(b) Config-2 allocates MIG=[1/7,1/7,1/7,1/7,3/7] with all 1/7
+instances running bert-base-cased and the 3/7 instance run-
+ning vgg19. It turns out that Config-1 has a total in-demand
+throughput 0.29 (0.09 and 0.2 for vgg19 and bert-base-cased,
+respectively), whereas Config-2 produces 0.48 (0.28 and 0.2)
+that is strictly better than Config-1.
+2
+3
+4
+7
+#slices
+0
+250
+500
+750
+1000
+throughput (req/s)
+vgg19 [batch=8]
+0
+20
+40
+latency (ms)
+2
+3
+4
+7
+#slices
+0
+200
+400
+600
+800
+throughput (req/s)
+bert-base-cased [batch=8]
+0
+5
+10
+15
+20
+latency (ms)
+Figure 3: Model throughputs and latencies of instances of differ-
+ent sizes. The x-axis is the instance sizes, where “1” represents a
+1/7 instance, and so forth. Bars represent throughputs of the cor-
+responding instances; the line represents the 99%-tile latencies.
+The reason why some GPU configurations are better than
+others is that models have different characteristics. Figure 3
+shows throughputs and latencies of different sized MIG in-
+stances for vgg19 and bert-base-cased. We see that bert
+prefers smaller instances because it cannot saturate computa-
+tion resources of larger instances like 4/7 instances, whereas
+vgg19 prefers larger instances. These different performance
+characteristics are why Config-2 works better than Config-1.
+Defining deployment. Finally, we consider the full-fledged
+problem of allocating multiple GPUs for multiple models. We
+define the allocation solution as a deployment: a deployment
+is a set of GPU configurations (§3.1), each of which is a tuple
+of ⟨MIG, MPS, batch sizes⟩. The multi-GPU, multi-model
+problem combines the mentioned two challenges, leading to
+an exponentially growing search space of deployments.
+71
+
+
+===== PAGE 5 =====
+Optimizing GPU Sharing for Container-Based DNN Serving with Multi-Instance GPUs
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+3.3
+The Reconfigurable Machine Allocation
+Problem
+We describe the MIG-enabled resource allocation problem in
+this section, which we abstract as the Reconfigurable Machine
+Allocation Problem (short as RMAP). RMAP is a new abstract
+problem and it is NP-hard.
+RMAP is defined as follows. There are a set of jobs and
+a set of machines; each machine can process one job at a
+time; different machines have different processing time for
+different jobs. Machines are reconfigurable: a set of machines
+can be rearranged to a different set of machines, under some
+pre-defined reconfiguration rules. And the goal is to find the
+machine configurations and job assignments that optimize
+some given objective, for example, maximizing throughputs
+while satisfying job deadlines.
+The problem that we focus on (namely, serving DNNs with
+MIG) is an instance of RMAP. In our problem, GPU instances
+are the machines; DNN model inferences are the jobs; different
+models have different performance on instances of different
+sizes (DNNs have different performance, §3.1). A set of in-
+stances in one GPU can be re-partitioned to another set of
+instances (a reconfiguration). The reconfiguration rules are
+the MIG hardware restrictions (§2). Our goal is to find the
+most efficient GPU partitions and service assignments that
+optimize the user-defined utility function (defined in §4.2).
+A new abstract problem. The Reconfigurable Machine Allo-
+cation Problem is a new abstract problem. Resource allocation
+and scheduling is a broad topic that has been intensively stud-
+ied. There are many abstract problems that consider reconfig-
+uration in several forms [15, 25, 33–35, 37, 53], but none of
+them fully captures the characteristics of MIG. We compare
+RMAP with the most relevant problems in section 9.
+An NP-hard problem. Serving DNNs with MIG is an NP-
+hard problem because another NP-hard problem, Cutting Stock
+Problem [4], reduces to it. The cutting stock problem studies
+how to cut standard-sized paper rolls into certain numbers of
+specified-sized pieces while minimizing wasted material. This
+problem reduces to our problem by treating the paper rolls as
+GPUs, specified-sized pieces as instances of different sizes,
+and the required piece numbers as demands. If one can find
+the minimum number of GPUs for our problem, we have the
+minimum paper rolls for the Cutting Stock Problem, which
+minimizes the wasted materials.
+4
+SEARCHING EFFICIENT GPU
+CONFIGURATIONS
+In this section, we introduce an algorithm to discover effi-
+cient solutions for allocating MIG-enabled resources, called
+utility-first search. We first introduce a basic version (§4.1)
+that maximizes throughputs while ensuring tail latencies are
+smaller than a given threshold. Then, we generalize the utility-
+first search to other objectives (§4.2).
+4.1
+Basic utility-first search
+Utility function. The core idea of the utility-first search is to
+use a utility function that enables comparing among different
+configuration candidates, and meanwhile optimizes the user-
+defined objective. For a GPU configuration, its utility function
+is defined as follows:
+utility(gconf, demands, weights) =
+∑︁
+model∈gconf
+gconf[𝑚𝑜𝑑𝑒𝑙].𝑡ℎ𝑟𝑜𝑢𝑔ℎ𝑝𝑢𝑡
+demands[model]
+∗weights[model]
+where
+• gconf represents the performance of a GPU configuration,
+encompassing throughput and latency for each model de-
+ployed on this GPU;
+• demands contain required throughput for each model de-
+fined by users;
+• weights consist of numbers ∈[0, 1], representing the weights
+of each model, described below.
+In our algorithm, the weights are defined as percentage
+of unsatisfied required throughputs. For example, if vgg19
+requires 2K req/s in total and 800 req/s have already been
+satisfied, then the 𝑤𝑒𝑖𝑔ℎ𝑡𝑠[vgg19] = (2𝐾−800)/2𝐾= 0.6.
+In other words, the utility of a GPU configuration is the sum of
+weighted in-demand throughputs (§3.1) of all served models.
+This utility function captures three desired properties. First,
+our objective is maximizing throughputs; for the same model,
+the utility function is monotonically increasing according
+to throughputs. Second, this utility function uses in-demand
+throughput (§3.1) to compare across models. Finally, the util-
+ity function prioritizes models that are less fulfilled, because
+the weight design priorities models with large demands (hence
+large weights), which are the ones with high resource require-
+ments, indicating the need for careful allocations.
+Profiling model performance. As mentioned (§1), serving
+DNN models have stable performance, an observation made
+by Gujarati et al. [27]. We confirm that given the same GPU
+configurations, model throughputs vary < 3% across experi-
+ments. Therefore, for a model, we can profile its throughput
+and latencies—including average, mean, 90%tile, 95%tile,
+99%tile latencies—and reuse them in utility-first search. Dur-
+ing profiling, we do an exhaustive search on all container
+configurations: (a) five MIG instances (1/7, 2/7, 3/7, 4/7, and
+7/7 instances), (b) three options for container’s MPS processes
+(1, 2, and 4 MPS processes), and (c) six batch sizes (1, 2, 4, 8,
+16, and 32). In total, for each model, we conduct 90 (= 5×3×6)
+profiling experiments, which takes tens of minutes to finish.
+72
+
+
+===== PAGE 6 =====
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+Xinpeng Wei, Zhichao Li, and Cheng Tan
+Basic algorithm. Figure 4 depicts the algorithm of utility-
+first search. The basic algorithm is as follows. The algorithm
+iteratively make decision for one GPU at a time. For each GPU,
+the algorithm calculates utilities of all GPU configurations
+from a set of candidates; the candidate set is pre-computed
+and one GPU serves three models at most. Then, the algorithm
+chooses the GPU configuration with the maximum utility for
+this GPU. Utility-first search repeats this process until all
+models’ demands are met.
+In particular, the utility-first search begins by initializing a
+set of possible GPU configurations (conf_set), each containing
+up to three different models that meet required latency thresh-
+olds. If a model’s configuration—for example, ⟨MIG=3/7,
+MPS=2, batch=16⟩—fails the latency requirement, we will
+remove it from conf_set. The algorithm then creates an empty
+deployment list and maps model demands to their required
+throughput. Weights are assigned to each model (initially 1),
+and the algorithm iteratively configure each GPU. For each
+GPU, the algorithm computes the utility of every configura-
+tion in conf_set using the utility function (§4.1), which sums
+the weighted throughput of models in the configuration. The
+configuration with the maximum utility is then selected and
+added to the deployment. If the algorithm satisfies all demands
+or runs out of GPUs, it terminates.
+Near-optimal deployment in practice. Utility-first search
+performs well in practice. It can produce near-optimal solu-
+tions in our experiments (§8). Here are some insights why it
+works. First, though simple, the weighted utilities capture the
+essence of the optimization problem: it prioritizes the configu-
+rations that greatly satisfy user demands, meanwhile balances
+the long-term allocations by using weights. Second, to manage
+the large search space, we limit deployment to a maximum
+of three different models per GPU. This limit is based on
+empirical observations: serving at most two different models
+sacrifices performance, while serving more than three causes
+significant slowdowns, often resulting in the algorithm timing
+out (10 minutes) when more than a dozen models are involved.
+Finally, the utility-first search is a greedy algorithm that runs
+fast but avoids the common pitfall of greedy algorithms, where
+an early suboptimal choice can lead to irreparable outcomes.
+This advantage arises because GPUs are interchangeable; a
+poor decision for the first GPU has the same impact as one for
+the last. This characteristic of the problem—DNN inferences—
+happens to favor the algorithm.
+Optimizations. We apply multiple optimizations to the utility-
+first search, both for improving deployment efficiency and
+algorithm runtime. First, we conduct a “last-mile mixing” for
+better GPU configuration efficiency. The idea is that when
+one model, such as vgg19, is close to reaching its required
+throughput, we temporarily increase the number of different
+models served on a single GPU by one. Since vgg19 will use
+1: procedure UtilityFirstSearch(numGPU)
+2:
+conf_set ←a set of GPU configurations \
+3:
+that contains ≤3 models and have required tail latencies
+4:
+deployment ←an empty list of length numGPU
+5:
+demands ←a map from model to its required throughput
+6:
+7:
+weights ←{𝑚𝑜𝑑𝑒𝑙1 : 1, ...}
+// assign 1 for model weights
+8:
+for i in [1, ..., numGPU]:
+9:
+utils ←an empty map
+10:
+for conf ∈conf_set:
+// calc utilities of all configs
+11:
+utils[conf] ←utility(conf, demands, weights) // ln 21
+12:
+best_conf ←pickConfig(utils)
+// line 27
+13:
+14:
+deployment[i] = best_conf
+15:
+for m ∈best_conf:
+// update model weights (≥0)
+16:
+weights[m] −= 𝑚𝑖𝑛( best_conf[m].throughput
+demands[m]
+, weights[m])
+17:
+if sum(weights) = 0:
+18:
+return deployment
+// find a valid solution
+19:
+return None
+// run out of GPUs
+20:
+21: procedure utility(conf, demands, weights)
+22:
+util ←0
+23:
+for model ∈conf:
+24:
+util += conf[𝑚𝑜𝑑𝑒𝑙].throughput
+demands[𝑚𝑜𝑑𝑒𝑙]
+∗weights[𝑚𝑜𝑑𝑒𝑙]
+// §4.1
+25:
+return util
+26:
+27: procedure pickConfig(utils)
+28:
+conf ←the config that has the max utility in utils
+29:
+return conf
+Figure 4: Jormungandr’s utility-first search.
+few resources at this stage, serving additional models is likely
+to yield more efficient GPU configurations.
+Second, utility-first search algorithm has some computa-
+tional heavy loops, for example, looping all GPU configura-
+tions to calculate their utilities (line 10–11, Figure 4). We
+can vectorize these computation by organizing GPU config-
+urations in a multi-dimensional array and computing their
+utilities in batch. Jormungandr’s implement is in Python
+(§7), so we use NumPy which leverages hardware SIMD (Sin-
+gle Instruction Multiple Data) instructions.
+Third, we cache GPU configurations to avoid repeated com-
+putation. This cache is on disk and shared across different
+executions. The cache is available for the algorithms that share
+the same problem setup—the same DNN models, demands,
+and algorithm parameters. Caching significantly accelerate
+solving large problems.
+4.2
+Algorithm variants
+Considering continuous allocations. The core algorithm
+(Figure 4) does a one-shot allocation: it allocates GPU con-
+figurations assuming all GPUs are empty. However, as we
+will show later (§5), Jormungandr works continuously, and
+73
+
+
+===== PAGE 7 =====
+Optimizing GPU Sharing for Container-Based DNN Serving with Multi-Instance GPUs
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+allocator
+deployer
+deploymenti
+transition plan
+GPU cluster
+…
+monitoring data
+(    )
+throughput
+time
+epochi-1
+…
+epochi
+Our system
+demands
+Figure 5: Jormungandr’s architecture.
+GPUs are usually not empty. In practice, we might want to
+sacrifice some GPU efficiency to minimize changes between
+adjacent deployments, as repartitioning GPUs and migrating
+models can be costly.
+To incorporate this concern, Jormungandr tunes its GPU
+configuration selecting policy. The default policy is to choose
+the configuration that has the largest utility (line 27, Figure 4).
+Instead, Jormungandr considers the top-K (𝐾= 10 by de-
+fault) GPU configurations and picks the one that is similar to
+some exiting configurations in the current deployment, so that
+some containers can run untouched between two deployments.
+Our similarity function is simple—we count the same MIG
+instances between two GPU partitions; the higher, the better.
+User-defined utility functions. By customizing the utility
+function, the utility-first search can optimize objectives beyond
+maximizing throughput. For instance, one could optimize
+for latency by designing a utility function that favors shorter
+mean and tail latencies while penalizing longer ones. Similarly,
+a utility function can be crafted to balance throughput and
+latency by combining throughput-focused and latency-focused
+utility functions.
+5
+SYSTEM OVERVIEW
+With utility-first search, we design and implement Jormungandr,
+a cloud-native resource allocation system that automatically
+orchestrates DNN serving containers on a cluster of MIG-
+enabled GPUs. This section introduces Jormungandr’s ar-
+chitecture and how Jormungandr works.
+Architecture. Figure 5 depicts Jormungandr’s architecture.
+Jormungandr has two main components: an allocator and a
+deployer. At a high level, the allocator calculates an efficient
+deployment for the required demands. The demands include
+required throughputs from end-users’ needs and required tail
+latencies that model owners specify. Later, the deployer im-
+plements this deployment on GPUs without interrupting end
+users. The allocator runs utility-first search (§4), and we will
+introduce the deployer in section 6.
+Workflow. When deployed on a MIG-enabled GPU cluster,
+Jormungandr initializes its model performance data by pro-
+filing models across various GPU configurations, specifically
+profiling each model in all container setups (§4.1). To expedite
+the profiling process, Jormungandr utilizes MIG to co-locate
+the profiling of different models on the same GPU. This ini-
+tialization typically takes several hours to complete for tens of
+models. When adding a new model, Jormungandr performs
+this initialization for the model before it can be served.
+After initialization, Jormungandr works in epochs. In each
+epoch, the allocator gets demands (i.e., required throughputs
+and tail latencies) from the data collected from last epoch, and
+produces a deployment that comprises new configurations for
+all GPUs. A deployment is valid if it satisfies demands: for
+each service, (i) the total throughput (from all instances) is
+greater than or equal to the required throughput in demands,
+and (ii) every instance’s tail latency is smaller than what re-
+quired by demands. Jormungandr allows users to specify the
+latency percentile; by default, it is 99%-tile.
+Jormungandr then generates a transition plan that transfers
+the GPU cluster from the last deployment to the new one. Tran-
+sition plan includes a series of instructions to create, delete in-
+stances, and repartition GPUs. When Jormungandr executes
+this transition plan, end users (and the external world) should
+not observe performance violations (for example, a model
+offers a smaller throughput than its SLOs). After transition,
+the GPU cluster moves to a new epoch. Next, we introduce
+how Jormungandr achieves the transition.
+6
+DEPLOYMENT TRANSITION
+In practice, DNN service demands (gathered from the last
+epoch, §5) change from time to time. As a response, Jor-
+mungandr periodically plans new deployments and switches
+GPU clusters from an old deployment to a new one. Jor-
+mungandr’s deployer is responsible for implementing these
+deployment transitions. A naive transition approach is to sus-
+pend all containers, repartition the underlying GPUs, and
+then resume all containers. Of course, for user-facing services
+like serving DNNs, this approach is unacceptable because all
+services will be unavailable during transitions. Instead, the de-
+ployer guarantees that the performance SLOs are not violated
+during the transition by gradually migrating containers.
+The deployer runs a transition protocol named exchange-
+and-compact, which detangles (a) MIG requirement changes
+(e.g., the new deployment replaces a 2/7 instance with a 4/7
+instance for vgg19) and (b) GPU repartitions (e.g., the new de-
+ployment needs a MIG=[3/7, 4/7] which does not exist in the
+old deployment). The exchange-and-compact has two phases:
+the first exchange phase focuses on the MIG instance changes,
+74
+
+
+===== PAGE 8 =====
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+Xinpeng Wei, Zhichao Li, and Cheng Tan
+and the second compact phase addresses GPU partition ad-
+justments. The phase-wise design also provides the desired
+robust transition by enabling partial transition at a time.
+Exchange phase. The exchange phase adjusts the existing
+MIG instances to the planned sizes by creating and deleting
+containers, without repartitioning the GPUs. In particular, the
+deployer calculates the differences in MIG instances between
+the old and new deployments for each model, denoted as Δ𝑖
+for the 𝑖𝑡ℎmodel. For example, Δ1 = [+4/7, −2/7] indicates
+that the first model requires a new 4/7 instance and needs to
+recycle an old 2/7 instance.
+In each Δ𝑖, the deployer creates pairs of new and old MIG
+instances; each pair contains a new MIG instance (e.g., +4/7)
+and one or more old instances (e.g., −2/7), ensuring that the
+throughput of the new instance is greater than or equal to that
+of the old instances. The deployer then applies each pair by
+first creating a container with the new MIG instance (using
+extra GPUs if needed) and then deleting the old containers.
+After processing all pairs, the deployer creates new containers
+that could not be paired with old ones and deletes any remain-
+ing old containers. Throughout the process, each model is
+guaranteed to maintain its expected throughput1 because new
+containers are always created before old ones are deleted.
+Compact phase. With all MIG instances in the correct sizes,
+the deployer needs to compact containers to eliminate GPU
+fragmentation. The deployer achieve this by repartitioning
+GPUs and migrating containers.
+At the beginning of the compact phase, the deployer creates
+a list of GPUs which are not fully occupied, denoted as 𝑆. If 𝑆
+is not empty, the deployer selects a 𝐺𝑃𝑈𝑖∈𝑆and identifies
+instances from other GPUs in 𝑆that, when combined, can satu-
+rate 𝐺𝑃𝑈𝑖.2 The deployer then repartitions 𝐺𝑃𝑈𝑖and migrates
+containers to 𝐺𝑃𝑈𝑖. For example, if 𝐺𝑃𝑈𝑖is currently run-
+ning only a 4/7 instance container, then deployer can choose
+a 2/7 instance container and a 1/7 instance container from
+another 𝐺𝑃𝑈𝑗in 𝑆, repartitions 𝐺𝑃𝑈𝑖to “MIG=[4/7,2/7,1/7]”,
+and migrates containers from 𝐺𝑃𝑈𝑗to 𝐺𝑃𝑈𝑖. The running
+4/7 instance container is not interrupted due to MIG’s par-
+tial repartition [8]. Finally, deployer removes 𝐺𝑃𝑈𝑖from 𝑆
+because the 𝐺𝑃𝑈𝑖is now fully utilized. The deployer repeats
+this process until finishing the new deployment.
+7
+IMPLEMENTATION
+Jormungandr is implemented in Python and Kubernetes
+(K8s). For the allocator, we implement the utility-first search
+(§4) in Python and NumPy. We implement the deployer based
+1The expected throughput is the throughput in either the old deployment or
+the new one, whichever is smaller.
+2The selction order is not important because the MIG instances of the same
+size are identical, and the new deployment ensures that GPU configurations
+exist to accommodate all instances.
+on K8s [6]. Jormungandr’s actions—instance creation, dele-
+tion, migration, and GPU partition—are wrappers of K8s
+operations and MIG operations via nvidia-smi. The alloca-
+tor uses 3300 lines of Python code. The deployer uses 800
+lines of Python, Bash, and Go code.
+Jormungandr uses a server-worker design where the allo-
+cator (§4) and the deployer (§6) run on a server node that man-
+ages a set of worker nodes. Periodically, the server sends ac-
+tions (e.g., container creation and deletion) to workers. Work-
+ers then executes K8s operations accordingly; workers are
+machines have GPUs and serve end-users’ requests.
+During implementing Jormungandr, we encounter mul-
+tiple challenges due to limitations of Kubernetes (K8s) and
+NVIDIA tools (nvidia-smi). We elaborate on them below.
+Pinpointing MIG locations. When allocating MIG instances,
+locations matter. For example, in the figure below, both 𝐺𝑃𝑈1
+and 𝐺𝑃𝑈2 have two running 1/7 instances. 𝐺𝑃𝑈1 allows allo-
+cating a 3/7 instance, but 𝐺𝑃𝑈2 does not (see partition con-
+straints in Figure 2).
+GPU1
+GPU2
+However, K8s only allows a container to configure which
+MIG sizes it wants, without pinpointing the MIG location. The
+container configuration is ambiguous when there are multiple
+available MIG instances of the same size. To resolve this ambi-
+guity, Jormungandr deletes MIG instances whenever they’re
+empty and creates them only when creating a corresponding
+K8s container. So, when a container requires a MIG instance,
+there is only one available. This approach sacrifices oppor-
+tunities of reusing MIG instances during transition for the
+container of the same size. The rationale is that MIG instance
+creation and deletions are cheap (<100ms, §8.3).
+MIG instance rediscovery. In the compact phase, the de-
+ployer need to repartition GPUs. But the device module of
+K8s (nvidia-device-plugin) lacks the ability to rediscover
+newly partitioned MIG instances. To make new partitions visi-
+ble, the Jormungandr reboots the module to trigger its GPU
+discovery procedure. Meanwhile, the deployer keeps actively
+pulling the changes to shorten the waiting time. It turns out
+that rediscoveries are the bottleneck of the deployment tran-
+sition (§8.3). Each takes a few seconds to finish. In order to
+reduce the number of rediscoveries, we batch instance cre-
+ations and deletions on the same GPU whenever we can. So,
+the discovery only need to happen once for all the changes.
+Fast resource release. In the exchange phase, the deployer
+frequently deletes K8s containers to release GPU resources.
+However, a graceful K8s deletion (kubectl delete) is ex-
+tremely slow. It usually takes tens of seconds to finish, which
+is too expensive for Jormungandr. We observe that con-
+tainers serving DNN models are stateless, meaning that “in-
+elegant” deletions do not affect system’s correctness. Thus,
+75
+
+
+===== PAGE 9 =====
+Optimizing GPU Sharing for Container-Based DNN Serving with Multi-Instance GPUs
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+0
+2000
+4000
+6000
+8000
+10000
+time (s)
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+normalized throughput
+gpt2
+execution
+transition
+demands
+expection
+Figure 6: Normalized throughput of gpt2 during the 24-hour experiment. The solid line represents (“execution”) the observed model
+throughputs; the dashed line indicates (“demands”) the demanded throughputs that we collect from production trace; the dotted line
+represents (“expectation”) the expected throughputs calculated by the Jormungandr’s profiling data. The shaded areas are when
+deployment transitions happen.
+Jormungandr implement a vicious but fast deletion: when
+deleting a K8s container, the deployer sends a SIGKILL signal
+to the container process which instantly releases the GPU re-
+sources, and then later recycles the container’s K8s metadata
+and clear the error messages. This approach accelerates the
+deletion by 30×, and the fast deletion finishes in less than 1s.
+8
+EXPERIMENTAL EVALUATION
+In this section, we answer three main questions:
+• How does Jormungandr perform in practice?
+• How does the utility-first search perform, versus baselines?
+• How long does Jormungandr take to complete a deploy-
+ment transition, and how does that compare to baselines?
+Workloads. We use two sets of workloads:
+• Real-world workloads with five models: we collect 24
+hour trace of five models from a production environment.
+The five DNN models are bert-base-cased, resnet101,
+albert-large-v2, resnet50 and gpt2. Note that we scale
+down models’ throughputs to fit into our testbed while pre-
+serving their throughputs’ relative amounts.
+• Simulation workloads with 16 models: we further gener-
+ate four workloads for 16 DNN models. In each workload,
+models’ demand throughputs are generated from either
+normal distributions (for two workloads) or lognormal dis-
+tributions (for the other two workloads). Each workload re-
+quires few hundreds of GPUs. These simulation workloads
+serve as large workloads to test the algorithm performance.
+Setup. We experiment with a four-machine GPU cluster that
+has eight A100 GPUs on Google Cloud Platform. Our testbed
+uses a2-highgpu-2g machines, each of which has 24 Intel
+Cascade Lake cores, 170GB memory, and two NVIDIA A100
+40GB GPUs. The OS is Debian 4.19. We use PyTorch v1.12.1
+and CUDA 11.6 for DNN inferences, and K8s v1.23.6.
+8.1
+Serving DNN models in practice
+To experiment if Jormungandr works as expected, we run a
+“24-hour” experiment, under the real-world workloads, on our
+cloud testbed. We set each Jormungandr epoch to be 1 hour,
+so there will be 24 deployment transitions during the exper-
+iment. Because containers do not change within one epoch,
+we shorten the 1-hour normal running period (during which
+Jormungandr is not involved) to 5 minutes to accelerate the
+experiment. Within each epoch (now 5min), we collect the
+throughputs and latencies of all models and record them as
+the execution trace. The K8s containers serve DNN models in
+a closed-loop to saturate the GPUs. Figure 6 shows the results
+for one model, gpt2. Other models show similar results.
+The 24-hour experiment last about 2.5 hours (i.e., 9000
+seconds). The white areas in Figure 6 indicate normal epochs
+with 5 minutes each; the shaded areas represent deployment
+transitions whose running time varies because of different
+deployments. Some adjacent deployments are similar while
+others are vastly different.
+By comparing the demanded (the dashed line) and expected
+(the dotted line) throughputs in Figure 6, we see that Jor-
+mungandr produce GPU configurations that provide just
+enough resources to satisfy the demands. Also, the actual
+throughputs (the solid line) overlap with the expected through-
+puts, which confirms our observation that DNN inferences
+have stable performance.
+In each deployment transition (the shaded area in Figure 6),
+we see that the line of the actual throughput never drops be-
+low the smaller throughput between the old and new deploy-
+ments. This demonstrates that the deployer can guarantee no
+performance violations during transitions. We further study
+transition procedures in section 8.3.
+76
+
+
+===== PAGE 10 =====
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+Xinpeng Wei, Zhichao Li, and Cheng Tan
+hr-1
+hr-2
+hr-3
+hr-4
+hr-5
+hr-6
+hr-7
+hr-8
+hr-9 hr-10 hr-11 hr-12 hr-13 hr-14 hr-15 hr-16 hr-17 hr-18 hr-19 hr-20 hr-21 hr-22 hr-23
+workloads
+0
+2
+4
+6
+8
+10
+12
+14
+#GPUs
+(lower is better)
+A100-7/7
+A100-7x1/7
+A100-MIX
+Ours
+lower-bound
+Figure 7: Number of GPUs used by algorithms for different real-world workloads. “A100-7/7”, “A100-7×1/7”, and “A100-MIX” are the
+three static allocation baselines; “Ours” represents the utility-first search; “lower-bound” is the minimal number of GPUs ignoring
+constraints.
+normal-1
+normal-2 lognormal-1lognormal-2
+workloads
+0.6
+0.8
+1.0
+normalized #GPUs
+(lower is better)
+145
+160
+218
+194
+A100-7/7
+A100-7x1/7
+A100-MIX
+Ours
+lower-bound
+Figure 8: Number of GPUs used by algorithms for four simula-
+tion workloads. The numbers are normalized cluster-wise for
+each workload. The absolute numbers of Jormungandr used
+GPUs are given.
+8.2
+Utility-first search performance
+Baselines. We compare the utility-first search with two cate-
+gories of baselines:
+• Static GPU partitions: (1) A100-7×1/7, partitioning all
+GPUs into 1/7 instances, (2) A100-7/7, using A100 GPUs
+as-is, and (3) A100-MIX, using MIG=[4/7,2/7,1/7] for all
+A100s, and scheduling one model on one GPU. A100-7/7
+uses GPU the traditional way (ignoring MIG). A100-MIX
+represents heterogeneous setup but does not serve different
+models on the same GPU.
+• Lower-bound estimation: To see how well Jormungandr
+performs compared to the optimal solution (which is com-
+putationally expensive to get), we calculate an approxi-
+mate optimality—a lower bound of GPU usage by ignoring
+MIG’s hardware constraints. In particular, we assume that
+GPUs are continuous resources, for example, allowing to
+allocate 0.1 share of a 1/7 instance. Notice that the lower
+bound is impossible to achieve.
+Static GPU partitions represent today’s MIG usage: develop-
+ers partition GPUs first, and then statically assign each MIG
+instances to containers. The lower-bound estimation is used to
+show how close utility-first search’s solutions to the optimal
+solutions. Lower-bound’s solutions are invalid in practice. We
+also discuss other possible baselines in section 10.
+In this section, we study how utility-first search performs
+compared to baselines.
+Real-world workloads. We run Jormungandr and the base-
+lines on the real-world workloads and count the number of
+GPUs they use. Figure 7 shows the results. Jormungandr uses
+fewer GPUs than other baselines. Moreover, Jormungandr
+is close to the optimal allocation—the largest gap to the lower
+bound is using one more GPU.
+Simulation workloads. The workloads used are the four simu-
+lation workloads generated from normal and lognormal distri-
+butions, denoted as normal-1, normal-2, lognormal-1, and
+lognormal-2. We design the four workloads to use one to
+two hundreds of GPUs, representing a large-scale GPU cluster.
+There are 16 models included in all four workloads. Figure 8
+shows the results. For all four workloads, Jormungandr’s so-
+lutions are close to the lower-bound estimation: Jormungandr
+uses < 6% more GPUs than the lower-bound, whereas other
+solutions all use > 20% more GPUs and A100-7×1/7 some-
+times uses 40% more GPUs. Compared with static partition
+baselines, Jormungandr can save up to 38% GPUs with an
+average saving of 22%
+8.3
+Deployment transition
+In the 24-hour experiment (§8.1), there are 24 deployment
+transitions. In this section, we want to take a closer look at
+how Jormungandr applies these transitions.
+End-to-end transition runtime. We measure the wall-clock
+time of Jormungandr’s deployment transitions. Figure 9
+shows the results. Most of the transitions finish within 2 min-
+utes. In particular, the transition of “18->19”’ uses zero sec-
+ond because the deployments designed by the allocator are
+the same (the SLOs are similar for the two epochs).
+77
+
+
+===== PAGE 11 =====
+Optimizing GPU Sharing for Container-Based DNN Serving with Multi-Instance GPUs
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+NULL->0
+0->1
+1->2
+2->3
+3->4
+4->5
+5->6
+6->7
+7->8
+8->9
+9->10
+10->11
+11->12
+12->13
+13->14
+14->15
+15->16
+16->17
+17->18
+18->19
+19->20
+20->21
+21->22
+22->23
+23->0
+0
+50
+100
+150
+transition time (s)
+restart plugin
+start pods
+delete pods
+Figure 9: Jormungandr’s transition time breakdown. The “restart plugin” represents the time Jormungandr spent on rebooting K8s
+device module; the “start pod” and “delete pod” indicate the time spent on creating and deleting instances, respectively. The “X->Y” on
+x-axis represents the transition from the deployment of hour “X” to the hour “Y” in our 24-hour experiment.
+NULL->0
+0->1
+1->2
+2->3
+3->4
+4->5
+5->6
+6->7
+7->8
+8->9
+9->10
+10->11
+11->12
+12->13
+13->14
+14->15
+15->16
+16->17
+17->18
+18->19
+19->20
+20->21
+21->22
+22->23
+23->0
+0
+10
+20
+action counts
+19
+4
+1
+7
+4
+1
+2
+5
+1
+8
+6
+5
+6
+4
+6
+7
+6
+5
+6
+0
+7
+5
+6
+9
+7
+0
+3
+1
+10
+2
+0
+4
+2
+1
+10
+4
+8
+8
+5
+4
+9
+5
+6
+6
+0
+7
+3
+1
+10
+6
+1
+4
+1
+5
+3
+0
+2
+3
+1
+5
+4
+3
+4
+3
+4
+5
+4
+5
+4
+0
+6
+3
+2
+6
+5
+start pods
+delete pods
+restart plugin
+Figure 10: Operation counts during deployment transitions.
+mig creation
+mig deletion
+restart plugin
+create pods
+delete pods
+K8s pod deletion
+(deprecated)
+10−1
+100
+101
+runtime (s)
+0.043
+0.109
+4.324
+0.12
+1.092
+32.277
+Figure 11: The average runtime of each transition operation. The
+y-axis is in log scale.
+We further decompose each transition runtime into time
+spent on different components: rebooting the K8s device mod-
+ule, creating K8s pods, and deleting K8s pods. We find that
+rebooting K8s module is the slowest. Our near future work is
+to implement a native device recovery for K8s. By further anal-
+ysis, it turns out that K8s’ creation is also expensive because
+K8s needs to bootstrap a container on a MIG instance. We
+believe DNN context switch techniques, like Pipeswitch [16],
+can significantly reduce this overhead.
+A closer look at transitions. To understand the details of
+the transitions, we record the number of actions issued by
+Jormungandr and summarize them in in Figure 10. Except
+for the first transition when the GPU cluster is empty, other
+transitions have balanced number of three operations. Com-
+pared with the runtime of these operations (Figure 9), we see
+that pod deletions are fast, confirming Jormungandr’s fast
+resource release optimization (§7).
+transition id
+nos
+ours
+speedup
+NULL->0
+37.4
+29.1 (29.1)
+1.3× (1.3×)
+3->4
+78.9
+70.4 (70.4)
+1.1× (1.1×)
+5->6
+106.5
+48.1 (48.1)
+2.2× (2.2×)
+22->23
+215.9
+151.2 (151.2)
+1.4× (1.4×)
+23->0
+88.6
+132.4 (66.4)
+0.7× (1.3×)
+Figure 12: Transition time in seconds for nos and exchange-and-
+compact (“ours”). For a fair comparison, we also list runtime of
+exchange-and-compact without compact in the parentheses.
+Transition baseline: Nebuly Operating System. To the best
+of our knowledge, Nebuly Operating System (nos) [10] is the
+only system that manages MIG-enabled GPUs. It supports
+dynamic GPU partitions for MIG and MPS, as well as elas-
+tic resource quota management. We use nos as the baseline
+for the deployment transition. Because nos does not support
+“compact”, meaning that nos may use more GPUs than our
+system, we implement a version of exchange-and-compact that
+does not apply compaction. Figure 12 depicts the transition
+runtime for nos and Jormungandr (w/ and w/o compaction).
+For the first three transitions (“NULL->0”, “3->4”, “5->6”),
+there is no need for compaction. Jormungandr accelerate
+nos by 1.1–2.2×. For the transition “22->23”, there is a slight
+compaction, which doesn’t affect much about the performance.
+Finally, the transition “23->0” has a heavy compaction because
+deployment changes significantly. If considering compaction,
+Jormungandr is slower than nos but uses fewer GPUs; if ig-
+noring compaction (Jormungandr will use the same number
+of GPUs as nos), Jormungandr is 1.3× faster than nos.
+Transition actions. During a transition, the deployer has five
+types of actions: MIG creation and deletion, K8s pod creation
+and deletion, and rebooting K8s device module. We measure
+78
+
+
+===== PAGE 12 =====
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+Xinpeng Wei, Zhichao Li, and Cheng Tan
+each of their runtime and show results in Figure 11. In this
+experiment, we run these actions 10 times in a synchronous
+manner—we issue an action and wait until it finishes.
+9
+RELATED WORK
+GPU sharing. There is a line of work [20, 22, 28, 46, 49, 51,
+54] studying GPU sharing for serving DNNs. They assume
+different setups. INFaaS [46] considers a model-less setup in
+which systems can substitute one model with similar models
+having the same functionality. Cocktail [28] allows an ensem-
+ble of models to serve user requests. GSLICE [22] uses MPS
+to share GPUs with an adaptive batching for models. Jor-
+mungandr targets cloud native environment and is compati-
+ble to Kubernetes. Unlike prior GPU sharing, Jormungandr
+considers a recent hardware feature, MIG. It turns out that
+sharing MIG-enabled GPUs is a harder problem (§3.3).
+Resource allocation. Resource allocation [14, 31, 42] is a
+broach topic that have many variants. Allocating MIG-enabled
+GPUs is a new problem (§3.3) that combines three character-
+istics: (a) instance performance does not grow linearly with
+additional resources (§3.1), (b) MIG-enabled GPUs follow
+restricted reconfiguration rules (§2), and (c) MIG supports
+partial reconfiguration. Traditional resource allocation meth-
+ods do not address all these characteristics. For example, CPU
+allocators usually assume cores are identical, hence violates
+(a). Memory allocators assume a continuous set of pages can
+be allocated together, contradicting (b). Reconfigurable Ma-
+chine Tools (RMTs) [35] allows rearranging machines, but
+must work in a fixed-sized reconfigurable unit, ignoring (c).
+A recent work Partitioned Optimization Problems (POP) [39]
+addresses difficult resource allocation problems by randomly
+splitting the original problem into smaller ones, solving smaller
+problems separately, and coalescing the results. POP requires
+the targeted problem satisfying four conditions, one of which
+needs the resources to be “fungible” [39, §2, Condition 3].
+But in our problem, resources are not fungible because a unit
+of resource contributes differently in different sized instances.
+Scheduling problem. Scheduling problems [45] have been
+well-studied by multiple communities. Some of them are re-
+lated to our problem. The problem UPM [45] (Unrelated Par-
+allel Machine Scheduling Problem) tackles different sized
+instances have different performance, but it requires a fixed
+set of machines and does not capture MIG’s reconfigura-
+bility. As mentioned, problems with RMTs [35] (Reconfig-
+urable Machine Tools) address GPU’s reconfigurability. Ex-
+amples are FJSSP-CDST [37] and permutation flow shop
+plus RMTs [15]. But they do not support partial reconfig-
+uration because RMTs have fixed-sized reconfigurable units.
+The problem DCSP [25, 34] (Discrete-Continuous Scheduling
+Problem) handles partial reconfiguration, but it requires the
+resources to be continuous (like power). But GPU has discrete
+resources (namely, GPU SMs and memory banks) and their
+allocation is restricted by MIG hardware constraints (§2).
+Partial reconfiguration. Similar to MIG-enabled GPUs, FPGA
+also supports partial reconfiguration [3]. A classic reconfig-
+urable device model is the 2D resource model [48, 50] which
+abstracts a job with two constraints, width and height, rep-
+resenting the runtime and spatial constraints. The 2D model
+targets a similar but different problem: a job in the model has
+a fixed width and height, which in our context means that a
+service can use one fixed-sized GPU instance.
+DNN serving systems. Traditional DNN serving systems—
+for example, Tensorflow-serving [40], TorchServe [2], Clip-
+per [21]—mainly focus on optimizing the performance for a
+single service instance, whereas Jormungandr works on a
+layer below their abstraction: Jormungandr targets planning
+resource allocation hence is complementary to them; these
+frameworks can run in containers created by Jormungandr.
+Another thread of DNN serving systems [17, 24, 27, 46, 47]
+aims at different workloads or specific DNN models. Though,
+conceptually, Jormungandr are complementary to these sys-
+tems and can run beneath them, it requires further research
+to unleash the full potential of combining both systems. For
+example, BatchMaker [24] improves RNN’s inference perfor-
+mance by cellular batching. Similarly, Nexus [47] accelerates
+DNN serving by batching requests partially across different
+DNN models. Because the acceleration of these systems de-
+pends on how much portion of requests can be batched, serv-
+ing performance varies with workloads. This is a challenge
+for Jormungandr as our algorithms require stable perfor-
+mance as inputs. Likewise, Clockwork [27] requires the full
+control over the execution stack to achieve predicable infer-
+ence latency, whose scheduling decisions may conflict with
+Jormungandr’s.
+DNN training resource allocation. Allocating resources for
+DNN training, especially distributed training, has been inten-
+sively studied [19, 26, 36, 43, 44, 52, 55]. Jormungandr only
+targets DNN serving because MIG’s GPU instances cannot
+use NVLink or NVSwtich to communicate [5]. This prohibits
+MIG from being used for multi-GPU training. If NVIDIA en-
+ables NVLink and NVSwitch for MIG, then it is an interesting
+and open problem of how to use MIG for training.
+10
+DISCUSSION
+Assumptions. Jormungandr operates under several assump-
+tions. First, we assume there are enough GPUs to meet the
+Service Level Objectives (SLOs). If this assumption fails, the
+utility-first search will terminate without producing a valid
+deployment (Figure 4, line 19), at which point Jormungandr
+will alert the user without altering the current deployment. A
+79
+
+
+===== PAGE 13 =====
+Optimizing GPU Sharing for Container-Based DNN Serving with Multi-Instance GPUs
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+similar outcome occurs if the transition (§6) lacks sufficient
+GPUs to complete. Second, we assume that out-of-memory
+errors will be detected during profiling. If a model runs out
+of memory with a given GPU configuration, we expect to
+identify this issue during profiling. Third, we assume that
+performance profiling is accurate, as observed by Gujarati et
+al. [27] and corroborated by our experiments. If this fails, then
+Jormungandr may violate SLOs.
+Jormungandr as a resource allocator. As mentioned (§1),
+Jormungandr functions as an allocator, distinct from but com-
+plementary to schedulers and load balancers. Jormungandr
+relies on a load balancer to dispatch requests to containers
+and address request fluctuation. What Jormungandr guaran-
+tees, assuming the above assumptions, is that when the instant
+requested throughput does not exceed the SLOs, the serv-
+ing latency will meet the SLOs. For example, if the request
+rate is lower than the expected throughput, the serving soft-
+ware will batch fewer requests, resulting in better turnaround
+time. Conversely, if there is a spike in requests exceeding the
+SLO-defined throughput, the load balancer—such as K8S Au-
+toscaler [13]—will need to temporarily allocate additional
+containers and GPUs.
+Tuning Jormungandr. Jormungandr involves several trade-
+offs which can be adjusted by tuning its parameters. For in-
+stance, it uses {1, 2, 4} as MPS options and batch sizes from
+{1, 2, 4, 8, 16, 32}. These MPS and batch size options can be
+added or removed, according to the specific use cases. In gen-
+eral, removing options decreases the likelihood of achieving
+optimal GPU utilization but increases the algorithm’s speed.
+When to trigger transitions. Jormungandr initiates deploy-
+ment transitions when adding, removing, or updating models,
+as well as periodically (by default, every hour). The trade-off
+lies in the frequency of these transitions: frequent transitions
+optimize immediate GPU utilization but incur higher transi-
+tion costs, while infrequent transitions reduce costs but may
+not adequately meet real-time user demands. Beyond transi-
+tion frequency, using continuous allocation (§4.2) can also
+reduce transition costs, albeit at the expense of deploying
+suboptimal GPU configurations.
+Deploying Jormungandr on MIG-disabled GPUs. MIG is
+only available on a limited number of GPU types [8], includ-
+ing NVIDIA A30, A100, H100, and H200. However, many
+other GPU types do not support this hardware feature. Despite
+this, Jormungandr remains functional on clusters with both
+MIG-enabled and MIG-disabled GPUs by omitting MIG op-
+tions from GPU configurations that do not support MIG. For
+example, an NVIDIA A5000 would have a configuration of
+⟨MIG=[], MPS=[1,2], batch=[8,16]⟩. The utility-first search
+(Figure 4, §4) remains unchanged, except that the “conf_set”
+(Figure 4, line 3) include the mentioned MIG-disabled GPU
+configurations. In a GPU cluster without any MIG devices,
+Jormungandr may not perform as efficient, as it does not fully
+explore the potential search space, such as running different-
+sized MPS on the same GPU. Existing systems [20, 30] could
+perform better in this scenario.
+Other solutions to RMAP. Finding solutions to the Recon-
+figurable Machine Allocation Problem (§3.3) is challenging,
+primarily because we are among the first to study this prob-
+lem in a practical context. Recent theoretical work [18] has
+highlighted the inherent difficulty of the problem, showing
+that so far, the best achievable result is an asymptotic (2+𝜖)-
+approximation in polynomial time. However, despite being
+polynomial, this algorithm is not fast enough for practical
+use. We have also explored several alternative approaches,
+including exhaustive search, using heuristics to configuring
+MIG, formulating the problem as a linear programming or
+SMT problem, and using a solver like Z3 to solve it. Unfortu-
+nately, all these methods are either too slow or produce results
+inferior to our current solution. In addition, the past schedul-
+ing systems are orthogonal to MIGs hence hard to compare
+apples-to-apples with Jormungandr.
+Number of MIG instances. Currently, Jormungandr is ef-
+fective because the number of possible MIG configurations
+remains manageable: with 7 MIG slices, there are 19 dis-
+tinct MIG partitions. However, as the number of MIG slices
+increases, the number of possible partitions will grow expo-
+nentially. If the number of MIG slices doubles or triples, the
+current approach will become intractable. At that point, we
+will need new strategies to conduct more efficient searches.
+Profiling versus performance estimation. Jormungandr
+uses profiling (§4.1) to gather performance data for differ-
+ent models across various GPU configurations. Profiling a
+model on all configurations—encompassing different MIG
+sizes, MPS numbers, and batch sizes—typically takes tens
+of minutes. To accelerate this process, one can estimate or
+predict model performance through simulation. However, in
+our targeted setup, where companies often use a model for a
+long period of time, accurate profiling is worth the time.
+11
+CONCLUSION
+This paper studies how to use a new hardware feature MIG for
+DNN serving. Because of MIG’s characteristics, we find that
+the problem of allocating MIG-enabled GPUs is a new abstract
+problem, which we define as the Reconfigurable Machine Al-
+location Problem. To solve this problem, we introduce a utility-
+first search that produces near-optimal solutions in practice.
+Further, we design and implement a system, Jormungandr,
+that produces valid deployments and implement them transpar-
+ently to GPUs. Evaluation shows that Jormungandr signifi-
+cantly outperforms baselines that statically partition A100s.
+80
+
+
+===== PAGE 14 =====
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+Xinpeng Wei, Zhichao Li, and Cheng Tan
+REFERENCES
+[1] NVIDIA Triton.
+https://developer.nvidia.com/nvidia-triton-inference-server.
+[2] TorchServe. https://pytorch.org/serve/.
+[3] Vivado Design Suite User Guide Partial Reconfiguration.
+https://www.xilinx.com/support/documentation/sw_manuals/
+xilinx2018_1/ug909-vivado-partial-reconfiguration.pdf, 2018.
+[4] Cutting stock problem.
+https://en.wikipedia.org/wiki/Cutting_stock_problem, 2021.
+[5] Fabric Manager for NVIDIA NVSwitch Systems.
+https://docs.nvidia.com/datacenter/tesla/pdf/fabric-manager-user-
+guide.pdf, 2021.
+[6] Kubernetes Controllers.
+https://kubernetes.io/docs/concepts/architecture/controller/, 2021.
+[7] Minimizing Deep Learning Inference Latency with NVIDIA
+Multi-Instance GPU. https://developer.nvidia.com/blog/minimizing-
+dl-inference-latency-with-mig/, 2021.
+[8] NVIDIA Multi-Instance GPU User Guide. https://docs.nvidia.com/
+datacenter/tesla/pdf/NVIDIA_MIG_User_Guide.pdf, 2021.
+[9] AWS Deep Learning Containers.
+https://aws.amazon.com/machine-learning/containers/, 2023.
+[10] Nebuly Operating System (nos). https://github.com/nebuly-ai/nos,
+2023.
+[11] NVIDIA Multi-Process Service.
+https://docs.nvidia.com/deploy/mps/index.html, 2023.
+[12] Use Deep Learning VM Images and Deep Learning Containers with
+Vertex AI.
+https://cloud.google.com/vertex-ai/docs/general/deep-learning, 2023.
+[13] Kubernetes Autoscaler. https://github.com/kubernetes/autoscaler,
+2024.
+[14] A. Ahmad, S. Ahmad, M. H. Rehmani, and N. U. Hassan. A survey on
+radio resource allocation in cognitive radio sensor networks. IEEE
+Communications Surveys & Tutorials, 17(2):888–917, 2015.
+[15] A. Azab and B. Naderi. Modelling the problem of production
+scheduling for reconfigurable manufacturing systems. Procedia CIRP,
+33:76–80, 2015.
+[16] Z. Bai, Z. Zhang, Y. Zhu, and X. Jin. Pipeswitch: Fast pipelined
+context switching for deep learning applications. In Proc. OSDI, 2020.
+[17] A. Balasubramanian, A. Kumar, Y. Liu, H. Cao, S. Venkataraman, and
+A. Akella. Accelerating deep learning inference via learned caches.
+arXiv preprint arXiv:2101.07344, 2021.
+[18] M. Casey, R. Rajaraman, D. Stalfa, and C. Tan. Scheduling splittable
+jobs on configurable machines. arXiv preprint arXiv:2312.05416,
+2023.
+[19] S. Chaudhary, R. Ramjee, M. Sivathanu, N. Kwatra, and S. Viswanatha.
+Balancing efficiency and fairness in heterogeneous gpu clusters for
+deep learning. In Proceedings of the Fifteenth European Conference on
+Computer Systems, 2020.
+[20] S. Choi, S. Lee, Y. Kim, J. Park, Y. Kwon, and J. Huh. Serving
+heterogeneous machine learning models on {Multi-GPU} servers with
+{Spatio-Temporal} sharing. In 2022 USENIX Annual Technical
+Conference (USENIX ATC 22), pages 199–216, 2022.
+[21] D. Crankshaw, X. Wang, G. Zhou, M. J. Franklin, J. E. Gonzalez, and
+I. Stoica. Clipper: A low-latency online prediction serving system. In
+Proc. NSDI, 2017.
+[22] A. Dhakal, S. G. Kulkarni, and K. Ramakrishnan. Gslice: controlled
+spatial sharing of gpus for a scalable inference platform. In
+Proceedings of the 11th ACM Symposium on Cloud Computing, pages
+492–506, 2020.
+[23] J. Fried, Z. Ruan, A. Ousterhout, and A. Belay. Caladan: Mitigating
+interference at microsecond timescales. In 14th USENIX Symposium
+on Operating Systems Design and Implementation (OSDI 20), pages
+281–297, 2020.
+[24] P. Gao, L. Yu, Y. Wu, and J. Li. Low latency rnn inference with
+cellular batching. In Proc. EuroSys, 2018.
+[25] M. Gorczyca, A. Janiak, and W. Janiak. The discrete part of the
+discrete-continuous scheduling problems-new properties. IFAC
+Proceedings Volumes, 42(13):244–249, 2009.
+[26] J. Gu, M. Chowdhury, K. G. Shin, Y. Zhu, M. Jeon, J. Qian, H. Liu,
+and C. Guo. Tiresias: A {GPU} cluster manager for distributed deep
+learning. In Proc. NSDI, 2019.
+[27] A. Gujarati, R. Karimi, S. Alzayat, W. Hao, A. Kaufmann,
+Y. Vigfusson, and J. Mace. Serving dnns like clockwork: Performance
+predictability from the bottom up. In Proc. OSDI, 2020.
+[28] J. R. Gunasekaran, C. S. Mishra, P. Thinakaran, B. Sharma, M. T.
+Kandemir, and C. R. Das. Cocktail: A multidimensional optimization
+for model serving in cloud. In USENIX NSDI, pages 1041–1057, 2022.
+[29] M. Han, H. Zhang, R. Chen, and H. Chen. Microsecond-scale
+preemption for concurrent {GPU-accelerated}{DNN} inferences. In
+16th USENIX Symposium on Operating Systems Design and
+Implementation (OSDI 22), pages 539–558, 2022.
+[30] Z. Han, R. Zhou, C. Xu, Y. Zeng, and R. Zhang. Inss: An intelligent
+scheduling orchestrator for multi-gpu inference with spatio-temporal
+sharing. IEEE Transactions on Parallel and Distributed Systems, 2024.
+[31] J. G. Herrera and J. F. Botero. Resource allocation in nfv: A
+comprehensive survey. IEEE Transactions on Network and Service
+Management, 13(3):518–532, 2016.
+[32] P. Jain, X. Mo, A. Jain, H. Subbaraj, R. S. Durrani, A. Tumanov,
+J. Gonzalez, and I. Stoica. Dynamic space-time scheduling for gpu
+inference. arXiv preprint arXiv:1901.00041, 2018.
+[33] K. Jansen, A. Lassota, and M. Maack. Approximation algorithms for
+scheduling with class constraints. In Proceedings of the 32nd ACM
+Symposium on Parallelism in Algorithms and Architectures, pages
+349–357, 2020.
+[34] J. Józefowska, M. Mika, R. Różycki, G. Waligóra, and J. Węglarz.
+Solving discrete-continuous scheduling problems by tabu search. In
+4th Metaheuristics International Conference MIC, pages 16–20, 2001.
+[35] R. G. Landers, B.-K. Min, and Y. Koren. Reconfigurable machine tools.
+CIRP Annals, 50(1):269–274, 2001.
+[36] K. Mahajan, A. Balasubramanian, A. Singhvi, S. Venkataraman,
+A. Akella, A. Phanishayee, and S. Chawla. Themis: Fair and efficient
+{GPU} cluster scheduling. In Proc. NSDI, 2020.
+[37] M. Mahmoodjanloo, R. Tavakkoli-Moghaddam, A. Baboli, and
+A. Bozorgi-Amiri. Flexible job shop scheduling problem with
+reconfigurable machine tools: An improved differential evolution
+algorithm. Applied Soft Computing, 94:106416, 2020.
+[38] S. McClure, A. Ousterhout, S. Shenker, and S. Ratnasamy. Efficient
+scheduling policies for {Microsecond-Scale} tasks. In 19th USENIX
+Symposium on Networked Systems Design and Implementation (NSDI
+22), pages 1–18, 2022.
+[39] D. Narayanan, F. Kazhamiaka, F. Abuzaid, P. Kraft, A. Agrawal,
+S. Kandula, S. Boyd, and M. Zaharia. Solving large-scale granular
+resource allocation problems efficiently with pop. In Proc. SOSP, 2021.
+[40] C. Olston, N. Fiedel, K. Gorovoy, J. Harmsen, L. Lao, F. Li,
+V. Rajashekhar, S. Ramesh, and J. Soyke. Tensorflow-serving: Flexible,
+high-performance ml serving. arXiv preprint arXiv:1712.06139, 2017.
+[41] A. Ousterhout, J. Fried, J. Behrens, A. Belay, and H. Balakrishnan.
+Shenango: Achieving high {CPU} efficiency for latency-sensitive
+datacenter workloads. In 16th USENIX Symposium on Networked
+Systems Design and Implementation (NSDI 19), pages 361–378, 2019.
+[42] M. Patriksson. A survey on the continuous nonlinear resource
+allocation problem. European Journal of Operational Research,
+185(1):1–46, 2008.
+81
+
+
+===== PAGE 15 =====
+Optimizing GPU Sharing for Container-Based DNN Serving with Multi-Instance GPUs
+SYSTOR ’24, September 23–24, 2024, Virtual, Israel
+[43] Y. Peng, Y. Bao, Y. Chen, C. Wu, and C. Guo. Optimus: an efficient
+dynamic resource scheduler for deep learning clusters. In Proc.
+EuroSys, 2018.
+[44] Y. Peng, Y. Zhu, Y. Chen, Y. Bao, B. Yi, C. Lan, C. Wu, and C. Guo. A
+generic communication scheduler for distributed dnn training
+acceleration. In Proc. SOSP, 2019.
+[45] M. Pinedo. Scheduling, volume 29. Springer, 2012.
+[46] F. Romero, Q. Li, N. J. Yadwadkar, and C. Kozyrakis. Infaas: A
+model-less inference serving system. arXiv preprint arXiv:1905.13348,
+2019.
+[47] H. Shen, L. Chen, Y. Jin, L. Zhao, B. Kong, M. Philipose,
+A. Krishnamurthy, and R. Sundaram. Nexus: a gpu cluster engine for
+accelerating dnn-based video analysis. In Proc. SOSP, 2019.
+[48] C. Steiger, H. Walder, and M. Platzner. Operating systems for
+reconfigurable embedded platforms: Online scheduling of real-time
+tasks. IEEE Transactions on computers, 53(11):1393–1407, 2004.
+[49] L. Wang, L. Yang, Y. Yu, W. Wang, B. Li, X. Sun, J. He, and L. Zhang.
+Morphling: Fast, near-optimal auto-configuration for cloud-native
+model serving. In Proceedings of the ACM Symposium on Cloud
+Computing, pages 639–653, 2021.
+[50] Z. Wang, Q. Tang, B. Guo, J.-B. Wei, and L. Wang. Resource
+partitioning and application scheduling with module merging on
+dynamically and partially reconfigurable fpgas. Electronics, 9(9):1461,
+2020.
+[51] X. Wu, H. Xu, and Y. Wang. Irina: Accelerating dnn inference with
+efficient online scheduling. In 4th Asia-Pacific Workshop on
+Networking, pages 36–43, 2020.
+[52] W. Xiao, R. Bhardwaj, R. Ramjee, M. Sivathanu, N. Kwatra, Z. Han,
+P. Patel, X. Peng, H. Zhao, Q. Zhang, et al. Gandiva: Introspective
+cluster scheduling for deep learning. In Proc. OSDI, 2018.
+[53] W. Xing and J. Zhang. Parallel machine scheduling with splitting jobs.
+Discrete Applied Mathematics, 103(1-3):259–269, 2000.
+[54] H. Zhang, Y. Tang, A. Khandelwal, and I. Stoica. {SHEPHERD}:
+Serving {DNNs} in the wild. In 20th USENIX Symposium on
+Networked Systems Design and Implementation (NSDI 23), pages
+787–808, 2023.
+[55] H. Zhao, Z. Han, Z. Yang, Q. Zhang, F. Yang, L. Zhou, M. Yang, F. C.
+Lau, Y. Wang, Y. Xiong, et al. Hived: Sharing a {GPU} cluster for
+deep learning with guarantees. In Proc. OSDI, 2020.
+82
