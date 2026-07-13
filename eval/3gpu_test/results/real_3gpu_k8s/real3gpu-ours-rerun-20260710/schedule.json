@@ -1,0 +1,46 @@
+{
+  "runId": "real3gpu-ours-rerun-20260710",
+  "stages": [
+    {
+      "gpt2": 0.5,
+      "llama": 0.3,
+      "resnet50": 500.0
+    },
+    {
+      "gpt2": 0.75,
+      "llama": 0.55,
+      "resnet50": 900.0
+    },
+    {
+      "gpt2": 0.95,
+      "llama": 0.2,
+      "resnet50": 1300.0
+    },
+    {
+      "gpt2": 0.35,
+      "llama": 0.62,
+      "resnet50": 700.0
+    },
+    {
+      "gpt2": 0.85,
+      "llama": 0.42,
+      "resnet50": 1500.0
+    },
+    {
+      "gpt2": 0.25,
+      "llama": 0.68,
+      "resnet50": 1100.0
+    },
+    {
+      "gpt2": 0.65,
+      "llama": 0.18,
+      "resnet50": 300.0
+    },
+    {
+      "gpt2": 0.0,
+      "llama": 0.0,
+      "resnet50": 0.0
+    }
+  ],
+  "steadySeconds": 300.0
+}

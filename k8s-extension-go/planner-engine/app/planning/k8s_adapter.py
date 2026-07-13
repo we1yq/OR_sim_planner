@@ -105,6 +105,13 @@ def plan_scenario_as_migplan_status(
     )
     if not milp_res.get("feasible"):
         return _status_from_infeasible_milp(scenario, milp_res)
+    budget = observed_physical_gpu_budget(source_state)
+    if _is_observed_cluster_state(source_state) and int(milp_res.get("gpu_count", 0)) > budget:
+        budget_res = dict(milp_res)
+        budget_res["feasible"] = False
+        budget_res["status"] = "physical_gpu_budget_exceeded"
+        budget_res["observedPhysicalGpuBudget"] = budget
+        return _status_from_infeasible_milp(scenario, budget_res)
 
     target_state = _call_planner(
         build_target_state_from_milp,
@@ -617,6 +624,7 @@ def _status_from_infeasible_milp(scenario: PlanningScenario, milp_res: dict[str,
                 "milpElapsedSec": float(milp_res.get("elapsed", 0.0)),
                 "targetBuildElapsedSec": 0.0,
                 "transitionPlanningElapsedSec": 0.0,
+                "observedPhysicalGpuBudget": milp_res.get("observedPhysicalGpuBudget"),
             },
             "planningTrace": {
                 "scenario": scenario.name,
@@ -626,6 +634,8 @@ def _status_from_infeasible_milp(scenario: PlanningScenario, milp_res: dict[str,
                     "status": milp_res.get("status"),
                     "feasible": False,
                     "elapsedSec": float(milp_res.get("elapsed", 0.0)),
+                    "gpuCount": milp_res.get("gpu_count"),
+                    "observedPhysicalGpuBudget": milp_res.get("observedPhysicalGpuBudget"),
                 },
             },
         },
@@ -932,6 +942,23 @@ def _physical_id_map(state: ClusterState) -> dict[str, Any]:
             key=lambda item: int(item[0]),
         )
     }
+
+
+def _is_observed_cluster_state(state: ClusterState) -> bool:
+    return str(state.metadata.get("source", "")).startswith("go-cluster-state-manager")
+
+
+def observed_physical_gpu_budget(state: ClusterState) -> int:
+    ensure_state_metadata(state)
+    observed: set[str] = set()
+    for gpu in state.real_gpus():
+        physical_id = state.metadata.get("physical_id_map", {}).get(int(gpu.gpu_id))
+        if physical_id:
+            observed.add(str(physical_id))
+    for physical_id in state.metadata.get("free_physical_gpu_pool", []) or []:
+        if physical_id:
+            observed.add(str(physical_id))
+    return len(observed)
 
 
 def _to_yamlable(value: Any) -> Any:

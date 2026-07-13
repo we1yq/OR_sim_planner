@@ -1,0 +1,68 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: MigActionPlan
+metadata:
+  name: repair-jorm-ampere-gpu0-return-20260710
+  namespace: or-sim-exp
+  labels:
+    app.kubernetes.io/name: migrant-go
+    mig.or-sim.io/component: real-3gpu-k8s-runner
+    mig.or-sim.io/plan-type: repair
+spec:
+  abstractActions: []
+  actionCount: 3
+  actionDag:
+    format: migrant.action-dag/v1
+    name: repair-jorm-ampere-gpu0-return-20260710
+    nodes:
+      - id: repair-clear-template-ampere-gpu0
+        index: 0
+        phase: 0
+        type: clear_template
+        action:
+          type: clear_template
+          abstractAction: Clear Template Before Available
+          node: ampere
+          gpuIndex: 0
+          gpu: ampere-gpu0
+          physicalGpuId: ampere-gpu0
+          physical_gpu_id: ampere-gpu0
+      - id: repair-clear-binding-ampere-gpu0
+        index: 1
+        phase: 1
+        type: clear_gpu_binding
+        dependsOn:
+          - repair-clear-template-ampere-gpu0
+        action:
+          type: clear_gpu_binding
+          abstractAction: Clear GPU Binding
+          node: ampere
+          gpuIndex: 0
+          gpu: ampere-gpu0
+          physicalGpuId: ampere-gpu0
+          physical_gpu_id: ampere-gpu0
+      - id: repair-return-gpu-ampere-gpu0
+        index: 2
+        phase: 2
+        type: return_gpu
+        dependsOn:
+          - repair-clear-binding-ampere-gpu0
+        action:
+          type: return_gpu
+          abstractAction: Return GPU
+          node: ampere
+          gpuIndex: 0
+          gpu: ampere-gpu0
+          physicalGpuId: ampere-gpu0
+          physical_gpu_id: ampere-gpu0
+  currentAllocationRef: physicalgpuregistries/default
+  executor: go-transition-executor
+  phaseGate: auto
+  plannerMetadata:
+    planner: manual-state-repair
+    reason: Restore ampere-gpu0 after failed Jormungandr adapter smoke run
+  summary:
+    desiredRuntimes: []
+    planType: repair
+    sourceGpuCount: 0
+    targetGpuCount: 0
+  targetGpuCount: 0

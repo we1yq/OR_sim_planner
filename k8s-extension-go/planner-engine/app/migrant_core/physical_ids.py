@@ -65,8 +65,14 @@ def release_to_free_pool(state: ClusterState, physical_id: str) -> None:
 
 def bootstrap_physical_ids_for_state(state: ClusterState) -> None:
     ensure_state_metadata(state)
+    real_cluster_state = str(state.metadata.get("source", "")).startswith("go-cluster-state-manager")
     for gpu in sorted(state.real_gpus(), key=lambda x: x.gpu_id):
         if get_physical_id(state, gpu.gpu_id) is None:
+            if real_cluster_state:
+                raise RuntimeError(
+                    "Observed cluster state is missing a physical GPU binding "
+                    f"for logical GPU {gpu.gpu_id}"
+                )
             set_physical_id(state, gpu.gpu_id, alloc_new_physical_id(state))
 
 

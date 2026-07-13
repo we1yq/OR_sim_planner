@@ -163,14 +163,14 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 			"actionDag":                actionDag,
 			"validationTargets":        planned["validationTargets"],
 			"summary": map[string]any{
-				"arrivalSnapshotRef": asString(asMap(snap["metadata"])["name"]),
-				"sourceArrival":      planInput.SourceArrival,
-				"targetArrival":      planInput.TargetArrival,
-				"sourceGpuCount":     sourceGPUCount(current),
-				"targetGpuCount":     uniqueGPUCountFromMaps(finalRuntimes),
-				"planner":            plannerName,
-				"plannerMakespanSec": asFloat(plannerMetrics["plannerMakespanSec"]),
-				"desiredRuntimes":    executionRuntimes,
+				"arrivalSnapshotRef":   asString(asMap(snap["metadata"])["name"]),
+				"sourceArrival":        planInput.SourceArrival,
+				"targetArrival":        planInput.TargetArrival,
+				"sourceGpuCount":       sourceGPUCount(current),
+				"targetGpuCount":       uniqueGPUCountFromMaps(finalRuntimes),
+				"planner":              plannerName,
+				"plannerMakespanSec":   asFloat(plannerMetrics["plannerMakespanSec"]),
+				"desiredRuntimes":      executionRuntimes,
 				"finalDesiredRuntimes": finalRuntimes,
 			},
 		},
@@ -203,8 +203,12 @@ func registryNeedsRepair(client *kube.Client) (bool, error) {
 	if asBool(health["repairRequired"]) {
 		return true, nil
 	}
-	if stable, ok := health["stable"].(bool); ok && !stable {
+	if len(asSlice(health["requiredActions"])) > 0 {
 		return true, nil
+	}
+	if stable, ok := health["stable"].(bool); ok && !stable {
+		queueCounts := asMap(asMap(registry["status"])["queueCounts"])
+		return intNumber(queueCounts["transitioning"]) > 0, nil
 	}
 	return false, nil
 }
@@ -235,14 +239,14 @@ func callPlannerEngine(plannerURL string, input system.PlanningInput, current sy
 func planningInputFromSnapshot(spec map[string]any) system.PlanningInput {
 	slo := asMap(spec["slo"])
 	return system.PlanningInput{
-		Source:                asString(spec["source"]),
-		Mode:                  asString(spec["mode"]),
-		Planner:               firstNonEmpty(asString(spec["planner"]), asString(spec["planningMethod"]), asString(spec["targetPlanner"]), "ours"),
-		Epoch:                 asString(spec["epoch"]),
-		WindowSeconds:         intNumber(spec["windowSeconds"]),
-		Unit:                  asString(spec["unit"]),
-		ObservedAt:            asString(spec["observedAt"]),
-		TriggerReason:         asString(spec["triggerReason"]),
+		Source:        asString(spec["source"]),
+		Mode:          asString(spec["mode"]),
+		Planner:       firstNonEmpty(asString(spec["planner"]), asString(spec["planningMethod"]), asString(spec["targetPlanner"]), "ours"),
+		Epoch:         asString(spec["epoch"]),
+		WindowSeconds: intNumber(spec["windowSeconds"]),
+		Unit:          asString(spec["unit"]),
+		ObservedAt:    asString(spec["observedAt"]),
+		TriggerReason: asString(spec["triggerReason"]),
 		SourceArrival: firstNonEmptyNumberMap(
 			numberMap(spec["sourceArrival"]),
 			numberMap(spec["currentDemand"]),
@@ -255,14 +259,14 @@ func planningInputFromSnapshot(spec map[string]any) system.PlanningInput {
 			numberMap(spec["targetDemand"]),
 			demandRateMapFromSLO(slo, "targetArrival", "demandRate", "targetDemandRate", "targetDemand"),
 		),
-		RegisteredSLOMs:       numberMap(spec["registeredSLOMs"]),
-		SLO:                   slo,
-		RequestCount:          int64Map(spec["requestCount"]),
+		RegisteredSLOMs:        numberMap(spec["registeredSLOMs"]),
+		SLO:                    slo,
+		RequestCount:           int64Map(spec["requestCount"]),
 		TransitionDemandPolicy: asString(spec["transitionDemandPolicy"]),
-		ProfileCatalogRef:     asString(spec["profileCatalogRef"]),
-		CalibrationOverlayRef: asString(spec["calibrationOverlayRef"]),
-		CurrentAllocationRef:  asString(spec["currentAllocationRef"]),
-		PlacementNodes:        stringList(asSlice(asMap(spec["placement"])["nodes"])),
+		ProfileCatalogRef:      asString(spec["profileCatalogRef"]),
+		CalibrationOverlayRef:  asString(spec["calibrationOverlayRef"]),
+		CurrentAllocationRef:   asString(spec["currentAllocationRef"]),
+		PlacementNodes:         stringList(asSlice(asMap(spec["placement"])["nodes"])),
 	}
 }
 

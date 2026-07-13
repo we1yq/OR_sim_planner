@@ -1,0 +1,37 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: MigActionPlan
+metadata:
+  name: repair-jorm-all-three-return-20260710
+  namespace: or-sim-exp
+  labels:
+    app.kubernetes.io/name: migrant-go
+    mig.or-sim.io/component: real-3gpu-k8s-runner
+    mig.or-sim.io/plan-type: repair
+spec:
+  abstractActions: []
+  actionCount: 9
+  actionDag:
+    format: migrant.action-dag/v1
+    name: repair-jorm-all-three-return-20260710
+    nodes:
+      - {id: repair-clear-template-ampere-gpu0, index: 0, phase: 0, type: clear_template, action: {type: clear_template, abstractAction: Clear Template Before Available, node: ampere, gpuIndex: 0, gpu: ampere-gpu0, physicalGpuId: ampere-gpu0, physical_gpu_id: ampere-gpu0}}
+      - {id: repair-clear-binding-ampere-gpu0, index: 1, phase: 1, type: clear_gpu_binding, dependsOn: [repair-clear-template-ampere-gpu0], action: {type: clear_gpu_binding, abstractAction: Clear GPU Binding, node: ampere, gpuIndex: 0, gpu: ampere-gpu0, physicalGpuId: ampere-gpu0, physical_gpu_id: ampere-gpu0}}
+      - {id: repair-return-gpu-ampere-gpu0, index: 2, phase: 2, type: return_gpu, dependsOn: [repair-clear-binding-ampere-gpu0], action: {type: return_gpu, abstractAction: Return GPU, node: ampere, gpuIndex: 0, gpu: ampere-gpu0, physicalGpuId: ampere-gpu0, physical_gpu_id: ampere-gpu0}}
+      - {id: repair-clear-template-ampere-gpu1, index: 3, phase: 0, type: clear_template, action: {type: clear_template, abstractAction: Clear Template Before Available, node: ampere, gpuIndex: 1, gpu: ampere-gpu1, physicalGpuId: ampere-gpu1, physical_gpu_id: ampere-gpu1}}
+      - {id: repair-clear-binding-ampere-gpu1, index: 4, phase: 1, type: clear_gpu_binding, dependsOn: [repair-clear-template-ampere-gpu1], action: {type: clear_gpu_binding, abstractAction: Clear GPU Binding, node: ampere, gpuIndex: 1, gpu: ampere-gpu1, physicalGpuId: ampere-gpu1, physical_gpu_id: ampere-gpu1}}
+      - {id: repair-return-gpu-ampere-gpu1, index: 5, phase: 2, type: return_gpu, dependsOn: [repair-clear-binding-ampere-gpu1], action: {type: return_gpu, abstractAction: Return GPU, node: ampere, gpuIndex: 1, gpu: ampere-gpu1, physicalGpuId: ampere-gpu1, physical_gpu_id: ampere-gpu1}}
+      - {id: repair-clear-template-rtx1-worker-gpu0, index: 6, phase: 0, type: clear_template, action: {type: clear_template, abstractAction: Clear Template Before Available, node: rtx1-worker, gpuIndex: 0, gpu: rtx1-worker-gpu0, physicalGpuId: rtx1-worker-gpu0, physical_gpu_id: rtx1-worker-gpu0}}
+      - {id: repair-clear-binding-rtx1-worker-gpu0, index: 7, phase: 1, type: clear_gpu_binding, dependsOn: [repair-clear-template-rtx1-worker-gpu0], action: {type: clear_gpu_binding, abstractAction: Clear GPU Binding, node: rtx1-worker, gpuIndex: 0, gpu: rtx1-worker-gpu0, physicalGpuId: rtx1-worker-gpu0, physical_gpu_id: rtx1-worker-gpu0}}
+      - {id: repair-return-gpu-rtx1-worker-gpu0, index: 8, phase: 2, type: return_gpu, dependsOn: [repair-clear-binding-rtx1-worker-gpu0], action: {type: return_gpu, abstractAction: Return GPU, node: rtx1-worker, gpuIndex: 0, gpu: rtx1-worker-gpu0, physicalGpuId: rtx1-worker-gpu0, physical_gpu_id: rtx1-worker-gpu0}}
+  currentAllocationRef: physicalgpuregistries/default
+  executor: go-transition-executor
+  phaseGate: auto
+  plannerMetadata:
+    planner: manual-state-repair
+    reason: Restore all GPUs after failed Jormungandr retry
+  summary:
+    desiredRuntimes: []
+    planType: repair
+    sourceGpuCount: 0
+    targetGpuCount: 0
+  targetGpuCount: 0

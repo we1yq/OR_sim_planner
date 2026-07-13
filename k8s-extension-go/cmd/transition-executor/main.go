@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -280,12 +281,12 @@ func patchExecutionStatus(client *kube.Client, planName, phase, message string, 
 func startRouterMonitor(router, planName string, spec map[string]any) (map[string]any, error) {
 	planningInput := asMap(spec["planningInput"])
 	payload := map[string]any{
-		"phase":         "start",
-		"planName":      planName,
-		"sourceArrival": asMap(planningInput["sourceArrival"]),
-		"targetArrival": asMap(planningInput["targetArrival"]),
+		"phase":           "start",
+		"planName":        planName,
+		"sourceArrival":   asMap(planningInput["sourceArrival"]),
+		"targetArrival":   asMap(planningInput["targetArrival"]),
 		"registeredSLOMs": asMap(planningInput["registeredSLOMs"]),
-		"slo": asMap(planningInput["slo"]),
+		"slo":             asMap(planningInput["slo"]),
 	}
 	return postRouterMonitor(router, payload)
 }
@@ -749,7 +750,8 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 		}
 		trace.Mark("cdiRefreshFinishedAt")
 		trace.Mark("migUUIDResolveStartedAt")
-		resolved, err := resolveRuntimeDeviceBindings(nodes, gpuRuntimes)
+		registerRuntimes := runtimesForActionSlots(action, gpuRuntimes)
+		resolved, err := resolveRuntimeDeviceBindings(nodes, registerRuntimes)
 		if err != nil {
 			trace.Mark("migUUIDResolveFinishedAt")
 			return err
@@ -862,6 +864,39 @@ func runtimesForGPU(runtimes []system.ModelRuntimeSpec, gpu string) []system.Mod
 	for _, rt := range runtimes {
 		if gpu == "" || rt.GPU == gpu {
 			out = append(out, rt)
+		}
+	}
+	return out
+}
+
+func runtimesForActionSlots(action map[string]any, runtimes []system.ModelRuntimeSpec) []system.ModelRuntimeSpec {
+	slots := []slotRequest{}
+	for _, raw := range asSlice(action["slots"]) {
+		item := asSlice(raw)
+		if len(item) != 3 {
+			continue
+		}
+		slots = append(slots, slotRequest{
+			Start:   intNumber(item[0]),
+			End:     intNumber(item[1]),
+			Profile: asString(item[2]),
+		})
+	}
+	if len(slots) == 0 {
+		return runtimes
+	}
+	out := []system.ModelRuntimeSpec{}
+	for _, rt := range runtimes {
+		rtSlot, err := parseSlotRequest(rt)
+		if err != nil {
+			continue
+		}
+		for _, slot := range slots {
+			slot.GPUIndex = rtSlot.GPUIndex
+			if slotRequestsEquivalent(rtSlot, slot) {
+				out = append(out, rt)
+				break
+			}
 		}
 	}
 	return out
@@ -1068,13 +1103,13 @@ func validateFinalTargetAllocationOnce(client *kube.Client, spec map[string]any)
 	missingMIG, extraMIG := diffStringSets(expectedMIG, actualMIG)
 	missingRuntime, extraRuntime := diffStringSets(expectedRuntimes, actualRuntimes)
 	out := map[string]any{
-		"ok":                    len(missingMIG) == 0 && len(extraMIG) == 0 && len(missingRuntime) == 0 && len(extraRuntime) == 0,
-		"expectedMigSlotCount":  len(expectedMIG),
-		"actualMigSlotCount":    len(actualMIG),
-		"expectedRuntimeCount":  len(expectedRuntimes),
-		"actualRuntimeCount":    len(actualRuntimes),
-		"missingMigSlots":       missingMIG,
-		"extraMigSlots":         extraMIG,
+		"ok":                     len(missingMIG) == 0 && len(extraMIG) == 0 && len(missingRuntime) == 0 && len(extraRuntime) == 0,
+		"expectedMigSlotCount":   len(expectedMIG),
+		"actualMigSlotCount":     len(actualMIG),
+		"expectedRuntimeCount":   len(expectedRuntimes),
+		"actualRuntimeCount":     len(actualRuntimes),
+		"missingMigSlots":        missingMIG,
+		"extraMigSlots":          extraMIG,
 		"missingRuntimeBindings": missingRuntime,
 		"extraRuntimeBindings":   extraRuntime,
 	}
@@ -1085,7 +1120,9 @@ func validateFinalTargetAllocationOnce(client *kube.Client, spec map[string]any)
 }
 
 func expectedMIGSlotsFromTargetState(targetState map[string]any) map[string]bool {
-	physicalByLogical := stringMap(asMap(targetState["metadata"]), "physical_id_map")
+	metadata := asMap(targetState["metadata"])
+	physicalByLogical := stringMap(metadata, "physical_id_map")
+	displayIDs := stringMap(metadata, "display_id_map")
 	out := map[string]bool{}
 	for _, rawGPU := range asSlice(targetState["gpus"]) {
 		gpu := asMap(rawGPU)
@@ -1097,12 +1134,15 @@ func expectedMIGSlotsFromTargetState(targetState map[string]any) map[string]bool
 		}
 		physicalID := physicalByLogical[logicalID]
 		if physicalID == "" {
+			physicalID = physicalByLogical[displayIDs[logicalID]]
+		}
+		if physicalID == "" {
 			continue
 		}
 		for _, rawInst := range asSlice(gpu["instances"]) {
 			inst := asMap(rawInst)
 			profile := asString(inst["profile"])
-			if profile == "" || profile == "void" || asString(inst["workload"]) == "" {
+			if profile == "" || profile == "void" {
 				continue
 			}
 			start := intNumber(inst["start"])
@@ -1173,6 +1213,9 @@ func stringMap(parent map[string]any, key string) map[string]string {
 	out := map[string]string{}
 	for logicalID, rawPhysicalID := range asMap(parent[key]) {
 		physicalID := asString(rawPhysicalID)
+		if physicalID == "" {
+			physicalID, _ = intString(rawPhysicalID)
+		}
 		if physicalID != "" {
 			out[logicalID] = physicalID
 		}
@@ -1232,6 +1275,9 @@ func configMapPath(ns, name string) string {
 func markRouteDrainingForAction(router string, action map[string]any) error {
 	route, err := routeEndpointForAction(router, action)
 	if err != nil {
+		if errors.Is(err, errRouteNotFound) {
+			return nil
+		}
 		return err
 	}
 	route["acceptingNew"] = false
@@ -1245,10 +1291,19 @@ func waitInstanceDrain(router string, action map[string]any, timeout time.Durati
 	for time.Now().Before(deadline) {
 		route, err := routeEndpointForAction(router, action)
 		if err != nil {
-			return nil
+			if errors.Is(err, errRouteNotFound) {
+				return nil
+			}
+			return err
 		}
-		inflight := firstNonZeroInt(intNumber(route["endpointInflight"]), intNumber(route["inflight"]))
-		queued := firstNonZeroInt(intNumber(route["endpointQueued"]), intNumber(route["queued"]))
+		inflight := intNumber(route["endpointInflight"])
+		if _, ok := route["endpointInflight"]; !ok {
+			inflight = intNumber(route["inflight"])
+		}
+		queued := intNumber(route["endpointQueued"])
+		if _, ok := route["endpointQueued"]; !ok {
+			queued = intNumber(route["queued"])
+		}
 		if inflight == 0 && queued == 0 {
 			return nil
 		}
@@ -1282,10 +1337,12 @@ func routeEndpointForAction(router string, action map[string]any) (map[string]an
 		return matches[0], nil
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("route not found for %s", routeActionLabel(action))
+		return nil, fmt.Errorf("%w for %s", errRouteNotFound, routeActionLabel(action))
 	}
 	return nil, fmt.Errorf("route ambiguous for %s: %d matches", routeActionLabel(action), len(matches))
 }
+
+var errRouteNotFound = errors.New("route not found")
 
 func routeRuntimeIDsForAction(router string, action map[string]any) []string {
 	route, err := routeEndpointForAction(router, action)
@@ -1311,8 +1368,7 @@ func routeMatchesAction(route, action map[string]any) bool {
 	if !ok {
 		return false
 	}
-	expected := fmt.Sprintf("%s-s%d-%d-%s", physicalID, slot.Start, slot.End, slot.Profile)
-	return strings.HasSuffix(asString(route["slotResource"]), expected)
+	return slotResourceMatches(physicalID, asString(route["slotResource"]), slot)
 }
 
 func routeActionLabel(action map[string]any) string {
@@ -1368,7 +1424,7 @@ func targetRuntimeForAction(action map[string]any, runtimes []system.ModelRuntim
 			if err != nil {
 				continue
 			}
-			if rtSlot.Start != slot.Start || rtSlot.End != slot.End || rtSlot.Profile != slot.Profile {
+			if !slotRequestsEquivalent(rtSlot, slot) {
 				continue
 			}
 		}
@@ -1401,6 +1457,29 @@ func actionSlot(action map[string]any) (slotRequest, bool) {
 		}
 	}
 	return slotRequest{GPUIndex: gpuIndex, Start: start, End: end, Profile: profile}, true
+}
+
+func slotRequestsEquivalent(a, b slotRequest) bool {
+	if a.GPUIndex != b.GPUIndex || a.Start != b.Start || a.Profile != b.Profile {
+		return false
+	}
+	if a.End == b.End {
+		return true
+	}
+	// A100 3g placements occupy four physical columns in the exact-slot
+	// resource name (for example s4-8-3g) while planner actions describe the
+	// logical 3g interval (for example [4,7,"3g"]).
+	if a.Profile == "3g" && absInt(a.End-b.End) == 1 {
+		return true
+	}
+	return false
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 func applyBatch(router string, action map[string]any, target system.ModelRuntimeSpec) error {
@@ -1562,8 +1641,15 @@ func deploymentMatchesSlot(dep map[string]any, physicalID string, slot slotReque
 		labels := asMap(asMap(dep["metadata"])["labels"])
 		physicalID = asString(labels["migrant.io/gpu"])
 	}
-	expected := fmt.Sprintf("%s-s%d-%d-%s", physicalID, slot.Start, slot.End, slot.Profile)
-	return strings.HasSuffix(slotResource, expected)
+	return slotResourceMatches(physicalID, slotResource, slot)
+}
+
+func slotResourceMatches(physicalID, slotResource string, expected slotRequest) bool {
+	observed, err := parseSlotRequest(system.ModelRuntimeSpec{
+		GPU:          physicalID,
+		SlotResource: slotResource,
+	})
+	return err == nil && slotRequestsEquivalent(observed, expected)
 }
 
 func deleteRuntimeDeploymentsForGPU(client *kube.Client, gpu string) error {
@@ -1885,7 +1971,11 @@ func clearGPUs(nodes map[string]string, gpus map[string]bool) error {
 		if err != nil {
 			return err
 		}
-		resp, err := http.Post(fmt.Sprintf("http://%s:10684/clear?gpuIndex=%d", ip, gpuIndex), "application/json", nil)
+		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://%s:10684/clear?gpuIndex=%d", ip, gpuIndex), nil)
+		if err != nil {
+			return err
+		}
+		resp, err := (&http.Client{Timeout: 45 * time.Second}).Do(req)
 		if err != nil {
 			return err
 		}
@@ -1945,7 +2035,13 @@ func resolveRuntimeDeviceBinding(nodes map[string]string, rt system.ModelRuntime
 	}
 	for _, raw := range asSlice(payload["migSlots"]) {
 		item := asMap(raw)
-		if intNumber(item["slotStart"]) != slot.Start || intNumber(item["slotEnd"]) != slot.End || asString(item["profile"]) != slot.Profile {
+		observed := slotRequest{
+			GPUIndex: slot.GPUIndex,
+			Start:    intNumber(item["slotStart"]),
+			End:      intNumber(item["slotEnd"]),
+			Profile:  asString(item["profile"]),
+		}
+		if !slotRequestsEquivalent(observed, slot) {
 			continue
 		}
 		uuid := asString(item["migDeviceUuid"])
@@ -2271,7 +2367,8 @@ func waitForOneRuntimeReadyAndCUDA(client *kube.Client, nodes map[string]string,
 	if rt.ExpectedMIGUUID != "" && migUUID != rt.ExpectedMIGUUID {
 		return nil, readiness, fmt.Errorf("runtime %s got MIG UUID %s, expected %s", rt.Model, migUUID, rt.ExpectedMIGUUID)
 	}
-	processes, foundAt, err := waitForCUDAProcess(nodes[rt.Node], migUUID, deadline)
+	parentGPUUUID, _ := parentGPUUUIDForRuntime(nodes[rt.Node], rt)
+	processes, foundAt, err := waitForCUDAProcess(nodes[rt.Node], migUUID, parentGPUUUID, deadline)
 	if err != nil {
 		return nil, readiness, fmt.Errorf("runtime %s CUDA verification failed: %w", rt.Model, err)
 	}
@@ -2283,6 +2380,7 @@ func waitForOneRuntimeReadyAndCUDA(client *kube.Client, nodes map[string]string,
 		"deviceResource":  rt.DeviceResource,
 		"expectedMigUUID": rt.ExpectedMIGUUID,
 		"migUUID":         migUUID,
+		"parentGPUUUID":   parentGPUUUID,
 		"processes":       processes,
 		"health":          health,
 	}, readiness, nil
@@ -2397,7 +2495,7 @@ func markReadinessTime(readiness map[string]any, key string, value time.Time, si
 	}
 }
 
-func waitForCUDAProcess(nodeIP, migUUID string, deadline time.Time) ([]any, time.Time, error) {
+func waitForCUDAProcess(nodeIP, migUUID, parentGPUUUID string, deadline time.Time) ([]any, time.Time, error) {
 	for time.Now().Before(deadline) {
 		payload, err := getJSON("http://" + nodeIP + ":10684/processes?migUuid=" + migUUID)
 		if err == nil {
@@ -2406,26 +2504,82 @@ func waitForCUDAProcess(nodeIP, migUUID string, deadline time.Time) ([]any, time
 				return processes, time.Now(), nil
 			}
 		}
+		if parentGPUUUID != "" {
+			payload, err = getJSON("http://" + nodeIP + ":10684/processes")
+			if err == nil {
+				processes := processesForUUID(payload, parentGPUUUID)
+				if len(processes) > 0 {
+					return processes, time.Now(), nil
+				}
+			}
+		}
 		time.Sleep(500 * time.Millisecond)
+	}
+	if parentGPUUUID != "" {
+		return nil, time.Time{}, fmt.Errorf("no active compute process found for %s or parent GPU %s before timeout", migUUID, parentGPUUUID)
 	}
 	return nil, time.Time{}, fmt.Errorf("no active compute process found for %s before timeout", migUUID)
 }
 
 func getJSON(url string) (map[string]any, error) {
-	client := http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(url)
+	client := http.Client{Timeout: 15 * time.Second}
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		resp, err := client.Get(url)
+		if err != nil {
+			lastErr = err
+		} else {
+			defer resp.Body.Close()
+			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+				lastErr = fmt.Errorf("GET %s returned %d", url, resp.StatusCode)
+			} else {
+				var payload map[string]any
+				if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+					return nil, err
+				}
+				return payload, nil
+			}
+		}
+		time.Sleep(time.Duration(attempt+1) * 500 * time.Millisecond)
+	}
+	return nil, lastErr
+}
+
+func parentGPUUUIDForRuntime(nodeIP string, rt system.ModelRuntimeSpec) (string, error) {
+	slot, err := parseSlotRequest(rt)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("GET %s returned %d", url, resp.StatusCode)
+	payload, err := getJSON(fmt.Sprintf("http://%s:10684/list?gpuIndex=%d", nodeIP, slot.GPUIndex))
+	if err != nil {
+		return "", err
 	}
-	var payload map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return nil, err
+	return parseGPUUUIDFromNvidiaSMIL(asString(payload["nvidiaSmiL"]), slot.GPUIndex), nil
+}
+
+func parseGPUUUIDFromNvidiaSMIL(out string, gpuIndex int) string {
+	prefix := fmt.Sprintf("GPU %d:", gpuIndex)
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		start := strings.Index(line, "(UUID: ")
+		end := strings.LastIndex(line, ")")
+		if start < 0 || end <= start {
+			return ""
+		}
+		return strings.TrimSpace(line[start+len("(UUID: ") : end])
 	}
-	return payload, nil
+	return ""
+}
+
+func processesForUUID(payload map[string]any, uuid string) []any {
+	byUUID := asMap(payload["processesByUUID"])
+	if len(byUUID) == 0 {
+		return nil
+	}
+	return asSlice(byUUID[uuid])
 }
 
 func deleteStaleRuntimes(client *kube.Client, desired []system.ModelRuntimeSpec) ([]string, error) {

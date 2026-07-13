@@ -29,11 +29,12 @@ spec:
           args:
             - --addr=:10680
           ports:
-            - containerPort: 10680
+            - name: http
+              containerPort: 10680
           readinessProbe:
             httpGet:
               path: /healthz
-              port: 10680
+              port: http
 ---
 apiVersion: v1
 kind: Service
@@ -46,4 +47,4 @@ spec:
   ports:
     - name: http
       port: 8080
-      targetPort: 10680
+      targetPort: http

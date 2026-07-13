@@ -790,23 +790,24 @@ func (s *routerState) monitorSnapshotLocked() map[string]any {
 			avg = stats.TotalLatencyMs / float64(stats.Requests)
 		}
 		row := map[string]any{
-			"requests":                    stats.Requests,
-			"errors":                      stats.Errors,
-			"avgLatencyMs":                round(avg, 3),
-			"maxLatencyMs":                round(stats.MaxLatencyMs, 3),
-			"latencySLOMs":                s.monitor.LatencySLOMs[model],
-			"latencyViolationCount":       stats.LatencyViolations,
-			"latencySLOViolationSeconds":  round(stats.LatencyViolationExcessMs/1000.0, 6),
-			"latencySLOViolated":          stats.LatencyViolations > 0,
-			"demandRate":                  s.monitor.TargetArrival[model],
-			"sourceDemandRate":            s.monitor.SourceArrival[model],
-			"demandRatePolicy":            "fixed_input_not_observed",
-			"demandRateSLOEvaluated":      false,
-			"demandRateSLOViolated":       false,
+			"requests":                   stats.Requests,
+			"errors":                     stats.Errors,
+			"avgLatencyMs":               round(avg, 3),
+			"maxLatencyMs":               round(stats.MaxLatencyMs, 3),
+			"latencySLOMs":               s.monitor.LatencySLOMs[model],
+			"latencyViolationCount":      stats.LatencyViolations,
+			"latencySLOViolationSeconds": round(stats.LatencyViolationExcessMs/1000.0, 6),
+			"latencySLOViolated":         stats.LatencyViolations > 0,
+			"demandRate":                 s.monitor.TargetArrival[model],
+			"sourceDemandRate":           s.monitor.SourceArrival[model],
+			"demandRatePolicy":           "fixed_input_not_observed",
+			"demandRateSLOEvaluated":     false,
+			"demandRateSLOViolated":      false,
 		}
 		if !stats.FirstViolationAt.IsZero() {
 			row["firstViolationAt"] = stats.FirstViolationAt.Format(time.RFC3339Nano)
 			row["lastViolationAt"] = stats.LastViolationAt.Format(time.RFC3339Nano)
+			row["latencySLOViolationWallSeconds"] = round(stats.LastViolationAt.Sub(stats.FirstViolationAt).Seconds(), 6)
 		}
 		models[model] = row
 	}

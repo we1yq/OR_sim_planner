@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import time
@@ -21,7 +22,9 @@ from migrant_core.state import ClusterState, GPUState, MigInstance  # noqa: E402
 from migrant_core.physical_ids import ensure_state_metadata  # noqa: E402
 
 
-HOST_PORT_BASE = 10681
+RUNTIME_HOST_PORT_POOL = tuple(
+    port for port in range(10681, 10721) if port not in {10684, 10690}
+)
 
 ABSTRACT_PROFILE_SIZE = {"7g": 7, "4g": 4, "3g": 3, "2g": 2, "1g": 1}
 PLACEMENT_PROFILE_SIZE = {"7g": 8, "4g": 4, "3g": 4, "2g": 2, "1g": 1}
@@ -68,7 +71,9 @@ def plan(payload: dict[str, Any]) -> dict[str, Any]:
     scenario = apply_planning_input(load_planning_scenario(scenario_path), planning_input)
     current = current_allocation_to_cluster_state(dict(payload.get("currentAllocation", {})))
     planner = normalize_planner_name(planning_input)
-    runtime_profile_correction = dict(payload.get("runtimeProfileCorrection") or {})
+    runtime_profile_correction = {}
+    if str(os.environ.get("ENABLE_RUNTIME_PROFILE_CORRECTION", "")).lower() == "true":
+        runtime_profile_correction = dict(payload.get("runtimeProfileCorrection") or {})
     if planner == "jormungandr":
         feasible_option_df = build_feasible_option_dataframe(
             scenario,
@@ -463,7 +468,6 @@ def desired_runtimes_from_target_state(target_state: dict[str, Any], planning_tr
                     "runtimeId": runtime_id,
                     "batchSize": int(inst.get("batch") or 1),
                     "node": node,
-                    "hostPort": int(HOST_PORT_BASE + len(runtimes)),
                     "profile": profile,
                     "gpu": physical_id,
                     "slotResource": exact_slot_resource(physical_id, start, end, profile),
@@ -471,6 +475,7 @@ def desired_runtimes_from_target_state(target_state: dict[str, Any], planning_tr
                     "weight": mu if mu > 0 else float(ABSTRACT_PROFILE_SIZE.get(profile, 1)),
                 }
             )
+    assign_runtime_host_ports(runtimes)
     runtimes.sort(key=lambda row: row["model"])
     return runtimes
 
@@ -504,7 +509,6 @@ def desired_runtimes_from_actions(actions: list[dict[str, Any]], target_state: d
                 "runtimeId": runtime_id,
                 "batchSize": int(record.get("batch") or 1),
                 "node": node,
-                "hostPort": int(HOST_PORT_BASE + len(by_key)),
                 "profile": profile,
                 "gpu": physical_id,
                 "slotResource": exact_slot_resource(physical_id, start, end, profile),
@@ -513,9 +517,42 @@ def desired_runtimes_from_actions(actions: list[dict[str, Any]], target_state: d
             }
     if by_key:
         out = list(by_key.values())
+        assign_runtime_host_ports(out)
         out.sort(key=lambda row: row["model"])
         return out
     return desired_runtimes_from_target_state(target_state)
+
+
+def assign_runtime_host_ports(runtimes: list[dict[str, Any]]) -> None:
+    next_index_by_node: dict[str, int] = {}
+    ordered = sorted(
+        runtimes,
+        key=lambda row: (
+            str(row.get("node") or ""),
+            str(row.get("gpu") or ""),
+            str(row.get("slotResource") or ""),
+            str(row.get("model") or ""),
+        ),
+    )
+    for runtime in ordered:
+        node = str(runtime.get("node") or "")
+        index = runtime_host_port_index(runtime)
+        if index is None:
+            index = next_index_by_node.get(node, 0)
+            next_index_by_node[node] = index + 1
+        if index >= len(RUNTIME_HOST_PORT_POOL):
+            raise ValueError(f"runtime host port pool exhausted on node {node!r}")
+        runtime["hostPort"] = RUNTIME_HOST_PORT_POOL[index]
+
+
+def runtime_host_port_index(runtime: dict[str, Any]) -> int | None:
+    gpu = str(runtime.get("gpu") or "")
+    slot_resource = str(runtime.get("slotResource") or "")
+    gpu_match = re.search(r"-gpu(\d+)$", gpu)
+    slot_match = re.search(r"-s(\d+)-\d+-[a-z0-9]+$", slot_resource)
+    if not gpu_match or not slot_match:
+        return None
+    return int(gpu_match.group(1)) * 7 + int(slot_match.group(1))
 
 
 def runtime_id_for(model: str, physical_id: str, start: int, end: int, profile: str) -> str:

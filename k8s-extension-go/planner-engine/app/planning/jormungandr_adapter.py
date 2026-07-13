@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import os
 import time
 from collections import Counter, defaultdict
 from typing import Any
@@ -9,6 +10,16 @@ from baselines.common import AllocationResult, GPUAllocation, WorkloadInstance, 
 from baselines.jormungandr_round import plan_jormungandr_round
 from migrant_core.physical_ids import alloc_from_free_pool_or_new, ensure_state_metadata, get_physical_id, set_physical_id
 from migrant_core.state import ClusterState, GPUState, MigInstance
+
+
+LOGICAL_PROFILE_SIZE = {"7g": 7, "4g": 4, "3g": 3, "2g": 2, "1g": 1}
+PHYSICAL_PROFILE_SIZE = {"7g": 8, "4g": 4, "3g": 4, "2g": 2, "1g": 1}
+
+
+class UnsupportedJormungandrReplayError(RuntimeError):
+    def __init__(self, message: str, *, unsupported: list[dict[str, Any]] | None = None) -> None:
+        super().__init__(message)
+        self.unsupported = unsupported or [{"type": "jormungandr_replay", "reason": message}]
 
 
 def plan_jormungandr_as_migplan_status(
@@ -23,6 +34,7 @@ def plan_jormungandr_as_migplan_status(
     source_demand = dict(scenario.source_arrival)
     target_demand = dict(scenario.target_arrival)
     source_alloc = allocation_result_from_cluster_state(source_state, scenario_id=f"{scenario.name}-source")
+    physical_gpu_budget = observed_physical_gpu_budget(source_state)
     jorm = plan_jormungandr_round(
         scenario_id=scenario.name,
         demand=target_demand,
@@ -31,23 +43,81 @@ def plan_jormungandr_as_migplan_status(
         source_demand=source_demand,
         workload_names=workload_names,
         transition_id=f"{scenario.name}-jormungandr",
+        max_gpus=physical_gpu_budget,
     )
     allocator_elapsed_sec = float((jorm.get("stage_runtime_sec") or {}).get("allocator_sec", 0.0))
     deployer_elapsed_sec = float((jorm.get("stage_runtime_sec") or {}).get("deployer_sec", 0.0))
     planner_makespan_sec = allocator_elapsed_sec + deployer_elapsed_sec
     adapter_start = time.perf_counter()
     target_alloc = jorm["target_allocation"]
+    if not bool(getattr(target_alloc, "feasible", False)) or int(target_alloc.gpu_count) > int(physical_gpu_budget):
+        return _status_from_infeasible_jormungandr(
+            scenario=scenario,
+            target_alloc=target_alloc,
+            physical_gpu_budget=physical_gpu_budget,
+            allocator_elapsed_sec=allocator_elapsed_sec,
+            deployer_elapsed_sec=deployer_elapsed_sec,
+            planner_makespan_sec=planner_makespan_sec,
+            wall_clock_sec=time.perf_counter() - start,
+        )
     physical_state = copy.deepcopy(source_state)
     ensure_state_metadata(physical_state)
     target_state, final_physical_ids = target_state_from_allocation(target_alloc, physical_state)
     transition_plan = dict(jorm.get("transition_plan") or {})
-    actions, action_dag = lower_jormungandr_transition(
-        source_state=source_state,
-        target_state=target_state,
-        transition_plan=transition_plan,
-        final_physical_ids=final_physical_ids,
-        physical_state=physical_state,
-    )
+    peak_active_gpu = int(transition_plan.get("peak_active_gpu") or max(len(source_state.real_gpus()), int(target_alloc.gpu_count)))
+    if peak_active_gpu > int(physical_gpu_budget):
+        return _status_from_unsupported_native_jormungandr(
+            scenario=scenario,
+            target_alloc=target_alloc,
+            physical_gpu_budget=physical_gpu_budget,
+            allocator_elapsed_sec=allocator_elapsed_sec,
+            deployer_elapsed_sec=deployer_elapsed_sec,
+            planner_makespan_sec=planner_makespan_sec,
+            wall_clock_sec=time.perf_counter() - start,
+            unsupported=[
+                {
+                    "phase": "transition",
+                    "type": "exchange_capacity",
+                    "peakActiveGpu": peak_active_gpu,
+                    "observedPhysicalGpuBudget": int(physical_gpu_budget),
+                    "reason": "jormungandr_exchange_requires_more_physical_gpus_than_observed",
+                }
+            ],
+            transition_plan=transition_plan,
+        )
+    unsupported_native = unsupported_native_jorm_primitives(transition_plan)
+    if unsupported_native and not allow_common_executor_fallback():
+        return _status_from_unsupported_native_jormungandr(
+            scenario=scenario,
+            target_alloc=target_alloc,
+            physical_gpu_budget=physical_gpu_budget,
+            allocator_elapsed_sec=allocator_elapsed_sec,
+            deployer_elapsed_sec=deployer_elapsed_sec,
+            planner_makespan_sec=planner_makespan_sec,
+            wall_clock_sec=time.perf_counter() - start,
+            unsupported=unsupported_native,
+            transition_plan=transition_plan,
+        )
+    try:
+        actions, action_dag = lower_jormungandr_transition(
+            source_state=source_state,
+            target_state=target_state,
+            transition_plan=transition_plan,
+            final_physical_ids=final_physical_ids,
+            physical_state=physical_state,
+        )
+    except UnsupportedJormungandrReplayError as exc:
+        return _status_from_unsupported_native_jormungandr(
+            scenario=scenario,
+            target_alloc=target_alloc,
+            physical_gpu_budget=physical_gpu_budget,
+            allocator_elapsed_sec=allocator_elapsed_sec,
+            deployer_elapsed_sec=deployer_elapsed_sec,
+            planner_makespan_sec=planner_makespan_sec,
+            wall_clock_sec=time.perf_counter() - start,
+            unsupported=exc.unsupported,
+            transition_plan=transition_plan,
+        )
     canonical_next = copy.deepcopy(target_state)
     adapter_elapsed_sec = time.perf_counter() - adapter_start
     planning_trace = {
@@ -65,6 +135,7 @@ def plan_jormungandr_as_migplan_status(
         "target": {
             "method": target_alloc.method,
             "gpuCount": target_alloc.gpu_count,
+            "maxGpus": physical_gpu_budget,
             "allocatedSlices": target_alloc.allocated_slices,
             "sliceUtilization": target_alloc.slice_utilization,
             "metadata": dict(target_alloc.metadata),
@@ -138,6 +209,160 @@ def plan_jormungandr_as_migplan_status(
     return status
 
 
+def allow_common_executor_fallback() -> bool:
+    value = str(os.environ.get("ALLOW_JORM_COMMON_EXECUTOR_FALLBACK", "")).strip().lower()
+    if value in {"0", "false", "no", "off"}:
+        return False
+    return True
+
+
+def unsupported_native_jorm_primitives(transition_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    unsupported = []
+    for raw in list(transition_plan.get("fine_actions") or []):
+        action = dict(raw)
+        action_type = str(action.get("type") or "")
+        if action_type in {"repartition_gpu", "migrate_container", "keep_container"}:
+            unsupported.append({
+                "id": action.get("id"),
+                "phase": action.get("phase"),
+                "type": action_type,
+                "gpu_id": action.get("gpu_id"),
+                "reason": action.get("reason"),
+            })
+    return unsupported
+
+
+def _status_from_unsupported_native_jormungandr(
+    *,
+    scenario: Any,
+    target_alloc: AllocationResult,
+    physical_gpu_budget: int,
+    allocator_elapsed_sec: float,
+    deployer_elapsed_sec: float,
+    planner_makespan_sec: float,
+    wall_clock_sec: float,
+    unsupported: list[dict[str, Any]],
+    transition_plan: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "apiVersion": "mig.or-sim.io/v1alpha1",
+        "kind": "MigPlan",
+        "metadata": {"name": f"{scenario.name}-jormungandr"},
+        "spec": {
+            "dryRun": True,
+            "planner": "jormungandr",
+            "scenario": scenario.name,
+            "sourceStateRef": scenario.source_state_ref,
+            "targetStateRef": scenario.target_state_ref,
+        },
+        "status": {
+            "phase": "Unsupported",
+            "reachedTarget": False,
+            "message": (
+                f"{scenario.name}: Jormungandr native transition primitives require "
+                "native executor support; refusing common-executor delete/create fallback"
+            ),
+            "actions": [],
+            "metrics": {
+                "gpuCount": int(target_alloc.gpu_count),
+                "observedPhysicalGpuBudget": int(physical_gpu_budget),
+                "iterationCount": 1,
+                "actionCount": 0,
+                "plannerMakespanSec": planner_makespan_sec,
+                "jormungandrAllocatorElapsedSec": allocator_elapsed_sec,
+                "jormungandrDeployerElapsedSec": deployer_elapsed_sec,
+                "adapterElapsedSec": 0.0,
+                "plannerWallClockSec": wall_clock_sec,
+                "unsupportedNativePrimitiveCount": len(unsupported),
+            },
+            "planningTrace": {
+                "pipeline": "jormungandr_allocator -> exchange_and_compact_deployer",
+                "planner": "jormungandr",
+                "target": {
+                    "method": target_alloc.method,
+                    "feasible": bool(target_alloc.feasible),
+                    "gpuCount": int(target_alloc.gpu_count),
+                    "maxGpus": int(physical_gpu_budget),
+                },
+                "transition": {
+                    "nativePrimitivesRequired": True,
+                    "unsupportedNativePrimitives": unsupported,
+                    "sourceActionCounts": dict(transition_plan.get("action_counts") or {}),
+                    "note": (
+                        "repartition_gpu, migrate_container, and keep_container are Jormungandr "
+                        "native transition primitives. The common Kubernetes/MIG executor does "
+                        "not currently implement native container migration, so this adapter does "
+                        "not lower them to delete_instance/place_instance by default."
+                    ),
+                },
+            },
+            "jormungandr": {
+                "targetAllocation": target_alloc.to_dict(),
+                "transitionPlan": transition_plan,
+            },
+        },
+    }
+
+
+def _status_from_infeasible_jormungandr(
+    *,
+    scenario: Any,
+    target_alloc: AllocationResult,
+    physical_gpu_budget: int,
+    allocator_elapsed_sec: float,
+    deployer_elapsed_sec: float,
+    planner_makespan_sec: float,
+    wall_clock_sec: float,
+) -> dict[str, Any]:
+    return {
+        "apiVersion": "mig.or-sim.io/v1alpha1",
+        "kind": "MigPlan",
+        "metadata": {"name": f"{scenario.name}-jormungandr"},
+        "spec": {
+            "dryRun": True,
+            "planner": "jormungandr",
+            "scenario": scenario.name,
+            "sourceStateRef": scenario.source_state_ref,
+            "targetStateRef": scenario.target_state_ref,
+        },
+        "status": {
+            "phase": "Infeasible",
+            "reachedTarget": False,
+            "message": (
+                f"{scenario.name}: Jormungandr target allocation is infeasible "
+                f"within observed physical GPU budget {physical_gpu_budget}"
+            ),
+            "actions": [],
+            "metrics": {
+                "gpuCount": int(target_alloc.gpu_count),
+                "observedPhysicalGpuBudget": int(physical_gpu_budget),
+                "iterationCount": 1,
+                "actionCount": 0,
+                "plannerMakespanSec": planner_makespan_sec,
+                "jormungandrAllocatorElapsedSec": allocator_elapsed_sec,
+                "jormungandrDeployerElapsedSec": deployer_elapsed_sec,
+                "adapterElapsedSec": 0.0,
+                "plannerWallClockSec": wall_clock_sec,
+            },
+            "planningTrace": {
+                "pipeline": "jormungandr_allocator -> exchange_and_compact_deployer",
+                "planner": "jormungandr",
+                "target": {
+                    "method": target_alloc.method,
+                    "feasible": bool(target_alloc.feasible),
+                    "gpuCount": int(target_alloc.gpu_count),
+                    "maxGpus": int(physical_gpu_budget),
+                    "coveredThroughput": dict(target_alloc.metadata.get("covered_throughput") or {}),
+                    "unmetDemand": dict(target_alloc.metadata.get("unmet_demand") or {}),
+                },
+            },
+            "jormungandr": {
+                "targetAllocation": target_alloc.to_dict(),
+            },
+        },
+    }
+
+
 def allocation_result_from_cluster_state(state: ClusterState, *, scenario_id: str) -> AllocationResult:
     gpus: list[GPUAllocation] = []
     for gpu in sorted(state.real_gpus(), key=lambda item: int(item.gpu_id)):
@@ -150,7 +375,7 @@ def allocation_result_from_cluster_state(state: ClusterState, *, scenario_id: st
                     workload=str(inst.workload),
                     profile=str(inst.profile),
                     start=int(inst.start),
-                    end=int(inst.end),
+                    end=_logical_end(int(inst.start), str(inst.profile)),
                     batch=int(inst.batch or 1),
                     mu=float(getattr(inst, "mu", 0.0)),
                 )
@@ -164,6 +389,22 @@ def allocation_result_from_cluster_state(state: ClusterState, *, scenario_id: st
         gpus=tuple(gpus),
         runtime_sec=0.0,
     )
+
+
+def observed_physical_gpu_budget(state: ClusterState) -> int:
+    ensure_state_metadata(state)
+    observed: set[str] = set()
+    physical_map = dict(state.metadata.get("physical_id_map") or {})
+    for gpu in state.real_gpus():
+        physical_id = get_physical_id(state, int(gpu.gpu_id))
+        if not physical_id:
+            physical_id = physical_map.get(str(gpu.gpu_id), physical_map.get(int(gpu.gpu_id)))
+        if physical_id:
+            observed.add(str(physical_id))
+    for physical_id in state.metadata.get("free_physical_gpu_pool", []) or []:
+        if physical_id:
+            observed.add(str(physical_id))
+    return max(1, len(observed))
 
 
 def target_state_from_allocation(
@@ -187,7 +428,7 @@ def target_state_from_allocation(
                 instances=[
                     MigInstance(
                         start=int(inst.start),
-                        end=int(inst.end),
+                        end=_physical_end(int(inst.start), str(inst.profile)),
                         profile=str(inst.profile),
                         workload=str(inst.workload),
                         batch=int(inst.batch or 1),
@@ -202,6 +443,11 @@ def target_state_from_allocation(
         metadata={
             **copy.deepcopy(physical_state.metadata),
             "physical_id_map": dict(physical_ids),
+            "free_physical_gpu_pool": [
+                physical_id
+                for physical_id in list(physical_state.metadata.get("free_physical_gpu_pool") or [])
+                if str(physical_id) not in set(physical_ids.values())
+            ],
         },
     )
     ensure_state_metadata(target)
@@ -230,6 +476,7 @@ def lower_jormungandr_transition(
     compact_repartitions: list[dict[str, Any]] = []
     compact_moves: list[dict[str, Any]] = []
     compact_returns: list[dict[str, Any]] = []
+    predeleted_source_keys: set[tuple[str, int, int, str, str]] = set()
 
     for raw in list(transition_plan.get("fine_actions") or []):
         action = dict(raw)
@@ -246,7 +493,7 @@ def lower_jormungandr_transition(
             gpu_id = int(action["gpu_id"])
             physical_id = source_physical_ids.get(gpu_id)
             if physical_id:
-                exchange_delete_slots[(gpu_id, physical_id)].append((int(action["start"]), int(action["end"]), str(action["profile"])))
+                exchange_delete_slots[(gpu_id, physical_id)].append(_physical_slot(action["start"], action["end"], action["profile"]))
         elif phase == "compact" and action_type == "repartition_gpu":
             compact_repartitions.append(action)
         elif phase == "compact" and action_type in {"keep_container", "migrate_container"}:
@@ -263,23 +510,74 @@ def lower_jormungandr_transition(
         node_deps[node_id] = list(action.get("dependsOn") or [])
         return node_id
 
+    def add_source_instance_deletes(root: str, physical_id: str, deps: list[str]) -> list[str]:
+        delete_nodes: list[str] = []
+        for source_gpu in sorted(source_state.real_gpus(), key=lambda item: int(item.gpu_id)):
+            source_gpu_id = int(source_gpu.gpu_id)
+            if source_physical_ids.get(source_gpu_id) != physical_id:
+                continue
+            for inst in sorted(source_gpu.instances, key=lambda item: (int(item.start), int(item.end), str(item.profile), str(item.workload))):
+                if inst.profile == "void" or inst.workload is None:
+                    continue
+                slot = _physical_slot(int(inst.start), int(inst.end), str(inst.profile))
+                workload = str(inst.workload)
+                source_key = (physical_id, slot[0], slot[1], slot[2], workload)
+                if source_key in predeleted_source_keys:
+                    continue
+                predeleted_source_keys.add(source_key)
+                old_root = f"{root}_OLD_{source_gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}_{workload}"
+                deactivate = add(_route_action("deactivate_instance_route", old_root, source_gpu_id, physical_id, slot, workload, "jormungandr_exchange"), deps)
+                wait = add(_route_action("wait_instance_drain", old_root, source_gpu_id, physical_id, slot, workload, "jormungandr_exchange"), [deactivate])
+                delete_nodes.append(add(_delete_action(old_root, source_gpu_id, physical_id, slot, workload, "jormungandr_exchange"), [wait]))
+        return delete_nodes
+
+    def choose_reused_final_physical_id(slots: list[tuple[int, int, str]]) -> str:
+        requested = {(int(start), int(end), str(profile)) for start, end, profile in slots}
+        fallback = ""
+        for gpu in sorted(target_state.real_gpus(), key=lambda item: int(item.gpu_id)):
+            physical_id = final_physical_ids.get(int(gpu.gpu_id))
+            if not physical_id:
+                continue
+            if not fallback:
+                fallback = physical_id
+            target_slots = {
+                (int(inst.start), int(inst.end), str(inst.profile))
+                for inst in gpu.instances
+                if inst.profile != "void"
+            }
+            if requested and requested.issubset(target_slots):
+                return physical_id
+        if fallback:
+            return fallback
+        raise RuntimeError("Jormungandr exchange requires a physical GPU but no final target GPU is available to reuse")
+
     exchange_terminals: list[str] = []
     for gpu_id in sorted(set(exchange_creates) | set(exchange_containers)):
-        physical_id = exchange_physical_ids.get(gpu_id)
-        if physical_id is None:
-            physical_id = alloc_from_free_pool_or_new(physical_state)
-            exchange_physical_ids[gpu_id] = physical_id
-        logical_id = f"jorm-exchange-{gpu_id}"
         slots = sorted(
             {
-                (int(item["start"]), int(item["end"]), str(item["profile"]))
+                _physical_slot(item["start"], item["end"], item["profile"])
                 for item in exchange_creates.get(gpu_id, [])
             }
         )
+        physical_id = exchange_physical_ids.get(gpu_id)
+        if physical_id is None:
+            if gpu_id in final_physical_ids:
+                physical_id = final_physical_ids[gpu_id]
+            elif list(physical_state.metadata.get("free_physical_gpu_pool") or []):
+                physical_id = alloc_from_free_pool_or_new(physical_state)
+            else:
+                physical_id = choose_reused_final_physical_id(slots)
+            exchange_physical_ids[gpu_id] = physical_id
+        logical_id = gpu_id if gpu_id in final_physical_ids else f"jorm-exchange-{gpu_id}"
         if not slots:
             continue
         root = f"JORM_EXCHANGE_GPU_{gpu_id}"
         alloc = add(_action("allocate_gpu", root, logical_id, physical_id, transitionMode="jormungandr_exchange"))
+        configure_deps = [alloc]
+        if physical_id in set(source_physical_ids.values()):
+            source_delete_nodes = add_source_instance_deletes(root, physical_id, [alloc])
+            clear = add(_action("clear_template", root, logical_id, physical_id, transitionMode="jormungandr_exchange"), source_delete_nodes or [alloc])
+            configure_deps = [clear]
         configure = add(
             _action(
                 "configure_full_template",
@@ -291,7 +589,7 @@ def lower_jormungandr_transition(
                 slots=[list(slot) for slot in slots],
                 transitionMode="jormungandr_exchange",
             ),
-            [alloc],
+            configure_deps,
         )
         bind = add(_action("bind_target_gpu", root, logical_id, physical_id, transitionMode="jormungandr_exchange"), [configure])
         register = add(
@@ -300,7 +598,7 @@ def lower_jormungandr_transition(
         )
         for create in sorted(exchange_containers.get(gpu_id, []), key=lambda item: str(item.get("id"))):
             inst = dict(create.get("instance") or {})
-            slot = (int(inst["start"]), int(inst["end"]), str(inst["profile"]))
+            slot = _physical_slot(inst["start"], inst["end"], inst["profile"])
             workload = str(inst["workload"])
             batch = int(inst.get("batch") or 1)
             mu = float(inst.get("mu") or 0.0)
@@ -318,60 +616,159 @@ def lower_jormungandr_transition(
         physical_id = source_physical_ids.get(gpu_id)
         if not physical_id:
             continue
-        slot = (int(inst["start"]), int(inst["end"]), str(inst["profile"]))
+        slot = _physical_slot(inst["start"], inst["end"], inst["profile"])
         workload = str(inst["workload"])
+        if (physical_id, slot[0], slot[1], slot[2], workload) in predeleted_source_keys:
+            continue
         root = f"JORM_EXCHANGE_DELETE_GPU_{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}"
         deactivate = add(_route_action("deactivate_instance_route", root, gpu_id, physical_id, slot, workload, "jormungandr_exchange"), exchange_terminals)
         wait = add(_route_action("wait_instance_drain", root, gpu_id, physical_id, slot, workload, "jormungandr_exchange"), [deactivate])
         exchange_terminals.append(add(_delete_action(root, gpu_id, physical_id, slot, workload, "jormungandr_exchange"), [wait]))
 
     for (gpu_id, physical_id), slots in sorted(exchange_delete_slots.items()):
-        root = f"JORM_EXCHANGE_PATCH_GPU_{gpu_id}"
         deps = [
             action["id"]
             for action in actions
             if action.get("type") == "delete_instance" and action.get("physical_gpu_id") == physical_id
         ] or exchange_terminals
-        exchange_terminals.append(
-            add(
-                _action(
-                    "configure_partial_profile",
-                    root,
-                    gpu_id,
-                    physical_id,
-                    deleteSlots=[list(slot) for slot in sorted(set(slots))],
-                    deleteSpec=_slot_spec(sorted(set(slots))),
-                    createSpec="",
-                    preserveSpec="",
-                    transitionMode="jormungandr_exchange",
-                ),
-                deps,
-            )
-        )
+        exchange_terminals.extend(deps)
 
     if not exchange_terminals:
         exchange_terminals = []
     compact_terminals: list[str] = []
-    compact_sources_by_target_gpu: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    compact_source_by_target: dict[tuple[int, int, int, str, str], tuple[str, dict[str, Any]]] = {}
+    compact_target_by_source: dict[tuple[str, int, int, str, str], tuple[str, dict[str, Any]]] = {}
     for move in compact_moves:
+        move_type = str(move.get("type"))
         source_key = "source_instance" if str(move.get("type")) == "keep_container" else "from_instance"
         target_key = "target_instance" if str(move.get("type")) == "keep_container" else "to_instance"
         source_inst = dict(move.get(source_key) or {})
         target_inst = dict(move.get(target_key) or {})
         if source_inst and target_inst and target_inst.get("gpu_id") is not None:
-            compact_sources_by_target_gpu[int(target_inst["gpu_id"])].append(source_inst)
+            compact_source_by_target[
+                (
+                    int(target_inst["gpu_id"]),
+                    int(target_inst["start"]),
+                    int(target_inst["end"]),
+                    str(target_inst["profile"]),
+                    str(target_inst["workload"]),
+                )
+            ] = (move_type, source_inst)
+        if source_inst and target_inst and source_inst.get("gpu_id") is not None:
+            source_origin = str(source_inst.get("origin") or "")
+            source_gpu = int(source_inst["gpu_id"])
+            source_physical = exchange_physical_ids.get(source_gpu) if source_origin == "exchange" else source_physical_ids.get(source_gpu)
+            if source_physical:
+                source_slot = _physical_slot(source_inst["start"], source_inst["end"], source_inst["profile"])
+                compact_target_by_source[
+                    (
+                        source_physical,
+                        source_slot[0],
+                        source_slot[1],
+                        source_slot[2],
+                        str(source_inst["workload"]),
+                    )
+                ] = (move_type, target_inst)
 
-    for repartition in sorted(compact_repartitions, key=lambda item: int(item.get("gpu_id", 0))):
+    def target_instance_key(inst: dict[str, Any]) -> tuple[int, int, int, str, str]:
+        return (
+            int(inst["gpu_id"]),
+            int(inst["start"]),
+            int(inst["end"]),
+            str(inst["profile"]),
+            str(inst["workload"]),
+        )
+
+    def repartition_ready(repartition: dict[str, Any], activated_targets: dict[tuple[int, int, int, str, str], str]) -> tuple[bool, list[dict[str, Any]]]:
+        target_slots = [
+            _physical_slot(inst["start"], inst["end"], inst["profile"])
+            for inst in list(repartition.get("instances") or [])
+        ]
+        old_sources = list(repartition.get("old_instances") or [])
+        old_slots = [
+            _physical_slot(inst["start"], inst["end"], inst["profile"])
+            for inst in old_sources
+        ]
+        layout_unchanged = sorted(old_slots) == sorted(target_slots)
+        blockers: list[dict[str, Any]] = []
+        for inst in old_sources:
+            old = dict(inst)
+            old_origin = str(old.get("origin") or "")
+            old_gpu = int(old.get("gpu_id", repartition.get("gpu_id", 0)))
+            old_physical = exchange_physical_ids.get(old_gpu) if old_origin == "exchange" else source_physical_ids.get(old_gpu)
+            if not old_physical:
+                continue
+            old_slot = _physical_slot(old["start"], old["end"], old["profile"])
+            old_key = (old_physical, old_slot[0], old_slot[1], old_slot[2], str(old["workload"]))
+            move_info = compact_target_by_source.get(old_key)
+            if move_info is None:
+                continue
+            move_type, target_inst = move_info
+            if move_type == "keep_container" and _same_instance_location(old, target_inst) and layout_unchanged:
+                continue
+            target_key = target_instance_key(target_inst)
+            if target_key not in activated_targets:
+                blockers.append(
+                    {
+                        "phase": "compact",
+                        "type": "repartition_gpu",
+                        "gpu_id": repartition.get("gpu_id"),
+                        "sourceInstance": _yamlable(old),
+                        "targetInstance": _yamlable(target_inst),
+                        "moveType": move_type,
+                        "reason": "target_not_active_before_repartition",
+                    }
+                )
+        return (not blockers, blockers)
+
+    target_activation_nodes: dict[tuple[int, int, int, str, str], str] = {}
+    remaining_repartitions = sorted(compact_repartitions, key=lambda item: int(item.get("gpu_id", 0)))
+    while remaining_repartitions:
+        selected_index = -1
+        selected_blockers: list[dict[str, Any]] = []
+        for idx, candidate in enumerate(remaining_repartitions):
+            ready, blockers = repartition_ready(candidate, target_activation_nodes)
+            if ready:
+                selected_index = idx
+                break
+            selected_blockers.extend(blockers)
+        if selected_index < 0:
+            raise UnsupportedJormungandrReplayError(
+                (
+                    "Jormungandr compact repartitions have a migration cycle that cannot be "
+                    "faithfully replayed without native container migration."
+                ),
+                unsupported=selected_blockers[:8],
+            )
+        repartition = remaining_repartitions.pop(selected_index)
         gpu_id = int(repartition["gpu_id"])
         physical_id = final_physical_ids[gpu_id]
         root = f"JORM_COMPACT_REPARTITION_GPU_{gpu_id}"
         entry_deps = list(exchange_terminals)
-        old_delete_nodes: list[str] = []
+        pre_clear_delete_nodes: list[str] = []
         seen_old_sources: set[tuple[str, int, int, str, str]] = set()
-        old_sources = [
-            *list(repartition.get("old_instances") or []),
-            *compact_sources_by_target_gpu.get(gpu_id, []),
+        old_sources = list(repartition.get("old_instances") or [])
+        target_slots = [
+            _physical_slot(inst["start"], inst["end"], inst["profile"])
+            for inst in list(repartition.get("instances") or [])
         ]
+        preserve_slots = [
+            _physical_slot(inst["start"], inst["end"], inst["profile"])
+            for inst in list(repartition.get("preserve_instances") or [])
+        ]
+        create_slots = [
+            _physical_slot(inst["start"], inst["end"], inst["profile"])
+            for inst in list(repartition.get("create_instances") or [])
+        ]
+        delete_slots = [
+            _physical_slot(inst["start"], inst["end"], inst["profile"])
+            for inst in list(repartition.get("delete_instances") or [])
+        ]
+        old_slots = [
+            _physical_slot(inst["start"], inst["end"], inst["profile"])
+            for inst in old_sources
+        ]
+        layout_unchanged = sorted(old_slots) == sorted(target_slots)
         for inst in old_sources:
             old = dict(inst)
             old_origin = str(old.get("origin") or "")
@@ -379,68 +776,166 @@ def lower_jormungandr_transition(
             old_physical = exchange_physical_ids.get(old_gpu) if old_origin == "exchange" else source_physical_ids.get(old_gpu)
             if not old_physical:
                 continue
-            slot = (int(old["start"]), int(old["end"]), str(old["profile"]))
+            slot = _physical_slot(old["start"], old["end"], old["profile"])
             workload = str(old["workload"])
             old_key = (old_physical, slot[0], slot[1], slot[2], workload)
             if old_key in seen_old_sources:
                 continue
             seen_old_sources.add(old_key)
+            move_info = compact_target_by_source.get(old_key)
+            if move_info is not None:
+                move_type, target_inst = move_info
+                if move_type == "keep_container" and _same_instance_location(old, target_inst) and layout_unchanged:
+                    continue
+                target_dep = target_activation_nodes.get(target_instance_key(target_inst))
+                if not target_dep:
+                    raise UnsupportedJormungandrReplayError(
+                        (
+                            "Jormungandr compact repartition would destroy a surviving source instance "
+                            "before its target is active."
+                        ),
+                        unsupported=[
+                            {
+                                "phase": "compact",
+                                "type": "repartition_gpu",
+                                "gpu_id": gpu_id,
+                                "physical_gpu_id": physical_id,
+                                "sourceInstance": _yamlable(old),
+                                "targetInstance": _yamlable(target_inst),
+                                "moveType": move_type,
+                                "reason": "target_not_active_before_repartition",
+                            }
+                        ],
+                    )
+                delete_deps = [target_dep]
+            else:
+                delete_deps = entry_deps
+            if old_key in predeleted_source_keys:
+                continue
+            predeleted_source_keys.add(old_key)
             old_root = f"{root}_OLD_{old_gpu}_{slot[0]}_{slot[1]}_{slot[2]}"
-            deactivate = add(_route_action("deactivate_instance_route", old_root, old_gpu, old_physical, slot, workload, "jormungandr_compact"), entry_deps)
+            deactivate = add(_route_action("deactivate_instance_route", old_root, old_gpu, old_physical, slot, workload, "jormungandr_compact"), delete_deps)
             wait = add(_route_action("wait_instance_drain", old_root, old_gpu, old_physical, slot, workload, "jormungandr_compact"), [deactivate])
-            old_delete_nodes.append(add(_delete_action(old_root, old_gpu, old_physical, slot, workload, "jormungandr_compact"), [wait]))
-        target_slots = [
-            (int(inst["start"]), int(inst["end"]), str(inst["profile"]))
-            for inst in list(repartition.get("instances") or [])
-        ]
-        clear = add(
-            _action(
-                "clear_template",
-                root,
-                gpu_id,
-                physical_id,
-                template="+".join(str(_profile_size(slot[2])) for slot in target_slots),
-                deleteSlots=[list(slot) for slot in target_slots],
-                slotCount=len(target_slots),
-                transitionMode="jormungandr_compact",
-            ),
-            old_delete_nodes or entry_deps,
-        )
-        configure = add(
-            _action(
-                "configure_full_template",
-                root,
-                gpu_id,
-                physical_id,
-                template=_template(target_slots),
-                createSpec=_slot_spec(target_slots),
-                slots=[list(slot) for slot in target_slots],
-                transitionMode="jormungandr_compact",
-            ),
-            [clear],
-        )
-        register = add(
-            _action("register_mig_devices", root, gpu_id, physical_id, slots=[list(slot) for slot in target_slots], transitionMode="jormungandr_compact"),
-            [configure],
-        )
+            pre_clear_delete_nodes.append(add(_delete_action(old_root, old_gpu, old_physical, slot, workload, "jormungandr_compact"), [wait]))
+        if layout_unchanged and not pre_clear_delete_nodes:
+            register_deps = entry_deps
+        elif preserve_slots:
+            patch = add(
+                _action(
+                    "configure_partial_profile",
+                    root,
+                    gpu_id,
+                    physical_id,
+                    template=_template(target_slots),
+                    deleteSlots=[list(slot) for slot in sorted(set(delete_slots))],
+                    createSlots=[list(slot) for slot in sorted(set(create_slots))],
+                    preserveSlots=[list(slot) for slot in sorted(set(preserve_slots))],
+                    deleteSpec=_slot_spec(sorted(set(delete_slots))),
+                    createSpec=_slot_spec(sorted(set(create_slots))),
+                    preserveSpec=_slot_spec(sorted(set(preserve_slots))),
+                    transitionMode="jormungandr_compact",
+                ),
+                pre_clear_delete_nodes or entry_deps,
+            )
+            register = add(
+                _action("register_mig_devices", root, gpu_id, physical_id, slots=[list(slot) for slot in target_slots], transitionMode="jormungandr_compact"),
+                [patch],
+            )
+            register_deps = [register]
+        else:
+            clear = add(
+                _action(
+                    "clear_template",
+                    root,
+                    gpu_id,
+                    physical_id,
+                    template="+".join(str(_profile_size(slot[2])) for slot in target_slots),
+                    deleteSlots=[list(slot) for slot in target_slots],
+                    slotCount=len(target_slots),
+                    transitionMode="jormungandr_compact",
+                ),
+                pre_clear_delete_nodes or entry_deps,
+            )
+            configure = add(
+                _action(
+                    "configure_full_template",
+                    root,
+                    gpu_id,
+                    physical_id,
+                    template=_template(target_slots),
+                    createSpec=_slot_spec(target_slots),
+                    slots=[list(slot) for slot in target_slots],
+                    transitionMode="jormungandr_compact",
+                ),
+                [clear],
+            )
+            register = add(
+                _action("register_mig_devices", root, gpu_id, physical_id, slots=[list(slot) for slot in target_slots], transitionMode="jormungandr_compact"),
+                [configure],
+            )
+            register_deps = [register]
         for raw_inst in sorted(list(repartition.get("instances") or []), key=lambda item: (int(item["start"]), int(item["end"]), str(item["workload"]))):
-            slot = (int(raw_inst["start"]), int(raw_inst["end"]), str(raw_inst["profile"]))
+            slot = _physical_slot(raw_inst["start"], raw_inst["end"], raw_inst["profile"])
             workload = str(raw_inst["workload"])
             batch = int(raw_inst.get("batch") or 1)
             mu = float(raw_inst.get("mu") or 0.0)
-            place = add(_instance_action("place_instance", root, gpu_id, physical_id, slot, workload, batch, mu, "jormungandr_compact"), [register])
-            compact_terminals.append(add(_instance_action("activate_instance_route", root, gpu_id, physical_id, slot, workload, batch, mu, "jormungandr_compact"), [place]))
+            move_info = compact_source_by_target.get((gpu_id, int(raw_inst["start"]), int(raw_inst["end"]), str(raw_inst["profile"]), workload))
+            if move_info is not None:
+                move_type, source_inst = move_info
+                if move_type == "keep_container" and _same_instance_location(source_inst, raw_inst) and layout_unchanged:
+                    continue
+            place = add(_instance_action("place_instance", root, gpu_id, physical_id, slot, workload, batch, mu, "jormungandr_compact"), register_deps)
+            activate = add(_instance_action("activate_instance_route", root, gpu_id, physical_id, slot, workload, batch, mu, "jormungandr_compact"), [place])
+            compact_terminals.append(activate)
+            target_activation_nodes[target_instance_key(raw_inst)] = activate
+            if move_info is None:
+                continue
+            move_type, source_inst = move_info
+            old = dict(source_inst)
+            old_origin = str(old.get("origin") or "")
+            old_gpu = int(old.get("gpu_id", gpu_id))
+            old_physical = exchange_physical_ids.get(old_gpu) if old_origin == "exchange" else source_physical_ids.get(old_gpu)
+            if not old_physical:
+                continue
+            old_slot = _physical_slot(old["start"], old["end"], old["profile"])
+            old_workload = str(old["workload"])
+            old_key = (old_physical, old_slot[0], old_slot[1], old_slot[2], old_workload)
+            if old_key in predeleted_source_keys:
+                continue
+            predeleted_source_keys.add(old_key)
+            old_root = f"{root}_MIGRATE_SOURCE_{old_gpu}_{old_slot[0]}_{old_slot[1]}_{old_slot[2]}"
+            deactivate = add(_route_action("deactivate_instance_route", old_root, old_gpu, old_physical, old_slot, old_workload, "jormungandr_compact"), [activate])
+            wait = add(_route_action("wait_instance_drain", old_root, old_gpu, old_physical, old_slot, old_workload, "jormungandr_compact"), [deactivate])
+            compact_terminals.append(add(_delete_action(old_root, old_gpu, old_physical, old_slot, old_workload, "jormungandr_compact"), [wait]))
 
+    final_physical_set = set(final_physical_ids.values())
     for item in compact_returns:
         gpu_id = int(item["gpu_id"])
         physical_id = exchange_physical_ids.get(gpu_id)
         if not physical_id:
             continue
+        if gpu_id in final_physical_ids or physical_id in final_physical_set:
+            continue
         root = f"JORM_RETURN_EXCHANGE_GPU_{gpu_id}"
-        clear = add(_action("clear_template", root, f"jorm-exchange-{gpu_id}", physical_id, transitionMode="jormungandr_compact"), compact_terminals or exchange_terminals)
+        return_delete_nodes: list[str] = []
+        delete_entry_deps = compact_terminals or exchange_terminals
+        for create in sorted(exchange_containers.get(gpu_id, []), key=lambda action: str(action.get("id"))):
+            inst = dict(create.get("instance") or {})
+            slot = _physical_slot(inst["start"], inst["end"], inst["profile"])
+            workload = str(inst["workload"])
+            old_root = f"{root}_OLD_{slot[0]}_{slot[1]}_{slot[2]}_{workload}"
+            deactivate = add(
+                _route_action("deactivate_instance_route", old_root, f"jorm-exchange-{gpu_id}", physical_id, slot, workload, "jormungandr_compact"),
+                delete_entry_deps,
+            )
+            wait = add(_route_action("wait_instance_drain", old_root, f"jorm-exchange-{gpu_id}", physical_id, slot, workload, "jormungandr_compact"), [deactivate])
+            return_delete_nodes.append(add(_delete_action(old_root, f"jorm-exchange-{gpu_id}", physical_id, slot, workload, "jormungandr_compact"), [wait]))
+        clear = add(
+            _action("clear_template", root, f"jorm-exchange-{gpu_id}", physical_id, transitionMode="jormungandr_compact"),
+            return_delete_nodes or compact_terminals or exchange_terminals,
+        )
         add(_action("return_gpu", root, f"jorm-exchange-{gpu_id}", physical_id, transitionMode="jormungandr_compact"), [clear])
 
-    final_physical_set = set(final_physical_ids.values())
     exchange_physical_set = set(exchange_physical_ids.values())
     for source_gpu_id, physical_id in sorted(source_physical_ids.items()):
         if not physical_id or physical_id in final_physical_set or physical_id in exchange_physical_set:
@@ -577,7 +1072,31 @@ def _slot_spec(slots: list[tuple[int, int, str]] | tuple[tuple[int, int, str], .
 
 
 def _profile_size(profile: str) -> int:
-    return {"7g": 7, "4g": 4, "3g": 3, "2g": 2, "1g": 1}.get(str(profile), 0)
+    return LOGICAL_PROFILE_SIZE.get(str(profile), 0)
+
+
+def _physical_slot(start: Any, end: Any, profile: Any) -> tuple[int, int, str]:
+    profile_name = str(profile)
+    slot_start = int(start)
+    return (slot_start, _physical_end(slot_start, profile_name), profile_name)
+
+
+def _same_instance_location(source: dict[str, Any], target: dict[str, Any]) -> bool:
+    return (
+        int(source.get("gpu_id", -1)) == int(target.get("gpu_id", -2))
+        and int(source.get("start", -1)) == int(target.get("start", -2))
+        and int(source.get("end", -1)) == int(target.get("end", -2))
+        and str(source.get("profile")) == str(target.get("profile"))
+        and str(source.get("workload")) == str(target.get("workload"))
+    )
+
+
+def _physical_end(start: int, profile: str) -> int:
+    return start + PHYSICAL_PROFILE_SIZE.get(str(profile), int(PHYSICAL_PROFILE_SIZE["1g"]))
+
+
+def _logical_end(start: int, profile: str) -> int:
+    return start + LOGICAL_PROFILE_SIZE.get(str(profile), int(LOGICAL_PROFILE_SIZE["1g"]))
 
 
 def _yamlable(value: Any) -> Any:

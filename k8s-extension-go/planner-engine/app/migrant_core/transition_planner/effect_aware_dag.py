@@ -439,8 +439,13 @@ def _new_temp_gpu_target(
         for pid in source_state.metadata.get("free_physical_gpu_pool", [])
         if pid is not None and str(pid) not in active_pids and str(pid) not in occupied_temp_physical_ids
     ]
-    never_seen = [pid for pid in PHYSICAL_ID_POOL if pid not in active_pids and pid not in free_pool and pid not in occupied_temp_physical_ids]
-    candidates = list(free_pool) + never_seen
+    if str(source_state.metadata.get("source", "")).startswith("go-cluster-state-manager"):
+        candidates = list(free_pool)
+        if not candidates:
+            return None
+    else:
+        never_seen = [pid for pid in PHYSICAL_ID_POOL if pid not in active_pids and pid not in free_pool and pid not in occupied_temp_physical_ids]
+        candidates = list(free_pool) + never_seen
     if not candidates:
         return None
     used_gpu_ids = set(src_map) | set(target_map) | set(occupied_temp_gpu_ids)

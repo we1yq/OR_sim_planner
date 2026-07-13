@@ -1,14 +1,14 @@
 package system
 
 type PlanningInput struct {
-	Source                string             `json:"source"`
-	Mode                  string             `json:"mode"`
-	Planner               string             `json:"planner,omitempty"`
-	Epoch                 string             `json:"epoch"`
-	WindowSeconds         int                `json:"windowSeconds"`
-	Unit                  string             `json:"unit"`
-	ObservedAt            string             `json:"observedAt"`
-	TriggerReason         string             `json:"triggerReason"`
+	Source                 string             `json:"source"`
+	Mode                   string             `json:"mode"`
+	Planner                string             `json:"planner,omitempty"`
+	Epoch                  string             `json:"epoch"`
+	WindowSeconds          int                `json:"windowSeconds"`
+	Unit                   string             `json:"unit"`
+	ObservedAt             string             `json:"observedAt"`
+	TriggerReason          string             `json:"triggerReason"`
 	SourceArrival          map[string]float64 `json:"sourceArrival,omitempty"`
 	TargetArrival          map[string]float64 `json:"targetArrival"`
 	RegisteredSLOMs        map[string]float64 `json:"registeredSLOMs"`

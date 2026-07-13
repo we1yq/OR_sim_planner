@@ -1,0 +1,54 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: MigActionPlan
+metadata:
+  name: repair-jorm-rtx1-gpu0-return-20260710
+  namespace: or-sim-exp
+  labels:
+    app.kubernetes.io/name: migrant-go
+    mig.or-sim.io/component: real-3gpu-k8s-runner
+    mig.or-sim.io/plan-type: repair
+spec:
+  abstractActions: []
+  actionCount: 2
+  actionDag:
+    format: migrant.action-dag/v1
+    name: repair-jorm-rtx1-gpu0-return-20260710
+    nodes:
+      - id: repair-clear-binding-rtx1-worker-gpu0
+        index: 0
+        phase: 0
+        type: clear_gpu_binding
+        action:
+          type: clear_gpu_binding
+          abstractAction: Clear GPU Binding
+          node: rtx1-worker
+          gpuIndex: 0
+          gpu: rtx1-worker-gpu0
+          physicalGpuId: rtx1-worker-gpu0
+          physical_gpu_id: rtx1-worker-gpu0
+      - id: repair-return-gpu-rtx1-worker-gpu0
+        index: 1
+        phase: 1
+        type: return_gpu
+        dependsOn:
+          - repair-clear-binding-rtx1-worker-gpu0
+        action:
+          type: return_gpu
+          abstractAction: Return GPU
+          node: rtx1-worker
+          gpuIndex: 0
+          gpu: rtx1-worker-gpu0
+          physicalGpuId: rtx1-worker-gpu0
+          physical_gpu_id: rtx1-worker-gpu0
+  currentAllocationRef: physicalgpuregistries/default
+  executor: go-transition-executor
+  phaseGate: auto
+  plannerMetadata:
+    planner: manual-state-repair
+    reason: Clear pending rtx1 binding left by failed Jormungandr configure
+  summary:
+    desiredRuntimes: []
+    planType: repair
+    sourceGpuCount: 0
+    targetGpuCount: 0
+  targetGpuCount: 0

@@ -105,6 +105,8 @@ var profileToPlacementSize = map[string]int{
 	"7g": 8,
 }
 
+var migMutationMu sync.Mutex
+
 var gpuIndexRe = regexp.MustCompile(`^[0-9]+$`)
 var giLineRe = regexp.MustCompile(`^\|\s+([0-9]+)\s+(MIG [0-9]+g\.[0-9]+gb)\s+([0-9]+)\s+([0-9]+)\s+([0-9]+):([0-9]+)\s+\|`)
 var migUUIDLineRe = regexp.MustCompile(`^MIG ([0-9]+g\.[0-9]+gb)\s+Device\s+[0-9]+:\s+\(UUID:\s+([^)]+)\)`)
@@ -273,11 +275,16 @@ func runHTTPAPI(addr, lockPath string) error {
 		}
 		gpuIndex := queryDefault(r, "gpuIndex", "0")
 		res := withLock(lockPath, "clear", gpuIndex, func() result {
-			clearMIG(gpuIndex)
-			out, err := run("nvidia-smi", "-L")
-			result := result{Command: "clear", GPUIndex: gpuIndex, Success: err == nil, NvidiaSMIL: out}
-			if err != nil {
-				result.Message = err.Error()
+			clearErr := clearMIG(gpuIndex)
+			out, listErr := run("nvidia-smi", "-L")
+			success := clearErr == nil && listErr == nil && !gpuBlockHasMIG(out, gpuIndex)
+			result := result{Command: "clear", GPUIndex: gpuIndex, Success: success, NvidiaSMIL: out}
+			if clearErr != nil {
+				result.Message = clearErr.Error()
+			} else if listErr != nil {
+				result.Message = listErr.Error()
+			} else if !success {
+				result.Message = "target GPU still has MIG devices after clear"
 			}
 			return result
 		})
@@ -681,8 +688,19 @@ func patchSlots(gpuIndex, deleteArg, createArg, preserveArg string) result {
 	}
 }
 
-func clearMIG(gpuIndex string) {
-	_ = destroyMIG(gpuIndex)
+func clearMIG(gpuIndex string) error {
+	deadline := time.Now().Add(15 * time.Second)
+	var lastErr error
+	for {
+		lastErr = destroyMIG(gpuIndex)
+		if lastErr == nil {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return lastErr
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 func refreshCDI(gpuIndex string) result {
@@ -794,7 +812,9 @@ func run(name string, args ...string) (string, error) {
 			commandName = "/host/usr/bin/nvidia-smi"
 		}
 	}
-	cmd := exec.Command(commandName, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, commandName, args...)
 	cmd.Env = append(
 		os.Environ(),
 		"LD_LIBRARY_PATH=/host/usr/lib/x86_64-linux-gnu:/host/usr/lib64:/host/lib/x86_64-linux-gnu",
@@ -805,6 +825,9 @@ func run(name string, args ...string) (string, error) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	out := stdout.String() + stderr.String()
+	if ctx.Err() == context.DeadlineExceeded {
+		return out, fmt.Errorf("%s %s timed out after 30s", commandName, strings.Join(args, " "))
+	}
 	if err != nil {
 		return out, fmt.Errorf("%s %s failed: %w", commandName, strings.Join(args, " "), err)
 	}
@@ -976,15 +999,15 @@ func validateSlotPatch(deleteSpecs, createSpecs, preserveSpecs []slotSpec) error
 	if err := rejectOverlaps("preserve", preserveSpecs); err != nil {
 		return err
 	}
-	for _, create := range createSpecs {
-		if !slotCoveredByUnion(create, deleteSpecs) {
-			return fmt.Errorf("create slot %s is not fully covered by deleted space", formatSlot(create))
-		}
-	}
 	for _, preserve := range preserveSpecs {
 		for _, del := range deleteSpecs {
 			if slotsOverlap(preserve, del) {
 				return fmt.Errorf("preserve slot %s overlaps delete slot %s", formatSlot(preserve), formatSlot(del))
+			}
+		}
+		for _, create := range createSpecs {
+			if slotsOverlap(preserve, create) {
+				return fmt.Errorf("preserve slot %s overlaps create slot %s", formatSlot(preserve), formatSlot(create))
 			}
 		}
 	}
@@ -1106,10 +1129,10 @@ func migSlotsFromObservation(nvidiaSMIL string, instances []gpuInstance, gpuInde
 		shortProfile := canonicalProfile(inst.Name)
 		uuids := uuidsByProfile[fullProfile]
 		used := usedByProfile[fullProfile]
-		uuid := ""
-		if used < len(uuids) {
-			uuid = uuids[used]
+		if used >= len(uuids) {
+			continue
 		}
+		uuid := uuids[used]
 		usedByProfile[fullProfile] = used + 1
 		out = append(out, migSlot{
 			SlotStart:     inst.Start,
@@ -1151,17 +1174,21 @@ func atoiStrict(value string) int {
 }
 
 func acquireLock(path string) (func(), error) {
+	migMutationMu.Lock()
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
+		migMutationMu.Unlock()
 		return nil, err
 	}
 	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
 		_ = file.Close()
+		migMutationMu.Unlock()
 		return nil, err
 	}
 	return func() {
 		_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
 		_ = file.Close()
+		migMutationMu.Unlock()
 	}, nil
 }
 
@@ -1623,6 +1650,7 @@ func discoverSlotDevices(nodeName string) ([]slotDevice, error) {
 		byPlacement[slotPlacementKey(slot.PhysicalGPUID, slot.SlotStart, slot.SlotEnd, slot.Profile)] = i
 	}
 	gpuUUIDs := parseGPUUUIDs(smi)
+	uuidDevices := map[string]slotDevice{}
 	for gpuIndex := range gpuUUIDs {
 		instances, _, err := listGPUInstances(gpuIndex)
 		if err != nil {
@@ -1635,10 +1663,24 @@ func discoverSlotDevices(nodeName string) ([]slotDevice, error) {
 			}
 			physicalID := fmt.Sprintf("%s-gpu%s", nodeName, gpuIndex)
 			key := slotPlacementKey(physicalID, slot.SlotStart, slot.SlotEnd, slot.Profile)
+			device := slotDevice{
+				ResourceName:  migUUIDResourceName(slot.MIGDeviceUUID),
+				SocketName:    socketNameForResource(migUUIDResourceName(slot.MIGDeviceUUID)),
+				PhysicalGPUID: physicalID,
+				GPUIndex:      gpuIndex,
+				SlotStart:     slot.SlotStart,
+				SlotEnd:       slot.SlotEnd,
+				Profile:       slot.Profile,
+				MIGUUID:       slot.MIGDeviceUUID,
+			}
+			uuidDevices[device.ResourceName] = device
 			if i, ok := byPlacement[key]; ok {
 				slots[i].MIGUUID = slot.MIGDeviceUUID
 			}
 		}
+	}
+	for _, device := range uuidDevices {
+		slots = append(slots, device)
 	}
 	sort.Slice(slots, func(i, j int) bool { return slots[i].ResourceName < slots[j].ResourceName })
 	return slots, nil

@@ -60,20 +60,34 @@ def plan_exchange_and_compact(
     source = _flatten_allocation(source_alloc, origin="source")
     target = _flatten_allocation(target_alloc, origin="target")
 
-    matched, additions, removals = _diff_instances_by_model_and_profile(source, target)
-    exchange_pairs, unpaired_additions, remaining_removals = _pair_exchange_instances(additions, removals)
-    exchange_plan = _build_exchange_phase(
-        source=source,
-        matched=matched,
-        exchange_pairs=exchange_pairs,
-        unpaired_additions=unpaired_additions,
-        remaining_removals=remaining_removals,
-    )
-    compact_plan = _build_compact_phase(
-        target_alloc=target_alloc,
-        carried_instances=exchange_plan["carried_instances"],
-        exchange_gpu_ids=exchange_plan["exchange_gpu_ids"],
-    )
+    if source:
+        matched, additions, removals = _diff_instances_by_model_and_profile(source, target)
+        exchange_pairs, unpaired_additions, remaining_removals = _pair_exchange_instances(additions, removals)
+        exchange_plan = _build_exchange_phase(
+            source=source,
+            matched=matched,
+            exchange_pairs=exchange_pairs,
+            unpaired_additions=unpaired_additions,
+            remaining_removals=remaining_removals,
+        )
+        compact_plan = _build_compact_phase(
+            target_alloc=target_alloc,
+            carried_instances=exchange_plan["carried_instances"],
+            exchange_gpu_ids=exchange_plan["exchange_gpu_ids"],
+        )
+    else:
+        additions = []
+        removals = []
+        exchange_pairs = []
+        unpaired_additions = []
+        remaining_removals = []
+        exchange_plan = {
+            "actions": [],
+            "carried_instances": [],
+            "exchange_gpu_count": 0,
+            "exchange_gpu_ids": [],
+        }
+        compact_plan = _build_bootstrap_compact_phase(target_alloc=target_alloc)
     actions = _with_action_ids([*exchange_plan["actions"], *compact_plan["actions"]])
     action_counts = Counter(str(action["type"]) for action in actions)
     elapsed = time.perf_counter() - start
@@ -261,41 +275,43 @@ def _build_compact_phase(
     carried_instances: list[_Instance],
     exchange_gpu_ids: list[int],
 ) -> dict[str, Any]:
-    target_by_gpu = _target_instances_by_gpu(target_alloc)
-    pool = _pool_by_key(carried_instances)
     actions: list[dict[str, Any]] = []
-    used_carried_ids: set[str] = set()
-    not_full_source_gpus = sorted(
-        gpu_id
-        for gpu_id, used in _used_slices_by_gpu(carried_instances).items()
-        if 0 < used < 7
-    )
     carried_by_gpu: dict[int, list[_Instance]] = defaultdict(list)
     for inst in carried_instances:
         carried_by_gpu[inst.gpu_id].append(inst)
     for gpu_id in carried_by_gpu:
         carried_by_gpu[gpu_id].sort(key=lambda inst: (inst.start, inst.end, inst.workload))
-    target_gpu_templates: dict[int, list[str]] = {}
 
-    for gpu_id, targets in sorted(target_by_gpu.items()):
-        target_gpu_templates[gpu_id] = [target.profile for target in targets]
-        old_instances = carried_by_gpu.get(gpu_id, [])
-        actions.append(
-            {
-                "phase": "compact",
-                "type": "repartition_gpu",
-                "gpu_id": gpu_id,
-                "old_profiles": [inst.profile for inst in old_instances],
-                "old_instances": [_instance_to_dict(inst) for inst in old_instances],
-                "profiles": [target.profile for target in targets],
-                "instances": [_instance_to_dict(target) for target in targets],
-                "reason": "compact_target_gpu",
-            }
+    not_full_source_gpus = sorted(
+        gpu_id
+        for gpu_id, used in _used_slices_by_gpu(carried_instances).items()
+        if 0 < used < 7
+    )
+    target_gpu_templates: dict[int, list[str]] = {}
+    compacted: dict[int, list[_Instance]] = {}
+    remaining_by_key = _pool_by_key(carried_instances)
+    target_gpu_count = _allocation_gpu_count(target_alloc)
+    target_sizes = sorted((sum(inst.size for inst in bucket) for bucket in _target_instances_by_gpu(target_alloc).values()), reverse=True)
+
+    for gpu_id in sorted(carried_by_gpu):
+        if gpu_id in compacted:
+            continue
+        repartition = _compact_gpu_once(
+            gpu_id=gpu_id,
+            carried_by_gpu=carried_by_gpu,
+            remaining_by_key=remaining_by_key,
+            compacted=compacted,
+            target_sizes=target_sizes,
         )
-        for target in targets:
-            source = _pop_matching_instance(pool, target)
-            used_carried_ids.add(source.instance_id)
-            if _same_location(source, target):
+        target_instances = compacted[gpu_id]
+        if not target_instances and str(repartition.get("reason")) == "compact_empty_gpu":
+            continue
+        actions.append(repartition)
+        target_gpu_templates[gpu_id] = [inst.profile for inst in target_instances]
+        for move in repartition.get("moves", []):
+            source = _instance_from_dict(dict(move["source_instance"]))
+            target = _instance_from_dict(dict(move["target_instance"]))
+            if str(move.get("type")) == "keep_container":
                 actions.append(
                     {
                         "phase": "compact",
@@ -319,14 +335,186 @@ def _build_compact_phase(
                     }
                 )
 
+    if len(compacted) > target_gpu_count:
+        extra_gpus = sorted(compacted, key=lambda item: (sum(inst.size for inst in compacted[item]), item))[target_gpu_count:]
+        for gpu_id in extra_gpus:
+            target_gpu_templates.pop(gpu_id, None)
+            for inst in compacted.pop(gpu_id, []):
+                actions.extend(_delete_container_actions(inst, phase="compact", reason="compact_extra_gpu_delete"))
+
+    if len(compacted) != target_gpu_count:
+        raise RuntimeError(
+            f"Jormungandr compact produced {len(compacted)} GPUs, expected {target_gpu_count}"
+        )
+
     for gpu_id in exchange_gpu_ids:
-        actions.append({"phase": "compact", "type": "return_extra_gpu", "gpu_id": gpu_id})
+        if gpu_id not in compacted:
+            actions.append({"phase": "compact", "type": "return_extra_gpu", "gpu_id": gpu_id})
 
     return {
         "actions": actions,
         "not_full_source_gpus": not_full_source_gpus,
         "target_gpu_templates": target_gpu_templates,
     }
+
+
+def _build_bootstrap_compact_phase(
+    *,
+    target_alloc: dict[str, Any] | AllocationResult,
+) -> dict[str, Any]:
+    target_by_gpu = _target_instances_by_gpu(target_alloc)
+    actions: list[dict[str, Any]] = []
+    target_gpu_templates: dict[int, list[str]] = {}
+    for gpu_id, targets in sorted(target_by_gpu.items()):
+        target_gpu_templates[gpu_id] = [target.profile for target in targets]
+        actions.append(
+            {
+                "phase": "compact",
+                "type": "repartition_gpu",
+                "gpu_id": gpu_id,
+                "old_profiles": [],
+                "old_instances": [],
+                "profiles": [target.profile for target in targets],
+                "instances": [_instance_to_dict(target) for target in targets],
+                "reason": "bootstrap_target_gpu",
+            }
+        )
+    return {
+        "actions": actions,
+        "not_full_source_gpus": [],
+        "target_gpu_templates": target_gpu_templates,
+    }
+
+
+def _compact_gpu_once(
+    *,
+    gpu_id: int,
+    carried_by_gpu: dict[int, list[_Instance]],
+    remaining_by_key: dict[tuple[str, str, int | None], list[_Instance]],
+    compacted: dict[int, list[_Instance]],
+    target_sizes: list[int],
+) -> dict[str, Any]:
+    old_instances = list(carried_by_gpu.get(gpu_id, []))
+    preserved_sources = [
+        inst
+        for inst in old_instances
+        if _remove_remaining_instance(remaining_by_key, inst)
+    ]
+    desired_used = _desired_compact_used_slices(sum(inst.size for inst in preserved_sources), target_sizes)
+    selected = list(preserved_sources)
+    while sum(inst.size for inst in selected) < desired_used:
+        remaining_capacity = desired_used - sum(inst.size for inst in selected)
+        candidate = _pop_best_compact_candidate(remaining_by_key, remaining_capacity)
+        if candidate is None:
+            break
+        selected.append(candidate)
+    if not selected:
+        compacted[gpu_id] = []
+        return {
+            "phase": "compact",
+            "type": "repartition_gpu",
+            "gpu_id": gpu_id,
+            "old_profiles": [inst.profile for inst in old_instances],
+            "old_instances": [_instance_to_dict(inst) for inst in old_instances],
+            "profiles": [],
+            "instances": [],
+            "preserve_instances": [],
+            "create_instances": [],
+            "delete_instances": [_instance_to_dict(source) for source in old_instances],
+            "moves": [],
+            "reason": "compact_empty_gpu",
+        }
+
+    target_slots = _materialize_slots_for_sizes([inst.size for inst in selected])
+    ordered_sources = sorted(selected, key=lambda inst: (-inst.size, inst.workload, inst.instance_id))
+    target_instances = [
+        replace(source, gpu_id=gpu_id, start=slot.start, end=slot.end, origin="target")
+        for slot, source in zip(target_slots, ordered_sources, strict=True)
+    ]
+    compacted[gpu_id] = target_instances
+    source_target_pairs = list(zip(ordered_sources, target_instances, strict=True))
+    preserved_targets = [
+        target
+        for source, target in source_target_pairs
+        if _same_location(source, target) and source.key == target.key
+    ]
+    create_targets = [
+        target
+        for source, target in source_target_pairs
+        if not (_same_location(source, target) and source.key == target.key)
+    ]
+    delete_sources = [
+        source
+        for source in old_instances
+        if not any(source.instance_id == paired_source.instance_id and _same_location(source, target) for paired_source, target in source_target_pairs)
+    ]
+    return {
+        "phase": "compact",
+        "type": "repartition_gpu",
+        "gpu_id": gpu_id,
+        "old_profiles": [inst.profile for inst in old_instances],
+        "old_instances": [_instance_to_dict(inst) for inst in old_instances],
+        "profiles": [target.profile for target in target_instances],
+        "instances": [_instance_to_dict(target) for target in target_instances],
+        "preserve_instances": [_instance_to_dict(target) for target in preserved_targets],
+        "create_instances": [_instance_to_dict(target) for target in create_targets],
+        "delete_instances": [_instance_to_dict(source) for source in delete_sources],
+        "moves": [
+            {
+                "source_instance": _instance_to_dict(source),
+                "target_instance": _instance_to_dict(target),
+                "type": "keep_container" if _same_location(source, target) and source.key == target.key else "migrate_container",
+            }
+            for source, target in source_target_pairs
+        ],
+        "reason": "compact_partial_repartition",
+    }
+
+
+def _desired_compact_used_slices(current_used: int, target_sizes: list[int]) -> int:
+    for size in sorted(target_sizes):
+        if size >= current_used:
+            return size
+    return max(current_used, target_sizes[-1] if target_sizes else current_used)
+
+
+def _remove_remaining_instance(pool: dict[tuple[str, str, int | None], list[_Instance]], inst: _Instance) -> bool:
+    bucket = pool.get(inst.key, [])
+    for idx, candidate in enumerate(bucket):
+        if candidate.instance_id == inst.instance_id:
+            del bucket[idx]
+            return True
+    return False
+
+
+def _pop_best_compact_candidate(pool: dict[tuple[str, str, int | None], list[_Instance]], capacity: int) -> _Instance | None:
+    best_key = None
+    best_idx = -1
+    best_rank = None
+    for key, bucket in pool.items():
+        for idx, inst in enumerate(bucket):
+            if inst.size > capacity:
+                continue
+            rank = (-inst.size, inst.workload, inst.profile, inst.instance_id)
+            if best_rank is None or rank < best_rank:
+                best_key = key
+                best_idx = idx
+                best_rank = rank
+    if best_key is None:
+        return None
+    return pool[best_key].pop(best_idx)
+
+
+def _source_target_pairs_for_compacted_gpu(
+    old_instances: list[_Instance],
+    target_instances: list[_Instance],
+) -> list[tuple[_Instance, _Instance]]:
+    old_by_key = _pool_by_key(old_instances)
+    pairs: list[tuple[_Instance, _Instance]] = []
+    for target in sorted(target_instances, key=_instance_sort_key):
+        source = _pop_matching_instance(old_by_key, target)
+        pairs.append((source, target))
+    return pairs
 
 
 def _place_exchange_instances(instances: list[_Instance], *, first_gpu_id: int) -> list[_Instance]:
@@ -509,6 +697,20 @@ def _instance_to_dict(inst: _Instance) -> dict[str, Any]:
         "gpu_id": inst.gpu_id,
         "origin": inst.origin,
     }
+
+
+def _instance_from_dict(raw: dict[str, Any]) -> _Instance:
+    return _Instance(
+        instance_id=str(raw["instance_id"]),
+        workload=str(raw["workload"]),
+        profile=str(raw["profile"]),
+        start=int(raw["start"]),
+        end=int(raw["end"]),
+        mu=float(raw.get("mu") or 0.0),
+        batch=int(raw["batch"]) if raw.get("batch") is not None else None,
+        gpu_id=int(raw["gpu_id"]),
+        origin=str(raw.get("origin") or "carried"),
+    )
 
 
 def _instance_sort_key(inst: _Instance) -> tuple[int, int, str, str]:
