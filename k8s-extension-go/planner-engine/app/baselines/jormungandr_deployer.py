@@ -404,7 +404,11 @@ def _compact_gpu_once(
     selected = list(preserved_sources)
     while sum(inst.size for inst in selected) < desired_used:
         remaining_capacity = desired_used - sum(inst.size for inst in selected)
-        candidate = _pop_best_compact_candidate(remaining_by_key, remaining_capacity)
+        candidate = _pop_best_compact_candidate(
+            remaining_by_key,
+            remaining_capacity,
+            existing_sizes=[inst.size for inst in selected],
+        )
         if candidate is None:
             break
         selected.append(candidate)
@@ -487,13 +491,20 @@ def _remove_remaining_instance(pool: dict[tuple[str, str, int | None], list[_Ins
     return False
 
 
-def _pop_best_compact_candidate(pool: dict[tuple[str, str, int | None], list[_Instance]], capacity: int) -> _Instance | None:
+def _pop_best_compact_candidate(
+    pool: dict[tuple[str, str, int | None], list[_Instance]],
+    capacity: int,
+    *,
+    existing_sizes: list[int],
+) -> _Instance | None:
     best_key = None
     best_idx = -1
     best_rank = None
     for key, bucket in pool.items():
         for idx, inst in enumerate(bucket):
             if inst.size > capacity:
+                continue
+            if not _can_materialize_sizes([*existing_sizes, inst.size]):
                 continue
             rank = (-inst.size, inst.workload, inst.profile, inst.instance_id)
             if best_rank is None or rank < best_rank:
