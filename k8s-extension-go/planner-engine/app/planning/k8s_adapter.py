@@ -220,6 +220,7 @@ def build_feasible_option_dataframe(
                 "opt_idx": opt_idx,
                 "w_idx": w_idx,
                 "workload": workload.name,
+                "runtimeModel": request.model,
                 "modelKey": option.model_key or request.model_key or request.model or workload.name,
                 "placementGroup": (
                     option.placement_group
@@ -343,6 +344,10 @@ def cluster_state_from_mock_yaml(obj: dict[str, Any]) -> ClusterState:
                 batch=inst.batch,
                 model_key=getattr(inst, "model_key", None),
                 placement_group=getattr(inst, "placement_group", None),
+                runtime_model=getattr(inst, "runtime_model", None),
+                request_class=getattr(inst, "request_class", None),
+                prompt_len=getattr(inst, "prompt_len", None),
+                output_tokens=getattr(inst, "output_tokens", None),
             )
             for inst in raw_gpu.instances
         ]
@@ -368,6 +373,10 @@ def cluster_state_from_dict(obj: dict[str, Any]) -> ClusterState:
                 batch=(int(inst["batch"]) if inst.get("batch") is not None else None),
                 model_key=inst.get("modelKey") or inst.get("model_key"),
                 placement_group=inst.get("placementGroup") or inst.get("placement_group"),
+                runtime_model=inst.get("runtimeModel") or inst.get("runtime_model"),
+                request_class=inst.get("requestClass") or inst.get("request_class"),
+                prompt_len=inst.get("promptLen") or inst.get("prompt_len"),
+                output_tokens=inst.get("outputTokens") or inst.get("output_tokens"),
                 mu=float(inst.get("mu", 0.0)),
                 preserved=bool(inst.get("preserved", False)),
             )
@@ -400,6 +409,10 @@ def cluster_state_to_dict(state: ClusterState) -> dict[str, Any]:
                         "batch": inst.batch,
                         "modelKey": getattr(inst, "model_key", None),
                         "placementGroup": getattr(inst, "placement_group", None),
+                        "runtimeModel": getattr(inst, "runtime_model", None),
+                        "requestClass": getattr(inst, "request_class", None),
+                        "promptLen": getattr(inst, "prompt_len", None),
+                        "outputTokens": getattr(inst, "output_tokens", None),
                         "mu": float(getattr(inst, "mu", 0.0)),
                         "preserved": bool(getattr(inst, "preserved", False)),
                     }

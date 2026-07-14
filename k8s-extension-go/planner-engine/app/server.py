@@ -133,6 +133,9 @@ def plan(payload: dict[str, Any]) -> dict[str, Any]:
         "metadata": {
             "planner": planner_label,
             "requestedPlanner": planner,
+            "plannerPhase": status.get("phase"),
+            "plannerMessage": status.get("message"),
+            "reachedTarget": status.get("reachedTarget"),
             "pipeline": planning_trace.get("pipeline"),
             "metrics": status.get("metrics", {}),
             "planningTrace": planning_trace,
@@ -385,7 +388,11 @@ def instances_from_current_gpu(gpu: dict[str, Any]) -> list[MigInstance]:
                 batch=int(binding.get("batchSize") or binding.get("batch") or 1),
                 model_key=binding.get("modelKey") or binding.get("model_key"),
                 placement_group=binding.get("placementGroup") or binding.get("placement_group"),
-                mu=float(binding.get("mu") or 0.0),
+                runtime_model=binding.get("runtimeModel") or binding.get("runtime_model"),
+                request_class=binding.get("requestClass") or binding.get("request_class"),
+                prompt_len=binding.get("promptLen") or binding.get("prompt_len"),
+                output_tokens=binding.get("outputTokens") or binding.get("output_tokens"),
+                mu=runtime_binding_capacity(binding),
             )
         )
     for device in list(gpu.get("migDevices") or []):
@@ -423,6 +430,27 @@ def instances_from_current_gpu(gpu: dict[str, Any]) -> list[MigInstance]:
     return out
 
 
+def runtime_binding_capacity(binding: dict[str, Any]) -> float:
+    for key in ("mu", "capacity", "weight"):
+        value = positive_float(binding.get(key))
+        if value > 0.0:
+            return value
+    route = binding.get("route") if isinstance(binding.get("route"), dict) else {}
+    for key in ("capacity", "weight"):
+        value = positive_float(route.get(key))
+        if value > 0.0:
+            return value
+    return 0.0
+
+
+def positive_float(value: Any) -> float:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return out if out > 0.0 else 0.0
+
+
 def parse_slot_resource(value: str) -> tuple[int, int, str] | None:
     match = re.search(r"-s([0-9]+)-([0-9]+)-([0-9]g)$", value)
     if not match:
@@ -454,17 +482,25 @@ def desired_runtimes_from_target_state(target_state: dict[str, Any], planning_tr
                 continue
             start, end = int(inst["start"]), int(inst["end"])
             model = str(workload)
+            runtime_model = str(inst.get("runtimeModel") or inst.get("runtime_model") or model)
             model_key = str(inst.get("modelKey") or inst.get("model_key") or model)
             placement_group = str(
                 inst.get("placementGroup") or inst.get("placement_group") or model_key
             )
+            request_class = inst.get("requestClass") or inst.get("request_class")
+            prompt_len = inst.get("promptLen") or inst.get("prompt_len")
+            output_tokens = inst.get("outputTokens") or inst.get("output_tokens")
             runtime_id = runtime_id_for(model, physical_id, start, end, profile)
             mu = float(inst.get("mu") or 0.0)
             runtimes.append(
                 {
                     "model": model,
+                    "runtimeModel": runtime_model,
                     "modelKey": model_key,
                     "placementGroup": placement_group,
+                    "requestClass": request_class,
+                    "promptLen": prompt_len,
+                    "outputTokens": output_tokens,
                     "runtimeId": runtime_id,
                     "batchSize": int(inst.get("batch") or 1),
                     "node": node,
@@ -496,18 +532,29 @@ def desired_runtimes_from_actions(actions: list[dict[str, Any]], target_state: d
                 continue
             start, end, profile = int(slot[0]), int(slot[1]), str(slot[2])
             model = str(workload)
+            runtime_model = str(record.get("runtimeModel") or record.get("runtime_model") or model)
             model_key = str(record.get("modelKey") or record.get("model_key") or model)
             placement_group = str(
                 record.get("placementGroup") or record.get("placement_group") or model_key
             )
+            request_class = record.get("requestClass") or record.get("request_class")
+            prompt_len = record.get("promptLen") or record.get("prompt_len")
+            output_tokens = record.get("outputTokens") or record.get("output_tokens")
             runtime_id = runtime_id_for(model, physical_id, start, end, profile)
             mu = float(record.get("mu") or 0.0)
+            batch = record.get("batch")
+            if batch is None:
+                batch = action.get("batch") or action.get("batchSize")
             by_key[(model, physical_id, start, end, profile)] = {
                 "model": model,
+                "runtimeModel": runtime_model,
                 "modelKey": model_key,
                 "placementGroup": placement_group,
+                "requestClass": request_class,
+                "promptLen": prompt_len,
+                "outputTokens": output_tokens,
                 "runtimeId": runtime_id,
-                "batchSize": int(record.get("batch") or 1),
+                "batchSize": int(batch or 1),
                 "node": node,
                 "profile": profile,
                 "gpu": physical_id,
