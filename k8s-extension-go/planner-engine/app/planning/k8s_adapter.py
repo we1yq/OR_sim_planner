@@ -100,6 +100,7 @@ def plan_scenario_as_migplan_status(
         arrival_rate=target_arrival,
         n_workloads=len(workload_names),
         warm_start_res=milp_warm_start_res,
+        current_workload_profile_counts=current_workload_profile_counts(source_state),
         time_limit_s=milp_time_limit_s,
         verbose=verbose,
     )
@@ -654,6 +655,19 @@ def _zero_arrival_requires_cleanup(
     return False
 
 
+def current_workload_profile_counts(state: ClusterState | None) -> dict[tuple[str, str], int]:
+    if state is None:
+        return {}
+    counts: dict[tuple[str, str], int] = {}
+    for gpu in state.real_gpus():
+        for inst in gpu.instances:
+            if inst.profile in {"void", "unusable"} or inst.workload is None:
+                continue
+            key = (str(inst.workload), str(inst.profile))
+            counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
 def _planning_trace(
     scenario: PlanningScenario,
     source_state: ClusterState,
@@ -708,7 +722,7 @@ def _planning_trace(
             "stage2ElapsedSec": stage2_elapsed_sec,
             "stage3ElapsedSec": stage3_elapsed_sec,
             "stage1Name": "target_allocation_milp",
-            "stage2Name": "target_materialization",
+            "stage2Name": "exact_global_stage2_milp",
             "stage3Name": str(transition_res.get("requested_transition_planner", "effect_aware_dag")),
             "excludedCommonPreprocessingSec": float(feasible_elapsed_sec),
         },
@@ -726,6 +740,8 @@ def _planning_trace(
             "totalSlack": milp_res.get("total_slack"),
             "totalElasticSlack": milp_res.get("total_elastic_slack"),
             "totalRemainingSlots": milp_res.get("total_remaining_slots"),
+            "totalLogicalDelta": milp_res.get("total_logical_delta"),
+            "stage1ObjectiveMode": milp_res.get("stage1_objective_mode"),
             "usedProfileTypes": milp_res.get("used_profile_types"),
             "chosenTemplates": list(milp_res.get("chosen_templates", [])),
             "KTotal": _to_yamlable(milp_res.get("K_total", {})),

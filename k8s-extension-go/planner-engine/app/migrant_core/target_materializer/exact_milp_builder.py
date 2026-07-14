@@ -243,6 +243,14 @@ def _build_target_state_exact_milp_aggregated(
     prev_by_id = gpu_map_by_id(prev_state) if prev_state is not None else {}
     old_slots = _prev_slot_map(prev_state)
     current_ids = sorted(prev_by_id)
+    cold_start_mode = len(current_ids) == 0 and gpu_count > 0
+    modeled_gpu_ids = list(range(gpu_count)) if cold_start_mode else current_ids
+    current_gpu_count = len(current_ids)
+    reused_current_gpu_count = 0 if cold_start_mode else min(current_gpu_count, gpu_count)
+    indexed_new_gpu_count = gpu_count if cold_start_mode else 0
+    aggregated_new_gpu_count = 0 if cold_start_mode else max(0, gpu_count - current_gpu_count)
+    new_gpu_count = indexed_new_gpu_count + aggregated_new_gpu_count
+    selected_modeled_gpu_count = gpu_count if cold_start_mode else reused_current_gpu_count
     next_gpu_id = max(current_ids, default=-1) + 1
 
     if gpu_count == 0 and demand_count > 0:
@@ -259,10 +267,10 @@ def _build_target_state_exact_milp_aggregated(
     if threads is not None:
         model.Params.Threads = int(threads)
 
-    q = {gpu_id: model.addVar(vtype=GRB.BINARY, name=f"q_{gpu_id}") for gpu_id in current_ids}
+    q = {gpu_id: model.addVar(vtype=GRB.BINARY, name=f"q_{gpu_id}") for gpu_id in modeled_gpu_ids}
     z = {
         (gpu_id, layout.layout_id): model.addVar(vtype=GRB.BINARY, name=f"z_{gpu_id}_{layout.layout_id}")
-        for gpu_id in current_ids
+        for gpu_id in modeled_gpu_ids
         for layout in layouts
     }
     new_count = {
@@ -272,7 +280,7 @@ def _build_target_state_exact_milp_aggregated(
 
     c_cur = {}
     for type_idx, demand in enumerate(demand_types):
-        for gpu_id in current_ids:
+        for gpu_id in modeled_gpu_ids:
             for profile in profiles:
                 if not profile_compatible(str(demand["profile"]), profile):
                     continue
@@ -284,23 +292,24 @@ def _build_target_state_exact_milp_aggregated(
                 )
 
     c_new = {}
-    for type_idx, demand in enumerate(demand_types):
-        for layout in layouts:
-            for profile in profiles:
-                if layout_caps[layout.layout_id].get(profile, 0) <= 0:
-                    continue
-                if not profile_compatible(str(demand["profile"]), profile):
-                    continue
-                c_new[(type_idx, layout.layout_id, profile)] = model.addVar(
-                    vtype=GRB.INTEGER,
-                    lb=0,
-                    ub=int(demand["count"]),
-                    name=f"n_{type_idx}_{layout.layout_id}_{profile}",
-                )
+    if not cold_start_mode:
+        for type_idx, demand in enumerate(demand_types):
+            for layout in layouts:
+                for profile in profiles:
+                    if layout_caps[layout.layout_id].get(profile, 0) <= 0:
+                        continue
+                    if not profile_compatible(str(demand["profile"]), profile):
+                        continue
+                    c_new[(type_idx, layout.layout_id, profile)] = model.addVar(
+                        vtype=GRB.INTEGER,
+                        lb=0,
+                        ub=int(demand["count"]),
+                        name=f"n_{type_idx}_{layout.layout_id}_{profile}",
+                    )
 
     y = {}
     for type_idx, demand in enumerate(demand_types):
-        for gpu_id in current_ids:
+        for gpu_id in modeled_gpu_ids:
             for layout in layouts:
                 for slot_idx, slot in enumerate(layout.slots):
                     if not profile_compatible(str(demand["profile"]), str(slot[2])):
@@ -318,7 +327,15 @@ def _build_target_state_exact_milp_aggregated(
         gp.quicksum(q.values()) + gp.quicksum(new_count.values()) == gpu_count,
         name="fixed_gpu_count",
     )
-    for gpu_id in current_ids:
+    model.addConstr(
+        gp.quicksum(q.values()) == selected_modeled_gpu_count,
+        name="fixed_modeled_gpu_count",
+    )
+    model.addConstr(
+        gp.quicksum(new_count.values()) == aggregated_new_gpu_count,
+        name="fixed_aggregated_new_gpu_count",
+    )
+    for gpu_id in modeled_gpu_ids:
         model.addConstr(
             gp.quicksum(z[(gpu_id, layout.layout_id)] for layout in layouts) == q[gpu_id],
             name=f"layout_select_{gpu_id}",
@@ -336,7 +353,7 @@ def _build_target_state_exact_milp_aggregated(
     for (type_idx, gpu_id, layout_id, slot_idx), var in y.items():
         model.addConstr(var <= z[(gpu_id, layout_id)], name=f"preserve_slot_active_{type_idx}_{gpu_id}_{layout_id}_{slot_idx}")
 
-    for gpu_id in current_ids:
+    for gpu_id in modeled_gpu_ids:
         for profile in profiles:
             cur_terms = [
                 var
@@ -421,26 +438,60 @@ def _build_target_state_exact_milp_aggregated(
             name=f"whole_no_extra_assignments_{gpu_id}",
         )
 
-    p_gpu = gp.quicksum(a.values())
-    p_exact = gp.quicksum(
-        _exact_coeff(demand_types[type_idx], gpu_id, layouts[layout_id].slots[slot_idx], old_slots) * var
-        for (type_idx, gpu_id, layout_id, slot_idx), var in y.items()
-    )
-    p_upgrade = gp.quicksum(
-        _upgrade_coeff(demand_types[type_idx], gpu_id, layouts[layout_id].slots[slot_idx], old_slots) * var
-        for (type_idx, gpu_id, layout_id, slot_idx), var in y.items()
-    )
-    p_mig = gp.quicksum(
-        _mig_preserve_coeff(gpu_id, layout, old_slots) * z[(gpu_id, layout.layout_id)]
-        for gpu_id in current_ids
-        for layout in layouts
-    )
-
     model.ModelSense = GRB.MAXIMIZE
-    model.setObjectiveN(p_gpu, index=0, priority=4, weight=1.0, abstol=0.0, reltol=0.0, name="whole_gpu")
-    model.setObjectiveN(p_exact, index=1, priority=3, weight=1.0, abstol=0.0, reltol=0.0, name="exact_workload")
-    model.setObjectiveN(p_upgrade, index=2, priority=2, weight=1.0, abstol=0.0, reltol=0.0, name="upgrade_workload")
-    model.setObjectiveN(p_mig, index=3, priority=1, weight=1.0, abstol=0.0, reltol=0.0, name="mig_placement")
+    cold_workload_gpu = {}
+    cold_workload_gpu_incidence = None
+    if cold_start_mode:
+        workloads = sorted({str(demand["workload"]) for demand in demand_types})
+        max_count_by_workload = {
+            workload: sum(int(demand["count"]) for demand in demand_types if str(demand["workload"]) == workload)
+            for workload in workloads
+        }
+        for workload in workloads:
+            for gpu_id in modeled_gpu_ids:
+                cold_workload_gpu[(workload, gpu_id)] = model.addVar(
+                    vtype=GRB.BINARY,
+                    name=f"cold_workload_gpu_{workload}_{gpu_id}",
+                )
+                assign_terms = [
+                    var
+                    for (type_idx, gid, _), var in c_cur.items()
+                    if gid == gpu_id and str(demand_types[type_idx]["workload"]) == workload
+                ]
+                model.addConstr(
+                    gp.quicksum(assign_terms) <= max_count_by_workload[workload] * cold_workload_gpu[(workload, gpu_id)],
+                    name=f"cold_workload_gpu_active_{workload}_{gpu_id}",
+                )
+        cold_workload_gpu_incidence = gp.quicksum(cold_workload_gpu.values())
+        model.setObjectiveN(
+            -cold_workload_gpu_incidence,
+            index=0,
+            priority=1,
+            weight=1.0,
+            abstol=0.0,
+            reltol=0.0,
+            name="cold_workload_collocation",
+        )
+    else:
+        p_gpu = gp.quicksum(a.values())
+        p_exact = gp.quicksum(
+            _exact_coeff(demand_types[type_idx], gpu_id, layouts[layout_id].slots[slot_idx], old_slots) * var
+            for (type_idx, gpu_id, layout_id, slot_idx), var in y.items()
+        )
+        p_upgrade = gp.quicksum(
+            _upgrade_coeff(demand_types[type_idx], gpu_id, layouts[layout_id].slots[slot_idx], old_slots) * var
+            for (type_idx, gpu_id, layout_id, slot_idx), var in y.items()
+        )
+        p_mig = gp.quicksum(
+            _mig_preserve_coeff(gpu_id, layout, old_slots) * z[(gpu_id, layout.layout_id)]
+            for gpu_id in current_ids
+            for layout in layouts
+        )
+
+        model.setObjectiveN(p_gpu, index=0, priority=4, weight=1.0, abstol=0.0, reltol=0.0, name="whole_gpu")
+        model.setObjectiveN(p_exact, index=1, priority=3, weight=1.0, abstol=0.0, reltol=0.0, name="exact_workload")
+        model.setObjectiveN(p_upgrade, index=2, priority=2, weight=1.0, abstol=0.0, reltol=0.0, name="upgrade_workload")
+        model.setObjectiveN(p_mig, index=3, priority=1, weight=1.0, abstol=0.0, reltol=0.0, name="mig_placement")
 
     model.optimize()
     status = _status_name(model.Status, GRB)
@@ -448,7 +499,7 @@ def _build_target_state_exact_milp_aggregated(
         raise RuntimeError(f"Exact Stage 2 MILP produced no solution; status={status}")
 
     selected_layout_by_gpu: dict[int, PhysicalLayout] = {}
-    active_current_ids = [gpu_id for gpu_id in current_ids if q[gpu_id].X > 0.5]
+    active_current_ids = [gpu_id for gpu_id in modeled_gpu_ids if q[gpu_id].X > 0.5]
     for gpu_id in active_current_ids:
         selected = [layout for layout in layouts if z[(gpu_id, layout.layout_id)].X > 0.5]
         if len(selected) != 1:
@@ -534,19 +585,26 @@ def _build_target_state_exact_milp_aggregated(
         target.metadata["arrivals"] = {}
     target.metadata["build_method"] = "exact_global_milp_aggregated"
 
-    score_tuple = (
-        int(round(p_gpu.getValue())),
-        int(round(p_exact.getValue())),
-        int(round(p_upgrade.getValue())),
-        int(round(p_mig.getValue())),
-    )
+    if cold_start_mode:
+        score_tuple = (
+            -int(round(cold_workload_gpu_incidence.getValue())) if cold_workload_gpu_incidence is not None else 0,
+        )
+    else:
+        score_tuple = (
+            int(round(p_gpu.getValue())),
+            int(round(p_exact.getValue())),
+            int(round(p_upgrade.getValue())),
+            int(round(p_mig.getValue())),
+        )
     elapsed = time.time() - start_time
     target.metadata["build_metrics"] = {
-        "whole_gpu_preserve": score_tuple[0],
-        "exact_preserve": score_tuple[1],
-        "upgrade_preserve": score_tuple[2],
-        "mig_preserve": score_tuple[3],
+        "whole_gpu_preserve": 0 if cold_start_mode else score_tuple[0],
+        "exact_preserve": 0 if cold_start_mode else score_tuple[1],
+        "upgrade_preserve": 0 if cold_start_mode else score_tuple[2],
+        "mig_preserve": 0 if cold_start_mode else score_tuple[3],
         "score_tuple": score_tuple,
+        "objective_mode": "cold_start_collocation" if cold_start_mode else "transition_preservation",
+        "cold_workload_gpu_incidence": -score_tuple[0] if cold_start_mode else None,
         "elapsed_time_sec": elapsed,
         "solver_status": status,
         "mip_gap": _safe_mip_gap(model),
@@ -554,6 +612,11 @@ def _build_target_state_exact_milp_aggregated(
         "num_vars": int(model.NumVars),
         "num_constraints": int(model.NumConstrs),
         "gpu_count": int(gpu_count),
+        "current_gpu_count": int(current_gpu_count),
+        "reused_current_gpu_count": int(reused_current_gpu_count),
+        "new_gpu_count": int(new_gpu_count),
+        "indexed_new_gpu_count": int(indexed_new_gpu_count),
+        "aggregated_new_gpu_count": int(aggregated_new_gpu_count),
         "demand_count": int(demand_count),
         "demand_type_count": int(len(demand_types)),
         "layout_count": int(len(layouts)),

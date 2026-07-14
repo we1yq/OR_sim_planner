@@ -105,12 +105,12 @@ def plan(payload: dict[str, Any]) -> dict[str, Any]:
     planner_label = (
         "jormungandr-exchange-and-compact-common-executor"
         if planner == "jormungandr"
-        else "original-gurobi-milp-greedy-repair-effect-aware-dag"
+        else "original-gurobi-milp-exact-stage2-effect-aware-dag"
     )
     objective = (
         "Jormungandr utility-first target allocation and exchange-and-compact transition, lowered to the common executor DAG"
         if planner == "jormungandr"
-        else "Gurobi MILP target allocation followed by target materialization greedy repair"
+        else "Gurobi MILP target allocation followed by exact global Stage 2 materialization"
     )
     return {
         "targetAllocationPlan": {

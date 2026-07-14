@@ -23,7 +23,7 @@ Deployments:
   emits `MigActionPlan` objects. If registry health is not stable, it waits for
   the repair path before starting demand-driven optimization.
 - `planner-engine`: runs the original planner pipeline in this tree:
-  Gurobi MILP target allocation, target materialization/greedy repair, transition
+  Gurobi MILP target allocation, exact global Stage 2 materialization, transition
   action extraction, and effect-aware action DAG generation.
 - `transition-executor`: executes `MigActionPlan` objects by calling node-agent,
   creating runtime Deployments with exact slot resources, and syncing routes.

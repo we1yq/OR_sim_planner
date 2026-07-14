@@ -152,6 +152,7 @@ def solve_milp_gurobi_batch_unified(
     verbose: bool = False,
     apply_option_pruning: bool = True,
     warm_start_res: dict[str, Any] | None = None,
+    current_workload_profile_counts: dict[tuple[str, str], int] | None = None,
 ) -> dict[str, Any]:
     try:
         import gurobipy as gp
@@ -180,12 +181,18 @@ def solve_milp_gurobi_batch_unified(
 
     options_by_workload = {workload_idx: [] for workload_idx in range(n_workloads)}
     options_by_profile = {profile: [] for profile in profile_order}
+    options_by_workload_profile = {
+        (workload_idx, profile): [] for workload_idx in range(n_workloads) for profile in profile_order
+    }
+    workload_name_by_idx: dict[int, str] = {}
 
     for row_idx in opt_rows:
         workload_idx = int(df.loc[row_idx, "w_idx"])
         profile = df.loc[row_idx, "profile"]
+        workload_name_by_idx.setdefault(workload_idx, str(df.loc[row_idx, "workload"]))
         options_by_workload[workload_idx].append(row_idx)
         options_by_profile[profile].append(row_idx)
+        options_by_workload_profile[(workload_idx, profile)].append(row_idx)
 
     for workload_idx in range(n_workloads):
         if len(options_by_workload[workload_idx]) == 0:
@@ -299,9 +306,35 @@ def solve_milp_gurobi_batch_unified(
         name="def_total_remaining_slots",
     )
 
-    model.setObjectiveN(total_gpu, index=0, priority=3, weight=1.0, name="obj_gpu")
-    model.setObjectiveN(total_elastic_slack, index=1, priority=2, weight=-1.0, name="obj_elastic_slack")
-    model.setObjectiveN(total_remaining_slots, index=2, priority=1, weight=-1.0, name="obj_remaining")
+    logical_delta = None
+    current_counts = {
+        (str(workload), str(profile)): int(count)
+        for (workload, profile), count in (current_workload_profile_counts or {}).items()
+        if int(count) > 0
+    }
+    if current_counts:
+        logical_delta_terms = []
+        for workload_idx in range(n_workloads):
+            workload_name = workload_name_by_idx.get(workload_idx, str(workload_idx))
+            for profile in profile_order:
+                current_count = int(current_counts.get((workload_name, profile), 0))
+                target_count = gp.quicksum(x[row_idx] for row_idx in options_by_workload_profile[(workload_idx, profile)])
+                delta = model.addVar(vtype=GRB.INTEGER, lb=0, name=f"logical_delta_{workload_idx}_{profile}")
+                model.addConstr(delta >= target_count - current_count, name=f"logical_delta_pos_{workload_idx}_{profile}")
+                model.addConstr(delta >= current_count - target_count, name=f"logical_delta_neg_{workload_idx}_{profile}")
+                logical_delta_terms.append(delta)
+
+        logical_delta = model.addVar(vtype=GRB.INTEGER, lb=0, name="total_logical_delta")
+        model.addConstr(logical_delta == gp.quicksum(logical_delta_terms), name="def_total_logical_delta")
+
+        model.setObjectiveN(total_gpu, index=0, priority=4, weight=1.0, name="obj_gpu")
+        model.setObjectiveN(logical_delta, index=1, priority=3, weight=1.0, name="obj_logical_delta")
+        model.setObjectiveN(total_elastic_slack, index=2, priority=2, weight=-1.0, name="obj_elastic_slack")
+        model.setObjectiveN(total_remaining_slots, index=3, priority=1, weight=-1.0, name="obj_remaining")
+    else:
+        model.setObjectiveN(total_gpu, index=0, priority=3, weight=1.0, name="obj_gpu")
+        model.setObjectiveN(total_elastic_slack, index=1, priority=2, weight=-1.0, name="obj_elastic_slack")
+        model.setObjectiveN(total_remaining_slots, index=2, priority=1, weight=-1.0, name="obj_remaining")
 
     if warm_start_res is not None:
         prev_x = _int_key_dict(warm_start_res.get("x_sol", {}) or {})
@@ -376,6 +409,8 @@ def solve_milp_gurobi_batch_unified(
         "total_slack": float(total_slack.X),
         "total_elastic_slack": float(total_elastic_slack.X),
         "total_remaining_slots": int(round(total_remaining_slots.X)),
+        "total_logical_delta": int(round(logical_delta.X)) if logical_delta is not None else None,
+        "stage1_objective_mode": "logical_delta" if logical_delta is not None else "headroom_only",
         "total_instances": int(round(total_instances.X)),
         "used_profile_types": used_profile_types,
         "effective_option_df": df,
