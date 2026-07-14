@@ -1,0 +1,218 @@
+template_id,method,epoch,logical_gpu_id,instance_idx,start_slice,end_slice,mig_profile,workload,workload_label,request_class,batch_size,expected_catalog_throughput_rps
+tpl_fee3ddbc57a8,ours,0,0,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_fee3ddbc57a8,ours,0,0,1,1,2,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_fee3ddbc57a8,ours,0,0,2,2,3,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_fee3ddbc57a8,ours,0,0,3,3,4,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_fee3ddbc57a8,ours,0,0,4,4,5,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_fee3ddbc57a8,ours,0,0,5,5,6,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_54a83c9ca012,ours,0,1,0,0,4,4g,llama_p2048_o64,Llama p2048/o64,p2048/o64,1,0.529162
+tpl_54a83c9ca012,ours,0,1,1,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_a43d6fe54f9c,ours,0,2,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_a43d6fe54f9c,ours,0,2,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_a43d6fe54f9c,ours,0,2,2,2,3,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_a43d6fe54f9c,ours,0,2,3,3,4,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_a43d6fe54f9c,ours,0,2,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_a43d6fe54f9c,ours,0,2,5,5,6,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_f50e60f49c9e,ours,2,3,0,0,4,4g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_f50e60f49c9e,ours,2,3,1,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_e9a83515bb41,ours,2,4,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_e9a83515bb41,ours,2,4,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_e9a83515bb41,ours,2,4,2,2,3,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_e9a83515bb41,ours,2,4,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_e9a83515bb41,ours,2,4,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_c974752f1167,ours,2,5,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_c974752f1167,ours,2,5,1,1,2,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_c974752f1167,ours,2,5,2,2,3,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_c974752f1167,ours,2,5,3,3,4,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_c974752f1167,ours,2,5,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_6fea432faf30,ours,3,3,0,0,4,4g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.33003
+tpl_6fea432faf30,ours,3,3,1,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_8f02cff2392a,ours,4,0,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_8f02cff2392a,ours,4,0,1,1,2,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_8f02cff2392a,ours,4,0,2,2,3,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_8f02cff2392a,ours,4,0,3,3,4,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_8f02cff2392a,ours,4,0,4,4,5,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_8f02cff2392a,ours,4,0,5,5,6,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_8f02cff2392a,ours,4,0,6,6,7,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_f2ad19386f88,ours,4,2,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_f2ad19386f88,ours,4,2,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_f2ad19386f88,ours,4,2,2,2,3,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_f2ad19386f88,ours,4,2,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_f2ad19386f88,ours,4,2,4,4,7,3g,llama_p2048_o64,Llama p2048/o64,p2048/o64,1,0.529162
+tpl_7a53b9b0d62a,ours,5,0,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_7a53b9b0d62a,ours,5,0,1,1,2,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_7a53b9b0d62a,ours,5,0,2,2,3,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_7a53b9b0d62a,ours,5,0,3,3,4,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_7a53b9b0d62a,ours,5,0,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_8d600ff442a5,ours,5,4,0,0,1,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_8d600ff442a5,ours,5,4,1,1,2,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_8d600ff442a5,ours,5,4,2,2,3,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_8d600ff442a5,ours,5,4,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_8d600ff442a5,ours,5,4,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_531b155fe060,ours,7,4,0,0,1,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_531b155fe060,ours,7,4,1,1,2,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_531b155fe060,ours,7,4,2,2,3,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_531b155fe060,ours,7,4,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_531b155fe060,ours,7,4,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_531b155fe060,ours,7,4,5,5,6,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_531b155fe060,ours,7,4,6,6,7,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_5012b2065bab,ours,8,4,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_5012b2065bab,ours,8,4,1,1,2,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_5012b2065bab,ours,8,4,2,2,3,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_5012b2065bab,ours,8,4,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_5012b2065bab,ours,8,4,4,4,5,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_5012b2065bab,ours,8,4,5,5,6,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_5012b2065bab,ours,8,4,6,6,7,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_9dedab6729bd,ours,10,4,0,0,1,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_9dedab6729bd,ours,10,4,1,1,2,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_9dedab6729bd,ours,10,4,2,2,3,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_9dedab6729bd,ours,10,4,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_9dedab6729bd,ours,10,4,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_1f1ebcbc6667,ours,11,4,0,0,1,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_1f1ebcbc6667,ours,11,4,1,1,2,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_1f1ebcbc6667,ours,11,4,2,2,3,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_1f1ebcbc6667,ours,11,4,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_1f1ebcbc6667,ours,11,4,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_1f1ebcbc6667,ours,11,4,5,5,6,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_1f1ebcbc6667,ours,11,4,6,6,7,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_6d4270471a09,ours,12,4,0,0,1,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_6d4270471a09,ours,12,4,1,1,2,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_6d4270471a09,ours,12,4,2,2,3,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_6d4270471a09,ours,12,4,3,3,4,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_6d4270471a09,ours,12,4,4,4,7,3g,llama_p2048_o64,Llama p2048/o64,p2048/o64,1,0.529162
+tpl_b34cd9d4a85b,ours,14,2,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_b34cd9d4a85b,ours,14,2,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_b34cd9d4a85b,ours,14,2,2,2,3,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_b34cd9d4a85b,ours,14,2,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_b34cd9d4a85b,ours,14,2,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_b34cd9d4a85b,ours,14,2,5,5,6,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_7691750e9188,ours,17,7,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_7691750e9188,ours,17,7,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_7691750e9188,ours,17,7,2,2,3,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_7691750e9188,ours,17,7,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_7691750e9188,ours,17,7,4,4,5,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_7691750e9188,ours,17,7,5,5,6,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_00cb616cf1f2,ours,18,7,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_00cb616cf1f2,ours,18,7,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_00cb616cf1f2,ours,18,7,2,2,3,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_00cb616cf1f2,ours,18,7,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_00cb616cf1f2,ours,18,7,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_562331941df4,ours,19,9,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_562331941df4,ours,19,9,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_562331941df4,ours,19,9,2,2,3,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_562331941df4,ours,19,9,3,3,4,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_562331941df4,ours,19,9,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_41b40f40234f,ours,21,4,0,0,1,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_41b40f40234f,ours,21,4,1,1,2,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_41b40f40234f,ours,21,4,2,2,3,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_41b40f40234f,ours,21,4,3,3,4,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_41b40f40234f,ours,21,4,4,4,5,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_41b40f40234f,ours,21,4,5,5,6,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_41b40f40234f,ours,21,4,6,6,7,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_b4811830f1eb,ours,22,4,0,0,1,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_b4811830f1eb,ours,22,4,1,1,2,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_b4811830f1eb,ours,22,4,2,2,3,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_b4811830f1eb,ours,22,4,3,3,4,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_b4811830f1eb,ours,22,4,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_b4811830f1eb,ours,22,4,5,5,6,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_b4811830f1eb,ours,22,4,6,6,7,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_193682398f68,ours,26,10,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_193682398f68,ours,26,10,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_193682398f68,ours,26,10,2,2,3,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_193682398f68,ours,26,10,3,3,4,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_193682398f68,ours,26,10,4,4,5,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_193682398f68,ours,26,10,5,5,6,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_193682398f68,ours,26,10,6,6,7,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_9f9e107234e7,ours,27,10,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_9f9e107234e7,ours,27,10,1,1,2,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_9f9e107234e7,ours,27,10,2,2,3,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_9f9e107234e7,ours,27,10,3,3,4,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_9f9e107234e7,ours,27,10,4,4,5,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_9f9e107234e7,ours,27,10,5,5,6,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_9f9e107234e7,ours,27,10,6,6,7,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_f0d070e83c0f,ours,28,10,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_f0d070e83c0f,ours,28,10,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_f0d070e83c0f,ours,28,10,2,2,3,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_f0d070e83c0f,ours,28,10,3,3,4,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_f0d070e83c0f,ours,28,10,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_f0d070e83c0f,ours,28,10,5,5,6,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_f0d070e83c0f,ours,28,10,6,6,7,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_5c4db00f10ec,ours,30,10,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_5c4db00f10ec,ours,30,10,1,1,2,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_5c4db00f10ec,ours,30,10,2,2,3,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_5c4db00f10ec,ours,30,10,3,3,4,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_5c4db00f10ec,ours,30,10,4,4,7,3g,llama_p2048_o64,Llama p2048/o64,p2048/o64,1,0.529162
+tpl_47eecc05c6d6,ours,31,12,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_47eecc05c6d6,ours,31,12,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_47eecc05c6d6,ours,31,12,2,2,3,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_47eecc05c6d6,ours,31,12,3,3,4,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_47eecc05c6d6,ours,31,12,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_04c2f4a7be27,ours,31,13,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_04c2f4a7be27,ours,31,13,1,1,2,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_04c2f4a7be27,ours,31,13,2,2,3,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_04c2f4a7be27,ours,31,13,3,3,4,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_04c2f4a7be27,ours,31,13,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_ee8de6f0debf,ours,32,13,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_ee8de6f0debf,ours,32,13,1,1,2,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_ee8de6f0debf,ours,32,13,2,2,3,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_ee8de6f0debf,ours,32,13,3,3,4,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_ee8de6f0debf,ours,32,13,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_d0157fb18d57,ours,33,13,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_d0157fb18d57,ours,33,13,1,1,2,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_d0157fb18d57,ours,33,13,2,2,3,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_d0157fb18d57,ours,33,13,3,3,4,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_d0157fb18d57,ours,33,13,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_d0157fb18d57,ours,33,13,5,5,6,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_d0157fb18d57,ours,33,13,6,6,7,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_3cd43ef33479,ours,34,13,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_3cd43ef33479,ours,34,13,1,1,2,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_3cd43ef33479,ours,34,13,2,2,3,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_3cd43ef33479,ours,34,13,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_3cd43ef33479,ours,34,13,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_3cd43ef33479,ours,34,13,5,5,6,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_3cd43ef33479,ours,34,13,6,6,7,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_59f87877d1d6,ours,36,13,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_59f87877d1d6,ours,36,13,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_59f87877d1d6,ours,36,13,2,2,3,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_59f87877d1d6,ours,36,13,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_59f87877d1d6,ours,36,13,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_59f87877d1d6,ours,36,13,5,5,6,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_59f87877d1d6,ours,36,13,6,6,7,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_81a418bf4b03,ours,37,16,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_81a418bf4b03,ours,37,16,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_81a418bf4b03,ours,37,16,2,2,3,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_81a418bf4b03,ours,37,16,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_81a418bf4b03,ours,37,16,4,4,5,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_4108352eeed1,ours,40,16,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_4108352eeed1,ours,40,16,1,1,2,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_4108352eeed1,ours,40,16,2,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_4108352eeed1,ours,40,16,3,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_18fb39cfd0a6,ours,41,0,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_18fb39cfd0a6,ours,41,0,1,1,2,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_18fb39cfd0a6,ours,41,0,2,2,3,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_18fb39cfd0a6,ours,41,0,3,3,4,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_18fb39cfd0a6,ours,41,0,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_18fb39cfd0a6,ours,41,0,5,5,6,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_18fb39cfd0a6,ours,41,0,6,6,7,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_14b71178b862,ours,44,16,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_14b71178b862,ours,44,16,1,1,2,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_14b71178b862,ours,44,16,2,2,3,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_14b71178b862,ours,44,16,3,3,4,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_14b71178b862,ours,44,16,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_a857be6fdc56,ours,45,0,0,0,1,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_a857be6fdc56,ours,45,0,1,1,2,1g,resnet50_image,ResNet50,image,64,383.264372
+tpl_a857be6fdc56,ours,45,0,2,2,3,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_a857be6fdc56,ours,45,0,3,3,4,1g,vit_base_image,ViT-base,image,64,65.076342
+tpl_a857be6fdc56,ours,45,0,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_03c9cea9b7e2,ours,45,16,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_03c9cea9b7e2,ours,45,16,1,1,2,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_03c9cea9b7e2,ours,45,16,2,2,3,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_03c9cea9b7e2,ours,45,16,3,3,4,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_03c9cea9b7e2,ours,45,16,4,4,7,3g,llama_p1024_o128,Llama p1024/o128,p1024/o128,1,0.309322
+tpl_08798200442e,ours,47,16,0,0,1,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_08798200442e,ours,47,16,1,1,2,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_08798200442e,ours,47,16,2,2,3,1g,gpt2_p64_o64,GPT-2 p64/o64,p64/o64,1,0.972478
+tpl_08798200442e,ours,47,16,3,3,4,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_08798200442e,ours,47,16,4,4,5,1g,gpt2_p512_o512,GPT-2 p512/o512,p512/o512,1,0.173821
+tpl_08798200442e,ours,47,16,5,5,6,1g,vgg16_image,VGG16,image,64,247.456259
+tpl_08798200442e,ours,47,16,6,6,7,1g,vit_base_image,ViT-base,image,64,65.076342

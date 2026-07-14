@@ -1,0 +1,11 @@
+{
+  "allocation_count": 48,
+  "epoch_count": 48,
+  "exported_methods": [
+    "ours"
+  ],
+  "generated_at": "2026-07-15 05:46:52",
+  "trace_dir": "/Users/weiyiqin/Downloads/OR_sim_planner/eval/results/online_24h_stress/20260715-053418-scale024",
+  "unique_target_allocation_count": 36,
+  "unique_template_count": 39
+}
