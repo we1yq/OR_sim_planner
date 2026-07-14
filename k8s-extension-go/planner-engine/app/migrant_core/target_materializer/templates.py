@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from ..state import PROFILE_SIZE
@@ -7,6 +8,15 @@ from ..state import PROFILE_SIZE
 
 PROFILE_ORDER = ["7g", "4g", "3g", "2g", "1g"]
 SIZE_TO_PROFILE = {7: "7g", 4: "4g", 3: "3g", 2: "2g", 1: "1g"}
+
+
+@dataclass(frozen=True)
+class PhysicalLayout:
+    layout_id: int
+    name: str
+    profiles: tuple[str, ...]
+    intervals: tuple[tuple[int, int, str], ...]
+    slots: tuple[tuple[int, int, str], ...]
 
 
 TEMPLATES = [
@@ -146,11 +156,58 @@ def all_unique_physical_realizations(template_name: str) -> list[tuple[str, list
     return out
 
 
+def physical_layout_key(
+    intervals: list[tuple[int, int, str]] | tuple[tuple[int, int, str], ...],
+) -> tuple[tuple[int, int, str], ...]:
+    return tuple((int(start), int(end), str(profile)) for start, end, profile in intervals)
+
+
+def current_gpu_physical_layout_key(gpu: Any) -> tuple[tuple[int, int, str], ...]:
+    instances = sorted(getattr(gpu, "instances", []), key=lambda inst: (inst.start, inst.end))
+    return physical_layout_key(
+        [(int(inst.start), int(inst.end), str(inst.profile)) for inst in instances]
+    )
+
+
+def fragment_free_physical_layouts() -> list[PhysicalLayout]:
+    records: list[tuple[str, tuple[str, ...]]] = []
+
+    for physical_profiles in ABSTRACT_TO_PHYSICAL.values():
+        for profiles in physical_profiles:
+            records.append((physical_profiles_to_string(profiles), tuple(profiles)))
+
+    for rewrite_candidates in FRAGMENTATION_AVOIDANCE_REWRITE_CANDIDATES.values():
+        for profiles in rewrite_candidates:
+            records.append((physical_profiles_to_string(profiles), tuple(profiles)))
+
+    out: list[PhysicalLayout] = []
+    seen: set[tuple[tuple[int, int, str], ...]] = set()
+    for name, profiles in records:
+        if "unusable" in profiles:
+            continue
+        intervals = physical_layout_key(physical_profiles_to_intervals(profiles))
+        if intervals in seen:
+            continue
+        seen.add(intervals)
+        slots = tuple(interval for interval in intervals if interval[2] not in {"void", "unusable"})
+        out.append(
+            PhysicalLayout(
+                layout_id=len(out),
+                name=name,
+                profiles=profiles,
+                intervals=intervals,
+                slots=slots,
+            )
+        )
+    return out
+
+
 def template_summary_dict() -> dict[str, Any]:
     return {
         "profileOrder": list(PROFILE_ORDER),
         "templateCount": len(TEMPLATES),
         "physicalRealizationCount": sum(len(v) for v in ABSTRACT_TO_PHYSICAL.values()),
+        "fragmentFreePhysicalLayoutCount": len(fragment_free_physical_layouts()),
         "fragmentationAvoidanceRewriteCandidateCount": sum(
             len(v) for v in FRAGMENTATION_AVOIDANCE_REWRITE_CANDIDATES.values()
         ),
