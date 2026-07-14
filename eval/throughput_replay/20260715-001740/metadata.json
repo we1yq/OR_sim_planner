@@ -1,0 +1,11 @@
+{
+  "allocation_count": 48,
+  "epoch_count": 48,
+  "exported_methods": [
+    "ours"
+  ],
+  "generated_at": "2026-07-15 00:17:43",
+  "trace_dir": "/Users/weiyiqin/Downloads/OR_sim_planner/eval/results/online_24h/20260714-231227-scale0925-llama",
+  "unique_target_allocation_count": 20,
+  "unique_template_count": 27
+}

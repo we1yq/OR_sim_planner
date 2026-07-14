@@ -1,0 +1,5579 @@
+[
+  {
+    "allocation_id": "alloc_1524b073395c",
+    "gpu_count": 3,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 0,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_5732737b4868"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p2048/o64",
+            "start_slice": 0,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 1,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_54a83c9ca012"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_9777d1eec6e2"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_1d8765d489ce",
+    "gpu_count": 5,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 0,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_5732737b4868"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.33003,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p1024/o128",
+            "start_slice": 0,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_87538058eef6"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_dd0be674bf6c"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_ef156c8b3721"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_1e0ffbefee1f",
+    "gpu_count": 4,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 0,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_5732737b4868"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p2048/o64",
+            "start_slice": 0,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 1,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_54a83c9ca012"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_9f93f5ce0c4d"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_7152971837b6"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_2ebb46e8a435",
+    "gpu_count": 5,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 0,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_5732737b4868"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.33003,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p1024/o128",
+            "start_slice": 0,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_87538058eef6"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_72492681eda6"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 2,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_d603b4084b0a"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_30a3612871ec",
+    "gpu_count": 5,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 3,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_9b3115eac4c8"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_ef5c04c854bf"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_dd0be674bf6c"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_ef156c8b3721"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_31458c515606",
+    "gpu_count": 5,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_0eaa66ee71ed"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.33003,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p1024/o128",
+            "start_slice": 0,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_803f97a23060"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_dd0be674bf6c"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_ef156c8b3721"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_399107db2050",
+    "gpu_count": 5,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_030bafde96b5"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_ef5c04c854bf"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_dd0be674bf6c"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_ef156c8b3721"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_3b97ae2fc9c5",
+    "gpu_count": 6,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_0eaa66ee71ed"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.33003,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p1024/o128",
+            "start_slice": 0,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_87538058eef6"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_dd0be674bf6c"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_ef156c8b3721"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p2048/o64",
+            "start_slice": 0,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 5,
+        "template_id": "tpl_cdcf9d0a6116"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_3c4d0cf93c47",
+    "gpu_count": 3,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 2,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_a440e2a22bdd"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_916d498de126"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_426494ce50f3",
+    "gpu_count": 4,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 0,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_5732737b4868"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_2e3d0dd0b4f1"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_d9de8a2b0a81"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_495e974e4312",
+    "gpu_count": 3,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 2,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_a440e2a22bdd"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_ef156c8b3721"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_4d05882ac4d6",
+    "gpu_count": 3,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 2,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_a440e2a22bdd"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_a0c4ccf5db25"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_4ff780a018bc",
+    "gpu_count": 5,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 0,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_5732737b4868"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.33003,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p1024/o128",
+            "start_slice": 0,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_87538058eef6"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_dd0be674bf6c"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_aa9ed71729b6"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_75e63af56e95",
+    "gpu_count": 3,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 2,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_a3d320cc5de3"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_ef156c8b3721"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_8201c7f15e05",
+    "gpu_count": 4,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 2,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_9b52a086c856"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_dd0be674bf6c"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_ef156c8b3721"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_a563daa0db1c",
+    "gpu_count": 5,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_00e38d1c3479"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.33003,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p1024/o128",
+            "start_slice": 0,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_87538058eef6"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_dd0be674bf6c"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_ef156c8b3721"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_bb8d29194074",
+    "gpu_count": 3,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 0,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_5732737b4868"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p2048/o64",
+            "start_slice": 0,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 1,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_54a83c9ca012"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_9f93f5ce0c4d"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_bd54180faf2a",
+    "gpu_count": 4,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 0,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_5732737b4868"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.33003,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p1024/o128",
+            "start_slice": 0,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_87538058eef6"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_72492681eda6"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_c672086521fc",
+    "gpu_count": 3,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 2,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_a440e2a22bdd"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 3,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_0c9c11459750"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_916d498de126"
+      }
+    ],
+    "method": "ours"
+  },
+  {
+    "allocation_id": "alloc_c74bad759dc4",
+    "gpu_count": 5,
+    "gpus": [
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 2,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 0,
+        "template_id": "tpl_0eaa66ee71ed"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.33003,
+            "instance_idx": 0,
+            "mig_profile": "4g",
+            "request_class": "p1024/o128",
+            "start_slice": 0,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 4,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 5,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 6,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          }
+        ],
+        "logical_gpu_id": 1,
+        "template_id": "tpl_87538058eef6"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 64,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 0,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 5,
+            "expected_catalog_throughput_rps": 383.264372,
+            "instance_idx": 4,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 4,
+            "workload": "resnet50_image",
+            "workload_label": "ResNet50"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 6,
+            "expected_catalog_throughput_rps": 247.456259,
+            "instance_idx": 5,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 5,
+            "workload": "vgg16_image",
+            "workload_label": "VGG16"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 6,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 6,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          }
+        ],
+        "logical_gpu_id": 2,
+        "template_id": "tpl_dd0be674bf6c"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 1,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 3,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.529162,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p2048/o64",
+            "start_slice": 4,
+            "workload": "llama_p2048_o64",
+            "workload_label": "Llama p2048/o64"
+          }
+        ],
+        "logical_gpu_id": 3,
+        "template_id": "tpl_75e12e8a08c7"
+      },
+      {
+        "instances": [
+          {
+            "batch_size": 1,
+            "end_slice": 1,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 0,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 0,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 2,
+            "expected_catalog_throughput_rps": 0.972478,
+            "instance_idx": 1,
+            "mig_profile": "1g",
+            "request_class": "p64/o64",
+            "start_slice": 1,
+            "workload": "gpt2_p64_o64",
+            "workload_label": "GPT-2 p64/o64"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 3,
+            "expected_catalog_throughput_rps": 0.173821,
+            "instance_idx": 2,
+            "mig_profile": "1g",
+            "request_class": "p512/o512",
+            "start_slice": 2,
+            "workload": "gpt2_p512_o512",
+            "workload_label": "GPT-2 p512/o512"
+          },
+          {
+            "batch_size": 64,
+            "end_slice": 4,
+            "expected_catalog_throughput_rps": 65.076342,
+            "instance_idx": 3,
+            "mig_profile": "1g",
+            "request_class": "image",
+            "start_slice": 3,
+            "workload": "vit_base_image",
+            "workload_label": "ViT-base"
+          },
+          {
+            "batch_size": 1,
+            "end_slice": 7,
+            "expected_catalog_throughput_rps": 0.309322,
+            "instance_idx": 4,
+            "mig_profile": "3g",
+            "request_class": "p1024/o128",
+            "start_slice": 4,
+            "workload": "llama_p1024_o128",
+            "workload_label": "Llama p1024/o128"
+          }
+        ],
+        "logical_gpu_id": 4,
+        "template_id": "tpl_ef156c8b3721"
+      }
+    ],
+    "method": "ours"
+  }
+]
