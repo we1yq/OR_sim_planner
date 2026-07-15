@@ -1,0 +1,212 @@
+{
+  "apiVersion": "mig.or-sim.io/v1alpha1",
+  "kind": "PhysicalGpuRegistry",
+  "metadata": {
+    "creationTimestamp": "2026-07-09T20:36:19Z",
+    "generation": 2,
+    "labels": {
+      "app.kubernetes.io/name": "migrant-go"
+    },
+    "name": "default",
+    "namespace": "or-sim-exp",
+    "resourceVersion": "33294214",
+    "uid": "7b7f6249-da54-4ff3-ab32-55ac9f6c3e58"
+  },
+  "spec": {
+    "policy": {
+      "source": "cluster-state-manager"
+    }
+  },
+  "status": {
+    "activeQueue": [],
+    "availableQueue": [
+      "ampere-gpu0",
+      "ampere-gpu1",
+      "rtx1-worker-gpu0"
+    ],
+    "bindings": {
+      "ampere-gpu0": {
+        "activeLogicalGpuId": null,
+        "availabilityReason": "empty",
+        "cleanliness": "empty",
+        "deviceIndex": 0,
+        "gpuIndex": 0,
+        "gpuUUID": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+        "gpuUuid": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+        "logicalBinding": {},
+        "logicalMigSlots": [],
+        "migCapable": true,
+        "migConfig": "",
+        "migConfigState": "",
+        "migDevices": [],
+        "node": "ampere",
+        "nodeName": "ampere",
+        "pendingLogicalGpuId": null,
+        "physicalGpuId": "ampere-gpu0",
+        "product": "NVIDIA A100-PCIE-40GB",
+        "repairPaused": false,
+        "requiredAction": "",
+        "runtimeBindings": [],
+        "state": "available"
+      },
+      "ampere-gpu1": {
+        "activeLogicalGpuId": null,
+        "availabilityReason": "empty",
+        "cleanliness": "empty",
+        "deviceIndex": 1,
+        "gpuIndex": 1,
+        "gpuUUID": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+        "gpuUuid": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+        "logicalBinding": {},
+        "logicalMigSlots": [],
+        "migCapable": true,
+        "migConfig": "",
+        "migConfigState": "",
+        "migDevices": [],
+        "node": "ampere",
+        "nodeName": "ampere",
+        "pendingLogicalGpuId": null,
+        "physicalGpuId": "ampere-gpu1",
+        "product": "NVIDIA A100-PCIE-40GB",
+        "repairPaused": false,
+        "requiredAction": "",
+        "runtimeBindings": [],
+        "state": "available"
+      },
+      "rtx1-worker-gpu0": {
+        "activeLogicalGpuId": null,
+        "availabilityReason": "empty",
+        "cleanliness": "empty",
+        "deviceIndex": 0,
+        "gpuIndex": 0,
+        "gpuUUID": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+        "gpuUuid": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+        "logicalBinding": {},
+        "logicalMigSlots": [],
+        "migCapable": true,
+        "migConfig": "",
+        "migConfigState": "",
+        "migDevices": [],
+        "node": "rtx1-worker",
+        "nodeName": "rtx1-worker",
+        "pendingLogicalGpuId": null,
+        "physicalGpuId": "rtx1-worker-gpu0",
+        "product": "NVIDIA A100-PCIE-40GB",
+        "repairPaused": false,
+        "requiredAction": "",
+        "runtimeBindings": [],
+        "state": "available"
+      }
+    },
+    "currentAllocation": {
+      "canonicalizedAt": "2026-07-15T06:54:57.505040095Z",
+      "format": "migrant.current-allocation/v1",
+      "freePhysicalGpuPool": [
+        "ampere-gpu0",
+        "ampere-gpu1",
+        "rtx1-worker-gpu0"
+      ],
+      "gpus": {},
+      "logicalGpuCount": 0,
+      "logicalGpus": [],
+      "metadata": {
+        "canonical_observed_physical_map": {},
+        "logical_id_map": {},
+        "physical_id_map": {}
+      },
+      "source": "cluster-state-manager"
+    },
+    "health": {
+      "observedAt": "2026-07-15T06:54:57.505048701Z",
+      "queueCounts": {
+        "active": 0,
+        "available": 3,
+        "transitioning": 0
+      },
+      "reasons": [],
+      "repairRequired": false,
+      "requiredActions": [],
+      "stable": true
+    },
+    "logicalBindingLedger": {
+      "available": true,
+      "bindings": {},
+      "lastPlanName": "plan-real3gpu-section44-latest3-r3-20260715-155257-e04",
+      "updatedAt": "2026-07-15T06:54:56.402071391Z",
+      "version": "migrant.logical-binding-ledger/v1"
+    },
+    "observedAt": "2026-07-15T06:54:57.513345237Z",
+    "phase": "Observed",
+    "profileCalibrationOverlay": {
+      "available": true,
+      "generatedAt": "2026-07-15T06:54:56.976666953Z",
+      "observations": [
+        {
+          "arrivalRate": 0,
+          "avgLatencyMs": 0,
+          "confidence": "high",
+          "demandRatePolicy": "fixed_input_not_observed",
+          "demandRateViolated": false,
+          "errorRate": 0,
+          "errors": 0,
+          "inflight": 0,
+          "maxLatencyMs": 0,
+          "model": "resnet50",
+          "p95LatencyMs": 0,
+          "queued": 0,
+          "requests": 12283750,
+          "sampleCount": 12283750,
+          "windowErrors": 0,
+          "windowRequests": 0
+        },
+        {
+          "arrivalRate": 0,
+          "avgLatencyMs": 0,
+          "confidence": "high",
+          "demandRatePolicy": "fixed_input_not_observed",
+          "demandRateViolated": false,
+          "errorRate": 0,
+          "errors": 0,
+          "inflight": 0,
+          "maxLatencyMs": 0,
+          "model": "gpt2",
+          "p95LatencyMs": 0,
+          "queued": 0,
+          "requests": 8543,
+          "sampleCount": 8543,
+          "windowErrors": 0,
+          "windowRequests": 0
+        },
+        {
+          "arrivalRate": 0,
+          "avgLatencyMs": 0,
+          "confidence": "high",
+          "demandRatePolicy": "fixed_input_not_observed",
+          "demandRateViolated": false,
+          "errorRate": 0,
+          "errors": 2781,
+          "inflight": 0,
+          "maxLatencyMs": 0,
+          "model": "llama",
+          "p95LatencyMs": 0,
+          "queued": 0,
+          "requests": 4987,
+          "sampleCount": 4987,
+          "windowErrors": 0,
+          "windowRequests": 0
+        }
+      ]
+    },
+    "queueCounts": {
+      "active": 0,
+      "available": 3,
+      "transitioning": 0
+    },
+    "routingState": {
+      "available": true,
+      "generatedAt": "2026-07-15T06:54:56.957933777Z",
+      "routes": []
+    },
+    "transitioningQueue": []
+  }
+}

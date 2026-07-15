@@ -1,0 +1,10 @@
+epoch,plan,active,reason,actionId,physicalGpuId,relativeSeconds,observedAt,available,transitioning
+0,plan-real3gpu-section44-latest3-r3-20260715-155257-e00,0,source_allocation,,,0.0,2026-07-15T06:53:03.540995Z,,
+0,plan-real3gpu-section44-latest3-r3-20260715-155257-e00,1,allocate_gpu,a0000_allocate_gpu_CREATE-gpu0,ampere-gpu0,0.030158,2026-07-15T06:53:03.571153Z,,
+1,plan-real3gpu-section44-latest3-r3-20260715-155257-e01,1,source_allocation,,,0.0,2026-07-15T06:53:37.167717Z,,
+1,plan-real3gpu-section44-latest3-r3-20260715-155257-e01,2,allocate_gpu,a0000_allocate_gpu_CREATE-gpu1,ampere-gpu1,0.030675,2026-07-15T06:53:37.198392Z,,
+2,plan-real3gpu-section44-latest3-r3-20260715-155257-e02,2,source_allocation,,,0.0,2026-07-15T06:54:00.284305Z,,
+2,plan-real3gpu-section44-latest3-r3-20260715-155257-e02,1,return_gpu,a0018_return_gpu_DELETE-gpu0,ampere-gpu0,23.014068,2026-07-15T06:54:23.298373Z,,
+3,plan-real3gpu-section44-latest3-r3-20260715-155257-e03,1,,,,,2026-07-15T06:54:29.729841987Z,2,0
+4,plan-real3gpu-section44-latest3-r3-20260715-155257-e04,1,source_allocation,,,0.0,2026-07-15T06:54:43.051643Z,,
+4,plan-real3gpu-section44-latest3-r3-20260715-155257-e04,0,return_gpu,a0011_return_gpu_DELETE-gpu0,ampere-gpu1,13.3532,2026-07-15T06:54:56.404843Z,,

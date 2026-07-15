@@ -1,0 +1,41 @@
+{
+  "runId": "real3gpu-section44-latest3-r2-20260715-155038",
+  "stages": [
+    {
+      "gpt2": 0.5,
+      "llama": 0.3,
+      "resnet50": 500.0,
+      "vgg16": 0.0,
+      "vit_base": 0.0
+    },
+    {
+      "gpt2": 0.9,
+      "llama": 0.18,
+      "resnet50": 1150.0,
+      "vgg16": 0.0,
+      "vit_base": 0.0
+    },
+    {
+      "gpt2": 0.25,
+      "llama": 0.66,
+      "resnet50": 720.0,
+      "vgg16": 0.0,
+      "vit_base": 0.0
+    },
+    {
+      "gpt2": 0.62,
+      "llama": 0.16,
+      "resnet50": 280.0,
+      "vgg16": 0.0,
+      "vit_base": 0.0
+    },
+    {
+      "gpt2": 0.0,
+      "llama": 0.0,
+      "resnet50": 0.0,
+      "vgg16": 0.0,
+      "vit_base": 0.0
+    }
+  ],
+  "steadySeconds": 150.0
+}

@@ -1,0 +1,244 @@
+{
+  "apiVersion": "mig.or-sim.io/v1alpha1",
+  "kind": "MigActionPlan",
+  "metadata": {
+    "creationTimestamp": "2026-07-15T06:50:38Z",
+    "generation": 1,
+    "labels": {
+      "app.kubernetes.io/name": "migrant-go",
+      "mig.or-sim.io/component": "real-3gpu-k8s-runner",
+      "mig.or-sim.io/plan-type": "repair"
+    },
+    "name": "real3gpu-section44-latest3-r2-20260715-155038-repair-ampere-gpu",
+    "namespace": "or-sim-exp",
+    "resourceVersion": "33292312",
+    "uid": "dd779a2f-7e27-4661-bae6-f60349e98dae"
+  },
+  "spec": {
+    "abstractActions": [],
+    "actionCount": 3,
+    "actionDag": {
+      "format": "migrant.action-dag/v1",
+      "name": "real3gpu-section44-latest3-r2-20260715-155038-repair-ampere-gpu",
+      "nodes": [
+        {
+          "action": {
+            "abstractAction": "Deep Repair Dirty GPU",
+            "gpu": "ampere-gpu1",
+            "gpuIndex": 1,
+            "node": "ampere",
+            "physicalGpuId": "ampere-gpu1",
+            "physical_gpu_id": "ampere-gpu1",
+            "type": "delete_instance"
+          },
+          "id": "repair-delete-instances-ampere-gpu1",
+          "index": 0,
+          "phase": 0,
+          "type": "delete_instance"
+        },
+        {
+          "action": {
+            "abstractAction": "Deep Repair Dirty GPU",
+            "gpu": "ampere-gpu1",
+            "gpuIndex": 1,
+            "node": "ampere",
+            "physicalGpuId": "ampere-gpu1",
+            "physical_gpu_id": "ampere-gpu1",
+            "type": "clear_template"
+          },
+          "dependsOn": [
+            "repair-delete-instances-ampere-gpu1"
+          ],
+          "id": "repair-clear-template-ampere-gpu1",
+          "index": 1,
+          "phase": 1,
+          "type": "clear_template"
+        },
+        {
+          "action": {
+            "abstractAction": "Deep Repair Dirty GPU",
+            "gpu": "ampere-gpu1",
+            "gpuIndex": 1,
+            "node": "ampere",
+            "physicalGpuId": "ampere-gpu1",
+            "physical_gpu_id": "ampere-gpu1",
+            "type": "return_gpu"
+          },
+          "dependsOn": [
+            "repair-clear-template-ampere-gpu1"
+          ],
+          "id": "repair-return-gpu-ampere-gpu1",
+          "index": 2,
+          "phase": 2,
+          "type": "return_gpu"
+        }
+      ]
+    },
+    "currentAllocationRef": "physicalgpuregistries/default",
+    "executor": "go-transition-executor",
+    "phaseGate": "auto",
+    "plannerMetadata": {
+      "planner": "real-3gpu-k8s-runner",
+      "reason": "Delete residual runtimes and clear ampere-gpu1 before experiment reset"
+    },
+    "summary": {
+      "desiredRuntimes": [],
+      "planType": "repair",
+      "sourceGpuCount": 0,
+      "targetGpuCount": 0
+    },
+    "targetGpuCount": 0
+  },
+  "status": {
+    "actionStatuses": [
+      {
+        "category": "delete_instance",
+        "durationSeconds": 4.063956,
+        "finishedAt": "2026-07-15T06:50:45.996109799Z",
+        "id": "repair-delete-instances-ampere-gpu1",
+        "phase": 0,
+        "physicalGpuId": "ampere-gpu1",
+        "relativeEndSeconds": 4.069359,
+        "relativeStartSeconds": 0.005404,
+        "startedAt": "2026-07-15T06:50:41.932154112Z",
+        "status": "completed",
+        "type": "delete_instance"
+      },
+      {
+        "category": "reconfiguration",
+        "dependsOn": [
+          "repair-delete-instances-ampere-gpu1"
+        ],
+        "durationSeconds": 0.813187,
+        "durationsSeconds": {
+          "clear": 0.813168647
+        },
+        "finishedAt": "2026-07-15T06:50:46.809343839Z",
+        "id": "repair-clear-template-ampere-gpu1",
+        "phase": 1,
+        "physicalGpuId": "ampere-gpu1",
+        "relativeEndSeconds": 4.882593,
+        "relativeStartSeconds": 4.069406,
+        "startedAt": "2026-07-15T06:50:45.996156948Z",
+        "status": "completed",
+        "timestamps": {
+          "clearFinishedAt": "2026-07-15T06:50:46.809342797Z",
+          "clearStartedAt": "2026-07-15T06:50:45.99617414Z"
+        },
+        "type": "clear_template"
+      },
+      {
+        "category": "gpu_release",
+        "dependsOn": [
+          "repair-clear-template-ampere-gpu1"
+        ],
+        "durationSeconds": 0.12109,
+        "durationsSeconds": {
+          "returnGPU": 0.121076963
+        },
+        "finishedAt": "2026-07-15T06:50:46.930493769Z",
+        "id": "repair-return-gpu-ampere-gpu1",
+        "phase": 2,
+        "physicalGpuId": "ampere-gpu1",
+        "relativeEndSeconds": 5.003743,
+        "relativeStartSeconds": 4.882653,
+        "startedAt": "2026-07-15T06:50:46.809403932Z",
+        "status": "completed",
+        "timestamps": {
+          "gpuReturnFinishedAt": "2026-07-15T06:50:46.930492486Z",
+          "gpuReturnStartedAt": "2026-07-15T06:50:46.809415524Z"
+        },
+        "type": "return_gpu"
+      }
+    ],
+    "message": "action DAG executed by Go transition executor",
+    "phase": "Executed",
+    "transitionExecution": {
+      "cudaVerification": {},
+      "durationsSeconds": {
+        "total": 5.003840146
+      },
+      "metrics": {
+        "actionScheduler": {
+          "dependencyKey": "dependsOn",
+          "phaseBarrier": false,
+          "policy": "event_driven_dag"
+        },
+        "actionSummary": {
+          "activeGpuCountOverTime": [
+            {
+              "activeGpuCount": 0,
+              "reason": "source_allocation",
+              "relativeSeconds": 0
+            },
+            {
+              "actionId": "repair-return-gpu-ampere-gpu1",
+              "actionType": "return_gpu",
+              "activeGpuCount": -1,
+              "delta": -1,
+              "physicalGpuId": "ampere-gpu1",
+              "relativeSeconds": 5.003743
+            }
+          ],
+          "blockedDagNodes": 0,
+          "byCategory": {
+            "delete_instance": 1,
+            "gpu_release": 1,
+            "reconfiguration": 1
+          },
+          "byType": {
+            "clear_template": 1,
+            "delete_instance": 1,
+            "return_gpu": 1
+          },
+          "completedDagNodes": 3,
+          "createInstanceNodes": 0,
+          "createdInstanceCount": 0,
+          "createdMIGSlotCount": 0,
+          "deleteInstanceNodes": 1,
+          "deletedInstanceCount": 0,
+          "deletedMIGSlotCount": 0,
+          "failedDagNodes": 0,
+          "finalActiveGPUCountEvent": -1,
+          "reconfigurationNodes": 1,
+          "totalDagNodes": 3
+        },
+        "finalValidation": {
+          "reason": "missing targetState",
+          "skipped": true
+        },
+        "gpuCountBaseline": {
+          "source": 0,
+          "target": 0
+        },
+        "routerMonitor": {
+          "active": true,
+          "demandRatePolicy": "fixed_input_not_observed",
+          "generatedAt": "2026-07-15T06:50:41.931963021Z",
+          "latencySLOMs": {},
+          "models": {},
+          "planName": "real3gpu-section44-latest3-r2-20260715-155038-repair-ampere-gpu",
+          "sourceArrival": {},
+          "startedAt": "2026-07-15T06:50:41.931958302Z",
+          "targetArrival": {}
+        },
+        "routerSLO": {
+          "active": false,
+          "demandRatePolicy": "fixed_input_not_observed",
+          "finishedAt": "2026-07-15T06:50:46.930793155Z",
+          "generatedAt": "2026-07-15T06:50:46.930796201Z",
+          "latencySLOMs": {},
+          "models": {},
+          "planName": "real3gpu-section44-latest3-r2-20260715-155038-repair-ampere-gpu",
+          "sourceArrival": {},
+          "startedAt": "2026-07-15T06:50:41.931958302Z",
+          "targetArrival": {}
+        }
+      },
+      "timestamps": {
+        "executorFinishedAt": "2026-07-15T06:50:46.930591333Z",
+        "executorStartedAt": "2026-07-15T06:50:41.926751207Z"
+      }
+    }
+  }
+}

@@ -1,0 +1,861 @@
+{
+  "apiVersion": "mig.or-sim.io/v1alpha1",
+  "kind": "MigActionPlan",
+  "metadata": {
+    "creationTimestamp": "2026-07-15T06:50:51Z",
+    "generation": 1,
+    "labels": {
+      "app.kubernetes.io/name": "migrant-go",
+      "mig.or-sim.io/component": "planner-controller"
+    },
+    "name": "plan-real3gpu-section44-latest3-r2-20260715-155038-reset-zero",
+    "namespace": "or-sim-exp",
+    "resourceVersion": "33292356",
+    "uid": "0ccab872-091a-4a70-a5c8-fa99e790fab5"
+  },
+  "spec": {
+    "abstractActions": [],
+    "actionCount": 0,
+    "actionDag": {
+      "actionCount": 0,
+      "criticalPathLength": 0,
+      "edgeCount": 0,
+      "name": "epoch-real3gpu-section44-latest3-r2-20260715-155038-reset-zero-final",
+      "nodeCount": 0,
+      "nodes": [],
+      "phaseCount": 0,
+      "phases": [],
+      "representation": "migrant.phased-action-dag/v1",
+      "roots": []
+    },
+    "currentAllocationRef": "physicalgpuregistries/default",
+    "executor": "go-transition-executor",
+    "phaseGate": "auto",
+    "plannerMetadata": {
+      "metrics": {
+        "actionCount": 0,
+        "elapsedSec": 0.0006037019193172455,
+        "feasibleOptionBuildElapsedSec": 0.2740246634930372,
+        "finalActiveGpu": 0,
+        "gpuCount": 0,
+        "iterationCount": 1,
+        "milpElapsedSec": 0.08656716346740723,
+        "peakActiveGpu": 0,
+        "plannerMakespanSec": 0.08956434950232506,
+        "sourceActiveGpu": 0,
+        "stage1ElapsedSec": 0.08656716346740723,
+        "stage2ElapsedSec": 0.002393484115600586,
+        "stage3ElapsedSec": 0.0006037019193172455,
+        "targetBuildElapsedSec": 0.002393484115600586,
+        "transitionPlanningElapsedSec": 0.0006037019193172455
+      },
+      "pipeline": "source -> feasible-options -> milp -> target-build -> effect_aware_dag -> canonical-next-state",
+      "planner": "original-gurobi-milp-exact-stage2-effect-aware-dag",
+      "plannerEngineElapsedSec": 0.384679751470685,
+      "plannerMessage": "epoch-real3gpu-section44-latest3-r2-20260715-155038-reset-zero: planned with real MILP target builder and effect_aware_dag transition planner",
+      "plannerPhase": "ReachedTarget",
+      "planningTrace": {
+        "canonicalization": {
+          "canonicalGpuCount": 0,
+          "canonicalPhysicalIds": {},
+          "freePhysicalGpuPool": [
+            "ampere-gpu0",
+            "ampere-gpu1",
+            "rtx1-worker-gpu0"
+          ],
+          "note": "Planner-engine canonicalization predicts the post-action state. The transition-executor validates the actual post-action GPU/MIG state after hardware execution."
+        },
+        "currentStateFeasibility": {
+          "a100ValidLayout": true,
+          "capacityByWorkload": {
+            "gpt2": 0,
+            "llama": 0,
+            "resnet50": 0
+          },
+          "feasible": true,
+          "gpuModel": "A100",
+          "phase": "CurrentStateSatisfiesDemand",
+          "reasons": [],
+          "recommendedAction": "no-op",
+          "safetyFactor": 1,
+          "targetByWorkload": {
+            "gpt2": 0,
+            "llama": 0,
+            "resnet50": 0
+          },
+          "workloads": [
+            {
+              "currentCapacity": 0,
+              "requiredWithSafetyFactor": 0,
+              "satisfied": true,
+              "targetArrival": 0,
+              "workload": "llama"
+            },
+            {
+              "currentCapacity": 0,
+              "requiredWithSafetyFactor": 0,
+              "satisfied": true,
+              "targetArrival": 0,
+              "workload": "gpt2"
+            },
+            {
+              "currentCapacity": 0,
+              "requiredWithSafetyFactor": 0,
+              "satisfied": true,
+              "targetArrival": 0,
+              "workload": "resnet50"
+            }
+          ]
+        },
+        "feasibleOptions": {
+          "byProfile": [
+            {
+              "optionCount": 4,
+              "profile": "1g"
+            },
+            {
+              "optionCount": 5,
+              "profile": "2g"
+            },
+            {
+              "optionCount": 7,
+              "profile": "3g"
+            },
+            {
+              "optionCount": 7,
+              "profile": "4g"
+            },
+            {
+              "optionCount": 8,
+              "profile": "7g"
+            }
+          ],
+          "byWorkload": [
+            {
+              "batches": [
+                1
+              ],
+              "maxMu": 1.161905,
+              "optionCount": 5,
+              "profiles": [
+                "1g",
+                "2g",
+                "3g",
+                "4g",
+                "7g"
+              ],
+              "workload": "gpt2"
+            },
+            {
+              "batches": [
+                1
+              ],
+              "maxMu": 0.776891,
+              "optionCount": 3,
+              "profiles": [
+                "3g",
+                "4g",
+                "7g"
+              ],
+              "workload": "llama"
+            },
+            {
+              "batches": [
+                4,
+                8,
+                16,
+                32,
+                64,
+                128
+              ],
+              "maxMu": 2867.974583,
+              "optionCount": 23,
+              "profiles": [
+                "1g",
+                "2g",
+                "3g",
+                "4g",
+                "7g"
+              ],
+              "workload": "resnet50"
+            }
+          ],
+          "elapsedSec": 0.2740246634930372,
+          "optionCount": 31,
+          "runtimeProfileCorrectionApplied": 0
+        },
+        "inputs": {
+          "sourceGpuCount": 3,
+          "sourcePhysicalIds": {
+            "0": "ampere-gpu0",
+            "1": "ampere-gpu1",
+            "2": "rtx1-worker-gpu0"
+          },
+          "sourceStateRef": "/app/mock/gpu-states/migrant-empty-9-a100.yaml",
+          "targetStateRef": "target0",
+          "workloadCount": 3,
+          "workloads": [
+            {
+              "delta": 0,
+              "name": "llama",
+              "profileCatalogConfigMap": null,
+              "profileCatalogRef": "/app/mock/profile-catalogs/llama.yaml",
+              "sourceArrival": 0,
+              "targetArrival": 0,
+              "workloadRef": "/app/manifests/examples/workloadrequests/llama.yaml"
+            },
+            {
+              "delta": 0,
+              "name": "gpt2",
+              "profileCatalogConfigMap": null,
+              "profileCatalogRef": "/app/mock/profile-catalogs/gpt2.yaml",
+              "sourceArrival": 0,
+              "targetArrival": 0,
+              "workloadRef": "/app/manifests/examples/workloadrequests/gpt2.yaml"
+            },
+            {
+              "delta": 0,
+              "name": "resnet50",
+              "profileCatalogConfigMap": null,
+              "profileCatalogRef": "/app/mock/profile-catalogs/resnet50.yaml",
+              "sourceArrival": 0,
+              "targetArrival": 0,
+              "workloadRef": "/app/manifests/examples/workloadrequests/resnet50.yaml"
+            }
+          ]
+        },
+        "milp": {
+          "KTotal": {
+            "1g": 0,
+            "2g": 0,
+            "3g": 0,
+            "4g": 0,
+            "7g": 0
+          },
+          "allocSummary": [
+            {
+              "arrival": 0,
+              "instanceCount": 0,
+              "instances": [],
+              "provided": 0,
+              "slack": 0,
+              "workload": "llama"
+            },
+            {
+              "arrival": 0,
+              "instanceCount": 0,
+              "instances": [],
+              "provided": 0,
+              "slack": 0,
+              "workload": "gpt2"
+            },
+            {
+              "arrival": 0,
+              "instanceCount": 0,
+              "instances": [],
+              "provided": 0,
+              "slack": 0,
+              "workload": "resnet50"
+            }
+          ],
+          "chosenTemplates": [],
+          "elapsedSec": 0.08656716346740723,
+          "feasible": true,
+          "gpuCount": 0,
+          "method": "MILP-Gurobi(batch)",
+          "objectiveGpuCount": 0,
+          "stage1ObjectiveMode": "headroom_only",
+          "status": "OPTIMAL",
+          "totalElasticSlack": 0,
+          "totalInstances": 0,
+          "totalLogicalDelta": null,
+          "totalRemainingSlots": 0,
+          "totalSlack": 0,
+          "usedProfileTypes": 0,
+          "warmStart": {
+            "available": false,
+            "source": "currentAllocation",
+            "templateMissCount": 0,
+            "templateMisses": [],
+            "unmatchedInstanceCount": 0,
+            "unmatchedInstances": [],
+            "xSolCount": 0,
+            "ySolCount": 0
+          }
+        },
+        "pipeline": "source -> feasible-options -> milp -> target-build -> effect_aware_dag -> canonical-next-state",
+        "plannerTiming": {
+          "excludedCommonPreprocessingSec": 0.2740246634930372,
+          "plannerMakespanSec": 0.08956434950232506,
+          "stage1ElapsedSec": 0.08656716346740723,
+          "stage1Name": "target_allocation_milp",
+          "stage2ElapsedSec": 0.002393484115600586,
+          "stage2Name": "exact_global_stage2_milp",
+          "stage3ElapsedSec": 0.0006037019193172455,
+          "stage3Name": "effect_aware_dag"
+        },
+        "runtimeProfileCorrection": {
+          "available": false,
+          "observationCount": 0
+        },
+        "scenario": "epoch-real3gpu-section44-latest3-r2-20260715-155038-reset-zero",
+        "targetBuild": {
+          "elapsedSec": 0.002393484115600586,
+          "method": "exact_global_milp_aggregated",
+          "orderedPhysicalTemplates": [],
+          "physicalTemplateCount": 0,
+          "preservation": {
+            "collocatePairs": null,
+            "exact": 0,
+            "mixedGpuCount": null,
+            "sameGpu": null,
+            "scoreTuple": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "upgrade": 0
+          },
+          "targetGpuCount": 0,
+          "targetPhysicalIds": {}
+        },
+        "transition": {
+          "actionCount": 0,
+          "actionCountsByType": {},
+          "candidateDecisions": [],
+          "elapsedSec": 0.0006037019193172455,
+          "executedPhysicalIds": {},
+          "finalActiveGpu": 0,
+          "finalCoarseActions": [],
+          "finalPlanItems": [],
+          "iterationCount": 1,
+          "iterations": [
+            {
+              "actionCountsByType": {},
+              "activeGpuAfter": 0,
+              "candidateActionCount": 0,
+              "candidateActionCountsByType": {},
+              "candidateActions": [],
+              "candidateDecisions": [],
+              "chosenActionCount": 0,
+              "chosenActions": [],
+              "chosenRootCount": 0,
+              "chosenRoots": [],
+              "iterPeakActiveGpu": 0,
+              "iteration": 1,
+              "madeProgress": true,
+              "phasedActionPlan": {
+                "actionCount": 0,
+                "criticalPathLength": 0,
+                "edgeCount": 0,
+                "nodeCount": 0,
+                "phaseCount": 0,
+                "phases": [],
+                "representation": "migrant.phased-action-dag/v1"
+              },
+              "reachedTarget": true,
+              "stateAfter": {
+                "gpus": [],
+                "metadata": {
+                  "free_physical_gpu_pool": [
+                    "ampere-gpu0",
+                    "ampere-gpu1",
+                    "rtx1-worker-gpu0"
+                  ],
+                  "free_physical_gpu_pool_policy": "lifo",
+                  "next_physical_idx": 0,
+                  "physicalGpuBindings": {
+                    "ampere-gpu0": {
+                      "deviceIndex": 0,
+                      "nodeName": "ampere"
+                    },
+                    "ampere-gpu1": {
+                      "deviceIndex": 1,
+                      "nodeName": "ampere"
+                    },
+                    "rtx1-worker-gpu0": {
+                      "deviceIndex": 0,
+                      "nodeName": "rtx1-worker"
+                    }
+                  },
+                  "physical_id_map": {},
+                  "source": "go-cluster-state-manager",
+                  "transition_draining_instances": {},
+                  "transition_reconfig_targets": {},
+                  "transition_runtime_instances": {}
+                }
+              },
+              "stateBefore": {
+                "gpus": [
+                  {
+                    "gpuId": 0,
+                    "instances": [
+                      {
+                        "batch": null,
+                        "end": 7,
+                        "modelKey": null,
+                        "mu": 0,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "void",
+                        "promptLen": null,
+                        "requestClass": null,
+                        "runtimeModel": null,
+                        "start": 0,
+                        "workload": null
+                      }
+                    ],
+                    "source": "planned"
+                  },
+                  {
+                    "gpuId": 1,
+                    "instances": [
+                      {
+                        "batch": null,
+                        "end": 7,
+                        "modelKey": null,
+                        "mu": 0,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "void",
+                        "promptLen": null,
+                        "requestClass": null,
+                        "runtimeModel": null,
+                        "start": 0,
+                        "workload": null
+                      }
+                    ],
+                    "source": "planned"
+                  },
+                  {
+                    "gpuId": 2,
+                    "instances": [
+                      {
+                        "batch": null,
+                        "end": 7,
+                        "modelKey": null,
+                        "mu": 0,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "void",
+                        "promptLen": null,
+                        "requestClass": null,
+                        "runtimeModel": null,
+                        "start": 0,
+                        "workload": null
+                      }
+                    ],
+                    "source": "planned"
+                  }
+                ],
+                "metadata": {
+                  "free_physical_gpu_pool": [
+                    "ampere-gpu0",
+                    "ampere-gpu1",
+                    "rtx1-worker-gpu0"
+                  ],
+                  "free_physical_gpu_pool_policy": "lifo",
+                  "next_physical_idx": 0,
+                  "physicalGpuBindings": {
+                    "ampere-gpu0": {
+                      "deviceIndex": 0,
+                      "nodeName": "ampere"
+                    },
+                    "ampere-gpu1": {
+                      "deviceIndex": 1,
+                      "nodeName": "ampere"
+                    },
+                    "rtx1-worker-gpu0": {
+                      "deviceIndex": 0,
+                      "nodeName": "rtx1-worker"
+                    }
+                  },
+                  "physical_id_map": {
+                    "0": "ampere-gpu0",
+                    "1": "ampere-gpu1",
+                    "2": "rtx1-worker-gpu0"
+                  },
+                  "source": "go-cluster-state-manager",
+                  "transition_draining_instances": {},
+                  "transition_reconfig_targets": {},
+                  "transition_runtime_instances": {}
+                }
+              }
+            }
+          ],
+          "peakActiveGpu": 0,
+          "phasedActionPlan": {
+            "actionCount": 0,
+            "criticalPathLength": 0,
+            "edgeCount": 0,
+            "name": "epoch-real3gpu-section44-latest3-r2-20260715-155038-reset-zero-final",
+            "nodeCount": 0,
+            "nodes": [],
+            "phaseCount": 0,
+            "phases": [],
+            "representation": "migrant.phased-action-dag/v1",
+            "roots": []
+          },
+          "phasedActionPlanSummary": {
+            "actionCount": 0,
+            "criticalPathLength": 0,
+            "edgeCount": 0,
+            "nodeCount": 0,
+            "phaseCount": 0,
+            "phases": [],
+            "representation": "migrant.phased-action-dag/v1"
+          },
+          "planner": "effect_aware_dag",
+          "plannerModule": "transition.effect_aware_dag",
+          "reachedTarget": true,
+          "runtimeAssumptions": {
+            "committedDemandPolicy": "component-wise min(source demand, target demand)",
+            "defaultInflight": 1,
+            "defaultQueued": 2,
+            "overrideExistingChangedSlots": false,
+            "transitionDemandPolicy": "min"
+          },
+          "sourceActiveGpu": 0,
+          "stageName": "epoch-real3gpu-section44-latest3-r2-20260715-155038-reset-zero"
+        }
+      },
+      "reachedTarget": true,
+      "requestedPlanner": "ours"
+    },
+    "planningInput": {
+      "calibrationOverlayRef": "",
+      "currentAllocationRef": "physicalgpuregistry/default",
+      "epoch": "real3gpu-section44-latest3-r2-20260715-155038-reset-zero",
+      "forceReplan": true,
+      "mode": "scheduled",
+      "observedAt": "2026-07-15T06:50:47Z",
+      "placementNodes": [
+        "ampere",
+        "rtx1-worker"
+      ],
+      "planner": "ours",
+      "profileCatalogRef": "default",
+      "registeredSLOMs": {
+        "gpt2": 50,
+        "llama": 180,
+        "resnet50": 100,
+        "vgg16": 100,
+        "vit_base": 300
+      },
+      "slo": {
+        "gpt2": {
+          "demandRate": 0,
+          "latencyMs": 50,
+          "requestClass": "p64/o64",
+          "tpotMs": 20,
+          "ttftMs": 50
+        },
+        "llama": {
+          "demandRate": 0,
+          "latencyMs": 180,
+          "requestClass": "p1024/o128",
+          "tpotMs": 35,
+          "ttftMs": 180
+        },
+        "resnet50": {
+          "demandRate": 0,
+          "latencyMs": 100,
+          "requestClass": "image batches"
+        },
+        "vgg16": {
+          "demandRate": 0,
+          "latencyMs": 100,
+          "requestClass": "image batches"
+        },
+        "vit_base": {
+          "demandRate": 0,
+          "latencyMs": 300,
+          "requestClass": "image batches"
+        }
+      },
+      "source": "real-3gpu-k8s-runner",
+      "sourceArrival": {
+        "gpt2": 0,
+        "llama": 0,
+        "resnet50": 0,
+        "vgg16": 0,
+        "vit_base": 0
+      },
+      "targetArrival": {
+        "gpt2": 0,
+        "llama": 0,
+        "resnet50": 0,
+        "vgg16": 0,
+        "vit_base": 0
+      },
+      "transitionDemandPolicy": "min",
+      "triggerReason": "real_3gpu_continuous_trace",
+      "unit": "requests_per_second",
+      "windowSeconds": 300
+    },
+    "summary": {
+      "arrivalSnapshotRef": "real3gpu-section44-latest3-r2-20260715-155038-reset-zero",
+      "desiredRuntimes": [],
+      "executionRuntimes": [],
+      "finalDesiredRuntimes": [],
+      "planner": "ours",
+      "plannerMakespanSec": 0.08956434950232506,
+      "sourceArrival": {
+        "gpt2": 0,
+        "llama": 0,
+        "resnet50": 0,
+        "vgg16": 0,
+        "vit_base": 0
+      },
+      "sourceGpuCount": 0,
+      "targetArrival": {
+        "gpt2": 0,
+        "llama": 0,
+        "resnet50": 0,
+        "vgg16": 0,
+        "vit_base": 0
+      },
+      "targetGpuCount": 0
+    },
+    "targetAllocationPlan": {
+      "desiredRuntimes": [],
+      "milp": {
+        "KTotal": {
+          "1g": 0,
+          "2g": 0,
+          "3g": 0,
+          "4g": 0,
+          "7g": 0
+        },
+        "alloc": [
+          {
+            "arrival": 0,
+            "instances": [],
+            "provided": 0,
+            "slack": 0,
+            "workload": "llama"
+          },
+          {
+            "arrival": 0,
+            "instances": [],
+            "provided": 0,
+            "slack": 0,
+            "workload": "gpt2"
+          },
+          {
+            "arrival": 0,
+            "instances": [],
+            "provided": 0,
+            "slack": 0,
+            "workload": "resnet50"
+          }
+        ],
+        "chosenTemplates": [],
+        "gpuCount": 0,
+        "rawSolution": {
+          "x_sol": {},
+          "y_sol": {}
+        },
+        "status": "OPTIMAL",
+        "warmStart": {
+          "available": false,
+          "source": "currentAllocation",
+          "templateMissCount": 0,
+          "templateMisses": [],
+          "unmatchedInstanceCount": 0,
+          "unmatchedInstances": [],
+          "xSolCount": 0,
+          "ySolCount": 0
+        }
+      },
+      "objective": "Gurobi MILP target allocation followed by exact global Stage 2 materialization",
+      "planner": "original-gurobi-milp-exact-stage2-effect-aware-dag",
+      "targetState": {
+        "gpus": [],
+        "metadata": {
+          "arrivals": {
+            "gpt2": 0,
+            "llama": 0,
+            "resnet50": 0
+          },
+          "build_method": "exact_global_milp_aggregated",
+          "build_metrics": {
+            "aggregated_new_gpu_count": 0,
+            "cold_workload_gpu_incidence": null,
+            "current_gpu_count": 0,
+            "demand_count": 0,
+            "demand_type_count": 0,
+            "elapsed_time_sec": 0.002393484115600586,
+            "exact_preserve": 0,
+            "gpu_count": 0,
+            "indexed_new_gpu_count": 0,
+            "layout_count": 16,
+            "mig_preserve": 0,
+            "mip_gap": null,
+            "new_gpu_count": 0,
+            "num_constraints": 36,
+            "num_vars": 16,
+            "objective_mode": "transition_preservation",
+            "optimality_proven": true,
+            "reused_current_gpu_count": 0,
+            "score_tuple": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "selected_layouts": {},
+            "solver_status": "OPTIMAL",
+            "upgrade_preserve": 0,
+            "whole_gpu_preserve": 0
+          },
+          "free_physical_gpu_pool": [
+            "rtx1-worker-gpu0",
+            "ampere-gpu1",
+            "ampere-gpu0"
+          ],
+          "free_physical_gpu_pool_policy": "lifo",
+          "next_physical_idx": 0,
+          "physical_id_map": {},
+          "stage2_demand_count": 0,
+          "stage2_demand_type_count": 0
+        }
+      }
+    },
+    "targetGpuCount": 0,
+    "validationTargets": {
+      "targetAllocationPlan": {
+        "desiredRuntimes": [],
+        "targetState": {
+          "gpus": [],
+          "metadata": {
+            "arrivals": {
+              "gpt2": 0,
+              "llama": 0,
+              "resnet50": 0
+            },
+            "build_method": "exact_global_milp_aggregated",
+            "build_metrics": {
+              "aggregated_new_gpu_count": 0,
+              "cold_workload_gpu_incidence": null,
+              "current_gpu_count": 0,
+              "demand_count": 0,
+              "demand_type_count": 0,
+              "elapsed_time_sec": 0.002393484115600586,
+              "exact_preserve": 0,
+              "gpu_count": 0,
+              "indexed_new_gpu_count": 0,
+              "layout_count": 16,
+              "mig_preserve": 0,
+              "mip_gap": null,
+              "new_gpu_count": 0,
+              "num_constraints": 36,
+              "num_vars": 16,
+              "objective_mode": "transition_preservation",
+              "optimality_proven": true,
+              "reused_current_gpu_count": 0,
+              "score_tuple": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "selected_layouts": {},
+              "solver_status": "OPTIMAL",
+              "upgrade_preserve": 0,
+              "whole_gpu_preserve": 0
+            },
+            "free_physical_gpu_pool": [
+              "rtx1-worker-gpu0",
+              "ampere-gpu1",
+              "ampere-gpu0"
+            ],
+            "free_physical_gpu_pool_policy": "lifo",
+            "next_physical_idx": 0,
+            "physical_id_map": {},
+            "stage2_demand_count": 0,
+            "stage2_demand_type_count": 0
+          }
+        }
+      }
+    }
+  },
+  "status": {
+    "message": "empty action DAG; no-op plan",
+    "phase": "Executed",
+    "transitionExecution": {
+      "durationsSeconds": {
+        "total": 0.016525743
+      },
+      "metrics": {
+        "routerMonitor": {
+          "active": true,
+          "demandRatePolicy": "fixed_input_not_observed",
+          "generatedAt": "2026-07-15T06:50:55.208104736Z",
+          "latencySLOMs": {
+            "gpt2": 50,
+            "llama": 180,
+            "resnet50": 100,
+            "vgg16": 100,
+            "vit_base": 300
+          },
+          "models": {},
+          "planName": "plan-real3gpu-section44-latest3-r2-20260715-155038-reset-zero",
+          "sourceArrival": {
+            "gpt2": 0,
+            "llama": 0,
+            "resnet50": 0,
+            "vgg16": 0,
+            "vit_base": 0
+          },
+          "startedAt": "2026-07-15T06:50:55.208097282Z",
+          "targetArrival": {
+            "gpt2": 0,
+            "llama": 0,
+            "resnet50": 0,
+            "vgg16": 0,
+            "vit_base": 0
+          }
+        },
+        "routerSLO": {
+          "active": false,
+          "demandRatePolicy": "fixed_input_not_observed",
+          "finishedAt": "2026-07-15T06:50:55.208388162Z",
+          "generatedAt": "2026-07-15T06:50:55.208388913Z",
+          "latencySLOMs": {
+            "gpt2": 50,
+            "llama": 180,
+            "resnet50": 100,
+            "vgg16": 100,
+            "vit_base": 300
+          },
+          "models": {},
+          "planName": "plan-real3gpu-section44-latest3-r2-20260715-155038-reset-zero",
+          "sourceArrival": {
+            "gpt2": 0,
+            "llama": 0,
+            "resnet50": 0,
+            "vgg16": 0,
+            "vit_base": 0
+          },
+          "startedAt": "2026-07-15T06:50:55.208097282Z",
+          "targetArrival": {
+            "gpt2": 0,
+            "llama": 0,
+            "resnet50": 0,
+            "vgg16": 0,
+            "vit_base": 0
+          }
+        }
+      },
+      "timestamps": {
+        "executorFinishedAt": "2026-07-15T06:50:55.208296629Z",
+        "executorStartedAt": "2026-07-15T06:50:55.191770886Z"
+      }
+    }
+  }
+}
