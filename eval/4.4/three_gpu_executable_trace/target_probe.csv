@@ -1,0 +1,6 @@
+round,intent,gpu_count,allocated_slices,min_service_rate_ratio
+0,initial provision: mixed workload on one GPU,1,7,1.0310733333333333
+1,scale up and bridge reconfiguration,2,9,1.080531111111111
+2,language/vision mix shift with replacement pressure,2,13,1.000090909090909
+3,scale down and compaction,1,7,1.5685129032258065
+4,shutdown and release resources,0,0,1.0

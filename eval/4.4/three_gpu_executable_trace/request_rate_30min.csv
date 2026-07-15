@@ -1,0 +1,6 @@
+epoch,minute,hour,intent,resnet50_image,vgg16_image,vit_base_image,gpt2_p64_o64,gpt2_p512_o512,llama_p1024_o128,llama_p2048_o64
+0,0,0.0,initial provision: mixed workload on one GPU,500.0,0.0,0.0,0.5,0.0,0.3,0.0
+1,30,0.5,scale up and bridge reconfiguration,1150.0,0.0,0.0,0.9,0.0,0.18,0.0
+2,60,1.0,language/vision mix shift with replacement pressure,720.0,0.0,0.0,0.25,0.0,0.66,0.0
+3,90,1.5,scale down and compaction,280.0,0.0,0.0,0.62,0.0,0.16,0.0
+4,120,2.0,shutdown and release resources,0.0,0.0,0.0,0.0,0.0,0.0,0.0
