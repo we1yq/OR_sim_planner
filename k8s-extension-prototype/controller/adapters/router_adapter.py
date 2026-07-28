@@ -50,10 +50,6 @@ def _workload_route_plan(action_plan_name: str, action: dict[str, Any]) -> dict[
             "workload": action.get("workload"),
             "sourceInstanceRef": _instance_ref(action),
             "queued": action.get("queued"),
-            "target": action.get("to"),
-            "targetInstanceRef": _target_instance_ref(action),
-            "routerQueueRedispatch": bool(action.get("routerQueueRedispatch")),
-            "reroutePressure": _reroute_pressure(action),
         },
     }
 
@@ -73,7 +69,6 @@ def _serving_instance_drain(action_plan_name: str, action: dict[str, Any]) -> di
             "targetQueued": 0,
             "currentInflightApprox": action.get("rounds"),
             "currentQueuedApprox": action.get("queued"),
-            "estimatedDrainSeconds": action.get("estimatedBacklogDrainSeconds"),
             "waitForInflightZero": True,
             "waitForQueuedZero": True,
         },
@@ -86,27 +81,6 @@ def _instance_ref(action: dict[str, Any]) -> dict[str, Any]:
         "physicalGpuId": action.get("physical_gpu_id"),
         "slot": action.get("slot"),
     }
-
-
-def _target_instance_ref(action: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "gpuId": action.get("target_gpu_id") or action.get("targetGpuId"),
-        "physicalGpuId": action.get("target_physical_gpu_id") or action.get("targetPhysicalGpuId"),
-        "slot": action.get("target_slot") or action.get("targetSlot"),
-        "endpoint": action.get("targetEndpoint") or action.get("toEndpoint") or action.get("to"),
-    }
-
-
-def _reroute_pressure(action: dict[str, Any]) -> dict[str, Any]:
-    keys = [
-        "targetMu",
-        "workloadRequiredMu",
-        "workloadProvidedAfterSourceRemoval",
-        "estimatedRerouteSpareMu",
-        "estimatedBacklogDrainSeconds",
-        "rerouteCapacitySafe",
-    ]
-    return {key: action.get(key) for key in keys if key in action}
 
 
 def _route_plan_name(action_plan_name: str, action: dict[str, Any]) -> str:

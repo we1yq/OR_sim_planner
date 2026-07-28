@@ -8,6 +8,7 @@ import datetime as dt
 import json
 import math
 import random
+import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -23,6 +24,7 @@ PALETTE = [
 ]
 
 SLO_MS = {"llama": 180.0, "gpt2": 50.0, "resnet50": 100.0}
+SLO_TPOT_MS = {"llama": 35.0, "gpt2": 20.0}
 
 
 def _pdf_text(s: object) -> str:
@@ -100,7 +102,7 @@ class Chart:
         self.left, self.bottom, self.right, self.top = 72, 68, 690, 412
         self.title, self.xlabel, self.ylabel = title, xlabel, ylabel
 
-    def frame(self, xmin: float, xmax: float, ymin: float, ymax: float) -> tuple:
+    def frame(self, xmin: float, xmax: float, ymin: float, ymax: float, x_ticks: list[tuple[float, object]] | None = None) -> tuple:
         if xmin == xmax:
             xmax = xmin + 1
         if ymin == ymax:
@@ -117,17 +119,23 @@ class Chart:
         p.text((self.left + self.right) / 2, 440, self.title, 14, "center")
         p.text((self.left + self.right) / 2, 28, self.xlabel, 10, "center")
         p.text(15, (self.bottom + self.top) / 2, self.ylabel, 10)
-        for i in range(6):
-            tx = xmin + (xmax - xmin) * i / 5
-            ty = ymin + (ymax - ymin) * i / 5
+        ticks = x_ticks if x_ticks is not None else [(xmin + (xmax - xmin) * i / 5, _fmt(xmin + (xmax - xmin) * i / 5)) for i in range(6)]
+        for tx, label in ticks:
             x = self.x(tx)
-            y = self.y(ty)
+            if x < self.left - 1 or x > self.right + 1:
+                continue
             p.color((0.86, 0.86, 0.86))
             p.line_width(0.4)
             p.line(x, self.bottom, x, self.top)
+            p.color((0, 0, 0))
+            p.text(x, self.bottom - 18, label, 8, "center")
+        for i in range(6):
+            ty = ymin + (ymax - ymin) * i / 5
+            y = self.y(ty)
+            p.color((0.86, 0.86, 0.86))
+            p.line_width(0.4)
             p.line(self.left, y, self.right, y)
             p.color((0, 0, 0))
-            p.text(x, self.bottom - 18, _fmt(tx), 8, "center")
             p.text(self.left - 10, y - 3, _fmt(ty), 8, "right")
         return self.bounds
 
@@ -146,6 +154,15 @@ def _fmt(v: float) -> str:
     if abs(v) >= 10:
         return f"{v:.1f}"
     return f"{v:.2f}".rstrip("0").rstrip(".")
+
+
+def epoch_ticks(epochs: list[int] | set[int]) -> list[tuple[float, str]]:
+    return [(float(epoch), str(epoch)) for epoch in sorted(set(int(e) for e in epochs))]
+
+
+def epoch_from_stage(stage: str) -> int | None:
+    match = re.search(r"-e(\d+)$", str(stage or ""))
+    return int(match.group(1)) if match else None
 
 
 def rows(path: Path) -> list[dict[str, str]]:
@@ -191,12 +208,26 @@ def slo_p95_duration(row: dict[str, str], request_p95: dict[str, dict[str, objec
     return slo_wall_clock(row)
 
 
+def slo_violation_rate(row: dict[str, str], request_slo: dict[str, dict[str, object]]) -> float:
+    stage = stage_name(row)
+    if stage in request_slo:
+        return float(request_slo[stage]["violationRate"])
+    if row.get("sloViolationRate"):
+        return float(row["sloViolationRate"])
+    requests = float(row.get("transitionRequestCount") or 0.0)
+    violations = float(row.get("sloViolationCount") or 0.0)
+    return violations / requests if requests > 0 else 0.0
+
+
 def p95_from_requests(
     path: Path,
     stage_windows: dict[str, tuple[float | None, float | None]],
     bucket_seconds: float = 1.0,
 ) -> dict[str, dict[str, object]]:
     buckets: dict[str, dict[str, dict[int, list[float]]]] = defaultdict(lambda: defaultdict(dict))
+    epoch_metrics: dict[str, dict[str, dict[str, list[float]]]] = defaultdict(
+        lambda: defaultdict(lambda: {"latency": [], "ttft": [], "tpot": []})
+    )
     with path.open(newline="") as f:
         for row in csv.DictReader(f):
             if row.get("phase") != "transition":
@@ -207,7 +238,7 @@ def p95_from_requests(
                 continue
             try:
                 sent_at = float(row.get("sentAt") or 0)
-                latency = float(row.get("latencyMs") or 0)
+                latency = float(first_present(row, "serviceLatencyMs", "latencyMs") or 0)
             except ValueError:
                 continue
             window_start, window_end = stage_windows.get(stage, (None, None))
@@ -215,16 +246,48 @@ def p95_from_requests(
                 continue
             if window_end is not None and sent_at > window_end:
                 continue
+            logical_count = logical_request_count(row)
             bucket = int(math.floor(sent_at / bucket_seconds))
-            buckets[stage][model].setdefault(bucket, []).append(latency)
+            buckets[stage][model].setdefault(bucket, []).extend([latency] * logical_count)
+            epoch_metrics[stage][model]["latency"].extend([latency] * logical_count)
+            ttft = optional_float(first_present(row, "ttftMs", "ttft_ms", "runtimeTtftMs"))
+            tpot = optional_float(first_present(row, "tpotMs", "tpot_ms", "runtimeTpotMs"))
+            if ttft is not None:
+                epoch_metrics[stage][model]["ttft"].extend([ttft] * logical_count)
+            elif model in SLO_TPOT_MS:
+                epoch_metrics[stage][model]["ttft"].extend([latency] * logical_count)
+            if tpot is not None:
+                epoch_metrics[stage][model]["tpot"].extend([tpot] * logical_count)
 
     out: dict[str, dict[str, object]] = {}
     for stage, by_model in buckets.items():
         intervals = []
         model_summary = {}
+        evaluated_classes = 0
+        violated_classes = 0
+        evaluated_requests = 0
+        violated_requests = 0
         for model, model_buckets in by_model.items():
             violating = 0
             max_p95 = 0.0
+            metrics = epoch_metrics[stage][model]
+            epoch_latency = metrics["latency"]
+            epoch_ttft = metrics["ttft"]
+            epoch_tpot = metrics["tpot"]
+            epoch_latency_p95 = percentile(epoch_latency, 95.0) if epoch_latency else 0.0
+            epoch_ttft_p95 = percentile(epoch_ttft, 95.0) if epoch_ttft else 0.0
+            epoch_tpot_p95 = percentile(epoch_tpot, 95.0) if epoch_tpot else 0.0
+            epoch_violated = bool(epoch_latency) and epoch_latency_p95 > SLO_MS[model]
+            if model in SLO_TPOT_MS:
+                epoch_violated = epoch_violated or (bool(epoch_ttft) and epoch_ttft_p95 > SLO_MS[model])
+                epoch_violated = epoch_violated or (bool(epoch_tpot) and epoch_tpot_p95 > SLO_TPOT_MS[model])
+            request_count = len(epoch_latency)
+            if request_count:
+                evaluated_classes += 1
+                evaluated_requests += request_count
+                if epoch_violated:
+                    violated_classes += 1
+                    violated_requests += request_count
             for bucket, values in model_buckets.items():
                 p95 = percentile(values, 95.0)
                 max_p95 = max(max_p95, p95)
@@ -241,10 +304,113 @@ def p95_from_requests(
                 "bucketCount": len(model_buckets),
                 "violatingBucketCount": violating,
                 "maxBucketP95LatencyMs": round(max_p95, 3),
+                "epochP95LatencyMs": round(epoch_latency_p95, 3),
+                "epochP95TtftMs": round(epoch_ttft_p95, 3) if epoch_ttft else 0.0,
+                "epochP95TpotMs": round(epoch_tpot_p95, 3) if epoch_tpot else 0.0,
+                "epochP95Violated": epoch_violated,
                 "latencySLOMs": SLO_MS[model],
             }
-        out[stage] = {"duration": union_seconds(intervals), "byModel": model_summary}
+        out[stage] = {
+            "duration": union_seconds(intervals),
+            "byModel": model_summary,
+            "p95ViolationClassRate": float(violated_classes) / evaluated_classes if evaluated_classes else 0.0,
+            "p95ViolationRequestRate": float(violated_requests) / evaluated_requests if evaluated_requests else 0.0,
+            "p95EvaluatedClassCount": evaluated_classes,
+            "p95ViolationClassCount": violated_classes,
+            "p95EvaluatedRequestCount": evaluated_requests,
+            "p95ViolationRequestCount": violated_requests,
+        }
     return out
+
+
+def request_slo_from_requests(
+    path: Path,
+    stage_windows: dict[str, tuple[float | None, float | None]],
+) -> dict[str, dict[str, object]]:
+    out: dict[str, dict[str, object]] = defaultdict(lambda: {"requestCount": 0, "violationCount": 0, "errorCount": 0, "byModel": {}})
+    with path.open(newline="") as f:
+        for row in csv.DictReader(f):
+            if row.get("phase") != "transition":
+                continue
+            stage = row.get("stage") or ""
+            model = row.get("model") or ""
+            if model not in SLO_MS:
+                continue
+            try:
+                sent_at = float(row.get("sentAt") or 0)
+            except ValueError:
+                continue
+            window_start, window_end = stage_windows.get(stage, (None, None))
+            if window_start is not None and sent_at < window_start:
+                continue
+            if window_end is not None and sent_at > window_end:
+                continue
+            failed = str(row.get("ok") or "").lower() not in {"true", "1"} or str(row.get("status") or "") not in {"", "200"}
+            violated = failed or request_violates_slo(model, row)
+            logical_count = logical_request_count(row)
+            stage_stats = out[stage]
+            by_model = stage_stats["byModel"]
+            model_stats = by_model.setdefault(model, {"requestCount": 0, "violationCount": 0, "errorCount": 0})
+            stage_stats["requestCount"] += logical_count
+            model_stats["requestCount"] += logical_count
+            if failed:
+                stage_stats["errorCount"] += logical_count
+                model_stats["errorCount"] += logical_count
+            if violated:
+                stage_stats["violationCount"] += logical_count
+                model_stats["violationCount"] += logical_count
+    for stats in out.values():
+        count = int(stats["requestCount"])
+        stats["violationRate"] = round(float(stats["violationCount"]) / count, 6) if count else 0.0
+        for model, model_stats in stats["byModel"].items():
+            model_count = int(model_stats["requestCount"])
+            model_stats["violationRate"] = round(float(model_stats["violationCount"]) / model_count, 6) if model_count else 0.0
+            model_stats["latencySLOMs"] = SLO_MS.get(model)
+            model_stats["tpotSLOMs"] = SLO_TPOT_MS.get(model)
+    return dict(out)
+
+
+def request_violates_slo(model: str, row: dict[str, str]) -> bool:
+    latency_slo = SLO_MS[model]
+    service_latency = optional_float(first_present(row, "serviceLatencyMs", "latencyMs"))
+    ttft = optional_float(first_present(row, "ttftMs", "ttft_ms", "runtimeTtftMs"))
+    tpot = optional_float(first_present(row, "tpotMs", "tpot_ms", "runtimeTpotMs"))
+    if model not in SLO_TPOT_MS:
+        return service_latency is not None and service_latency > latency_slo
+    ttft_value = ttft if ttft is not None else service_latency
+    return bool(
+        (ttft_value is not None and ttft_value > latency_slo)
+        or (tpot is not None and tpot > SLO_TPOT_MS[model])
+    )
+
+
+def logical_request_count(row: dict[str, str]) -> int:
+    try:
+        return max(1, int(float(row.get("logicalRequestCount") or 1)))
+    except (TypeError, ValueError):
+        return 1
+
+
+def first_present(row: dict[str, str], *keys: str) -> str:
+    for key in keys:
+        value = row.get(key)
+        if value not in ("", None):
+            return value
+    return ""
+
+
+def optional_float(value: object) -> float | None:
+    try:
+        if value in ("", None):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def float_or_zero(value: object) -> float:
+    parsed = optional_float(value)
+    return parsed if parsed is not None else 0.0
 
 
 def percentile(values: list[float], pct: float) -> float:
@@ -277,11 +443,18 @@ def union_seconds(intervals: list[tuple[float, float]]) -> float:
     return sum(end - start for start, end in merged)
 
 
-def write_line_pdf(path: Path, title: str, xlabel: str, ylabel: str, series: dict[str, list[tuple[float, float]]]) -> None:
+def write_line_pdf(
+    path: Path,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    series: dict[str, list[tuple[float, float]]],
+    x_ticks: list[tuple[float, object]] | None = None,
+) -> None:
     pts = [pt for values in series.values() for pt in values]
     pdf = Pdf(path)
     c = Chart(pdf, title, xlabel, ylabel)
-    c.frame(min(x for x, _ in pts), max(x for x, _ in pts), min(y for _, y in pts), max(y for _, y in pts))
+    c.frame(min(x for x, _ in pts), max(x for x, _ in pts), min(y for _, y in pts), max(y for _, y in pts), x_ticks=x_ticks)
     for i, (name, values) in enumerate(series.items()):
         pdf.color(PALETTE[i % len(PALETTE)])
         pdf.line_width(1.6)
@@ -296,7 +469,7 @@ def write_bar_pdf(path: Path, title: str, xlabel: str, ylabel: str, bars: list[t
     pdf = Pdf(path)
     c = Chart(pdf, title, xlabel, ylabel)
     ymax = max([v for _, v in bars] + [1])
-    c.frame(-0.5, len(bars) - 0.5, 0, ymax)
+    c.frame(-0.5, len(bars) - 0.5, 0, ymax, x_ticks=[(float(i), label) for i, (label, _) in enumerate(bars)])
     width = 0.66
     pdf.color(color)
     for i, (label, value) in enumerate(bars):
@@ -304,7 +477,6 @@ def write_bar_pdf(path: Path, title: str, xlabel: str, ylabel: str, bars: list[t
         x1 = c.x(i + width / 2)
         pdf.rect(x0, c.y(0), x1 - x0, c.y(value) - c.y(0), True)
         pdf.color((0, 0, 0))
-        pdf.text(c.x(i), c.bottom - 36, label, 8, "center")
         pdf.text(c.x(i), c.y(value) + 4, _fmt(value), 8, "center")
         pdf.color(color)
     pdf.write()
@@ -316,7 +488,7 @@ def transition_and_planner_pdf(out: Path, metrics: list[dict[str, str]]) -> None
     epochs = [int(r["epoch"]) for r in metrics]
     tvals = [float(r["transitionMakespanSec"]) for r in metrics]
     pvals = [float(r["plannerMakespanSec"]) for r in metrics]
-    c.frame(min(epochs) - 0.5, max(epochs) + 0.5, 0, max(tvals + pvals))
+    c.frame(min(epochs) - 0.5, max(epochs) + 0.5, 0, max(tvals + pvals), x_ticks=epoch_ticks(epochs))
     for i, e in enumerate(epochs):
         for offset, val, col in [(-0.17, tvals[i], PALETTE[0]), (0.17, pvals[i], PALETTE[1])]:
             pdf.color(col)
@@ -340,7 +512,7 @@ def action_breakdown_pdf(out: Path, action_rows: list[dict[str, str]]) -> None:
     c = Chart(pdf, "Transition action breakdown", "epoch", "actions")
     epochs = sorted(by_epoch)
     totals = [sum(by_epoch[e].values()) for e in epochs]
-    c.frame(min(epochs) - 0.5, max(epochs) + 0.5, 0, max(totals))
+    c.frame(min(epochs) - 0.5, max(epochs) + 0.5, 0, max(totals), x_ticks=epoch_ticks(epochs))
     for e in epochs:
         base = 0
         for i, t in enumerate(action_types):
@@ -364,10 +536,24 @@ def service_rate_pdfs(result_dir: Path, out_dir: Path) -> None:
     rs = rows(result_dir / "service_rate_samples.csv")
     if not rs:
         return
-    t0 = min(float(r["sampledAt"]) for r in rs)
+    stage_max: dict[str, float] = defaultdict(float)
     for r in rs:
+        stage = r.get("stage") or ""
+        epoch = epoch_from_stage(stage)
+        if epoch is None:
+            continue
+        stage_max[stage] = max(stage_max[stage], float_or_zero(r.get("timeSeconds")))
+    epochs = {epoch for row in rs if (epoch := epoch_from_stage(row.get("stage") or "")) is not None}
+    if not epochs:
+        return
+    for r in rs:
+        stage = r.get("stage") or ""
+        epoch = epoch_from_stage(stage)
+        if epoch is None:
+            continue
         model = r["model"]
-        t = (float(r["sampledAt"]) - t0) / 60.0
+        denom = max(stage_max.get(stage, 0.0), 1.0)
+        t = float(epoch) + min(0.98, max(0.0, float_or_zero(r.get("timeSeconds")) / denom))
         for key, col in [
             ("actual", "actualServiceRate"),
             ("capacity", "capacity"),
@@ -379,7 +565,7 @@ def service_rate_pdfs(result_dir: Path, out_dir: Path) -> None:
                 data[model][key].append((t, value))
     for model, series in data.items():
         thin = {k: _thin(v, 900) for k, v in series.items()}
-        write_line_pdf(out_dir / f"service_rate_{model}.pdf", f"Service rate: {model}", "minutes", "req/s", thin)
+        write_line_pdf(out_dir / f"service_rate_{model}.pdf", f"Service rate: {model}", "epoch", "req/s", thin, x_ticks=epoch_ticks(epochs))
 
 
 def maybe_float(value: str) -> float | None:
@@ -408,15 +594,17 @@ def latency_cdf_pdf(result_dir: Path, out: Path) -> None:
             if r.get("ok") != "True":
                 continue
             model = r["model"]
-            seen[model] += 1
-            lat = float(r["latencyMs"])
+            count = logical_request_count(r)
+            seen[model] += count
+            lat = float(first_present(r, "serviceLatencyMs", "latencyMs"))
             bucket = samples[model]
-            if len(bucket) < limit:
-                bucket.append(lat)
-            else:
-                j = rng.randrange(seen[model])
-                if j < limit:
-                    bucket[j] = lat
+            for _ in range(count):
+                if len(bucket) < limit:
+                    bucket.append(lat)
+                else:
+                    j = rng.randrange(seen[model])
+                    if j < limit:
+                        bucket[j] = lat
     series = {}
     for model, vals in samples.items():
         vals.sort()
@@ -443,16 +631,31 @@ def main() -> None:
         for r in metrics
     }
     request_p95 = p95_from_requests(result_dir / "requests.csv", stage_windows)
+    request_slo = request_slo_from_requests(result_dir / "requests.csv", stage_windows)
     gpu = rows(result_dir / "gpu_counts.csv")
     sim = rows(result_dir / "allocation_similarity.csv")
     actions = rows(result_dir / "action_statuses.csv")
+    metric_epochs = [int(r["epoch"]) for r in metrics]
+    gpu_epoch_max: dict[int, float] = defaultdict(float)
+    for r in gpu:
+        epoch = int(r["epoch"])
+        gpu_epoch_max[epoch] = max(gpu_epoch_max[epoch], float_or_zero(r.get("relativeSeconds")))
 
     write_line_pdf(
         out_dir / "active_gpu_count.pdf",
         "Active GPU count over time",
-        "epoch + relative transition seconds / 100",
+        "epoch",
         "active GPUs",
-        {"active": [(int(r["epoch"]) + float(r["relativeSeconds"]) / 100.0, float(r["active"])) for r in gpu]},
+        {
+            "active": [
+                (
+                    int(r["epoch"]) + min(0.98, float_or_zero(r.get("relativeSeconds")) / max(gpu_epoch_max[int(r["epoch"])], 1.0)),
+                    float_or_zero(r.get("active")),
+                )
+                for r in gpu
+            ]
+        },
+        x_ticks=epoch_ticks(metric_epochs),
     )
     transition_and_planner_pdf(out_dir / "makespan.pdf", metrics)
     write_bar_pdf(
@@ -472,11 +675,19 @@ def main() -> None:
         PALETTE[4],
     )
     write_bar_pdf(
+        out_dir / "slo_violation_rate.pdf",
+        "Transition request SLO violation rate",
+        "epoch",
+        "violating requests / requests",
+        [(r["epoch"], slo_violation_rate(r, request_slo)) for r in metrics],
+        PALETTE[3],
+    )
+    write_bar_pdf(
         out_dir / "transition_action_count.pdf",
-        "Transition actions",
+        "Physical transition actions",
         "epoch",
         "actions",
-        [(r["epoch"], float(r["actionCount"])) for r in metrics],
+        [(r["epoch"], float(r.get("physicalActionCount") or r.get("actionCount") or 0)) for r in metrics],
         PALETTE[2],
     )
     if sim:
@@ -486,6 +697,7 @@ def main() -> None:
             "transition",
             "Jaccard similarity",
             {"similarity": [(float(r["toEpoch"]), float(r["jaccardSimilarity"])) for r in sim]},
+            x_ticks=epoch_ticks({int(float(r["toEpoch"])) for r in sim}),
         )
     action_breakdown_pdf(out_dir / "transition_action_breakdown.pdf", actions)
     service_rate_pdfs(result_dir, out_dir)
@@ -496,12 +708,23 @@ def main() -> None:
             "epoch",
             "planner",
             "actionCount",
+            "physicalActionCount",
+            "dagNodeCount",
+            "podCreateCount",
+            "podDeleteCount",
+            "migReconfigOpCount",
+            "migPartitionCreateCount",
+            "migPartitionDeleteCount",
             "transitionMakespanSec",
             "plannerMakespanSec",
             "sloViolationWallClockSec",
             "sloViolationP95BucketSec",
             "sloViolationExcessSec",
             "sloViolationCount",
+            "sloTransitionRequestCount",
+            "sloViolationRequestCount",
+            "sloRequestErrorCount",
+            "sloViolationRate",
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -509,13 +732,24 @@ def main() -> None:
             writer.writerow({
                 "epoch": r["epoch"],
                 "planner": r.get("planner"),
-                "actionCount": r.get("actionCount"),
+                "actionCount": r.get("physicalActionCount") or r.get("actionCount"),
+                "physicalActionCount": r.get("physicalActionCount") or r.get("actionCount"),
+                "dagNodeCount": r.get("dagNodeCount"),
+                "podCreateCount": r.get("podCreateCount"),
+                "podDeleteCount": r.get("podDeleteCount"),
+                "migReconfigOpCount": r.get("migReconfigOpCount"),
+                "migPartitionCreateCount": r.get("migPartitionCreateCount"),
+                "migPartitionDeleteCount": r.get("migPartitionDeleteCount"),
                 "transitionMakespanSec": r.get("transitionMakespanSec"),
                 "plannerMakespanSec": r.get("plannerMakespanSec"),
                 "sloViolationWallClockSec": round(slo_wall_clock(r), 6),
                 "sloViolationP95BucketSec": round(slo_p95_duration(r, request_p95), 6),
                 "sloViolationExcessSec": round(slo_excess(r), 6),
                 "sloViolationCount": r.get("sloViolationCount"),
+                "sloTransitionRequestCount": int(request_slo.get(stage_name(r), {}).get("requestCount", r.get("sloTransitionRequestCount") or r.get("transitionRequestCount") or 0)),
+                "sloViolationRequestCount": int(request_slo.get(stage_name(r), {}).get("violationCount", r.get("sloViolationRequestCount") or 0)),
+                "sloRequestErrorCount": int(request_slo.get(stage_name(r), {}).get("errorCount", r.get("sloRequestErrorCount") or r.get("transitionErrorCount") or 0)),
+                "sloViolationRate": round(slo_violation_rate(r, request_slo), 6),
             })
 
     manifest = {
@@ -526,6 +760,8 @@ def main() -> None:
                 "epoch": int(r["epoch"]),
                 "violationWallClockSeconds": slo_wall_clock(r),
                 "violationP95BucketSeconds": slo_p95_duration(r, request_p95),
+                "violationRequestRate": slo_violation_rate(r, request_slo),
+                "requestViolationByModel": request_slo.get(stage_name(r), {}).get("byModel", {}),
                 "violationExcessSeconds": slo_excess(r),
                 "p95ByModel": request_p95.get(stage_name(r), {}).get("byModel", {}),
                 "byModel": json.loads(r["sloByModel"] or "{}"),

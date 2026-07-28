@@ -15,7 +15,9 @@ type PlanningInput struct {
 	SLO                    map[string]any     `json:"slo,omitempty"`
 	RequestCount           map[string]int64   `json:"requestCount,omitempty"`
 	TransitionDemandPolicy string             `json:"transitionDemandPolicy,omitempty"`
+	ForceReplan            bool               `json:"forceReplan,omitempty"`
 	ProfileCatalogRef      string             `json:"profileCatalogRef"`
+	ScenarioPath           string             `json:"scenarioPath,omitempty"`
 	CalibrationOverlayRef  string             `json:"calibrationOverlayRef"`
 	CurrentAllocationRef   string             `json:"currentAllocationRef"`
 	PlacementNodes         []string           `json:"placementNodes,omitempty"`
@@ -50,6 +52,10 @@ type ObservedMIGSlot struct {
 
 type RuntimeBinding struct {
 	Model           string `json:"model"`
+	RuntimeModel    string `json:"runtimeModel,omitempty"`
+	RequestClass    string `json:"requestClass,omitempty"`
+	PromptLen       int    `json:"promptLen,omitempty"`
+	OutputTokens    int    `json:"outputTokens,omitempty"`
 	BatchSize       int    `json:"batchSize,omitempty"`
 	Pod             string `json:"pod,omitempty"`
 	Phase           string `json:"phase,omitempty"`
@@ -68,6 +74,8 @@ type TargetAllocationPlan struct {
 
 type TargetAllocation struct {
 	Model         string     `json:"model"`
+	RuntimeModel  string     `json:"runtimeModel,omitempty"`
+	RequestClass  string     `json:"requestClass,omitempty"`
 	ArrivalRate   float64    `json:"arrivalRate"`
 	SLOMs         float64    `json:"sloMs,omitempty"`
 	Mu            float64    `json:"mu,omitempty"`
@@ -101,6 +109,8 @@ type AbstractAction struct {
 	GPU           string            `json:"gpu,omitempty"`
 	GPUIndex      int               `json:"gpuIndex,omitempty"`
 	Model         string            `json:"model,omitempty"`
+	RuntimeModel  string            `json:"runtimeModel,omitempty"`
+	RequestClass  string            `json:"requestClass,omitempty"`
 	SlotResource  string            `json:"slotResource,omitempty"`
 	Runtime       *ModelRuntimeSpec `json:"runtime,omitempty"`
 	Slots         []TargetSlot      `json:"slots,omitempty"`

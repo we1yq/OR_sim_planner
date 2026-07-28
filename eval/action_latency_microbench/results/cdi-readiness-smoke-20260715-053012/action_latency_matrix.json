@@ -1,0 +1,34 @@
+[
+  {
+    "case_id": "create-instance-resnet50-1g",
+    "action_type": "create_instance",
+    "executor_action": "place_instance+activate_instance_route",
+    "profile": "1g",
+    "template": "",
+    "source_template": "",
+    "target_template": "",
+    "workload": "resnet50",
+    "runtime_model": "resnet50",
+    "request_class": "image-batches",
+    "slot": "[0, 1, \"1g\"]",
+    "create_spec": "",
+    "delete_spec": "",
+    "preserve_spec": ""
+  },
+  {
+    "case_id": "delete-instance-resnet50-1g",
+    "action_type": "delete_instance",
+    "executor_action": "deactivate_instance_route+wait_instance_drain+delete_instance",
+    "profile": "1g",
+    "template": "",
+    "source_template": "",
+    "target_template": "",
+    "workload": "resnet50",
+    "runtime_model": "resnet50",
+    "request_class": "image-batches",
+    "slot": "[0, 1, \"1g\"]",
+    "create_spec": "",
+    "delete_spec": "",
+    "preserve_spec": ""
+  }
+]

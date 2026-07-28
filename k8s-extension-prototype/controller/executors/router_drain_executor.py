@@ -94,18 +94,6 @@ def apply_router_drain_from_action_plan(
             )
             drain_results.append(result)
 
-    if mode == "http" and router_endpoint:
-        for action in actions:
-            if action.get("type") == "stop_accepting_new" and action.get("routerQueueRedispatch"):
-                workload = str(action.get("workload") or "")
-                if workload:
-                    verification_results.append(
-                        _verify_router_target(
-                            router_endpoint=str(router_endpoint),
-                            workload=workload,
-                        )
-                    )
-
     summary = {
         "kind": "RouterDrainApplySummary",
         "apiVersion": "mig.or-sim.io/v1alpha1",
@@ -144,10 +132,7 @@ def _stop_accepting_new(
     source_pod = str(action.get("sourcePod") or action.get("podName") or "")
     source_endpoint = str(action.get("sourceEndpoint") or "")
     workload = str(action.get("workload") or "")
-    target_endpoint = str(action.get("targetEndpoint") or action.get("toEndpoint") or "")
-    target_pod = str(action.get("targetPod") or action.get("toPod") or "")
     queued_requested = int(action.get("queued", 0) or 0)
-    queued_moved = queued_requested if action.get("routerQueueRedispatch") else 0
     response = {}
     if mode == "http" and source_endpoint:
         response = _http_json(f"{source_endpoint.rstrip('/')}/drain")
@@ -161,58 +146,18 @@ def _stop_accepting_new(
                 "mig.or-sim.io/draining": "true",
             },
         )
-    if action.get("routerQueueRedispatch") and mode == "http":
-        if not workload:
-            raise RouterDrainApplyError("mode=http stop_accepting_new queue redispatch requires workload.")
-        params = {"workload": workload, "queued": str(queued_requested)}
-        if target_endpoint:
-            params["target"] = target_endpoint
-        response = _http_json(f"{router_endpoint.rstrip('/')}/dispatch-backlog?" + urlencode(params))
-        queued_moved = int(response.get("queuedMoved", response.get("moved", queued_requested)) or 0)
-    elif action.get("routerQueueRedispatch") and mode == "annotation":
-        if source_pod:
-            _patch_pod_annotations(
-                client=client,
-                namespace=namespace,
-                pod_name=source_pod,
-                annotations={
-                    "mig.or-sim.io/queued": "0",
-                    "mig.or-sim.io/router-backlog-target": target_pod or target_endpoint or str(action.get("to") or ""),
-                    "mig.or-sim.io/last-dispatched-backlog": str(queued_moved),
-                    "mig.or-sim.io/last-rerouted-queued": str(queued_moved),
-                },
-            )
-        if target_pod:
-            _patch_pod_annotations(
-                client=client,
-                namespace=namespace,
-                pod_name=target_pod,
-                annotations={
-                    "mig.or-sim.io/dispatched-backlog": str(queued_moved),
-                    "mig.or-sim.io/accepted-queued": str(queued_moved),
-                    "mig.or-sim.io/router-backlog-source": source_pod,
-                },
-            )
-    elif action.get("routerQueueRedispatch") and mode == "no-traffic":
-        queued_moved = 0
     return {
         "workload": workload,
         "sourcePod": source_pod or None,
         "sourceEndpoint": source_endpoint or None,
-        "targetPod": target_pod or None,
-        "targetEndpoint": target_endpoint or None,
         "queuedRequested": queued_requested,
-        "queuedMoved": queued_moved,
         "queueRuntime": {
             "mode": mode,
-            "supportsRouterBacklogDispatch": mode in {"http", "annotation"},
-            "sourceQueueAfter": 0 if mode in {"http", "annotation"} else queued_requested,
-            "routerBacklogDispatched": queued_moved if mode in {"http", "annotation"} else 0,
-            "targetAcceptedQueued": queued_moved if mode in {"http", "annotation"} else 0,
+            "drainDecisionOwner": "executor",
         },
         "mode": mode,
         "response": response,
-        "success": not action.get("routerQueueRedispatch") or mode != "no-traffic" or queued_requested == 0,
+        "success": True,
     }
 
 
@@ -327,11 +272,7 @@ def _record_workload_route_plan(
             "workload": action.get("workload"),
             "sourceInstanceRef": _instance_ref(action),
             "queued": int(action.get("queued", 0) or 0),
-            "target": action.get("targetEndpoint") or action.get("toEndpoint") or action.get("to"),
-            "targetInstanceRef": _target_instance_ref(action),
-            "reroutePressure": _reroute_pressure(action),
             "queueRuntime": result.get("queueRuntime"),
-            "queuedMoved": int(result.get("queuedMoved", 0) or 0),
         },
     }
     client.apply_workloadrouteplan(manifest)
@@ -380,8 +321,6 @@ def _record_serving_instance_drain(
             "targetQueued": 0,
             "currentInflightApprox": int(metrics.get("inflight", 0) or 0),
             "currentQueuedApprox": int(metrics.get("queued", 0) or 0),
-            "estimatedDrainSeconds": action.get("estimatedBacklogDrainSeconds"),
-            "reroutePressure": _reroute_pressure(action),
             "waitForInflightZero": True,
             "waitForQueuedZero": True,
         },
@@ -410,28 +349,6 @@ def _instance_ref(action: dict[str, Any]) -> dict[str, Any]:
         "podName": action.get("sourcePod") or action.get("podName"),
         "endpoint": action.get("sourceEndpoint"),
     }
-
-
-def _target_instance_ref(action: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "podName": action.get("targetPod") or action.get("toPod"),
-        "endpoint": action.get("targetEndpoint") or action.get("toEndpoint") or action.get("to"),
-        "slot": action.get("targetSlot") or action.get("toSlot"),
-        "physicalGpuId": action.get("target_physical_gpu_id") or action.get("targetPhysicalGpuId"),
-    }
-
-
-def _reroute_pressure(action: dict[str, Any]) -> dict[str, Any]:
-    keys = [
-        "targetMu",
-        "workloadRequiredMu",
-        "workloadProvidedAfterSourceRemoval",
-        "estimatedRerouteSpareMu",
-        "estimatedBacklogDrainSeconds",
-        "rerouteCapacitySafe",
-    ]
-    return {key: action.get(key) for key in keys if key in action}
-
 
 def _child_name(action_plan_name: str, action_name: str, action: dict[str, Any]) -> str:
     workload = str(action.get("workload") or "workload")

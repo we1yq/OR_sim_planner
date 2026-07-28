@@ -61,6 +61,10 @@ class MigInstance:
     batch: int | None = None
     model_key: str | None = None
     placement_group: str | None = None
+    runtime_model: str | None = None
+    request_class: str | None = None
+    prompt_len: int | None = None
+    output_tokens: int | None = None
 
     @property
     def size(self) -> int:

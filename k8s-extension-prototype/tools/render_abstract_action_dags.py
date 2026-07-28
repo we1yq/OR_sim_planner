@@ -79,7 +79,7 @@ DIAGRAMS: list[dict[str, Any]] = [
         "title": "In-Place Reconfiguration",
         "description": "When all current pods can be deleted safely, delete the old side first and rebuild the same physical GPU in place.",
         "nodes": [
-            ("stop", "Stop GPU Traffic: stop new requests entering this GPU; router may redispatch queued requests to remaining ready pods", "router", 0, 1),
+            ("stop", "Stop GPU Traffic: stop new requests entering this GPU", "router", 0, 1),
             ("drain", "Wait Drain: wait until queued requests and running work are zero", "router", 1, 1, "optional"),
             ("delete-pods", "Delete Pods: delete current workload pods", "cleanup", 2, 1),
             ("clear-binding", "Clear GPU Binding: remove activeLogicalGpuId; keep pendingLogicalGpuId; move GPU to transitionQueue", "cleanup", 3, 1),
@@ -103,9 +103,9 @@ DIAGRAMS: list[dict[str, Any]] = [
     {
         "name": "delete-gpu",
         "title": "Delete GPU",
-        "description": "Stop traffic, optionally move queued requests to a stable serving slot, then drain and release the GPU.",
+        "description": "Stop traffic, wait for executor-confirmed drain, then release the GPU.",
         "nodes": [
-            ("stop", "Stop GPU Traffic: stop new requests entering source GPU pods; router may redispatch queued requests to remaining ready pods", "router", 0, 1),
+            ("stop", "Stop GPU Traffic: stop new requests entering source GPU pods", "router", 0, 1),
             ("drain", "Wait Drain: wait until queued requests and running work are zero", "router", 1, 1, "optional"),
             ("delete-pods", "Delete Pods: delete workload pods on the source GPU", "cleanup", 2, 1),
             ("clear-binding", "Clear GPU Binding: remove activeLogicalGpuId; assign pendingLogicalGpuId; move GPU to transitionQueue", "cleanup", 3, 1),
@@ -125,7 +125,7 @@ DIAGRAMS: list[dict[str, Any]] = [
         "title": "Partial Reconfiguration",
         "description": "Patch only changed MIG slots on an active GPU; preserved slots keep serving while new slots are registered and deployed.",
         "nodes": [
-            ("stop", "Stop Slot Traffic: stop new requests entering pods on deleted slots; router may redispatch queued requests to remaining ready pods", "router", 0, 1),
+            ("stop", "Stop Slot Traffic: stop new requests entering pods on deleted slots", "router", 0, 1),
             ("drain", "Wait Drain: wait until queued requests and running work are zero on deleted slots", "router", 1, 1, "optional"),
             ("delete-pods", "Delete Pods: delete workload pods only on deleted slots", "cleanup", 2, 1),
             ("patch", "Partial Reconfiguration: patch MIG geometry using delete/create/preserve slot specs", "mig", 3, 1),
@@ -145,9 +145,9 @@ DIAGRAMS: list[dict[str, Any]] = [
     {
         "name": "workload-replacement",
         "title": "Workload Replacement on Existing Slot",
-        "description": "Direct replacement when the old workload can be removed safely; optional reroute uses an existing target instance.",
+        "description": "Direct replacement when the old workload can be removed safely after executor-confirmed drain.",
         "nodes": [
-            ("stop", "Stop Slot Traffic: stop new requests entering this slot/pod; router may redispatch queued requests to remaining ready pods", "router", 0, 1),
+            ("stop", "Stop Slot Traffic: stop new requests entering this slot/pod", "router", 0, 1),
             ("drain", "Wait Drain: wait until queued requests and running work are zero", "router", 1, 1, "optional"),
             ("remove", "Delete Pod: delete old workload pod", "cleanup", 2, 1),
             ("place", "Deploy Pod: deploy replacement workload pod on same slot", "pod", 3, 1),

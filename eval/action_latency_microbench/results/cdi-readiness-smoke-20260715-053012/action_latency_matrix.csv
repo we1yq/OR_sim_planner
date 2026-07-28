@@ -1,0 +1,3 @@
+case_id,action_type,executor_action,profile,template,source_template,target_template,workload,runtime_model,request_class,slot,create_spec,delete_spec,preserve_spec
+create-instance-resnet50-1g,create_instance,place_instance+activate_instance_route,1g,,,,resnet50,resnet50,image-batches,"[0, 1, ""1g""]",,,
+delete-instance-resnet50-1g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,1g,,,,resnet50,resnet50,image-batches,"[0, 1, ""1g""]",,,

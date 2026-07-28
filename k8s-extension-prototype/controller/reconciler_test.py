@@ -396,7 +396,7 @@ def test_physical_gpu_registry_treats_clean_dynamic_per_device_config_as_availab
     assert registry["status"]["bindings"]["ampere-gpu1"]["availabilityReason"] == "per_device_empty_config_success"
 
 
-def test_router_drain_annotation_queue_runtime_moves_queued_requests() -> None:
+def test_router_drain_annotation_waits_for_observed_empty_queue() -> None:
     client = FakeKubernetesClient()
     client.pods = [
         {
@@ -404,7 +404,7 @@ def test_router_drain_annotation_queue_runtime_moves_queued_requests() -> None:
                 "name": "source-pod",
                 "namespace": "or-sim",
                 "annotations": {
-                    "mig.or-sim.io/queued": "3",
+                    "mig.or-sim.io/queued": "0",
                     "mig.or-sim.io/inflight": "0",
                 },
             }
@@ -429,9 +429,7 @@ def test_router_drain_annotation_queue_runtime_moves_queued_requests() -> None:
                         "type": "stop_accepting_new",
                         "workload": "resnet50",
                         "sourcePod": "source-pod",
-                        "targetPod": "target-pod",
-                        "queued": 3,
-                        "routerQueueRedispatch": True,
+                        "queued": 0,
                     },
                     {
                         "type": "mark_draining_instance",
@@ -455,17 +453,14 @@ def test_router_drain_annotation_queue_runtime_moves_queued_requests() -> None:
     )
 
     source_annotations = client.get_pod("source-pod", "or-sim")["metadata"]["annotations"]
-    target_annotations = client.get_pod("target-pod", "or-sim")["metadata"]["annotations"]
     assert summary["success"] is True
     assert source_annotations["mig.or-sim.io/queued"] == "0"
-    assert source_annotations["mig.or-sim.io/last-rerouted-queued"] == "3"
-    assert target_annotations["mig.or-sim.io/accepted-queued"] == "3"
     route_status = next(
         status
         for status in client.workloadrouteplan_statuses.values()
-        if status["result"].get("queuedMoved") == 3
+        if status["result"].get("workload") == "resnet50"
     )
-    assert route_status["result"]["queueRuntime"]["targetAcceptedQueued"] == 3
+    assert route_status["result"]["queueRuntime"]["drainDecisionOwner"] == "executor"
     drain_spec = next(iter(client.servinginstancedrains.values()))["spec"]
     assert drain_spec["waitForQueuedZero"] is True
 
@@ -606,8 +601,6 @@ def test_build_action_rule_previews() -> None:
                 "slot": (0, 3, "3g"),
                 "workload": "gpt2",
                 "queued": 2,
-                "to": "target-backed[gpu2:3g[0,3)]",
-                "routerQueueRedispatch": True,
             },
             {
                 "type": "mark_draining_instance",
@@ -684,7 +677,7 @@ def test_build_action_rule_previews() -> None:
     assert mig["internalStateActionsExcluded"] == []
     assert abstract["actions"][0]["mode"] == "bridge"
     assert "prepareBridgeMigGeometry" in abstract["actions"][0]["gates"]
-    assert adapter["adapters"]["router"]["wouldRedispatchRouterQueue"][0]["queued"] == 2
+    assert adapter["adapters"]["router"]["wouldStartDrains"][0]["rounds"] == 1
     assert observer["targetsToObserve"]["workloads"] == ["gpt2"]
 
 

@@ -11,7 +11,6 @@ from .state_diff import (
     classify_gpu_change,
     diff_instances_within_same_template,
     matches_target_state,
-    provided_by_workload,
     safe_after_removing_gpu,
     safe_after_removing_instance,
     safe_after_removing_instances,
@@ -21,7 +20,6 @@ from .action_simulator import (
     _get_runtime_entry,
     _nonfree_instances,
     _reroute_destination_candidates,
-    _reroute_destination_label,
     _target_activation_actions,
     prepare_transition_runtime,
     required_arrival_dict,
@@ -31,12 +29,15 @@ from .dag_format import build_phased_action_plan, compact_phased_action_plan
 
 
 NAME = "transition.action_builder"
-_REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS = 5.0
 
 
 def _model_affinity_fields(inst: MigInstance) -> dict[str, Any]:
     return {
         "modelKey": getattr(inst, "model_key", None) or inst.workload,
+        "runtimeModel": getattr(inst, "runtime_model", None) or inst.workload,
+        "requestClass": getattr(inst, "request_class", None),
+        "promptLen": getattr(inst, "prompt_len", None),
+        "outputTokens": getattr(inst, "output_tokens", None),
         "placementGroup": (
             getattr(inst, "placement_group", None)
             or getattr(inst, "model_key", None)
@@ -86,7 +87,6 @@ def run(
         required=required,
     )
     actions = _preserve_independent_slot_deletes(actions)
-    _assert_reroute_destinations_stable(current_state, target_state, actions)
     planned_state = _planned_state_for_actions(current_state, target_state, actions)
     executed_state = simulate_transition_actions(
         source_state=current_state,
@@ -252,7 +252,7 @@ def _preserve_independent_slot_deletes(actions: list[dict[str, Any]]) -> list[di
     """Keep slot deletions independent.
 
     Slot-level delete actions may become ready at different times because each
-    slot can have its own queue/reroute/drain chain. Merging them into one
+    slot can have its own stop/drain chain. Merging them into one
     coarse delete action serializes later per-slot placement behind the slowest
     deleted slot, so the planner keeps the independent delete actions here.
     Multi-slot operations that are intrinsically atomic, such as full template
@@ -275,35 +275,6 @@ def _slot_tuple(value: Any) -> tuple[int, int, str] | None:
     if not isinstance(value, (list, tuple)) or len(value) < 3:
         return None
     return (int(value[0]), int(value[1]), str(value[2]))
-
-
-def _assert_reroute_destinations_stable(
-    source_state: ClusterState,
-    target_state: ClusterState,
-    actions: list[dict[str, Any]],
-) -> None:
-    source_map = gpu_map_by_id(source_state)
-    target_map = gpu_map_by_id(target_state)
-    for action in actions:
-        if not action.get("routerQueueRedispatch"):
-            continue
-        target_gpu_id = action.get("target_gpu_id")
-        target_slot = _slot_tuple(action.get("target_slot"))
-        if target_gpu_id is None or target_slot is None:
-            raise ValueError(f"Router queue redispatch action is missing target slot: {action}")
-        source_gpu = source_map.get(int(target_gpu_id))
-        target_gpu = target_map.get(int(target_gpu_id))
-        source_inst = get_inst_by_slot(source_gpu, target_slot)
-        target_inst = get_inst_by_slot(target_gpu, target_slot)
-        if source_inst is None or target_inst is None:
-            raise ValueError(f"Router queue redispatch target slot is not present in source/target: {action}")
-        if source_inst.workload != target_inst.workload or source_inst.batch != target_inst.batch:
-            raise ValueError(
-                "Router queue redispatch target slot is not stable: "
-                f"gpu={target_gpu_id} slot={target_slot} "
-                f"source=({source_inst.workload}, bs={source_inst.batch}) "
-                f"target=({target_inst.workload}, bs={target_inst.batch})"
-            )
 
 
 def _append_create_target_gpu_actions(
@@ -501,7 +472,7 @@ def _append_partial_reconfiguration_actions(
     delete_slots = list(partial_plan.delete_slots)
     for slot in delete_slots:
         inst = get_inst_by_slot(src_gpu, slot)
-        if inst is None:
+        if inst is None or inst.workload is None:
             continue
         actions.extend(
             _queue_and_drain_actions(
@@ -521,13 +492,15 @@ def _append_partial_reconfiguration_actions(
     preserve_slots = list(partial_plan.preserve_slots)
     for slot in delete_slots:
         inst = get_inst_by_slot(src_gpu, slot)
+        if inst is None or inst.workload is None:
+            continue
         actions.append(
             _action(
                 "delete_instance",
                 gpu_id=gpu_id,
                 physical_gpu_id=physical_id,
                 slot=slot,
-                workload=inst.workload if inst is not None else None,
+                workload=inst.workload,
                 partial=True,
                 **common,
             )
@@ -820,37 +793,6 @@ def _queue_and_drain_actions(
     actions: list[dict[str, Any]] = []
     queued = int(runtime.get("queued", 0) or 0)
     inflight = int(runtime.get("inflight", 0) or 0)
-    local_completion_seconds = _local_completion_estimate_seconds(inst, queued, inflight)
-    candidates = _reroute_destination_candidates(
-        source_state,
-        target_state,
-        inst.workload,
-        exclude_gpu_id=gpu_id,
-        exclude_slot=slot,
-        exclude_entire_gpu=exclude_entire_gpu,
-    )
-    reroute_candidate = candidates[0] if candidates else None
-    should_reroute = (
-        queued > 0
-        and reroute_candidate is not None
-        and local_completion_seconds > _REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS
-    )
-    redispatch_fields: dict[str, Any] = {}
-    if should_reroute:
-        transfer_id = f"queue_gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}_{inst.workload}"
-        pressure = _reroute_pressure_estimate(source_state, target_state, inst, reroute_candidate, required, queued)
-        redispatch_fields = {
-            "queued": queued,
-            "routerQueueRedispatch": True,
-            "to": _reroute_destination_label(candidates),
-            "target_gpu_id": reroute_candidate.get("gpu_id"),
-            "target_physical_gpu_id": reroute_candidate.get("physical_gpu_id"),
-            "target_slot": reroute_candidate.get("slot"),
-            "queue_transfer_id": transfer_id,
-            "estimatedLocalCompletionSeconds": round(local_completion_seconds, 6),
-            "rerouteThresholdSeconds": _REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS,
-            **pressure,
-        }
     if stop_new and bool(runtime.get("accepting_new", True)):
         actions.append(
             _action(
@@ -859,18 +801,11 @@ def _queue_and_drain_actions(
                 physical_gpu_id=physical_id,
                 slot=slot,
                 workload=inst.workload,
-                **redispatch_fields,
                 **common,
             )
         )
-    queued_to_drain_locally = queued if queued > 0 and not should_reroute else 0
-    if inflight > 0 or queued_to_drain_locally > 0:
-        drain_rounds = max(1, inflight + queued_to_drain_locally)
-        skip_reason = None
-        if queued > 0 and reroute_candidate is None:
-            skip_reason = "no_reroute_destination"
-        elif queued > 0 and not should_reroute:
-            skip_reason = "local_completion_within_threshold"
+    if inflight > 0 or queued > 0:
+        drain_rounds = max(1, inflight + queued)
         actions.append(
             _action(
                 "wait_instance_drain",
@@ -879,74 +814,13 @@ def _queue_and_drain_actions(
                 slot=slot,
                 workload=inst.workload,
                 rounds=drain_rounds,
-                queued=queued_to_drain_locally,
+                queued=queued,
                 inflight=inflight,
-                estimatedLocalCompletionSeconds=round(local_completion_seconds, 6),
-                rerouteThresholdSeconds=_REROUTE_LOCAL_COMPLETION_THRESHOLD_SECONDS,
-                rerouteSkippedReason=skip_reason,
                 capacitySafe=safe_after_removing_instance(source_state, inst, required) if required else None,
                 **common,
             )
         )
     return actions
-
-
-def _local_completion_estimate_seconds(inst: MigInstance, queued: int, inflight: int) -> float:
-    mu = max(float(getattr(inst, "mu", 0.0) or 0.0), 1e-9)
-    return (max(0, int(queued)) + max(0, int(inflight))) / mu
-
-
-def _reroute_pressure_estimate(
-    source_state: ClusterState,
-    target_state: ClusterState,
-    inst: MigInstance,
-    candidate: dict[str, Any],
-    required: dict[str, float],
-    queued: int,
-) -> dict[str, Any]:
-    """Estimate reroute pressure using the current static profile catalog values.
-
-    This is intentionally conservative and hardware-profile based. It does not
-    replace future Pod-inside runtime measurements; it only makes today's DAG and
-    candidate scores aware that queued traffic consumes destination spare
-    throughput.
-    """
-
-    workload = str(inst.workload or "")
-    provided = provided_by_workload(source_state)
-    provided_after_source = max(0.0, float(provided.get(workload, 0.0)) - float(inst.mu))
-    required_mu = float(required.get(workload, 0.0)) if required else 0.0
-    global_spare = max(0.0, provided_after_source - required_mu)
-    target_mu = _candidate_mu(source_state, target_state, candidate)
-    estimated_spare = max(0.0, min(float(target_mu), global_spare))
-    if int(queued) <= 0:
-        backlog_seconds = 0.0
-    elif estimated_spare > 1e-9:
-        backlog_seconds = float(queued) / estimated_spare
-    else:
-        backlog_seconds = 1_000_000.0
-    return {
-        "targetMu": round(float(target_mu), 6),
-        "workloadRequiredMu": round(required_mu, 6),
-        "workloadProvidedAfterSourceRemoval": round(provided_after_source, 6),
-        "estimatedRerouteSpareMu": round(estimated_spare, 6),
-        "estimatedBacklogDrainSeconds": round(backlog_seconds, 6),
-        "rerouteCapacitySafe": provided_after_source + 1e-9 >= required_mu,
-    }
-
-
-def _candidate_mu(source_state: ClusterState, target_state: ClusterState, candidate: dict[str, Any]) -> float:
-    gpu_id = candidate.get("gpu_id")
-    slot = _slot_tuple(candidate.get("slot"))
-    if gpu_id is None or slot is None:
-        return 0.0
-    for state in (source_state, target_state):
-        gpu = gpu_map_by_id(state).get(int(gpu_id))
-        inst = get_inst_by_slot(gpu, slot)
-        if inst is not None:
-            return float(inst.mu)
-    return 0.0
-
 
 def _planned_state_for_actions(
     source_state: ClusterState,

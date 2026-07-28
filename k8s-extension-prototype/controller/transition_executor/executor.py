@@ -394,7 +394,53 @@ def _load_actions_from_action_plan(
     parsed = yaml.safe_load(raw_status)
     if not isinstance(parsed, dict):
         raise TransitionExecutorError(f"ConfigMap {namespace}/{full_plan_name} status.yaml is not a YAML object.")
+    dag_actions = _actions_from_compiled_dag(parsed)
+    if dag_actions:
+        return dag_actions
     return [dict(action) for action in list(parsed.get("actions", []))]
+
+
+def _actions_from_compiled_dag(parsed_status: dict[str, Any]) -> list[dict[str, Any]]:
+    """Load executor actions from the compiled DAG when available.
+
+    The raw planner action list is not necessarily a safe linear execution
+    order. Some dependencies, such as slot resource ordering and temporary
+    bridge cleanup, are introduced by the DAG compiler as node-level
+    dependencies. Convert those node dependencies back to action ids so the
+    step-wise Python executor observes the same order as the production Go
+    executor.
+    """
+
+    dag = dict(parsed_status.get("actionDag") or {})
+    if not dag:
+        dag = dict(
+            dict(dict(parsed_status.get("planningTrace", {})).get("transition", {})).get("phasedActionPlan")
+            or {}
+        )
+    nodes = [dict(node) for node in list(dag.get("nodes") or [])]
+    if not nodes:
+        return []
+
+    node_to_action_id: dict[str, str] = {}
+    for idx, node in enumerate(nodes):
+        action = dict(node.get("action") or {})
+        node_id = str(node.get("id") or f"action-{idx:04d}")
+        node_to_action_id[node_id] = str(action.get("actionKey") or action.get("id") or node_id)
+
+    out: list[dict[str, Any]] = []
+    for idx, node in enumerate(sorted(nodes, key=lambda item: (int(item.get("phase", 0) or 0), int(item.get("index", 0) or 0), str(item.get("id", ""))))):
+        action = dict(node.get("action") or {})
+        if not action:
+            continue
+        node_id = str(node.get("id") or f"action-{idx:04d}")
+        action.setdefault("actionKey", node_to_action_id.get(node_id, node_id))
+        deps = [node_to_action_id.get(str(dep), str(dep)) for dep in list(node.get("dependsOn") or [])]
+        existing = [str(dep) for dep in list(action.get("dependsOnActionKeys") or action.get("dependsOn") or [])]
+        merged = sorted(dict.fromkeys([*existing, *deps]))
+        if merged:
+            action["dependsOnActionKeys"] = merged
+        out.append(action)
+    return out
 
 
 def _physical_gpu_id(action: dict[str, Any]) -> str:

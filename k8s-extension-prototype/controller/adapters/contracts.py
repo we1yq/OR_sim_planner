@@ -39,9 +39,6 @@ class DryRunRouterDrainAdapter:
         return {
             "previewOnly": True,
             "wouldStopAcceptingNew": [row for row in actions if row.get("type") == "stop_accepting_new"],
-            "wouldRedispatchRouterQueue": [
-                row for row in actions if row.get("type") == "stop_accepting_new" and row.get("routerQueueRedispatch")
-            ],
             "wouldStartDrains": [row for row in actions if row.get("type") == "mark_draining_instance"],
         }
 

@@ -50,11 +50,6 @@ spec:
                   type: integer
                 currentQueuedApprox:
                   type: integer
-                estimatedDrainSeconds:
-                  type: number
-                reroutePressure:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
                 waitForInflightZero:
                   type: boolean
                 waitForQueuedZero:

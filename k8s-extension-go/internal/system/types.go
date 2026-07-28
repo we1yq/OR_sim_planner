@@ -26,6 +26,10 @@ type StageSpec struct {
 
 type ModelRuntimeSpec struct {
 	Model           string  `json:"model"`
+	RuntimeModel    string  `json:"runtimeModel,omitempty"`
+	RequestClass    string  `json:"requestClass,omitempty"`
+	PromptLen       int     `json:"promptLen,omitempty"`
+	OutputTokens    int     `json:"outputTokens,omitempty"`
 	RuntimeID       string  `json:"runtimeId,omitempty"`
 	BatchSize       int     `json:"batchSize"`
 	Node            string  `json:"node"`

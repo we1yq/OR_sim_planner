@@ -213,7 +213,7 @@ The old phase-greedy planner remains as an ablation baseline.
 The notebook comments summarize the main stage behavior:
 
 - `stage0`: pure `create_gpu`; build the target side directly.
-- `stage1`: create target side first, then stop/reroute/drain/remove old work.
+- `stage1`: create target side first, then stop routing, wait for drain, and remove old work.
 - `stage2`: stop routing on old-side items first, wait on drain barriers, then
   clear/remove old side and fill remaining target placement.
 - `stage3`: mostly target-side placement/create, with little visible drain chain.

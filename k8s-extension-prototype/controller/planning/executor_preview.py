@@ -145,9 +145,9 @@ def build_traffic_and_drain_preview(status: dict[str, Any]) -> dict[str, Any]:
         "adapter": "router-drain",
         "rules": [
             "Stop accepting new work before removing or replacing an active slot.",
-            "Reroute queued requests to a stable serving slot when one exists.",
-            "Wait for queued requests and running work to drain to zero before deleting pods or clearing MIG geometry.",
-            "Defer the abstract action when reroute capacity or drain completion is missing.",
+            "Let the executor/router confirm the old slot stopped accepting new requests.",
+            "Wait for observed queued and in-flight work to drain to zero before deleting pods or clearing MIG geometry.",
+            "Defer the abstract action when drain completion is missing.",
         ],
         "planItems": [
             {
@@ -161,7 +161,6 @@ def build_traffic_and_drain_preview(status: dict[str, Any]) -> dict[str, Any]:
                 "targetPhysicalGpuId": item.get("target_physical_gpu_id"),
                 "slot": item.get("slot"),
                 "workload": item.get("workload"),
-                "rerouteDestination": item.get("rerouteDestination") or item.get("reroute_destination") or item.get("takeover"),
                 "queued": item.get("queued"),
                 "runningWork": item.get("runningWork") or item.get("running_work") or item.get("inflight"),
                 "drainRemaining": item.get("drain_remaining"),
@@ -199,7 +198,7 @@ def build_pod_lifecycle_preview(status: dict[str, Any]) -> dict[str, Any]:
             in {"stop_gpu_traffic", "stop_accepting_new", "mark_draining_instance"}
         ],
         "deleteOrRecycle": [
-            _pod_lifecycle_row(action, reason="safe only after queued requests reroute and running work reaches zero")
+            _pod_lifecycle_row(action, reason="safe only after route deactivation and drain confirmation")
             for action in actions
             if str(action.get("type")) in {"delete_pods", "remove_instance", "delete_gpu_pods", "delete_bridge_pod", "clear_gpu", "clear_gpu_binding"}
         ],
@@ -228,8 +227,8 @@ def build_abstract_action_preview(status: dict[str, Any]) -> dict[str, Any]:
         "rules": {
             "keep_gpu": "Source and target MIG layout plus workload payload are unchanged.",
             "create_gpu": "Source has no logical GPU and target has one; prepare target-side MIG geometry.",
-            "remove_gpu": "Target no longer needs the GPU; stop/reroute/drain active slots before clearing geometry.",
-            "reconfiguration": "Source and target MIG templates differ; choose bridge reconfiguration unless old workloads have unchanged stable reroute slots.",
+            "remove_gpu": "Target no longer needs the GPU; stop/drain active slots before clearing geometry.",
+            "reconfiguration": "Source and target MIG templates differ; choose bridge reconfiguration unless old workloads have unchanged stable serving capacity.",
             "instance_diff": "MIG geometry is unchanged but slot workload or batch payload differs.",
         },
         "notes": [
@@ -257,10 +256,6 @@ def build_adapter_dry_run_preview(status: dict[str, Any]) -> dict[str, Any]:
                 "wouldStopAcceptingNew": [
                     action for action in traffic.get("trafficActions", [])
                     if action.get("type") == "stop_accepting_new"
-                ],
-                "wouldRedispatchRouterQueue": [
-                    action for action in traffic.get("trafficActions", [])
-                    if action.get("type") == "stop_accepting_new" and action.get("routerQueueRedispatch")
                 ],
                 "wouldStartDrains": [
                     action for action in traffic.get("trafficActions", [])
@@ -427,11 +422,11 @@ def _abstract_rule(action: dict[str, Any]) -> str:
     action_type = str(action.get("type"))
     mode = action.get("mode")
     if action_type == "reconfiguration" and mode in {"bridge", "bridge_reconfiguration"}:
-        return "No unchanged reroute destination exists for every old workload slot, so bridge through a prepared GPU before old-side cutover."
+        return "No unchanged stable serving capacity exists for every old workload slot, so bridge through a prepared GPU before old-side cutover."
     if action_type == "reconfiguration" and mode == "in_place_old_first":
-        return "Every old workload slot has unchanged reroute capacity, so drain old side and reconfigure in place."
+        return "Every old workload slot has unchanged stable serving capacity, so drain old side and reconfigure in place."
     if action_type == "remove_gpu":
-        return "All active slots must pass stop/reroute/drain barriers before old MIG geometry can be cleared."
+        return "All active slots must pass stop/drain barriers before old MIG geometry can be cleared."
     if action_type == "instance_diff":
         return "MIG geometry is stable; only slot workload or batch payload changes need router/pod handling."
     if action_type == "create_gpu":
@@ -498,21 +493,6 @@ def _action_brief(action: dict[str, Any]) -> dict[str, Any]:
         "clearsActiveLogicalGpuId",
         "phase",
         "queued",
-        "to",
-        "target_gpu_id",
-        "target_physical_gpu_id",
-        "target_slot",
-        "queue_transfer_id",
-        "routerQueueRedispatch",
-        "targetMu",
-        "workloadRequiredMu",
-        "workloadProvidedAfterSourceRemoval",
-        "estimatedRerouteSpareMu",
-        "estimatedBacklogDrainSeconds",
-        "estimatedLocalCompletionSeconds",
-        "rerouteThresholdSeconds",
-        "rerouteSkippedReason",
-        "rerouteCapacitySafe",
         "rounds",
         "safe_now",
         "drained",

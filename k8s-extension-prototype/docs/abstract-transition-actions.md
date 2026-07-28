@@ -51,12 +51,12 @@ Apply Batch -> apply_batch
 Verify Batch -> verify_batch
 ```
 
-Queue semantics are router-level, not pod-level. `stop_accepting_new` tells the
-router to stop assigning new requests to the old pod/slot. Any queued work stays
-at the router and may be dispatched to remaining ready pods; this is recorded as
-`routerQueueRedispatch` metadata on `stop_accepting_new`, not as a separate
-planner action. `mark_draining_instance` waits for observed inflight work to
-reach zero before pod deletion.
+Drain semantics are executor-owned. `stop_accepting_new` tells the router to
+stop assigning new requests to the old pod/slot. `mark_draining_instance` is a
+gate: the executor confirms the instance has stopped accepting new work and
+waits for observed queued and in-flight requests to reach zero before pod
+deletion. Stage 3 does not predict drain time and does not decide queued-request
+migration.
 
 ```text
 1. create-target-gpu

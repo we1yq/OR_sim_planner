@@ -1,0 +1,37 @@
+# syntax=docker/dockerfile:1.4
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+
+ARG HF_MODEL_ID
+ARG LOCAL_MODEL_NAME
+ARG MODEL_DTYPE=float16
+
+ENV HF_HOME=/opt/hf-cache \
+    HUGGINGFACE_HUB_CACHE=/opt/hf-cache/hub \
+    TRANSFORMERS_CACHE=/opt/hf-cache/hub \
+    XDG_CACHE_HOME=/opt/cache \
+    RUNTIME_MODE=transformers \
+    MODEL_DTYPE=${MODEL_DTYPE} \
+    MODEL_ID=/opt/models/${LOCAL_MODEL_NAME} \
+    TRANSFORMERS_OFFLINE=1 \
+    HF_HUB_OFFLINE=1
+
+RUN pip install --no-cache-dir \
+      "transformers==4.47.1" \
+      "accelerate==1.2.1" \
+      "huggingface_hub==0.27.1" \
+      "safetensors==0.4.5" \
+      "sentencepiece==0.2.0" \
+      "protobuf==5.29.2" \
+    && useradd -u 65532 -m nonroot \
+    && mkdir -p /opt/hf-cache /opt/cache /opt/models
+
+RUN --mount=type=secret,id=hf_token,required=false \
+    HF_HUB_OFFLINE=0 TRANSFORMERS_OFFLINE=0 \
+    python -c 'import os; from huggingface_hub import snapshot_download; token_path="/run/secrets/hf_token"; token=open(token_path).read().strip() if os.path.exists(token_path) else None; patterns=["*.json","*.txt","*.model","*.safetensors","pytorch_model*.bin","tokenizer*","vocab*","merges.txt","special_tokens_map.json"]; snapshot_download(repo_id=os.environ["HF_MODEL_ID"], local_dir=os.path.join("/opt/models", os.environ["LOCAL_MODEL_NAME"]), local_dir_use_symlinks=False, allow_patterns=patterns, token=token)'
+
+COPY cmd/model-runtime/transformers_runtime.py /transformers_runtime.py
+RUN chmod +x /transformers_runtime.py \
+    && chown -R 65532:65532 /opt/hf-cache /opt/cache /opt/models /transformers_runtime.py
+
+USER 65532:65532
+ENTRYPOINT ["python", "/transformers_runtime.py"]

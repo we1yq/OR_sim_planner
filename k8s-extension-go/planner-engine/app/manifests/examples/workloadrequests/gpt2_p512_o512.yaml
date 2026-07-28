@@ -1,0 +1,21 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: WorkloadRequest
+metadata:
+  name: gpt2_p512_o512
+  namespace: or-sim
+spec:
+  model: gpt2
+  modelKey: gpt2
+  placementGroup: gpt2
+  family: llm
+  arrivalRate: 0
+  requestClass: p512/o512
+  allowedBatches:
+  - 1
+  priority: normal
+  slo:
+    ttftMs: 100.0
+    tpotMs: 20.0
+  requestShape:
+    promptLen: 512
+    outputTokens: 512

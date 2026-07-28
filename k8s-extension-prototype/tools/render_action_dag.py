@@ -1206,8 +1206,6 @@ def _duration(action: dict[str, Any]) -> float:
         return float(TEMPLATE_ALLOCATABLE_SECONDS.get(template, ACTION_SECONDS["configure_full_template"]))
     if action_type == "clear_template":
         return float(EMPTY_SUCCESS_SECONDS.get(template, ACTION_SECONDS["clear_template"]))
-    if action_type == "mark_draining_instance" and action.get("estimatedLocalCompletionSeconds") is not None:
-        return max(0.0, float(action.get("estimatedLocalCompletionSeconds", 0.0) or 0.0))
     return float(ACTION_SECONDS.get(str(action.get("type", "")), 1.0))
 
 
@@ -1300,19 +1298,6 @@ def _timeline_detail_lines(action: dict[str, Any], state: Any) -> list[str]:
         return [summary[0] if summary else "target layout", summary[1] if len(summary) > 1 else ""]
     if action_type in {"observe_mig_devices", "register_mig_devices"}:
         return [f"gpu{action.get('gpu_id', '-')}", "slot -> MIG UUID"]
-    if action_type == "stop_accepting_new" and action.get("routerQueueRedispatch"):
-        return [
-            f"stop + redispatch {action.get('queued', '-')}",
-            f"from gpu{action.get('gpu_id', '-')} {_format_slot(action.get('slot'))}",
-            f"to gpu{action.get('target_gpu_id', '-')} {_format_slot(action.get('target_slot'))}",
-            f"spare {action.get('estimatedRerouteSpareMu', '-')} backlog {action.get('estimatedBacklogDrainSeconds', '-')}s",
-        ]
-    if action_type == "mark_draining_instance" and action.get("rerouteSkippedReason"):
-        return [
-            f"slot {_format_slot(action.get('slot'))}",
-            str(action.get("workload") or "-"),
-            f"local {action.get('estimatedLocalCompletionSeconds', '-')}s <= {action.get('rerouteThresholdSeconds', '-')}s",
-        ]
     if action_type == "deploy_target_workloads":
         return [f"gpu{action.get('gpu_id', '-')}", "pods ready"]
     if action_type == "activate_serving_route":

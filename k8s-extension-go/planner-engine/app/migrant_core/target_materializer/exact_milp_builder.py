@@ -20,6 +20,56 @@ from ..state import ClusterState, GPUState, MigInstance, assert_valid_cluster_st
 EMPTY_PROFILES = {"void", "unusable"}
 
 
+def _is_empty_gpu(gpu: GPUState) -> bool:
+    return all(
+        inst.profile in EMPTY_PROFILES or inst.workload is None
+        for inst in gpu.instances
+    )
+
+
+def _assign_target_physical_metadata(target: ClusterState, prev_state: ClusterState | None) -> None:
+    ensure_state_metadata(target)
+    if prev_state is None:
+        return
+    ensure_state_metadata(prev_state)
+    prev_map = {
+        int(gpu_id): str(physical_id)
+        for gpu_id, physical_id in dict(prev_state.metadata.get("physical_id_map", {})).items()
+    }
+    pool = [str(item) for item in list(prev_state.metadata.get("free_physical_gpu_pool", []))]
+    if str(prev_state.metadata.get("source", "")).startswith("go-cluster-state-manager"):
+        # Stage3/action lowering consumes the observed free pool by reversing it
+        # and popping from the end, so mirror that policy here.  Validation
+        # targets must predict the same physical GPU IDs as the executable DAG.
+        pool = list(reversed(pool))
+    policy = str(prev_state.metadata.get("free_physical_gpu_pool_policy", "lifo"))
+    if policy != "lifo":
+        raise ValueError(f"Unsupported physical GPU free-pool policy: {policy}")
+
+    assigned: dict[int, str] = {}
+    used: set[str] = set()
+    for gpu in sorted(target.real_gpus(), key=lambda item: int(item.gpu_id)):
+        gpu_id = int(gpu.gpu_id)
+        physical_id = prev_map.get(gpu_id)
+        if physical_id is None:
+            while pool and pool[-1] in used:
+                pool.pop()
+            if not pool:
+                raise RuntimeError(f"No free physical GPU available for target logical GPU {gpu_id}")
+            physical_id = pool.pop()
+        assigned[gpu_id] = physical_id
+        used.add(physical_id)
+
+    target.metadata["physical_id_map"] = assigned
+    target.metadata["free_physical_gpu_pool"] = [
+        physical_id
+        for physical_id in pool
+        if physical_id not in used
+    ]
+    target.metadata["free_physical_gpu_pool_policy"] = policy
+    target.metadata["next_physical_idx"] = int(prev_state.metadata.get("next_physical_idx", 0))
+
+
 def _status_name(gurobi_status: int, grb: Any) -> str:
     names = {
         grb.OPTIMAL: "OPTIMAL",
@@ -54,6 +104,8 @@ def _current_layout_ids_by_gpu(
     by_key = {layout.intervals: layout.layout_id for layout in layouts}
     out = {}
     for gpu in prev_state.real_gpus():
+        if _is_empty_gpu(gpu):
+            continue
         key = current_gpu_physical_layout_key(gpu)
         if key not in by_key:
             raise ValueError(
@@ -240,7 +292,11 @@ def _build_target_state_exact_milp_aggregated(
     layout_caps = {layout.layout_id: _layout_profile_caps(layout) for layout in layouts}
 
     current_layout_id = _current_layout_ids_by_gpu(prev_state, layouts)
-    prev_by_id = gpu_map_by_id(prev_state) if prev_state is not None else {}
+    prev_by_id = {
+        gpu_id: gpu
+        for gpu_id, gpu in (gpu_map_by_id(prev_state) if prev_state is not None else {}).items()
+        if not _is_empty_gpu(gpu)
+    }
     old_slots = _prev_slot_map(prev_state)
     current_ids = sorted(prev_by_id)
     cold_start_mode = len(current_ids) == 0 and gpu_count > 0
@@ -629,7 +685,7 @@ def _build_target_state_exact_milp_aggregated(
     target.metadata["stage2_demand_type_count"] = int(len(demand_types))
 
     assert_valid_cluster_state(target)
-    ensure_state_metadata(target)
+    _assign_target_physical_metadata(target, prev_state)
     return target
 
 

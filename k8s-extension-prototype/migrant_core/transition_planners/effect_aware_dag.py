@@ -69,7 +69,6 @@ def run(
     _add_capacity_dependency_edges(actions, current_state, required)
     _add_physical_reuse_dependency_edges(actions)
     actions = basic_dag._coalesce_slot_delete_pods(actions)
-    basic_dag._assert_reroute_destinations_stable(current_state, target_state, actions)
     planned_state = basic_dag._planned_state_for_actions(current_state, target_state, actions)
     executed_state = simulate_transition_actions(
         source_state=current_state,
@@ -104,7 +103,7 @@ def run(
         },
         "effect_model": {
             "capacity": "producesCapacity/consumesCapacity annotate route activation and serving removal",
-            "router": "stop_accepting_new owns router queue redispatch when routerQueueRedispatch=true",
+            "router": "stop_accepting_new deactivates old routing; executor confirms drain at runtime",
             "physicalGpu": "allocate_gpu and return_gpu carry physicalGpuEffect",
             "mig": "configure/observe/clear actions carry migEffect",
         },
@@ -797,7 +796,6 @@ def _effects_for_action(
             out["capacityGate"] = _capacity_gate(consumed, required)
         out["routeEffect"] = {
             "type": "deactivate_route",
-            "routerQueueRedispatch": bool(action.get("routerQueueRedispatch")),
         }
     elif action_type == "stop_gpu_traffic":
         consumed = _capacity_for_action_source(action, source_map)

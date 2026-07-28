@@ -49,6 +49,20 @@ def gpu_state_from_mock_yaml(obj: dict) -> GpuMigState:
                 profile=str(raw_inst["profile"]),
                 workload=raw_inst.get("workload"),
                 batch=(int(raw_inst["batch"]) if raw_inst.get("batch") is not None else None),
+                model_key=raw_inst.get("modelKey") or raw_inst.get("model_key"),
+                placement_group=raw_inst.get("placementGroup") or raw_inst.get("placement_group"),
+                runtime_model=raw_inst.get("runtimeModel") or raw_inst.get("runtime_model"),
+                request_class=raw_inst.get("requestClass") or raw_inst.get("request_class"),
+                prompt_len=(
+                    int(raw_inst.get("promptLen") or raw_inst.get("prompt_len"))
+                    if raw_inst.get("promptLen") is not None or raw_inst.get("prompt_len") is not None
+                    else None
+                ),
+                output_tokens=(
+                    int(raw_inst.get("outputTokens") or raw_inst.get("output_tokens"))
+                    if raw_inst.get("outputTokens") is not None or raw_inst.get("output_tokens") is not None
+                    else None
+                ),
             )
             for raw_inst in raw_gpu.get("instances", [])
         ]

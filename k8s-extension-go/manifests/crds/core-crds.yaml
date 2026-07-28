@@ -44,6 +44,8 @@ spec:
                   type: string
                 targetPlanner:
                   type: string
+                forceReplan:
+                  type: boolean
                 epoch:
                   type: string
                 triggerReason:

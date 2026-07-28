@@ -219,14 +219,15 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
     action_type = str(action.get("type", ""))
     if action.get("slot") is not None:
         resources.add(f"slot:{action.get('gpu_id')}:{tuple(action['slot'])}")
-    if action.get("queue_transfer_id") is not None:
-        resources.add(f"queue-transfer:{action['queue_transfer_id']}")
     if action_type in {"delete_instance", "deactivate_instance_route"}:
         for slot in _slots_for_action(action):
             if action_type == "delete_instance":
                 resources.add(f"slot:{action.get('gpu_id')}:{slot}")
             resources.add(f"traffic-slot:{action.get('gpu_id')}:{slot}")
     if action_type in {"clear_gpu_binding", "clear_template"}:
+        for slot in _slots_for_action(action):
+            resources.add(f"slot:{action.get('gpu_id')}:{slot}")
+    if action_type == "configure_partial_profile":
         for slot in _slots_for_action(action):
             resources.add(f"slot:{action.get('gpu_id')}:{slot}")
     if action_type in {
@@ -250,10 +251,12 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
 
 
 def _slots_for_action(action: dict[str, Any]) -> list[tuple[Any, ...]]:
-    raw_slots = action.get("slots")
-    if raw_slots is None:
-        raw_slots = action.get("deleteSlots")
-    if raw_slots is None and action.get("slot") is not None:
+    raw_slots = []
+    for field in ("slots", "deleteSlots", "createSlots"):
+        value = action.get(field)
+        if value is not None:
+            raw_slots.extend(list(value or []))
+    if not raw_slots and action.get("slot") is not None:
         raw_slots = [action.get("slot")]
     out = []
     for slot in list(raw_slots or []):

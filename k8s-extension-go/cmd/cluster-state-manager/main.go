@@ -17,6 +17,10 @@ import (
 
 type runtimeBinding struct {
 	Model           string
+	RuntimeModel    string
+	RequestClass    string
+	PromptLen       int
+	OutputTokens    int
 	BatchSize       int
 	Pod             string
 	Phase           string
@@ -599,10 +603,18 @@ func observeRuntimeBindings(client *kube.Client, routes map[string][]map[string]
 			continue
 		}
 		model := asString(labels["migrant.io/model"])
+		runtimeModel := asString(labels["migrant.io/runtime-model"])
+		requestClass := asString(labels["migrant.io/request-class"])
+		promptLen := intNumber(labels["migrant.io/prompt-len"])
+		outputTokens := intNumber(labels["migrant.io/output-tokens"])
 		slotResource := asString(asMap(meta["annotations"])["migrant.io/slot-resource"])
 		expectedMIGUUID := asString(asMap(meta["annotations"])["migrant.io/expected-mig-uuid"])
 		out[gpuID] = append(out[gpuID], runtimeBinding{
 			Model:           model,
+			RuntimeModel:    runtimeModel,
+			RequestClass:    requestClass,
+			PromptLen:       promptLen,
+			OutputTokens:    outputTokens,
 			BatchSize:       runtimeBatchSize(spec),
 			Pod:             asString(meta["name"]),
 			Phase:           asString(status["phase"]),
@@ -622,6 +634,7 @@ func routeSummaryForBinding(routes []map[string]any, slotResource, expectedMIGUU
 	}
 	keys := []string{
 		"runtimeId", "endpoint", "weight", "capacity", "profile", "batchSize", "gpu", "slotResource", "deviceResource", "expectedMigUuid",
+		"runtimeModel", "requestClass", "promptLen", "outputTokens",
 		"active", "acceptingNew", "draining", "arrivalRate", "requests", "errors", "errorRate",
 		"inflight", "queued", "avgLatencyMs", "endpointRequests", "endpointInflight", "endpointAvgLatencyMs", "runtimeMetricsAvailable", "runtime.batchSize",
 		"runtime.migUuid", "runtime.slotResource", "runtime.avgLatencyMs", "runtime.requests", "runtime.errors",
@@ -808,7 +821,9 @@ func runtimeBindingsAsMaps(bindings []runtimeBinding) []map[string]any {
 	out := []map[string]any{}
 	for _, binding := range bindings {
 		out = append(out, map[string]any{
-			"model": binding.Model, "batchSize": binding.BatchSize, "pod": binding.Pod, "phase": binding.Phase,
+			"model": binding.Model, "runtimeModel": binding.RuntimeModel, "requestClass": binding.RequestClass,
+			"promptLen": binding.PromptLen, "outputTokens": binding.OutputTokens,
+			"batchSize": binding.BatchSize, "pod": binding.Pod, "phase": binding.Phase,
 			"slotResource": binding.SlotResource, "deviceResource": binding.DeviceResource, "expectedMigUuid": binding.ExpectedMIGUUID,
 		})
 		if len(binding.Route) > 0 {
@@ -887,6 +902,30 @@ func asBool(v any) bool {
 		return b
 	}
 	return false
+}
+
+func intNumber(v any) int {
+	switch x := v.(type) {
+	case float64:
+		return int(x)
+	case float32:
+		return int(x)
+	case int:
+		return x
+	case int64:
+		return int(x)
+	case json.Number:
+		n, _ := x.Int64()
+		return int(n)
+	case string:
+		value, err := strconv.Atoi(strings.TrimSpace(x))
+		if err == nil {
+			return value
+		}
+	default:
+		return 0
+	}
+	return 0
 }
 
 func atoi(s string) int {

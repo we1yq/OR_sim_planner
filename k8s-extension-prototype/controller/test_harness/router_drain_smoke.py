@@ -26,7 +26,6 @@ def create_router_drain_smoke_action_plan(
             "targetPod": target_pod,
             "targetEndpoint": target_endpoint,
             "queued": 1,
-            "routerQueueRedispatch": True,
         },
         {
             "type": "mark_draining_instance",

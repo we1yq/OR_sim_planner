@@ -123,6 +123,12 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 	if err != nil {
 		return err
 	}
+	if err := createFailedPlanForPlannerFailure(client, snap, planName, planInput, current, planned, runtimeProfileCorrection); err != nil {
+		return err
+	}
+	if plannerFailure(planned) {
+		return nil
+	}
 	finalRuntimes := asSlice(planned["desiredRuntimes"])
 	executionRuntimes := asSlice(planned["executionRuntimes"])
 	if len(executionRuntimes) == 0 {
@@ -170,7 +176,8 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 				"targetGpuCount":       uniqueGPUCountFromMaps(finalRuntimes),
 				"planner":              plannerName,
 				"plannerMakespanSec":   asFloat(plannerMetrics["plannerMakespanSec"]),
-				"desiredRuntimes":      executionRuntimes,
+				"desiredRuntimes":      finalRuntimes,
+				"executionRuntimes":    executionRuntimes,
 				"finalDesiredRuntimes": finalRuntimes,
 			},
 		},
@@ -180,6 +187,78 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 	}
 	_, err = client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", planName)+"/status", map[string]any{
 		"status": map[string]any{"phase": "Planned", "message": "planned by planner-engine using planner=" + plannerName},
+	}, nil)
+	return err
+}
+
+func plannerFailure(planned map[string]any) bool {
+	metadata := asMap(planned["metadata"])
+	phase := asString(metadata["plannerPhase"])
+	if phase == "" {
+		return false
+	}
+	if reached, ok := metadata["reachedTarget"].(bool); ok && reached {
+		return false
+	}
+	switch phase {
+	case "Infeasible", "Unsupported", "Failed", "Error", "Blocked":
+		return true
+	default:
+		return false
+	}
+}
+
+func createFailedPlanForPlannerFailure(client *kube.Client, snap map[string]any, planName string, planInput system.PlanningInput, current system.CurrentAllocation, planned map[string]any, runtimeProfileCorrection map[string]any) error {
+	if !plannerFailure(planned) {
+		return nil
+	}
+	metadata := asMap(planned["metadata"])
+	plannerName := asString(metadata["requestedPlanner"])
+	if plannerName == "" {
+		plannerName = firstNonEmpty(planInput.Planner, asString(metadata["planner"]), "ours")
+	}
+	message := firstNonEmpty(asString(metadata["plannerMessage"]), "planner-engine did not reach a target allocation")
+	body := map[string]any{
+		"apiVersion": "mig.or-sim.io/v1alpha1",
+		"kind":       "MigActionPlan",
+		"metadata": map[string]any{
+			"name":      planName,
+			"namespace": client.Namespace(),
+			"labels": map[string]any{
+				"app.kubernetes.io/name":  "migrant-go",
+				"mig.or-sim.io/component": "planner-controller",
+			},
+		},
+		"spec": map[string]any{
+			"executor":                 "go-transition-executor",
+			"phaseGate":                "blocked",
+			"actionCount":              0,
+			"targetGpuCount":           0,
+			"plannerMetadata":          planned["metadata"],
+			"planningInput":            planInput,
+			"runtimeProfileCorrection": runtimeProfileCorrection,
+			"currentAllocationRef":     "physicalgpuregistries/default",
+			"targetAllocationPlan":     planned["targetAllocationPlan"],
+			"abstractActions":          planned["abstractActions"],
+			"actionDag":                planned["actionDag"],
+			"validationTargets":        planned["validationTargets"],
+			"summary": map[string]any{
+				"arrivalSnapshotRef": asString(asMap(snap["metadata"])["name"]),
+				"sourceArrival":      planInput.SourceArrival,
+				"targetArrival":      planInput.TargetArrival,
+				"sourceGpuCount":     sourceGPUCount(current),
+				"targetGpuCount":     0,
+				"planner":            plannerName,
+				"plannerMakespanSec": asFloat(asMap(asMap(planned["metadata"])["metrics"])["plannerMakespanSec"]),
+				"desiredRuntimes":    []any{},
+			},
+		},
+	}
+	if err := client.Upsert(kube.NamespacedResourceName(client.Namespace(), "migactionplans", planName), body, nil); err != nil {
+		return err
+	}
+	_, err := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", planName)+"/status", map[string]any{
+		"status": map[string]any{"phase": "Failed", "message": message},
 	}, nil)
 	return err
 }
@@ -218,7 +297,7 @@ func callPlannerEngine(plannerURL string, input system.PlanningInput, current sy
 		"planningInput":            input,
 		"currentAllocation":        current,
 		"runtimeProfileCorrection": runtimeProfileCorrection,
-		"scenarioPath":             "mock/scenarios/stage0.yaml",
+		"scenarioPath":             firstNonEmpty(input.ScenarioPath, "mock/scenarios/stage0.yaml"),
 	}
 	raw, _ := json.Marshal(body)
 	resp, err := http.Post(strings.TrimRight(plannerURL, "/")+"/plan", "application/json", bytes.NewReader(raw))
@@ -263,7 +342,9 @@ func planningInputFromSnapshot(spec map[string]any) system.PlanningInput {
 		SLO:                    slo,
 		RequestCount:           int64Map(spec["requestCount"]),
 		TransitionDemandPolicy: asString(spec["transitionDemandPolicy"]),
+		ForceReplan:            asBool(spec["forceReplan"]),
 		ProfileCatalogRef:      asString(spec["profileCatalogRef"]),
+		ScenarioPath:           asString(spec["scenarioPath"]),
 		CalibrationOverlayRef:  asString(spec["calibrationOverlayRef"]),
 		CurrentAllocationRef:   asString(spec["currentAllocationRef"]),
 		PlacementNodes:         stringList(asSlice(asMap(spec["placement"])["nodes"])),
@@ -310,6 +391,10 @@ func loadCurrentAllocation(client *kube.Client) (system.CurrentAllocation, error
 			binding := asMap(rawBinding)
 			gpu.RuntimeBindings = append(gpu.RuntimeBindings, system.RuntimeBinding{
 				Model:           asString(binding["model"]),
+				RuntimeModel:    asString(binding["runtimeModel"]),
+				RequestClass:    asString(binding["requestClass"]),
+				PromptLen:       intNumber(binding["promptLen"]),
+				OutputTokens:    intNumber(binding["outputTokens"]),
 				BatchSize:       intNumber(binding["batchSize"]),
 				Pod:             asString(binding["pod"]),
 				Phase:           asString(binding["phase"]),
@@ -413,8 +498,9 @@ func runtimesAsMaps(runtimes []system.ModelRuntimeSpec) []map[string]any {
 	out := []map[string]any{}
 	for _, rt := range runtimes {
 		out = append(out, map[string]any{
-			"model": rt.Model, "batchSize": rt.BatchSize, "node": rt.Node,
-			"hostPort": rt.HostPort, "profile": rt.Profile, "gpu": rt.GPU,
+			"model": rt.Model, "runtimeModel": rt.RuntimeModel, "requestClass": rt.RequestClass,
+			"promptLen": rt.PromptLen, "outputTokens": rt.OutputTokens, "batchSize": rt.BatchSize,
+			"node": rt.Node, "hostPort": rt.HostPort, "profile": rt.Profile, "gpu": rt.GPU,
 			"slotResource": rt.SlotResource,
 		})
 	}

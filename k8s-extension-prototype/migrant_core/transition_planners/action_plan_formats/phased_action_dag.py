@@ -219,8 +219,6 @@ def _resources_for_action(action: dict[str, Any], root_id: str) -> set[str]:
     action_type = str(action.get("type", ""))
     if action.get("slot") is not None:
         resources.add(f"slot:{action.get('gpu_id')}:{tuple(action['slot'])}")
-    if action.get("queue_transfer_id") is not None:
-        resources.add(f"queue-transfer:{action['queue_transfer_id']}")
     if action_type in {"delete_pods", "delete_gpu_pods", "stop_gpu_traffic"}:
         for slot in _slots_for_action(action):
             if action_type in {"delete_pods", "delete_gpu_pods"}:

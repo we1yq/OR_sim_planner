@@ -1,0 +1,22 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: WorkloadRequest
+metadata:
+  name: vit_base_image
+  namespace: or-sim
+spec:
+  model: vit_base
+  modelKey: vit_base
+  placementGroup: vit_base
+  family: cv
+  arrivalRate: 0
+  requestClass: image batches
+  allowedBatches:
+  - 1
+  - 4
+  - 16
+  - 32
+  - 64
+  priority: normal
+  slo:
+    e2eMs: 300.0
+    latencyMs: 300.0

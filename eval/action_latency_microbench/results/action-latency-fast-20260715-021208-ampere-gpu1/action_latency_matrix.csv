@@ -1,0 +1,64 @@
+case_id,action_type,executor_action,profile,template,source_template,target_template,workload,runtime_model,request_class,slot,create_spec,delete_spec,preserve_spec
+profile-delete-1g,delete_mig,patch_slots,1g,,,,,,,"[0, 1, ""1g""]",,0:1:1g,
+profile-create-3g,create_mig,configure_full_template,3g,,,,,,,"[0, 4, ""3g""]",0:4:3g,,
+profile-delete-4g,delete_mig,patch_slots,4g,,,,,,,"[0, 4, ""4g""]",,0:4:4g,
+full-template-7,configure_full_template,configure_full_template,,7,,,,,,,0:8:7g,,
+clear-template-4-3,clear_template,clear_template,,4+3,,,,,,,"0:4:4g,4:4:3g",,
+full-template-4-1-1-1,configure_full_template,configure_full_template,,4+1+1+1,,,,,,,"0:4:4g,4:1:1g,5:1:1g,6:1:1g",,
+clear-template-3-3,clear_template,clear_template,,3+3,,,,,,,"0:4:3g,4:4:3g",,
+full-template-3-1-1-1,configure_full_template,configure_full_template,,3+1+1+1,,,,,,,"0:4:3g,4:1:1g,5:1:1g,6:1:1g",,
+clear-template-2-2-3,clear_template,clear_template,,2+2+3,,,,,,,"0:2:2g,2:2:2g,4:4:3g",,
+full-template-3-1-1-1-1,configure_full_template,configure_full_template,,3+1+1+1+1,,,,,,,"0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:4:3g",,
+clear-template-2-2-2-1,clear_template,clear_template,,2+2+2+1,,,,,,,"0:2:2g,2:2:2g,4:2:2g,6:1:1g",,
+full-template-2-1-1-1-1-1,configure_full_template,configure_full_template,,2+1+1+1+1+1,,,,,,,"0:2:2g,2:1:1g,3:1:1g,4:1:1g,5:1:1g,6:1:1g",,
+clear-template-1-1-1-1-1-1-1,clear_template,clear_template,,1+1+1+1+1+1+1,,,,,,,"0:1:1g,1:1:1g,2:1:1g,3:1:1g,4:1:1g,5:1:1g,6:1:1g",,
+partial-4-3-to-3-3,partial_reconfig,patch_slots,,,4+3,3+3,,,,,0:4:3g,0:4:4g,4:4:3g
+partial-4-3-to-3-1-1-1-1,partial_reconfig,patch_slots,,,4+3,3+1+1+1+1,,,,,"0:1:1g,1:1:1g,2:1:1g,3:1:1g",0:4:4g,4:4:3g
+partial-4-2-1-to-3-2-1,partial_reconfig,patch_slots,,,4+2+1,3+2+1,,,,,0:4:3g,0:4:4g,"4:2:2g,6:1:1g"
+partial-4-2-1-to-2-2-1-1-1,partial_reconfig,patch_slots,,,4+2+1,2+2+1+1+1,,,,,"0:2:2g,2:1:1g,3:1:1g",0:4:4g,"4:2:2g,6:1:1g"
+partial-4-1-1-1-to-4-3,partial_reconfig,patch_slots,,,4+1+1+1,4+3,,,,,4:4:3g,"4:1:1g,5:1:1g,6:1:1g",0:4:4g
+partial-4-1-1-1-to-3-1-1-1,partial_reconfig,patch_slots,,,4+1+1+1,3+1+1+1,,,,,0:4:3g,0:4:4g,"4:1:1g,5:1:1g,6:1:1g"
+partial-4-1-1-1-to-2-1-1-1-1-1,partial_reconfig,patch_slots,,,4+1+1+1,2+1+1+1+1+1,,,,,"0:2:2g,2:1:1g,3:1:1g",0:4:4g,"4:1:1g,5:1:1g,6:1:1g"
+partial-3-3-to-3-1-1-1,partial_reconfig,patch_slots,,,3+3,3+1+1+1,,,,,"4:1:1g,5:1:1g,6:1:1g",4:4:3g,0:4:3g
+partial-3-1-1-1-to-3-3,partial_reconfig,patch_slots,,,3+1+1+1,3+3,,,,,4:4:3g,"4:1:1g,5:1:1g,6:1:1g",0:4:3g
+partial-2-2-3-to-3-3,partial_reconfig,patch_slots,,,2+2+3,3+3,,,,,0:4:3g,"0:2:2g,2:2:2g",4:4:3g
+partial-2-2-3-to-2-2-2-1,partial_reconfig,patch_slots,,,2+2+3,2+2+2+1,,,,,"4:2:2g,6:1:1g",4:4:3g,"0:2:2g,2:2:2g"
+partial-3-2-1-1-to-4-3,partial_reconfig,patch_slots,,,3+2+1+1,4+3,,,,,0:4:4g,"0:2:2g,2:1:1g,3:1:1g",4:4:3g
+partial-3-2-1-1-to-3-1-1-1-1,partial_reconfig,patch_slots,,,3+2+1+1,3+1+1+1+1,,,,,"0:1:1g,1:1:1g",0:2:2g,"2:1:1g,3:1:1g,4:4:3g"
+partial-3-2-1-1-to-2-1-1-1-1-1,partial_reconfig,patch_slots,,,3+2+1+1,2+1+1+1+1+1,,,,,"4:1:1g,5:1:1g,6:1:1g",4:4:3g,"0:2:2g,2:1:1g,3:1:1g"
+partial-3-1-1-1-1-to-3-3,partial_reconfig,patch_slots,,,3+1+1+1+1,3+3,,,,,0:4:3g,"0:1:1g,1:1:1g,2:1:1g,3:1:1g",4:4:3g
+partial-3-1-1-1-1-to-2-2-1-1-1,partial_reconfig,patch_slots,,,3+1+1+1+1,2+2+1+1+1,,,,,"0:2:2g,4:2:2g,6:1:1g","0:1:1g,1:1:1g,4:4:3g","2:1:1g,3:1:1g"
+partial-2-2-2-1-to-4-2-1,partial_reconfig,patch_slots,,,2+2+2+1,4+2+1,,,,,0:4:4g,"0:2:2g,2:2:2g","4:2:2g,6:1:1g"
+partial-2-2-2-1-to-3-1-1-1,partial_reconfig,patch_slots,,,2+2+2+1,3+1+1+1,,,,,"0:4:3g,4:1:1g,5:1:1g","0:2:2g,2:2:2g,4:2:2g",6:1:1g
+partial-2-2-2-1-to-2-2-1-1-1,partial_reconfig,patch_slots,,,2+2+2+1,2+2+1+1+1,,,,,"2:1:1g,3:1:1g",2:2:2g,"0:2:2g,4:2:2g,6:1:1g"
+partial-2-2-1-1-1-to-4-2-1,partial_reconfig,patch_slots,,,2+2+1+1+1,4+2+1,,,,,0:4:4g,"0:2:2g,2:1:1g,3:1:1g","4:2:2g,6:1:1g"
+partial-2-2-1-1-1-to-3-1-1-1,partial_reconfig,patch_slots,,,2+2+1+1+1,3+1+1+1,,,,,"0:4:3g,4:1:1g,5:1:1g","0:2:2g,2:1:1g,3:1:1g,4:2:2g",6:1:1g
+partial-2-2-1-1-1-to-3-1-1-1-1,partial_reconfig,patch_slots,,,2+2+1+1+1,3+1+1+1+1,,,,,"0:1:1g,1:1:1g,4:4:3g","0:2:2g,4:2:2g,6:1:1g","2:1:1g,3:1:1g"
+partial-2-2-1-1-1-to-1-1-1-1-1-1-1,partial_reconfig,patch_slots,,,2+2+1+1+1,1+1+1+1+1+1+1,,,,,"0:1:1g,1:1:1g,4:1:1g,5:1:1g","0:2:2g,4:2:2g","2:1:1g,3:1:1g,6:1:1g"
+partial-2-1-1-1-1-1-to-3-2-1,partial_reconfig,patch_slots,,,2+1+1+1+1+1,3+2+1,,,,,"0:4:3g,4:2:2g","0:2:2g,2:1:1g,3:1:1g,4:1:1g,5:1:1g",6:1:1g
+partial-2-1-1-1-1-1-to-3-2-1-1,partial_reconfig,patch_slots,,,2+1+1+1+1+1,3+2+1+1,,,,,4:4:3g,"4:1:1g,5:1:1g,6:1:1g","0:2:2g,2:1:1g,3:1:1g"
+partial-2-1-1-1-1-1-to-2-2-1-1-1,partial_reconfig,patch_slots,,,2+1+1+1+1+1,2+2+1+1+1,,,,,4:2:2g,"4:1:1g,5:1:1g","0:2:2g,2:1:1g,3:1:1g,6:1:1g"
+partial-1-1-1-1-1-1-1-to-4-1-1-1,partial_reconfig,patch_slots,,,1+1+1+1+1+1+1,4+1+1+1,,,,,0:4:4g,"0:1:1g,1:1:1g,2:1:1g,3:1:1g","4:1:1g,5:1:1g,6:1:1g"
+partial-1-1-1-1-1-1-1-to-3-2-1-1,partial_reconfig,patch_slots,,,1+1+1+1+1+1+1,3+2+1+1,,,,,"0:2:2g,4:4:3g","0:1:1g,1:1:1g,4:1:1g,5:1:1g,6:1:1g","2:1:1g,3:1:1g"
+partial-1-1-1-1-1-1-1-to-2-2-1-1-1,partial_reconfig,patch_slots,,,1+1+1+1+1+1+1,2+2+1+1+1,,,,,"0:2:2g,4:2:2g","0:1:1g,1:1:1g,4:1:1g,5:1:1g","2:1:1g,3:1:1g,6:1:1g"
+delete-instance-resnet50-1g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,1g,,,,resnet50,resnet50,image-batches,"[0, 1, ""1g""]",,,
+create-instance-resnet50-3g,create_instance,place_instance+activate_instance_route,3g,,,,resnet50,resnet50,image-batches,"[0, 4, ""3g""]",,,
+route-deactivate-drain-resnet50-3g,route_deactivate_drain,deactivate_instance_route+wait_instance_drain,3g,,,,resnet50,resnet50,image-batches,"[0, 4, ""3g""]",,,
+route-activate-vgg16-1g,route_activate,activate_instance_route,1g,,,,vgg16,vgg16,image-batches,"[0, 1, ""1g""]",,,
+delete-instance-vgg16-3g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,3g,,,,vgg16,vgg16,image-batches,"[0, 4, ""3g""]",,,
+create-instance-vit_base-1g,create_instance,place_instance+activate_instance_route,1g,,,,vit_base,vit_base,image-batches,"[0, 1, ""1g""]",,,
+route-deactivate-drain-vit_base-1g,route_deactivate_drain,deactivate_instance_route+wait_instance_drain,1g,,,,vit_base,vit_base,image-batches,"[0, 1, ""1g""]",,,
+route-activate-vit_base-3g,route_activate,activate_instance_route,3g,,,,vit_base,vit_base,image-batches,"[0, 4, ""3g""]",,,
+delete-instance-gpt2_p64_o64-1g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,1g,,,,gpt2_p64_o64,gpt2,p64/o64,"[0, 1, ""1g""]",,,
+create-instance-gpt2_p64_o64-3g,create_instance,place_instance+activate_instance_route,3g,,,,gpt2_p64_o64,gpt2,p64/o64,"[0, 4, ""3g""]",,,
+route-deactivate-drain-gpt2_p64_o64-3g,route_deactivate_drain,deactivate_instance_route+wait_instance_drain,3g,,,,gpt2_p64_o64,gpt2,p64/o64,"[0, 4, ""3g""]",,,
+route-activate-gpt2_p512_o512-1g,route_activate,activate_instance_route,1g,,,,gpt2_p512_o512,gpt2,p512/o512,"[0, 1, ""1g""]",,,
+delete-instance-gpt2_p512_o512-3g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,3g,,,,gpt2_p512_o512,gpt2,p512/o512,"[0, 4, ""3g""]",,,
+create-instance-llama_p1024_o128-1g,create_instance,place_instance+activate_instance_route,1g,,,,llama_p1024_o128,llama,p1024/o128,"[0, 1, ""1g""]",,,
+route-deactivate-drain-llama_p1024_o128-1g,route_deactivate_drain,deactivate_instance_route+wait_instance_drain,1g,,,,llama_p1024_o128,llama,p1024/o128,"[0, 1, ""1g""]",,,
+route-activate-llama_p1024_o128-3g,route_activate,activate_instance_route,3g,,,,llama_p1024_o128,llama,p1024/o128,"[0, 4, ""3g""]",,,
+delete-instance-llama_p2048_o64-1g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,1g,,,,llama_p2048_o64,llama,p2048/o64,"[0, 1, ""1g""]",,,
+create-instance-llama_p2048_o64-3g,create_instance,place_instance+activate_instance_route,3g,,,,llama_p2048_o64,llama,p2048/o64,"[0, 4, ""3g""]",,,
+route-deactivate-drain-llama_p2048_o64-3g,route_deactivate_drain,deactivate_instance_route+wait_instance_drain,3g,,,,llama_p2048_o64,llama,p2048/o64,"[0, 4, ""3g""]",,,
+route-activate-llama_p4096_o512-1g,route_activate,activate_instance_route,1g,,,,llama_p4096_o512,llama,p4096/o512,"[0, 1, ""1g""]",,,
+delete-instance-llama_p4096_o512-3g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,3g,,,,llama_p4096_o512,llama,p4096/o512,"[0, 4, ""3g""]",,,

@@ -75,7 +75,6 @@ def run(
     _assert_executable_actions(actions)
     _add_physical_reuse_dependency_edges(actions)
     actions = action_builder._preserve_independent_slot_deletes(actions)
-    action_builder._assert_reroute_destinations_stable(current_state, target_state, actions)
     planned_state = action_builder._planned_state_for_actions(current_state, target_state, actions)
     executed_state = simulate_transition_actions(
         source_state=current_state,
@@ -112,7 +111,7 @@ def run(
         },
         "effect_model": {
             "capacity": "producesCapacity/consumesCapacity annotate route activation and serving removal",
-            "router": "deactivate_instance_route owns router queue redispatch when routerQueueRedispatch=true",
+            "router": "deactivate_instance_route deactivates old routing; executor confirms drain at runtime",
             "physicalGpu": "allocate_gpu and return_gpu carry physicalGpuEffect",
             "mig": "configure/observe/clear actions carry migEffect",
         },
@@ -320,13 +319,15 @@ def _append_temporary_capacity_actions(
                 continue
             if (str(workload), (source_inst.start, source_inst.end, source_inst.profile)) in existing_temp:
                 continue
+            occupied_physical_at_consumer = set(occupied_temp_physical_ids)
+            occupied_physical_at_consumer.update(_acquired_physical_ids_before_action(actions, consumer))
             temp = _temporary_capacity_target(
                 source_state,
                 target_state,
                 source_inst,
                 occupied_temp_slots=occupied_temp_slots,
                 occupied_temp_gpu_ids=occupied_temp_gpu_ids,
-                occupied_temp_physical_ids=occupied_temp_physical_ids,
+                occupied_temp_physical_ids=occupied_physical_at_consumer,
             )
             if temp is None:
                 continue
@@ -339,6 +340,41 @@ def _append_temporary_capacity_actions(
             occupied_temp_physical_ids.add(str(temp["physical_gpu_id"]))
             added = True
     return added
+
+
+def _acquired_physical_ids_before_action(actions: list[dict[str, Any]], stop_action: dict[str, Any]) -> set[str]:
+    """Physical GPUs that the planned transition has acquired before stop_action.
+
+    Temporary-capacity placement must be based on the allocation state at the
+    point where the protected consumer runs. Source and target states alone are
+    insufficient: an earlier bridge action may already have acquired an
+    otherwise-free GPU, even if that GPU is not part of the source allocation.
+    """
+    stop_key = stop_action.get("actionKey")
+    acquired: set[str] = set()
+    found_stop = False
+    for action in actions:
+        if action is stop_action or (stop_key is not None and action.get("actionKey") == stop_key):
+            found_stop = True
+            break
+        physical_id = action.get("physical_gpu_id")
+        if physical_id is None:
+            physical_id = action.get("physicalGpuId")
+        if physical_id is None:
+            continue
+        physical_id = str(physical_id)
+        action_type = str(action.get("type", ""))
+        if action_type == "allocate_gpu":
+            acquired.add(physical_id)
+        elif action_type == "return_gpu":
+            acquired.discard(physical_id)
+    if found_stop:
+        return acquired
+    return {
+        str(action.get("physical_gpu_id") or action.get("physicalGpuId"))
+        for action in actions
+        if action.get("type") == "allocate_gpu" and (action.get("physical_gpu_id") or action.get("physicalGpuId")) is not None
+    }
 
 
 def _source_instance_for_capacity_record(
@@ -484,7 +520,22 @@ def _temporary_capacity_actions(temp: dict[str, Any], source_inst: MigInstance) 
     }
     actions: list[dict[str, Any]] = []
     if temp["kind"] == "temp_gpu":
-        target_gpu = GPUState(gpu_id=gpu_id, instances=[MigInstance(int(slot[0]), int(slot[1]), str(slot[2]), source_inst.workload, source_inst.batch, float(source_inst.mu))])
+        target_gpu = GPUState(
+            gpu_id=gpu_id,
+            instances=[
+                MigInstance(
+                    int(slot[0]),
+                    int(slot[1]),
+                    str(slot[2]),
+                    workload=source_inst.workload,
+                    batch=source_inst.batch,
+                    model_key=getattr(source_inst, "model_key", None),
+                    placement_group=getattr(source_inst, "placement_group", None),
+                    runtime_model=getattr(source_inst, "runtime_model", None),
+                    mu=float(source_inst.mu),
+                )
+            ],
+        )
         actions.extend(
             [
                 action_builder._action("allocate_gpu", gpu_id=gpu_id, physical_gpu_id=physical_id, logical_gpu_id=gpu_id, pendingLogicalGpuId=gpu_id, **common),
@@ -817,13 +868,7 @@ def _append_effect_bridge_reconfiguration_actions(
 
 
 def _partial_effect_feasible(source_state: ClusterState, src_gpu: GPUState, partial_plan: Any, required: dict[str, float]) -> bool:
-    if action_builder._partial_reconfiguration_capacity_safe(source_state, src_gpu, partial_plan, required):
-        return True
-    delete_slots = set(partial_plan.delete_slots)
-    for inst in src_gpu.instances:
-        if (inst.start, inst.end, inst.profile) in delete_slots and not _same_workload_producer_exists(source_state, inst.workload, exclude=inst):
-            return False
-    return True
+    return action_builder._partial_reconfiguration_capacity_safe(source_state, src_gpu, partial_plan, required)
 
 
 def _append_preserved_slot_serving_updates(
@@ -1088,20 +1133,50 @@ def _assert_executable_actions(actions: list[dict[str, Any]]) -> None:
         for action in actions
         if str(action.get("type", "")).startswith("defer_") or bool(action.get("blockedByCapacity"))
     ]
-    if not blocked:
-        return
-    summary = [
-        {
-            "type": action.get("type"),
-            "gpu_id": action.get("gpu_id"),
-            "physical_gpu_id": action.get("physical_gpu_id"),
-            "slot": action.get("slot"),
-            "reason": action.get("reason"),
-            "capacityGate": action.get("capacityGate"),
-        }
-        for action in blocked[:5]
-    ]
-    raise RuntimeError(f"stage3 produced non-executable blocked actions: {summary}")
+    if blocked:
+        summary = [
+            {
+                "type": action.get("type"),
+                "gpu_id": action.get("gpu_id"),
+                "physical_gpu_id": action.get("physical_gpu_id"),
+                "slot": action.get("slot"),
+                "reason": action.get("reason"),
+                "capacityGate": action.get("capacityGate"),
+            }
+            for action in blocked[:5]
+        ]
+        raise RuntimeError(f"stage3 produced non-executable blocked actions: {summary}")
+    _assert_physical_acquire_lifecycle(actions)
+
+
+def _assert_physical_acquire_lifecycle(actions: list[dict[str, Any]]) -> None:
+    acquired: dict[str, dict[str, Any]] = {}
+    for idx, action in enumerate(actions):
+        action_type = str(action.get("type", ""))
+        physical_id = action.get("physical_gpu_id")
+        if physical_id is None:
+            physical_id = action.get("physicalGpuId")
+        if physical_id is None:
+            continue
+        physical_id = str(physical_id)
+        if action_type == "allocate_gpu":
+            owner = acquired.get(physical_id)
+            if owner is not None:
+                raise RuntimeError(
+                    "stage3 produced a non-executable physical GPU lifecycle: "
+                    f"physical GPU {physical_id} is acquired by action "
+                    f"{owner.get('actionKey') or owner.get('type')} and then acquired again by action "
+                    f"{action.get('actionKey') or action.get('type')} before a return_gpu"
+                )
+            acquired[physical_id] = {
+                "type": action_type,
+                "actionKey": action.get("actionKey"),
+                "index": idx,
+                "gpu_id": action.get("gpu_id"),
+                "abstractRoot": action.get("abstractRoot"),
+            }
+        elif action_type == "return_gpu":
+            acquired.pop(physical_id, None)
 
 
 def _add_temporary_cleanup_dependency_edges(actions: list[dict[str, Any]]) -> None:
@@ -1209,9 +1284,10 @@ def _same_physical_capacity_dependency_allowed(consumer: dict[str, Any], produce
 
     Full in-place reconfiguration cannot use capacity produced on the same
     physical GPU to justify deleting the old side: the old side must be gone
-    before that new capacity exists. Partial reconfiguration is different
-    because preserved slots and locally-created slots can coexist after the
-    partial patch, as long as the dependency does not form a structural cycle.
+    before that new capacity exists. Partial reconfiguration can use same-GPU
+    capacity only when the producer and consumer slots do not physically
+    overlap. If the new slot is created in space freed by the old slot, the old
+    route must be drained and deleted before the producer can exist.
 
     Plain instance-diff transitions on an unchanged MIG template are also safe
     when the producer and consumer slots do not overlap. In that case the target
@@ -1219,16 +1295,12 @@ def _same_physical_capacity_dependency_allowed(consumer: dict[str, Any], produce
 
     """
 
-    if _partial_capacity_context(consumer) and _partial_capacity_context(producer):
-        return True
     return not _action_slots_overlap(consumer, producer)
 
 
 def _action_slots_overlap(left: dict[str, Any], right: dict[str, Any]) -> bool:
     for left_slot in _action_slots(left):
         for right_slot in _action_slots(right):
-            if str(left_slot[2]) != str(right_slot[2]):
-                continue
             if max(int(left_slot[0]), int(right_slot[0])) < min(int(left_slot[1]), int(right_slot[1])):
                 return True
     return False
@@ -1330,7 +1402,6 @@ def _effects_for_action(
             out["capacityGate"] = _capacity_gate(consumed, required)
         out["routeEffect"] = {
             "type": "deactivate_instance_route",
-            "routerQueueRedispatch": bool(action.get("routerQueueRedispatch")),
         }
     elif action_type == "activate_instance_route":
         produced = _temporary_capacity_record(action) if action.get("temporaryCapacity") else _capacity_for_action_target(action, target_map)
@@ -1440,8 +1511,12 @@ def _instances_for_slots(gpu: GPUState, slots: list[tuple[int, int, str]]) -> li
 
 
 def _action_slots(action: dict[str, Any]) -> list[tuple[int, int, str]]:
-    raw_slots = action.get("slots")
-    if raw_slots is None and action.get("slot") is not None:
+    raw_slots = []
+    for field in ("slots", "deleteSlots", "createSlots"):
+        value = action.get(field)
+        if value is not None:
+            raw_slots.extend(list(value or []))
+    if not raw_slots and action.get("slot") is not None:
         raw_slots = [action.get("slot")]
     out = []
     for slot in list(raw_slots or []):

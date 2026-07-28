@@ -186,7 +186,7 @@ Fine action types are grouped as follows.
 | --- | --- | --- |
 | MIG geometry | `allocate_gpu`, `configure_full_template`, `place_target_layout`, `clear_gpu`, `clear_template` | Candidate inputs to GPU Operator/MIG Manager. |
 | Internal binding | `bind_target_gpu`, `mark_reconfig_target_prepared` | Controller bookkeeping only. Never send directly to MIG Manager. |
-| Router/drain | `stop_accepting_new`, `mark_draining_instance` | Traffic and drain gates before pod deletion or MIG clearing. Router backlog handling is metadata on `stop_accepting_new`, not a separate action. |
+| Router/drain | `stop_accepting_new`, `mark_draining_instance` | Traffic and drain gates before pod deletion or MIG clearing. The executor/router confirms stop-accepting and waits for observed queued/in-flight work; the planner does not predict drain time or choose queue migration. |
 | Pod/serving | `place_instance`, `deploy_target_workloads`, `remove_instance`, `workload_change`, `update_batch` | Serving capacity and pod lifecycle intent. |
 | Deferred gates | `defer_remove_gpu`, `defer_remove_instance`, `defer_workload_change` | Not executable; explain why the abstract action is blocked. |
 

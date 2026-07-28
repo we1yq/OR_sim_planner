@@ -54,7 +54,8 @@ class RuntimeState:
         self.device = "cuda" if torch is not None and torch.cuda.is_available() else "cpu"
         self.load_error = ""
         self.model = None
-        self.input_tensor = None
+        self.input_tensors: dict[int, Any] = {}
+        self.load_timings: dict[str, float] = {}
         self.load_model()
 
     def load_model(self) -> None:
@@ -64,10 +65,12 @@ class RuntimeState:
         if self.model_name not in MODEL_SPECS:
             self.load_error = f"unsupported torchvision model {self.model_name!r}"
             return
+        started = time.perf_counter()
         try:
             factory_name, weights_class_name = MODEL_SPECS[self.model_name]
             factory = getattr(models, factory_name)
             kwargs: dict[str, Any] = {}
+            weights_started = time.perf_counter()
             if self.weights_mode.lower() in {"default", "pretrained", "true", "1"}:
                 weights_cls = getattr(models, weights_class_name, None)
                 if weights_cls is not None:
@@ -76,47 +79,74 @@ class RuntimeState:
                     kwargs["pretrained"] = True
             else:
                 kwargs["weights"] = None
+            self.load_timings["weightsResolveSec"] = time.perf_counter() - weights_started
+            factory_started = time.perf_counter()
             model = factory(**kwargs)
+            self.load_timings["modelFactorySec"] = time.perf_counter() - factory_started
+            device_started = time.perf_counter()
             model.eval()
             model.to(self.device)
+            if self.device == "cuda":
+                torch.cuda.synchronize()
+            self.load_timings["modelEvalAndDeviceSyncSec"] = time.perf_counter() - device_started
             self.model = model
-            self.input_tensor = torch.randn(
-                self.batch_size,
-                3,
-                self.image_size,
-                self.image_size,
-                device=self.device,
-            )
+            input_started = time.perf_counter()
+            self.input_tensors[self.batch_size] = self.make_input(self.batch_size)
+            self.load_timings["inputTensorBuildSec"] = time.perf_counter() - input_started
+            warmup_started = time.perf_counter()
             self.warmup()
+            self.load_timings["warmupSec"] = time.perf_counter() - warmup_started
+            self.load_timings["totalLoadSec"] = time.perf_counter() - started
+            self.load_timings["loadedAtSinceStartSec"] = time.time() - self.started_at
         except Exception as exc:
             self.load_error = str(exc)
 
+    def make_input(self, batch_size: int):
+        return torch.randn(
+            max(1, batch_size),
+            3,
+            self.image_size,
+            self.image_size,
+            device=self.device,
+        )
+
+    def input_for_batch(self, batch_size: int):
+        batch_size = max(1, batch_size)
+        with self.lock:
+            if batch_size not in self.input_tensors:
+                self.input_tensors[batch_size] = self.make_input(batch_size)
+            return self.input_tensors[batch_size]
+
     def warmup(self) -> None:
-        if self.model is None or self.input_tensor is None:
+        if self.model is None:
             return
+        input_tensor = self.input_for_batch(self.batch_size)
         with torch.inference_mode():
             for _ in range(max(0, self.warmup_iters)):
-                _ = self.model(self.input_tensor)
+                _ = self.model(input_tensor)
             if self.device == "cuda":
                 torch.cuda.synchronize()
 
-    def infer(self) -> dict[str, Any]:
-        if self.model is None or self.input_tensor is None:
+    def infer(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        if self.model is None:
             raise RuntimeError(self.load_error or "model is not loaded")
+        payload = payload or {}
+        request_batch = int_value(payload.get("batch"), self.batch_size)
+        input_tensor = self.input_for_batch(request_batch)
         wall_start = time.perf_counter()
         if self.device == "cuda":
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             with torch.inference_mode():
                 start.record()
-                output = self.model(self.input_tensor)
+                output = self.model(input_tensor)
                 end.record()
                 torch.cuda.synchronize()
             runtime_latency_ms = float(start.elapsed_time(end))
         else:
             with torch.inference_mode():
                 started = time.perf_counter()
-                output = self.model(self.input_tensor)
+                output = self.model(input_tensor)
                 runtime_latency_ms = (time.perf_counter() - started) * 1000.0
         wall_latency_ms = (time.perf_counter() - wall_start) * 1000.0
         top_class = int(torch.argmax(output[0]).item()) if hasattr(output, "__getitem__") else 0
@@ -125,7 +155,8 @@ class RuntimeState:
             "model": self.model_name,
             "runtimeId": self.runtime_id,
             "runtimeMode": self.runtime_mode,
-            "batchSize": self.batch_size,
+            "batchSize": request_batch,
+            "maxBatchSize": self.batch_size,
             "device": self.device,
             "runtimeLatencyMs": runtime_latency_ms,
             "latencyMs": wall_latency_ms,
@@ -165,6 +196,7 @@ class RuntimeState:
                 "migUuid": os.environ.get("OR_SIM_MIG_UUID", ""),
                 "slotResource": os.environ.get("OR_SIM_SLOT_RESOURCE", ""),
                 "deviceResource": os.environ.get("OR_SIM_DEVICE_RESOURCE", ""),
+                "loadTimings": dict(self.load_timings),
                 "loadError": self.load_error,
                 "loaded": self.model is not None,
             }
@@ -200,9 +232,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/infer":
             try:
                 length = int(self.headers.get("content-length", "0"))
+                payload: dict[str, Any] = {}
                 if length > 0:
-                    _ = self.rfile.read(length)
-                self._json(200, STATE.infer())
+                    payload = json.loads(self.rfile.read(length).decode() or "{}")
+                self._json(200, STATE.infer(payload))
             except Exception as exc:
                 STATE.record(0.0, 0.0, failed=True)
                 self._json(500, {"error": str(exc), "model": STATE.model_name})
@@ -238,6 +271,15 @@ def env_int(key: str, fallback: int) -> int:
     try:
         return int(os.environ.get(key, ""))
     except ValueError:
+        return fallback
+
+
+def int_value(value: Any, fallback: int) -> int:
+    try:
+        if value in (None, ""):
+            return fallback
+        return int(value)
+    except (TypeError, ValueError):
         return fallback
 
 

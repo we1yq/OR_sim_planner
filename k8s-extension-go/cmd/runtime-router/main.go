@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,10 @@ type route struct {
 
 type routeEndpoint struct {
 	Model           string  `json:"model"`
+	RuntimeModel    string  `json:"runtimeModel,omitempty"`
+	RequestClass    string  `json:"requestClass,omitempty"`
+	PromptLen       int     `json:"promptLen,omitempty"`
+	OutputTokens    int     `json:"outputTokens,omitempty"`
 	RuntimeID       string  `json:"runtimeId"`
 	Endpoint        string  `json:"endpoint"`
 	Weight          float64 `json:"weight,omitempty"`
@@ -37,6 +42,27 @@ type routeEndpoint struct {
 	Active          bool    `json:"active"`
 	AcceptingNew    bool    `json:"acceptingNew"`
 	Draining        bool    `json:"draining,omitempty"`
+}
+
+type batchResponse struct {
+	Status      int
+	ContentType string
+	Body        []byte
+}
+
+type batchRequest struct {
+	Model      string
+	Body       []byte
+	ArrivedAt  time.Time
+	ModelStats *modelMetrics
+	Done       chan batchResponse
+}
+
+type endpointBatcher struct {
+	mu        sync.Mutex
+	queue     []*batchRequest
+	timer     *time.Timer
+	runtimeID string
 }
 
 type latencySample struct {
@@ -82,8 +108,10 @@ type routerState struct {
 	routes          map[string][]routeEndpoint
 	metrics         map[string]*modelMetrics
 	endpointMetrics map[string]*modelMetrics
+	batchers        map[string]*endpointBatcher
 	monitor         monitorState
 	window          time.Duration
+	visionBatchWait time.Duration
 	http            *http.Client
 	kube            *kube.Client
 	store           string
@@ -92,8 +120,10 @@ type routerState struct {
 func main() {
 	var addr string
 	var window time.Duration
+	var visionBatchWait time.Duration
 	flag.StringVar(&addr, "addr", ":8080", "listen address")
 	flag.DurationVar(&window, "arrival-window", 60*time.Second, "arrival-rate window")
+	flag.DurationVar(&visionBatchWait, "vision-max-batch-wait", durationEnv("VISION_MAX_BATCH_WAIT", 5*time.Millisecond), "maximum router-side micro-batch wait for vision workloads")
 	flag.Parse()
 
 	ns := strings.TrimSpace(os.Getenv("NAMESPACE"))
@@ -116,8 +146,10 @@ func main() {
 		routes:          routes,
 		metrics:         map[string]*modelMetrics{},
 		endpointMetrics: map[string]*modelMetrics{},
+		batchers:        map[string]*endpointBatcher{},
 		monitor:         monitorState{Stats: map[string]*monitorStats{}},
 		window:          window,
+		visionBatchWait: visionBatchWait,
 		http:            &http.Client{Timeout: 30 * time.Second},
 		kube:            kubeClient,
 		store:           store,
@@ -164,26 +196,38 @@ func (s *routerState) handleInfer(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "unknown model", "model": model})
 		return
 	}
-	endpoint := strings.TrimRight(selected.Endpoint, "/")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
+	logicalCount := logicalRequestCountFromBody(body)
+	if isVisionModel(model) && s.visionBatchWait >= 0 && !driverBatchedRequest(body) {
+		s.handleBatchedInfer(w, r, model, selected, body)
+		return
+	}
 
+	s.proxyInfer(w, r, model, selected, body, logicalCount)
+}
+
+func (s *routerState) proxyInfer(w http.ResponseWriter, r *http.Request, model string, selected routeEndpoint, body []byte, logicalCount int64) {
+	if logicalCount <= 0 {
+		logicalCount = 1
+	}
+	endpoint := strings.TrimRight(selected.Endpoint, "/")
 	metrics := s.metricsFor(model)
 	endpointMetrics := s.metricsForEndpoint(selected.RuntimeID)
 	started := time.Now()
-	metrics.begin(started)
-	endpointMetrics.begin(started)
+	metrics.beginN(started, logicalCount)
+	endpointMetrics.beginN(started, logicalCount)
 	status := http.StatusBadGateway
 	var responseBody []byte
 	defer func() {
 		elapsed := time.Since(started)
 		failed := status >= 500
-		metrics.finish(elapsed, failed)
-		endpointMetrics.finish(elapsed, failed)
-		s.recordMonitorSample(model, elapsed, failed)
+		metrics.finishN(elapsed, failed, logicalCount)
+		endpointMetrics.finishN(elapsed, failed, logicalCount)
+		s.recordMonitorSampleN(model, elapsed, failed, logicalCount)
 	}()
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, endpoint+"/infer", bytes.NewReader(body))
@@ -210,6 +254,230 @@ func (s *routerState) handleInfer(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(resp.StatusCode)
 	_, _ = w.Write(responseBody)
+}
+
+func (s *routerState) handleBatchedInfer(w http.ResponseWriter, r *http.Request, model string, selected routeEndpoint, body []byte) {
+	metrics := s.metricsFor(model)
+	arrived := time.Now()
+	metrics.begin(arrived)
+	req := &batchRequest{
+		Model:      model,
+		Body:       append([]byte(nil), body...),
+		ArrivedAt:  arrived,
+		ModelStats: metrics,
+		Done:       make(chan batchResponse, 1),
+	}
+	s.batcherFor(selected.RuntimeID).enqueue(s, selected, req)
+	select {
+	case response := <-req.Done:
+		contentType := response.ContentType
+		if contentType == "" {
+			contentType = "application/json"
+		}
+		w.Header().Set("content-type", contentType)
+		w.WriteHeader(response.Status)
+		_, _ = w.Write(response.Body)
+	case <-r.Context().Done():
+		writeJSON(w, http.StatusGatewayTimeout, map[string]any{"error": r.Context().Err().Error(), "model": model})
+	}
+}
+
+func (s *routerState) batcherFor(runtimeID string) *endpointBatcher {
+	if runtimeID == "" {
+		runtimeID = "unknown"
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.batchers[runtimeID] == nil {
+		s.batchers[runtimeID] = &endpointBatcher{runtimeID: runtimeID}
+	}
+	return s.batchers[runtimeID]
+}
+
+func (b *endpointBatcher) enqueue(s *routerState, endpoint routeEndpoint, req *batchRequest) {
+	b.mu.Lock()
+	b.queue = append(b.queue, req)
+	maxBatch := endpoint.BatchSize
+	if maxBatch <= 0 {
+		maxBatch = 1
+	}
+	if len(b.queue) >= maxBatch {
+		batch := b.queue
+		b.queue = nil
+		if b.timer != nil {
+			b.timer.Stop()
+			b.timer = nil
+		}
+		b.mu.Unlock()
+		go s.dispatchBatch(endpoint, batch)
+		return
+	}
+	if len(b.queue) == 1 {
+		wait := s.visionBatchWait
+		if wait <= 0 {
+			wait = time.Nanosecond
+		}
+		b.timer = time.AfterFunc(wait, func() {
+			b.flush(s, endpoint)
+		})
+	}
+	b.mu.Unlock()
+}
+
+func (b *endpointBatcher) flush(s *routerState, endpoint routeEndpoint) {
+	b.mu.Lock()
+	batch := b.queue
+	b.queue = nil
+	b.timer = nil
+	b.mu.Unlock()
+	if len(batch) > 0 {
+		s.dispatchBatch(endpoint, batch)
+	}
+}
+
+func (b *endpointBatcher) takeQueued() []*batchRequest {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.timer != nil {
+		b.timer.Stop()
+		b.timer = nil
+	}
+	batch := b.queue
+	b.queue = nil
+	return batch
+}
+
+func (b *endpointBatcher) queued() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.queue)
+}
+
+func (s *routerState) drainBatcher(endpoint routeEndpoint) {
+	if endpoint.RuntimeID == "" {
+		return
+	}
+	b := s.batcherFor(endpoint.RuntimeID)
+	pending := b.takeQueued()
+	for _, req := range pending {
+		s.redispatchQueuedRequest(req, endpoint.RuntimeID, endpoint)
+	}
+}
+
+func (s *routerState) redispatchQueuedRequest(req *batchRequest, excludeRuntimeID string, fallback routeEndpoint) {
+	endpoint, ok := s.routeForExcluding(req.Model, excludeRuntimeID)
+	if ok {
+		s.batcherFor(endpoint.RuntimeID).enqueue(s, endpoint, req)
+		return
+	}
+	go s.dispatchBatch(fallback, []*batchRequest{req})
+}
+
+func (s *routerState) dispatchBatch(endpoint routeEndpoint, batch []*batchRequest) {
+	if len(batch) == 0 {
+		return
+	}
+	serviceStarted := time.Now()
+	endpointMetrics := s.metricsForEndpoint(endpoint.RuntimeID)
+	for range batch {
+		endpointMetrics.begin(serviceStarted)
+	}
+	payload := map[string]any{}
+	if err := json.Unmarshal(batch[0].Body, &payload); err != nil {
+		s.finishBatch(endpointMetrics, batch, serviceStarted, http.StatusBadRequest, map[string]any{"error": err.Error(), "model": batch[0].Model}, true)
+		return
+	}
+	payload["batch"] = len(batch)
+	payload["logicalRequestCount"] = len(batch)
+	raw, _ := json.Marshal(payload)
+	runtimeEndpoint := strings.TrimRight(endpoint.Endpoint, "/")
+	req, err := http.NewRequest(http.MethodPost, runtimeEndpoint+"/infer", bytes.NewReader(raw))
+	if err != nil {
+		s.finishBatch(endpointMetrics, batch, serviceStarted, http.StatusBadGateway, map[string]any{"error": err.Error(), "model": batch[0].Model, "endpoint": runtimeEndpoint}, true)
+		return
+	}
+	req.Header.Set("content-type", "application/json")
+	resp, err := s.http.Do(req)
+	if err != nil {
+		s.finishBatch(endpointMetrics, batch, serviceStarted, http.StatusBadGateway, map[string]any{"error": err.Error(), "model": batch[0].Model, "endpoint": runtimeEndpoint}, true)
+		return
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		s.finishBatch(endpointMetrics, batch, serviceStarted, http.StatusBadGateway, map[string]any{"error": err.Error(), "model": batch[0].Model}, true)
+		return
+	}
+	contentType := resp.Header.Get("content-type")
+	enriched := enrichBatchResponse(body, map[string]any{
+		"routerBatchSize":         len(batch),
+		"routerEndpointRuntimeId": endpoint.RuntimeID,
+		"routerDispatchAt":        serviceStarted.Format(time.RFC3339Nano),
+		"serviceLatencyMs":        round(float64(time.Since(serviceStarted).Microseconds())/1000.0, 6),
+	})
+	failed := resp.StatusCode >= 500
+	serviceLatency := time.Since(serviceStarted)
+	for _, item := range batch {
+		queueWait := serviceStarted.Sub(item.ArrivedAt)
+		e2e := time.Since(item.ArrivedAt)
+		responseBody := enrichBatchResponse(enriched, map[string]any{
+			"queueWaitMs":  round(float64(queueWait.Microseconds())/1000.0, 6),
+			"e2eLatencyMs": round(float64(e2e.Microseconds())/1000.0, 6),
+		})
+		item.ModelStats.finish(serviceLatency, failed)
+		endpointMetrics.finish(serviceLatency, failed)
+		s.recordMonitorSample(item.Model, serviceLatency, failed)
+		item.Done <- batchResponse{Status: resp.StatusCode, ContentType: contentType, Body: responseBody}
+	}
+}
+
+func (s *routerState) finishBatch(endpointMetrics *modelMetrics, batch []*batchRequest, serviceStarted time.Time, status int, payload map[string]any, failed bool) {
+	body, _ := json.Marshal(payload)
+	serviceLatency := time.Since(serviceStarted)
+	for _, item := range batch {
+		item.ModelStats.finish(serviceLatency, failed)
+		endpointMetrics.finish(serviceLatency, failed)
+		s.recordMonitorSample(item.Model, serviceLatency, failed)
+		item.Done <- batchResponse{Status: status, ContentType: "application/json", Body: body}
+	}
+}
+
+func driverBatchedRequest(raw []byte) bool {
+	payload := map[string]any{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return false
+	}
+	if value, ok := payload["driverBatched"].(bool); ok && value {
+		return true
+	}
+	return intNumber(payload["logicalRequestCount"]) > 1
+}
+
+func logicalRequestCountFromBody(raw []byte) int64 {
+	payload := map[string]any{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return 1
+	}
+	count := intNumber(payload["logicalRequestCount"])
+	if count <= 0 {
+		count = intNumber(payload["batch"])
+	}
+	if count <= 0 {
+		return 1
+	}
+	return int64(count)
+}
+
+func enrichBatchResponse(raw []byte, extra map[string]any) []byte {
+	out := map[string]any{}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		out["rawResponse"] = string(raw)
+	}
+	for key, value := range extra {
+		out[key] = value
+	}
+	body, _ := json.Marshal(out)
+	return body
 }
 
 func (s *routerState) handleRouteSnapshot(w http.ResponseWriter, r *http.Request) {
@@ -249,6 +517,9 @@ func (s *routerState) handleRoutes(w http.ResponseWriter, r *http.Request) {
 		s.routes[input.Model] = upsertEndpoints(s.routes[input.Model], input)
 		routes := s.copyRoutesLocked()
 		s.mu.Unlock()
+		if input.Draining || !input.AcceptingNew {
+			s.drainBatcher(input)
+		}
 		if err := s.persistRoutes(routes); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 			return
@@ -261,10 +532,17 @@ func (s *routerState) handleRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		runtimeID := strings.TrimSpace(r.URL.Query().Get("runtimeId"))
+		var removed []routeEndpoint
 		s.mu.Lock()
 		if runtimeID == "" {
+			removed = append(removed, s.routes[model]...)
 			delete(s.routes, model)
 		} else {
+			for _, endpoint := range s.routes[model] {
+				if endpoint.RuntimeID == runtimeID {
+					removed = append(removed, endpoint)
+				}
+			}
 			s.routes[model] = deleteEndpoint(s.routes[model], runtimeID)
 			if len(s.routes[model]) == 0 {
 				delete(s.routes, model)
@@ -272,6 +550,9 @@ func (s *routerState) handleRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		routes := s.copyRoutesLocked()
 		s.mu.Unlock()
+		for _, endpoint := range removed {
+			s.drainBatcher(endpoint)
+		}
 		if err := s.persistRoutes(routes); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 			return
@@ -367,14 +648,17 @@ func (s *routerState) routeSnapshot(now time.Time) []map[string]any {
 		endpoints := append([]routeEndpoint(nil), routes[model]...)
 		sort.Slice(endpoints, func(i, j int) bool { return endpoints[i].RuntimeID < endpoints[j].RuntimeID })
 		for _, endpoint := range endpoints {
-			row := metricsRow(model, metricsByModel[model], s.window)
 			endpointMetrics := metricsByEndpoint[endpoint.RuntimeID]
+			row := metricsRow(model, endpointMetrics, s.window)
+			row["modelArrivalRate"] = round(float64(len(metricsByModel[model].Arrivals))/s.window.Seconds(), 4)
 			row["runtimeId"] = endpoint.RuntimeID
 			row["endpoint"] = strings.TrimRight(endpoint.Endpoint, "/")
 			row["weight"] = effectiveWeight(endpoint)
 			row["capacity"] = endpoint.Capacity
 			row["profile"] = endpoint.Profile
+			runtimeMetrics := s.runtimeMetrics(endpoint.Endpoint)
 			row["batchSize"] = endpoint.BatchSize
+			row["driverBatchSize"] = trueBatchSize(endpoint, runtimeMetrics)
 			row["gpu"] = endpoint.GPU
 			row["slotResource"] = endpoint.SlotResource
 			row["deviceResource"] = endpoint.DeviceResource
@@ -384,8 +668,9 @@ func (s *routerState) routeSnapshot(now time.Time) []map[string]any {
 			row["draining"] = endpoint.Draining
 			row["endpointRequests"] = endpointMetrics.Requests
 			row["endpointInflight"] = endpointMetrics.Inflight
+			row["endpointQueued"] = s.endpointQueued(endpoint.RuntimeID)
 			row["endpointAvgLatencyMs"] = round(avgLatency(endpointMetrics), 3)
-			for key, value := range s.runtimeMetrics(endpoint.Endpoint) {
+			for key, value := range runtimeMetrics {
 				row[key] = value
 			}
 			if endpointLatency := asFloat(row["endpointAvgLatencyMs"]); endpointLatency > 0 {
@@ -467,11 +752,13 @@ func (s *routerState) handleProfileObservations(w http.ResponseWriter, _ *http.R
 			row["runtimeId"] = endpoint.RuntimeID
 			row["endpoint"] = endpoint.Endpoint
 			row["profile"] = endpoint.Profile
+			runtimeMetrics := s.runtimeMetrics(endpoint.Endpoint)
 			row["batchSize"] = endpoint.BatchSize
+			row["driverBatchSize"] = trueBatchSize(endpoint, runtimeMetrics)
 			row["slotResource"] = endpoint.SlotResource
 			row["deviceResource"] = endpoint.DeviceResource
 			row["expectedMigUuid"] = endpoint.ExpectedMIGUUID
-			for key, value := range s.runtimeMetrics(endpoint.Endpoint) {
+			for key, value := range runtimeMetrics {
 				row[key] = value
 			}
 		}
@@ -572,6 +859,10 @@ func (s *routerState) gcStaleRoutes(timeout time.Duration) (int, error) {
 }
 
 func (s *routerState) routeFor(model string) (routeEndpoint, bool) {
+	return s.routeForExcluding(model, "")
+}
+
+func (s *routerState) routeForExcluding(model, excludeRuntimeID string) (routeEndpoint, bool) {
 	s.mu.RLock()
 	endpoints := append([]routeEndpoint(nil), s.routes[model]...)
 	s.mu.RUnlock()
@@ -582,11 +873,14 @@ func (s *routerState) routeFor(model string) (routeEndpoint, bool) {
 	bestScore := math.Inf(1)
 	found := false
 	for _, endpoint := range endpoints {
+		if excludeRuntimeID != "" && endpoint.RuntimeID == excludeRuntimeID {
+			continue
+		}
 		if !endpoint.Active || !endpoint.AcceptingNew || endpoint.Draining {
 			continue
 		}
 		metrics := s.metricsForEndpoint(endpoint.RuntimeID).snapshot(time.Now(), s.window)
-		score := float64(metrics.Inflight) / effectiveWeight(endpoint)
+		score := float64(metrics.Inflight+int64(s.endpointQueued(endpoint.RuntimeID))) / effectiveWeight(endpoint)
 		if !found || score < bestScore || (score == bestScore && endpoint.RuntimeID < best.RuntimeID) {
 			best = endpoint
 			bestScore = score
@@ -597,11 +891,27 @@ func (s *routerState) routeFor(model string) (routeEndpoint, bool) {
 		return best, true
 	}
 	for _, endpoint := range endpoints {
+		if excludeRuntimeID != "" && endpoint.RuntimeID == excludeRuntimeID {
+			continue
+		}
 		if endpoint.Active && !endpoint.Draining {
 			return endpoint, true
 		}
 	}
 	return routeEndpoint{}, false
+}
+
+func (s *routerState) endpointQueued(runtimeID string) int {
+	if runtimeID == "" {
+		return 0
+	}
+	s.mu.RLock()
+	b := s.batchers[runtimeID]
+	s.mu.RUnlock()
+	if b == nil {
+		return 0
+	}
+	return b.queued()
 }
 
 func (s *routerState) metricsFor(model string) *modelMetrics {
@@ -656,23 +966,45 @@ func (s *routerState) snapshotEndpointMetrics(now time.Time) map[string]modelMet
 }
 
 func (m *modelMetrics) begin(now time.Time) {
+	m.beginN(now, 1)
+}
+
+func (m *modelMetrics) beginN(now time.Time, count int64) {
+	if count <= 0 {
+		count = 1
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Inflight++
-	m.Arrivals = append(m.Arrivals, now)
+	m.Inflight += count
+	for i := int64(0); i < count; i++ {
+		m.Arrivals = append(m.Arrivals, now)
+	}
 }
 
 func (m *modelMetrics) finish(latency time.Duration, failed bool) {
+	m.finishN(latency, failed, 1)
+}
+
+func (m *modelMetrics) finishN(latency time.Duration, failed bool, count int64) {
+	if count <= 0 {
+		count = 1
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Inflight--
-	m.Requests++
+	m.Inflight -= count
+	if m.Inflight < 0 {
+		m.Inflight = 0
+	}
+	m.Requests += count
 	if failed {
-		m.Errors++
+		m.Errors += count
 	}
 	latencyMs := float64(latency.Milliseconds())
-	m.TotalLatency += latencyMs
-	m.Latencies = append(m.Latencies, latencySample{At: time.Now(), LatencyMs: latencyMs, Failed: failed})
+	m.TotalLatency += latencyMs * float64(count)
+	now := time.Now()
+	for i := int64(0); i < count; i++ {
+		m.Latencies = append(m.Latencies, latencySample{At: now, LatencyMs: latencyMs, Failed: failed})
+	}
 }
 
 func (m *modelMetrics) snapshot(now time.Time, window time.Duration) modelMetrics {
@@ -743,6 +1075,13 @@ func confidence(samples int64) string {
 }
 
 func (s *routerState) recordMonitorSample(model string, latency time.Duration, failed bool) {
+	s.recordMonitorSampleN(model, latency, failed, 1)
+}
+
+func (s *routerState) recordMonitorSampleN(model string, latency time.Duration, failed bool, count int64) {
+	if count <= 0 {
+		count = 1
+	}
 	latencyMs := float64(latency.Milliseconds())
 	now := time.Now()
 	s.mu.Lock()
@@ -758,17 +1097,17 @@ func (s *routerState) recordMonitorSample(model string, latency time.Duration, f
 		stats = &monitorStats{}
 		s.monitor.Stats[model] = stats
 	}
-	stats.Requests++
+	stats.Requests += count
 	if failed {
-		stats.Errors++
+		stats.Errors += count
 	}
-	stats.TotalLatencyMs += latencyMs
+	stats.TotalLatencyMs += latencyMs * float64(count)
 	if latencyMs > stats.MaxLatencyMs {
 		stats.MaxLatencyMs = latencyMs
 	}
 	if slo := s.monitor.LatencySLOMs[model]; slo > 0 && latencyMs > slo {
-		stats.LatencyViolations++
-		stats.LatencyViolationExcessMs += latencyMs - slo
+		stats.LatencyViolations += count
+		stats.LatencyViolationExcessMs += (latencyMs - slo) * float64(count)
 		if stats.FirstViolationAt.IsZero() {
 			stats.FirstViolationAt = now
 		}
@@ -1025,6 +1364,32 @@ func effectiveWeight(endpoint routeEndpoint) float64 {
 	return 1
 }
 
+func trueBatchSize(endpoint routeEndpoint, runtimeMetrics map[string]any) int {
+	if endpoint.BatchSize > 0 {
+		return endpoint.BatchSize
+	}
+	return intNumber(runtimeMetrics["runtime.batchSize"])
+}
+
+func isVisionModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	if model == "" {
+		return false
+	}
+	if strings.HasPrefix(model, "gpt") || strings.HasPrefix(model, "llama") {
+		return false
+	}
+	if strings.HasSuffix(model, "_image") {
+		return true
+	}
+	switch model {
+	case "resnet50", "resnet101", "vgg16", "vit_base", "vit_b_16", "mobilenet_v3_large", "efficientnet_b0", "convnext_tiny":
+		return true
+	default:
+		return false
+	}
+}
+
 func runtimeIDFromEndpoint(model, endpoint string) string {
 	raw := strings.ToLower(model + "-" + endpoint)
 	replacer := strings.NewReplacer("http://", "", "https://", "", ":", "-", "/", "-", ".", "-")
@@ -1073,6 +1438,30 @@ func optionalFloat(v any) (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func intNumber(v any) int {
+	switch x := v.(type) {
+	case float64:
+		return int(x)
+	case float32:
+		return int(x)
+	case int:
+		return x
+	case int64:
+		return int(x)
+	case json.Number:
+		n, _ := x.Int64()
+		return int(n)
+	case string:
+		value, err := strconv.Atoi(strings.TrimSpace(x))
+		if err == nil {
+			return value
+		}
+	default:
+		return 0
+	}
+	return 0
 }
 
 func asString(v any) string {

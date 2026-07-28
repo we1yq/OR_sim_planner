@@ -4,7 +4,7 @@ import csv
 import sys
 from pathlib import Path
 
-from plot_real_3gpu_results import Chart, PALETTE, Pdf, rows, write_line_pdf
+from plot_real_3gpu_results import Chart, PALETTE, Pdf, epoch_ticks, rows, write_line_pdf
 
 
 LABELS = {
@@ -24,8 +24,9 @@ def main() -> None:
     raw_transition_rows = [rows(path / "transition_metrics.csv") for path in run_dirs]
     grouped_bar_pdf(out_dir / "compare_transition_makespan.pdf", labels, transition_rows, "transitionMakespanSec", "Transition makespan", "seconds")
     grouped_bar_pdf(out_dir / "compare_planner_makespan.pdf", labels, transition_rows, "plannerMakespanSec", "Planner makespan", "seconds")
-    grouped_bar_pdf(out_dir / "compare_action_count.pdf", labels, raw_transition_rows, "actionCount", "Transition action count", "actions")
+    grouped_bar_pdf(out_dir / "compare_action_count.pdf", labels, raw_transition_rows, "physicalActionCount", "Physical transition actions", "actions")
     grouped_bar_pdf(out_dir / "compare_p95_slo_violation.pdf", labels, transition_rows, "sloViolationP95BucketSec", "P95 SLO violation duration", "seconds")
+    grouped_bar_pdf(out_dir / "compare_slo_violation_rate.pdf", labels, transition_rows, "sloViolationRate", "Request SLO violation rate", "violating requests / requests")
     active_gpu_pdf(out_dir / "compare_active_gpu_count.pdf", labels, run_dirs)
     print(f"wrote comparison pdfs to {out_dir}")
 
@@ -44,17 +45,19 @@ def transition_metrics(run_dir: Path) -> list[dict[str, str]]:
 
 def grouped_bar_pdf(out: Path, labels: list[str], data: list[list[dict[str, str]]], key: str, title: str, ylabel: str) -> None:
     epochs = sorted({int(r["epoch"]) for rows_ in data for r in rows_})
-    max_y = max([float_or_zero(r.get(key, "")) for rows_ in data for r in rows_] or [1.0])
+    if not epochs:
+        return
+    max_y = max([metric_value(r, key) for rows_ in data for r in rows_] or [1.0])
     pdf = Pdf(out)
     c = Chart(pdf, title, "epoch", ylabel)
-    c.frame(min(epochs) - 0.6, max(epochs) + 0.6, 0, max_y * 1.15 if max_y else 1.0)
+    c.frame(min(epochs) - 0.6, max(epochs) + 0.6, 0, max_y * 1.15 if max_y else 1.0, x_ticks=epoch_ticks(epochs))
     width = 0.28
     for idx, rows_ in enumerate(data):
         by_epoch = {int(r["epoch"]): r for r in rows_}
         pdf.color(PALETTE[idx % len(PALETTE)])
         offset = (idx - (len(data) - 1) / 2) * width
         for epoch in epochs:
-            value = float_or_zero(by_epoch.get(epoch, {}).get(key, ""))
+            value = metric_value(by_epoch.get(epoch, {}), key)
             x0, x1 = c.x(epoch + offset - width * 0.42), c.x(epoch + offset + width * 0.42)
             pdf.rect(x0, c.y(0), x1 - x0, c.y(value) - c.y(0), True)
     legend(pdf, labels)
@@ -63,15 +66,36 @@ def grouped_bar_pdf(out: Path, labels: list[str], data: list[list[dict[str, str]
 
 def active_gpu_pdf(out: Path, labels: list[str], run_dirs: list[Path]) -> None:
     series = {}
+    all_epochs = set()
     for label, run_dir in zip(labels, run_dirs):
-        values = []
-        offset = 0.0
-        for r in rows(run_dir / "gpu_counts.csv"):
-            epoch = float_or_zero(r.get("epoch", "0"))
-            rel = float_or_zero(r.get("relativeSeconds", "0"))
-            values.append((epoch * 5.0 + rel / 60.0 + offset, float_or_zero(r.get("active", "0"))))
+        gpu_rows = rows(run_dir / "gpu_counts.csv")
+        epoch_max: dict[int, float] = {}
+        for r in gpu_rows:
+            epoch = int(float_or_zero(r.get("epoch", "0")))
+            all_epochs.add(epoch)
+            epoch_max[epoch] = max(epoch_max.get(epoch, 0.0), float_or_zero(r.get("relativeSeconds", "0")))
+        values = [
+            (
+                int(float_or_zero(r.get("epoch", "0")))
+                + min(0.98, float_or_zero(r.get("relativeSeconds", "0")) / max(epoch_max[int(float_or_zero(r.get("epoch", "0")))], 1.0)),
+                float_or_zero(r.get("active", "0")),
+            )
+            for r in gpu_rows
+        ]
         series[label] = values
-    write_line_pdf(out, "Active GPU count comparison", "experiment minutes", "active GPUs", series)
+    write_line_pdf(out, "Active GPU count comparison", "epoch", "active GPUs", series, x_ticks=epoch_ticks(all_epochs))
+
+
+def metric_value(row: dict[str, str], key: str) -> float:
+    if key == "physicalActionCount":
+        return float_or_zero(row.get("physicalActionCount") or row.get("actionCount") or "")
+    if key == "sloViolationRate":
+        if row.get("sloViolationRate"):
+            return float_or_zero(row.get("sloViolationRate"))
+        violations = float_or_zero(row.get("sloViolationRequestCount") or row.get("sloViolationCount") or "")
+        requests = float_or_zero(row.get("sloTransitionRequestCount") or row.get("transitionRequestCount") or "")
+        return violations / requests if requests > 0 else 0.0
+    return float_or_zero(row.get(key, ""))
 
 
 def legend(pdf: Pdf, labels: list[str]) -> None:

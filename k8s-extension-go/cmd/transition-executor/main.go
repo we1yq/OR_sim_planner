@@ -336,10 +336,15 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 	verified := map[string]any{}
 	var verifiedMu sync.Mutex
 	statuses := []map[string]any{}
+	if err := validatePhysicalAcquireLifecycle(actions); err != nil {
+		return verified, statuses, err
+	}
 	pending := map[string]actionNode{}
 	known := map[string]bool{}
 	completed := map[string]bool{}
 	blockedOrFailed := map[string]string{}
+	runningPhysical := map[string]bool{}
+	acquiredPhysical := map[string]string{}
 	done := make(chan actionRunResult, len(actions))
 	running := 0
 	for _, node := range actions {
@@ -370,12 +375,30 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 			if !dependenciesCompleted(node, completed) {
 				continue
 			}
+			physicalID := physicalIDFromAction(node.Action)
+			if physicalID != "" && serializesPhysicalGPU(node.Type) && runningPhysical[physicalID] {
+				continue
+			}
+			if node.Type == "allocate_gpu" && physicalID != "" {
+				if owner := acquiredPhysical[physicalID]; owner != "" {
+					reason := fmt.Sprintf("physical GPU %s is already acquired in this plan by %s", physicalID, owner)
+					statuses = append(statuses, actionStatus(node, "blocked", time.Time{}, time.Time{}, trace.start, runtimes, reason))
+					blockedOrFailed[id] = reason
+					delete(pending, id)
+					progress = true
+					continue
+				}
+			}
 			delete(pending, id)
+			if physicalID != "" && serializesPhysicalGPU(node.Type) {
+				runningPhysical[physicalID] = true
+			}
 			running++
 			progress = true
 			go func(node actionNode) {
 				start := time.Now()
-				err := executeAction(client, router, nodes, runtimes, node, verified, &verifiedMu, planName, trace)
+				actionTrace := newExecutionTrace()
+				err := executeAction(client, router, nodes, runtimes, node, verified, &verifiedMu, planName, actionTrace)
 				finished := time.Now()
 				status := "completed"
 				message := ""
@@ -383,9 +406,11 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 					status = "failed"
 					message = err.Error()
 				}
+				statusRow := actionStatus(node, status, start, finished, trace.start, runtimes, message)
+				addActionTraceStatus(statusRow, actionTrace)
 				done <- actionRunResult{
 					node:   node,
-					status: actionStatus(node, status, start, finished, trace.start, runtimes, message),
+					status: statusRow,
 					err:    err,
 				}
 			}(node)
@@ -417,6 +442,9 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 
 		result := <-done
 		running--
+		if physicalID := physicalIDFromAction(result.node.Action); physicalID != "" && serializesPhysicalGPU(result.node.Type) {
+			delete(runningPhysical, physicalID)
+		}
 		statuses = append(statuses, result.status)
 		if result.err != nil {
 			blockedOrFailed[result.node.ID] = result.err.Error()
@@ -425,6 +453,14 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 			}
 		} else {
 			completed[result.node.ID] = true
+			if physicalID := physicalIDFromAction(result.node.Action); physicalID != "" {
+				switch result.node.Type {
+				case "allocate_gpu":
+					acquiredPhysical[physicalID] = result.node.ID
+				case "return_gpu":
+					delete(acquiredPhysical, physicalID)
+				}
+			}
 		}
 	}
 	sort.Slice(statuses, func(i, j int) bool {
@@ -448,6 +484,44 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 		return verified, statuses, firstErr
 	}
 	return verified, statuses, nil
+}
+
+func validatePhysicalAcquireLifecycle(actions []actionNode) error {
+	acquired := map[string]actionNode{}
+	for _, node := range actions {
+		physicalID := physicalIDFromAction(node.Action)
+		if physicalID == "" {
+			continue
+		}
+		switch node.Type {
+		case "allocate_gpu":
+			if owner, ok := acquired[physicalID]; ok {
+				return fmt.Errorf(
+					"action DAG has invalid physical GPU lifecycle: physical GPU %s is acquired by %s and then acquired again by %s before return_gpu",
+					physicalID,
+					owner.ID,
+					node.ID,
+				)
+			}
+			acquired[physicalID] = node
+		case "return_gpu":
+			delete(acquired, physicalID)
+		}
+	}
+	return nil
+}
+
+func serializesPhysicalGPU(actionType string) bool {
+	switch actionType {
+	case "allocate_gpu", "return_gpu",
+		"configure_full_template", "apply_slots", "configure_partial_profile", "patch_slots",
+		"clear_full_template", "clear_gpu", "clear_template", "clear_gpu_binding",
+		"bind_target_gpu", "register_mig_devices",
+		"place_instance", "activate_instance_route", "deactivate_instance_route", "wait_instance_drain", "delete_instance":
+		return true
+	default:
+		return false
+	}
 }
 
 func readyActionIDs(pending map[string]actionNode) []string {
@@ -540,6 +614,29 @@ func actionStatus(node actionNode, status string, startedAt, finishedAt, origin 
 		out["message"] = message
 	}
 	return out
+}
+
+func addActionTraceStatus(status map[string]any, trace *executionTrace) {
+	if trace == nil {
+		return
+	}
+	raw := trace.Status(nil)
+	for _, key := range []string{"timestamps", "durationsSeconds", "runtimeReadiness"} {
+		if value := nonEmptyMap(raw[key]); value != nil {
+			status[key] = value
+		}
+	}
+	if rawMetrics := nonEmptyMap(raw["metrics"]); rawMetrics != nil {
+		status["traceMetrics"] = rawMetrics
+	}
+}
+
+func nonEmptyMap(value any) map[string]any {
+	items, ok := value.(map[string]any)
+	if !ok || len(items) == 0 {
+		return nil
+	}
+	return items
 }
 
 func summarizeActionStatuses(statuses []map[string]any, initialActiveGPUCount int) map[string]any {
@@ -783,6 +880,12 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 		if err != nil {
 			return err
 		}
+		trace.Mark("cdiDeviceWaitStartedAt")
+		if err := waitForRuntimeCDIDevices(nodes, resolved, 45*time.Second); err != nil {
+			trace.Mark("cdiDeviceWaitFinishedAt")
+			return err
+		}
+		trace.Mark("cdiDeviceWaitFinishedAt")
 		trace.Mark("runtimeDeploymentCreateStartedAt")
 		err = syncRuntimes(client, resolved)
 		trace.Mark("runtimeDeploymentCreatedAt")
@@ -805,7 +908,7 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 		if err != nil {
 			return err
 		}
-		perGPUVerification, readiness, err := waitForRuntimeReadyAndCUDA(client, nodes, resolved, trace.Timestamp("runtimeDeploymentCreatedAt"), 180*time.Second)
+		perGPUVerification, readiness, err := waitForRuntimeReadyAndCUDA(client, nodes, resolved, trace.Timestamp("runtimeDeploymentCreatedAt"), runtimeReadyTimeout())
 		if err != nil {
 			return err
 		}
@@ -1431,12 +1534,19 @@ func targetRuntimeForAction(action map[string]any, runtimes []system.ModelRuntim
 		matches = append(matches, rt)
 	}
 	if len(matches) == 1 {
-		return matches[0], nil
+		return applyActionRuntimeOverrides(matches[0], action), nil
 	}
 	if len(matches) == 0 {
 		return system.ModelRuntimeSpec{}, fmt.Errorf("target runtime not found for action %s model=%q gpu=%q slot=%v", asString(action["type"]), model, physicalID, action["slot"])
 	}
 	return system.ModelRuntimeSpec{}, fmt.Errorf("target runtime ambiguous for action %s model=%q gpu=%q slot=%v: %d matches", asString(action["type"]), model, physicalID, action["slot"], len(matches))
+}
+
+func applyActionRuntimeOverrides(rt system.ModelRuntimeSpec, action map[string]any) system.ModelRuntimeSpec {
+	if batch := intNumber(firstNonNil(action["batch"], action["batchSize"], action["targetBatchSize"], action["newBatchSize"])); batch > 0 {
+		rt.BatchSize = batch
+	}
+	return rt
 }
 
 func actionSlot(action map[string]any) (slotRequest, bool) {
@@ -1688,7 +1798,7 @@ func applySlots(nodes map[string]string, physicalID, createSpec string) (map[str
 	defer resp.Body.Close()
 	body := decodeNodeAgentResponse(resp)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return body, fmt.Errorf("apply slots on %s gpu%d returned %d", node, gpuIndex, resp.StatusCode)
+		return body, fmt.Errorf("apply slots on %s gpu%d returned %d%s", node, gpuIndex, resp.StatusCode, nodeAgentErrorDetail(body))
 	}
 	return body, nil
 }
@@ -1706,7 +1816,7 @@ func patchSlots(nodes map[string]string, physicalID, deleteSpec, createSpec, pre
 	defer resp.Body.Close()
 	body := decodeNodeAgentResponse(resp)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return body, fmt.Errorf("patch slots on %s gpu%d returned %d", node, gpuIndex, resp.StatusCode)
+		return body, fmt.Errorf("patch slots on %s gpu%d returned %d%s", node, gpuIndex, resp.StatusCode, nodeAgentErrorDetail(body))
 	}
 	return body, nil
 }
@@ -1723,7 +1833,7 @@ func refreshCDI(nodes map[string]string, physicalID string) (map[string]any, err
 	defer resp.Body.Close()
 	body := decodeNodeAgentResponse(resp)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return body, fmt.Errorf("refresh CDI on %s gpu%d returned %d", node, gpuIndex, resp.StatusCode)
+		return body, fmt.Errorf("refresh CDI on %s gpu%d returned %d%s", node, gpuIndex, resp.StatusCode, nodeAgentErrorDetail(body))
 	}
 	return body, nil
 }
@@ -1736,6 +1846,22 @@ func decodeNodeAgentResponse(resp *http.Response) map[string]any {
 	return body
 }
 
+func nodeAgentErrorDetail(body map[string]any) string {
+	if body == nil {
+		return ""
+	}
+	if message := asString(body["message"]); message != "" {
+		return ": " + message
+	}
+	if err := asString(body["error"]); err != "" {
+		return ": " + err
+	}
+	if err := asString(body["decodeError"]); err != "" {
+		return ": " + err
+	}
+	return ""
+}
+
 func nodeAgentTransactionSummary(body map[string]any) map[string]any {
 	if body == nil {
 		return nil
@@ -1744,6 +1870,7 @@ func nodeAgentTransactionSummary(body map[string]any) map[string]any {
 		"success":           body["success"],
 		"command":           body["command"],
 		"gpuIndex":          body["gpuIndex"],
+		"message":           body["message"],
 		"createSeconds":     body["createSeconds"],
 		"deleteSeconds":     body["deleteSeconds"],
 		"expectedResources": body["expectedResources"],
@@ -1855,6 +1982,10 @@ func runtimeFromDeployment(dep map[string]any) system.ModelRuntimeSpec {
 	annotations := asMap(meta["annotations"])
 	rt := system.ModelRuntimeSpec{
 		Model:           asString(labels["migrant.io/model"]),
+		RuntimeModel:    asString(labels["migrant.io/runtime-model"]),
+		RequestClass:    asString(labels["migrant.io/request-class"]),
+		PromptLen:       intNumber(labels["migrant.io/prompt-len"]),
+		OutputTokens:    intNumber(labels["migrant.io/output-tokens"]),
 		RuntimeID:       asString(labels["migrant.io/runtime-id"]),
 		Node:            asString(asMap(podSpec["nodeSelector"])["kubernetes.io/hostname"]),
 		Profile:         asString(labels["migrant.io/profile"]),
@@ -1872,6 +2003,26 @@ func runtimeFromDeployment(dep map[string]any) system.ModelRuntimeSpec {
 			switch asString(e["name"]) {
 			case "BATCH_SIZE":
 				rt.BatchSize = intNumber(e["value"])
+			case "OR_SIM_WORKLOAD":
+				if value := asString(e["value"]); value != "" {
+					rt.Model = value
+				}
+			case "MODEL_NAME":
+				if value := asString(e["value"]); value != "" {
+					rt.RuntimeModel = value
+				}
+			case "OR_SIM_REQUEST_CLASS":
+				if value := asString(e["value"]); value != "" {
+					rt.RequestClass = value
+				}
+			case "PROMPT_LEN":
+				if rt.PromptLen == 0 {
+					rt.PromptLen = intNumber(e["value"])
+				}
+			case "OUTPUT_TOKENS":
+				if rt.OutputTokens == 0 {
+					rt.OutputTokens = intNumber(e["value"])
+				}
 			}
 		}
 		for _, port := range asSlice(c["ports"]) {
@@ -1883,7 +2034,9 @@ func runtimeFromDeployment(dep map[string]any) system.ModelRuntimeSpec {
 }
 
 func runtimeEquivalent(a, b system.ModelRuntimeSpec) bool {
-	return runtimeID(a) == runtimeID(b) && a.Model == b.Model && a.BatchSize == b.BatchSize && a.Node == b.Node &&
+	return runtimeID(a) == runtimeID(b) && a.Model == b.Model && runtimeModel(a) == runtimeModel(b) &&
+		a.RequestClass == b.RequestClass && a.PromptLen == b.PromptLen && a.OutputTokens == b.OutputTokens &&
+		a.BatchSize == b.BatchSize && a.Node == b.Node &&
 		a.HostPort == b.HostPort && a.Profile == b.Profile && a.GPU == b.GPU &&
 		a.SlotResource == b.SlotResource && a.DeviceResource == b.DeviceResource &&
 		a.ExpectedMIGUUID == b.ExpectedMIGUUID && floatEqual(routeWeight(a), routeWeight(b)) && floatEqual(a.Capacity, b.Capacity)
@@ -2273,6 +2426,62 @@ func waitForAllocatableTargets(client *kube.Client, targets []allocatableTarget,
 	return metrics, fmt.Errorf("timed out waiting for allocatable resources: %s", strings.Join(lastMissing, ", "))
 }
 
+func waitForRuntimeCDIDevices(nodes map[string]string, runtimes []system.ModelRuntimeSpec, timeout time.Duration) error {
+	if len(runtimes) == 0 {
+		return nil
+	}
+	refreshed := map[string]bool{}
+	for _, rt := range runtimes {
+		if rt.ExpectedMIGUUID == "" {
+			return fmt.Errorf("runtime %s missing expected MIG UUID for CDI readiness", rt.Model)
+		}
+		key := rt.Node + "|" + rt.GPU
+		if refreshed[key] {
+			continue
+		}
+		if _, err := refreshCDI(nodes, rt.GPU); err != nil {
+			return err
+		}
+		refreshed[key] = true
+	}
+	deadline := time.Now().Add(timeout)
+	lastMissing := []string{}
+	for time.Now().Before(deadline) {
+		missing := []string{}
+		for _, rt := range runtimes {
+			ready, err := runtimeCDIDeviceReady(nodes, rt)
+			if err != nil || !ready {
+				detail := rt.Node + "/" + rt.ExpectedMIGUUID
+				if err != nil {
+					detail += ": " + err.Error()
+				}
+				missing = append(missing, detail)
+			}
+		}
+		if len(missing) == 0 {
+			return nil
+		}
+		lastMissing = missing
+		time.Sleep(500 * time.Millisecond)
+	}
+	return fmt.Errorf("timed out waiting for CDI devices: %s", strings.Join(lastMissing, ", "))
+}
+
+func runtimeCDIDeviceReady(nodes map[string]string, rt system.ModelRuntimeSpec) (bool, error) {
+	ip := nodes[rt.Node]
+	if ip == "" {
+		return false, fmt.Errorf("node IP not found for %s", rt.Node)
+	}
+	u := fmt.Sprintf("http://%s:10684/cdi-ready?migUuid=%s", ip, url.QueryEscape(rt.ExpectedMIGUUID))
+	client := http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(u)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode >= 200 && resp.StatusCode < 300, nil
+}
+
 func nodeAgentRegisteredTargets(body map[string]any, targets []allocatableTarget) (bool, []string) {
 	if len(targets) == 0 {
 		return true, nil
@@ -2360,7 +2569,14 @@ func waitForOneRuntimeReadyAndCUDA(client *kube.Client, nodes map[string]string,
 	if health == nil || health["ok"] != true {
 		return nil, readiness, fmt.Errorf("runtime %s did not become healthy before timeout", rt.Model)
 	}
-	migUUID := asString(health["orSimMIGUUID"])
+	if loadTimings := asMap(health["loadTimings"]); len(loadTimings) > 0 {
+		readiness["loadTimings"] = loadTimings
+	}
+	readiness["healthModelId"] = asString(health["modelId"])
+	readiness["healthRuntimeMode"] = asString(health["runtimeMode"])
+	readiness["healthDevice"] = asString(health["device"])
+	readiness["healthLoaded"] = asBool(health["loaded"])
+	migUUID := asString(firstNonNil(health["orSimMIGUUID"], health["migUuid"], health["migUUID"]))
 	if migUUID == "" {
 		return nil, readiness, fmt.Errorf("runtime %s health did not report OR_SIM_MIG_UUID", rt.Model)
 	}
@@ -2615,6 +2831,10 @@ func upsertRoutes(router string, runtimes []system.ModelRuntimeSpec, nodes map[s
 		}
 		raw, _ := json.Marshal(map[string]any{
 			"model":           rt.Model,
+			"runtimeModel":    runtimeModel(rt),
+			"requestClass":    rt.RequestClass,
+			"promptLen":       rt.PromptLen,
+			"outputTokens":    rt.OutputTokens,
 			"runtimeId":       runtimeID(rt),
 			"endpoint":        "http://" + ip + ":" + strconv.Itoa(rt.HostPort),
 			"weight":          routeWeight(rt),
@@ -2689,26 +2909,50 @@ func deleteRouteEndpoint(router, model, runtimeID string) error {
 func deployment(ns string, rt system.ModelRuntimeSpec) map[string]any {
 	name := runtimeDeploymentName(rt)
 	rid := runtimeID(rt)
+	modelName := runtimeModel(rt)
+	modelLabel := labelValue(rt.Model)
+	runtimeModelLabel := labelValue(modelName)
+	requestClassLabel := labelValue(rt.RequestClass)
+	envVars := []map[string]any{
+		{"name": "MODEL_NAME", "value": modelName},
+		{"name": "OR_SIM_WORKLOAD", "value": rt.Model},
+		{"name": "OR_SIM_REQUEST_CLASS", "value": rt.RequestClass},
+		{"name": "PROMPT_LEN", "value": strconv.Itoa(rt.PromptLen)},
+		{"name": "OUTPUT_TOKENS", "value": strconv.Itoa(rt.OutputTokens)},
+		{"name": "RUNTIME_MODE", "value": runtimeMode(rt)},
+		{"name": "TORCHVISION_WEIGHTS", "value": env("TORCHVISION_WEIGHTS", "default")},
+		{"name": "TORCH_HOME", "value": env("MODEL_RUNTIME_TORCH_HOME", "/opt/torch-cache")},
+		{"name": "XDG_CACHE_HOME", "value": env("MODEL_RUNTIME_XDG_CACHE_HOME", "/opt/cache")},
+		{"name": "OR_SIM_RUNTIME_ID", "value": rid},
+		{"name": "BATCH_SIZE", "value": strconv.Itoa(rt.BatchSize)},
+		{"name": "OR_SIM_GPU", "value": rt.GPU},
+		{"name": "OR_SIM_PROFILE", "value": rt.Profile},
+		{"name": "OR_SIM_SLOT_RESOURCE", "value": rt.SlotResource},
+		{"name": "OR_SIM_DEVICE_RESOURCE", "value": rt.DeviceResource},
+		{"name": "OR_SIM_EXPECTED_MIG_UUID", "value": rt.ExpectedMIGUUID},
+	}
+	if isLLMRuntime(rt) {
+		if modelID := llmModelID(rt); modelID != "" {
+			envVars = append(envVars, map[string]any{"name": "MODEL_ID", "value": modelID})
+		}
+		envVars = append(envVars,
+			map[string]any{"name": "HF_HOME", "value": env("MODEL_RUNTIME_HF_HOME", "/opt/hf-cache")},
+			map[string]any{"name": "HUGGINGFACE_HUB_CACHE", "value": env("MODEL_RUNTIME_HF_HUB_CACHE", "/opt/hf-cache/hub")},
+			map[string]any{"name": "TRANSFORMERS_CACHE", "value": env("MODEL_RUNTIME_TRANSFORMERS_CACHE", "/opt/hf-cache/hub")},
+			map[string]any{"name": "HF_TOKEN", "valueFrom": map[string]any{"secretKeyRef": map[string]any{
+				"name":     env("HF_TOKEN_SECRET_NAME", "hf-token"),
+				"key":      env("HF_TOKEN_SECRET_KEY", "HF_TOKEN"),
+				"optional": true,
+			}}},
+		)
+	}
 	container := map[string]any{
 		"name":            "runtime",
-		"image":           env("MODEL_RUNTIME_IMAGE", "localhost:10690/migrant-model-runtime:go"),
+		"image":           runtimeImage(rt),
 		"imagePullPolicy": "IfNotPresent",
 		"args":            []string{"--addr=:" + strconv.Itoa(rt.HostPort)},
-		"env": []map[string]any{
-			{"name": "MODEL_NAME", "value": rt.Model},
-			{"name": "RUNTIME_MODE", "value": env("MODEL_RUNTIME_MODE", "synthetic")},
-			{"name": "TORCHVISION_WEIGHTS", "value": env("TORCHVISION_WEIGHTS", "default")},
-			{"name": "TORCH_HOME", "value": env("MODEL_RUNTIME_TORCH_HOME", "/opt/torch-cache")},
-			{"name": "XDG_CACHE_HOME", "value": env("MODEL_RUNTIME_XDG_CACHE_HOME", "/opt/cache")},
-			{"name": "OR_SIM_RUNTIME_ID", "value": rid},
-			{"name": "BATCH_SIZE", "value": strconv.Itoa(rt.BatchSize)},
-			{"name": "OR_SIM_GPU", "value": rt.GPU},
-			{"name": "OR_SIM_PROFILE", "value": rt.Profile},
-			{"name": "OR_SIM_SLOT_RESOURCE", "value": rt.SlotResource},
-			{"name": "OR_SIM_DEVICE_RESOURCE", "value": rt.DeviceResource},
-			{"name": "OR_SIM_EXPECTED_MIG_UUID", "value": rt.ExpectedMIGUUID},
-		},
-		"ports": []map[string]any{{"containerPort": rt.HostPort}},
+		"env":             envVars,
+		"ports":           []map[string]any{{"containerPort": rt.HostPort}},
 		"readinessProbe": map[string]any{"httpGet": map[string]any{
 			"path": "/healthz", "port": rt.HostPort,
 		}, "periodSeconds": 1, "failureThreshold": 3, "timeoutSeconds": 1},
@@ -2726,28 +2970,40 @@ func deployment(ns string, rt system.ModelRuntimeSpec) map[string]any {
 			"name":      name,
 			"namespace": ns,
 			"labels": map[string]any{
-				"app.kubernetes.io/name": "migrant-model-runtime",
-				"migrant.io/model":       rt.Model,
-				"migrant.io/runtime-id":  rid,
-				"migrant.io/profile":     rt.Profile,
-				"migrant.io/gpu":         rt.GPU,
+				"app.kubernetes.io/name":   "migrant-model-runtime",
+				"migrant.io/model":         modelLabel,
+				"migrant.io/runtime-model": runtimeModelLabel,
+				"migrant.io/request-class": requestClassLabel,
+				"migrant.io/prompt-len":    strconv.Itoa(rt.PromptLen),
+				"migrant.io/output-tokens": strconv.Itoa(rt.OutputTokens),
+				"migrant.io/runtime-id":    rid,
+				"migrant.io/profile":       rt.Profile,
+				"migrant.io/gpu":           rt.GPU,
 			},
 		},
 		"spec": map[string]any{
 			"replicas": 1,
 			"strategy": map[string]any{"type": "Recreate"},
 			"selector": map[string]any{"matchLabels": map[string]any{
-				"app.kubernetes.io/name": "migrant-model-runtime",
-				"migrant.io/model":       rt.Model,
-				"migrant.io/runtime-id":  rid,
+				"app.kubernetes.io/name":   "migrant-model-runtime",
+				"migrant.io/model":         modelLabel,
+				"migrant.io/runtime-model": runtimeModelLabel,
+				"migrant.io/request-class": requestClassLabel,
+				"migrant.io/prompt-len":    strconv.Itoa(rt.PromptLen),
+				"migrant.io/output-tokens": strconv.Itoa(rt.OutputTokens),
+				"migrant.io/runtime-id":    rid,
 			}},
 			"template": map[string]any{
 				"metadata": map[string]any{"labels": map[string]any{
-					"app.kubernetes.io/name": "migrant-model-runtime",
-					"migrant.io/model":       rt.Model,
-					"migrant.io/runtime-id":  rid,
-					"migrant.io/profile":     rt.Profile,
-					"migrant.io/gpu":         rt.GPU,
+					"app.kubernetes.io/name":   "migrant-model-runtime",
+					"migrant.io/model":         modelLabel,
+					"migrant.io/runtime-model": runtimeModelLabel,
+					"migrant.io/request-class": requestClassLabel,
+					"migrant.io/prompt-len":    strconv.Itoa(rt.PromptLen),
+					"migrant.io/output-tokens": strconv.Itoa(rt.OutputTokens),
+					"migrant.io/runtime-id":    rid,
+					"migrant.io/profile":       rt.Profile,
+					"migrant.io/gpu":           rt.GPU,
 				}, "annotations": map[string]any{
 					"migrant.io/slot-resource":      rt.SlotResource,
 					"migrant.io/device-resource":    rt.DeviceResource,
@@ -2758,17 +3014,40 @@ func deployment(ns string, rt system.ModelRuntimeSpec) map[string]any {
 					"migrant.io/binding-layer":      "kubelet-device-plugin-allocate",
 					"migrant.io/long-term-identity": "logical-slot",
 				}},
-				"spec": map[string]any{
-					"nodeSelector":     map[string]any{"kubernetes.io/hostname": rt.Node},
-					"hostNetwork":      true,
-					"dnsPolicy":        "ClusterFirstWithHostNet",
-					"runtimeClassName": "nvidia",
-					"tolerations":      []map[string]any{{"operator": "Exists"}},
-					"containers":       []map[string]any{container},
-				},
+				"spec": runtimePodSpec(rt, container),
 			},
 		},
 	}
+}
+
+func runtimePodSpec(rt system.ModelRuntimeSpec, container map[string]any) map[string]any {
+	spec := map[string]any{
+		"nodeSelector":                  map[string]any{"kubernetes.io/hostname": rt.Node},
+		"hostNetwork":                   true,
+		"dnsPolicy":                     "ClusterFirstWithHostNet",
+		"runtimeClassName":              "nvidia",
+		"terminationGracePeriodSeconds": runtimeTerminationGraceSeconds(),
+		"tolerations":                   []map[string]any{{"operator": "Exists"}},
+		"containers":                    []map[string]any{container},
+	}
+	if !isLLMRuntime(rt) {
+		return spec
+	}
+	container["volumeMounts"] = []map[string]any{{"name": "hf-cache", "mountPath": env("MODEL_RUNTIME_HF_HOME", "/opt/hf-cache")}}
+	spec["volumes"] = []map[string]any{{"name": "hf-cache", "hostPath": map[string]any{
+		"path": env("MODEL_RUNTIME_HF_CACHE_HOST_PATH", "/var/lib/or-sim/hf-cache"),
+		"type": "DirectoryOrCreate",
+	}}}
+	spec["initContainers"] = []map[string]any{{
+		"name":    "prepare-hf-cache",
+		"image":   env("RUNTIME_INIT_IMAGE", "busybox:1.36"),
+		"command": []string{"sh", "-c", "mkdir -p /cache/hub && chown -R 65532:65532 /cache"},
+		"volumeMounts": []map[string]any{{
+			"name":      "hf-cache",
+			"mountPath": "/cache",
+		}},
+	}}
+	return spec
 }
 
 func nodeIPs(client *kube.Client) (map[string]string, error) {
@@ -2797,18 +3076,22 @@ func nodeIPs(client *kube.Client) (map[string]string, error) {
 }
 
 func parseRuntimes(spec map[string]any) []system.ModelRuntimeSpec {
-	items := asSlice(asMap(spec["summary"])["desiredRuntimes"])
+	items := asSlice(asMap(asMap(spec["validationTargets"])["targetAllocationPlan"])["desiredRuntimes"])
 	if len(items) == 0 {
-		items = asSlice(asMap(spec["podLifecyclePreview"])["desiredRuntimes"])
+		items = asSlice(asMap(spec["summary"])["desiredRuntimes"])
 	}
 	if len(items) == 0 {
-		items = asSlice(asMap(asMap(spec["validationTargets"])["targetAllocationPlan"])["desiredRuntimes"])
+		items = asSlice(asMap(spec["podLifecyclePreview"])["desiredRuntimes"])
 	}
 	out := []system.ModelRuntimeSpec{}
 	for _, item := range items {
 		m := asMap(item)
 		out = append(out, system.ModelRuntimeSpec{
 			Model:           asString(m["model"]),
+			RuntimeModel:    asString(m["runtimeModel"]),
+			RequestClass:    asString(m["requestClass"]),
+			PromptLen:       intNumber(m["promptLen"]),
+			OutputTokens:    intNumber(m["outputTokens"]),
 			RuntimeID:       asString(m["runtimeId"]),
 			BatchSize:       intNumber(m["batchSize"]),
 			Node:            asString(m["node"]),
@@ -2871,6 +3154,34 @@ func env(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envDurationSeconds(key string, fallback time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	seconds, err := strconv.ParseFloat(raw, 64)
+	if err != nil || seconds <= 0 {
+		return fallback
+	}
+	return time.Duration(seconds * float64(time.Second))
+}
+
+func runtimeReadyTimeout() time.Duration {
+	return envDurationSeconds("RUNTIME_READY_TIMEOUT_SECONDS", 600*time.Second)
+}
+
+func runtimeTerminationGraceSeconds() int {
+	raw := strings.TrimSpace(os.Getenv("RUNTIME_TERMINATION_GRACE_SECONDS"))
+	if raw == "" {
+		return 30
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds < 0 {
+		return 30
+	}
+	return seconds
 }
 
 func asMap(v any) map[string]any {
@@ -2951,6 +3262,96 @@ func runtimeID(rt system.ModelRuntimeSpec) string {
 		return "runtime"
 	}
 	return raw
+}
+
+func labelValue(value string) string {
+	out := make([]rune, 0, len(value))
+	lastDash := false
+	for _, ch := range value {
+		ok := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '.' || ch == '*'
+		if ok {
+			out = append(out, ch)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			out = append(out, '-')
+			lastDash = true
+		}
+	}
+	label := strings.Trim(string(out), "-.*")
+	if label == "" {
+		return "x"
+	}
+	if len(label) > 63 {
+		label = strings.Trim(label[:63], "-.*")
+	}
+	if label == "" {
+		return "x"
+	}
+	return label
+}
+
+func runtimeModel(rt system.ModelRuntimeSpec) string {
+	if strings.TrimSpace(rt.RuntimeModel) != "" {
+		return strings.TrimSpace(rt.RuntimeModel)
+	}
+	return rt.Model
+}
+
+func runtimeImage(rt system.ModelRuntimeSpec) string {
+	if isLLMRuntime(rt) {
+		model := strings.ToLower(runtimeModel(rt))
+		if strings.Contains(model, "gpt2") {
+			return env("GPT2_MODEL_RUNTIME_IMAGE", env("LLM_GPT2_MODEL_RUNTIME_IMAGE", env("LLM_MODEL_RUNTIME_IMAGE", "localhost:10690/migrant-model-runtime:llm-transformers-20260622")))
+		}
+		if strings.Contains(model, "llama") {
+			return env("LLAMA_MODEL_RUNTIME_IMAGE", env("LLM_LLAMA_MODEL_RUNTIME_IMAGE", env("LLM_MODEL_RUNTIME_IMAGE", "localhost:10690/migrant-model-runtime:llm-transformers-20260622")))
+		}
+		return env("LLM_MODEL_RUNTIME_IMAGE", "localhost:10690/migrant-model-runtime:llm-transformers-20260622")
+	}
+	if isVisionRuntime(rt) {
+		return env("VISION_MODEL_RUNTIME_IMAGE", env("MODEL_RUNTIME_IMAGE", "localhost:10690/migrant-model-runtime:torchvision-20260602"))
+	}
+	return env("MODEL_RUNTIME_IMAGE", "localhost:10690/migrant-model-runtime:go")
+}
+
+func llmModelID(rt system.ModelRuntimeSpec) string {
+	model := strings.ToLower(runtimeModel(rt))
+	if strings.Contains(model, "gpt2") {
+		return env("GPT2_MODEL_ID", env("LLM_GPT2_MODEL_ID", ""))
+	}
+	if strings.Contains(model, "llama") {
+		return env("LLAMA_MODEL_ID", env("LLM_LLAMA_MODEL_ID", ""))
+	}
+	return env("LLM_MODEL_ID", "")
+}
+
+func runtimeMode(rt system.ModelRuntimeSpec) string {
+	if isLLMRuntime(rt) {
+		return env("LLM_RUNTIME_MODE", "transformers")
+	}
+	if isVisionRuntime(rt) {
+		return env("VISION_RUNTIME_MODE", "torchvision")
+	}
+	return env("MODEL_RUNTIME_MODE", "synthetic")
+}
+
+func isLLMRuntime(rt system.ModelRuntimeSpec) bool {
+	model := strings.ToLower(strings.TrimSpace(runtimeModel(rt)))
+	workload := strings.ToLower(strings.TrimSpace(rt.Model))
+	return strings.HasPrefix(model, "gpt") || strings.HasPrefix(workload, "gpt") ||
+		strings.Contains(model, "llama") || strings.Contains(workload, "llama")
+}
+
+func isVisionRuntime(rt system.ModelRuntimeSpec) bool {
+	model := strings.ToLower(strings.TrimSpace(runtimeModel(rt)))
+	workload := strings.ToLower(strings.TrimSpace(rt.Model))
+	switch model {
+	case "resnet50", "resnet101", "vgg16", "vit_base", "vit_b_16", "mobilenet_v3_large", "efficientnet_b0", "convnext_tiny":
+		return true
+	}
+	return strings.HasSuffix(workload, "_image")
 }
 
 func runtimeDeploymentName(rt system.ModelRuntimeSpec) string {

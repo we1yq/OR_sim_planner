@@ -305,7 +305,7 @@ actions.
 
 `adapterDryRunPreview` is the dry-run skeleton for future adapters. It groups the
 same plan into what a MIG adapter would patch, what a router adapter would
-stop/reroute/drain, and what a Pod adapter would create/reuse/delete/reload. It
+stop/drain, and what a Pod adapter would create/reuse/delete/reload. It
 does not execute any of those operations.
 
 `observerPreview` lists the observations required before real execution can be

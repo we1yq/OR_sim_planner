@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import hashlib
 import json
 import math
 import subprocess
@@ -20,9 +21,29 @@ from typing import Any
 TEST_ROOT = Path(__file__).resolve().parent
 RESULT_ROOT = TEST_ROOT / "results/real_3gpu_k8s"
 
-WORKLOADS = ("llama", "gpt2", "resnet50")
-REGISTERED_SLO_MS = {"llama": 180.0, "gpt2": 50.0, "resnet50": 100.0}
-REQUEST_CLASSES = {"llama": "p1024/o128", "gpt2": "p64/o64", "resnet50": "image batches"}
+WORKLOADS = ("llama", "gpt2", "resnet50", "vgg16", "vit_base")
+
+EVALUATION_SLOS = {
+    "resnet50": {"model": "resnet50", "requestClass": "image batches", "latencyMs": 100.0, "tpotMs": None},
+    "vgg16": {"model": "vgg16", "requestClass": "image batches", "latencyMs": 100.0, "tpotMs": None},
+    "vit_base": {"model": "vit_base", "requestClass": "image batches", "latencyMs": 300.0, "tpotMs": None},
+    "gpt2_p64_o64": {"model": "gpt2", "requestClass": "p64/o64", "promptLen": 64, "outputTokens": 64, "latencyMs": 50.0, "tpotMs": 20.0},
+    "gpt2_p512_o512": {"model": "gpt2", "requestClass": "p512/o512", "promptLen": 512, "outputTokens": 512, "latencyMs": 100.0, "tpotMs": 20.0},
+    "llama_p1024_o128": {"model": "llama", "requestClass": "p1024/o128", "promptLen": 1024, "outputTokens": 128, "latencyMs": 180.0, "tpotMs": 35.0},
+    "llama_p2048_o64": {"model": "llama", "requestClass": "p2048/o64", "promptLen": 2048, "outputTokens": 64, "latencyMs": 250.0, "tpotMs": 35.0},
+    "llama_p4096_o512": {"model": "llama", "requestClass": "p4096/o512", "promptLen": 4096, "outputTokens": 512, "latencyMs": 500.0, "tpotMs": 35.0},
+}
+
+# The current real-3GPU fixture exposes only three Kubernetes workload names.
+# These aliases bind those names to one concrete request class from the full
+# evaluation SLO table above.
+WORKLOAD_SLO_KEYS = {
+    "resnet50": "resnet50",
+    "vgg16": "vgg16",
+    "vit_base": "vit_base",
+    "gpt2": "gpt2_p64_o64",
+    "llama": "llama_p1024_o128",
+}
 
 # The deployed planner-engine fixture is the real three-model system
 # (llama/gpt2/resnet50). These points keep the online-3GPU shape: seven
@@ -51,13 +72,15 @@ def main() -> int:
     router = args.router_url.rstrip("/")
     kubectl(["get", "nodes", "-o", "wide"])
     assert_router(router)
-    cleanup_router_routes(router)
     ensure_empty_cluster(args, run_id, out_dir)
+    if args.warmup:
+        run_warmup(args, run_id, out_dir)
 
     request_rows: list[dict[str, Any]] = []
     route_rows: list[dict[str, Any]] = []
     transition_rows: list[dict[str, Any]] = []
     action_rows: list[dict[str, Any]] = []
+    readiness_rows: list[dict[str, Any]] = []
     gpu_rows: list[dict[str, Any]] = []
     allocation_snapshots: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -66,18 +89,20 @@ def main() -> int:
     for idx, target in enumerate(stages):
         epoch = f"{run_id}-e{idx:02d}"
         print(f"\n=== epoch {idx}: source={source} target={target} ===", flush=True)
-        traffic = TrafficDriver(
-            router=router,
-            source=source,
-            target=target,
-            stage=epoch,
-            request_rows=request_rows,
-            route_rows=route_rows,
-            sample_interval_s=args.route_sample_s,
-            poll_s=args.traffic_poll_s,
-            infer_timeout_s=args.infer_timeout_s,
-        )
-        traffic.start()
+        traffic = None
+        if not args.no_traffic:
+            traffic = TrafficDriver(
+                router=router,
+                source=source,
+                target=target,
+                stage=epoch,
+                request_rows=request_rows,
+                route_rows=route_rows,
+                sample_interval_s=args.route_sample_s,
+                poll_s=args.traffic_poll_s,
+                infer_timeout_s=args.infer_timeout_s,
+            )
+            traffic.start()
         try:
             snapshot_name = create_arrival_snapshot(args.namespace, epoch, source, target, args.planner)
             plan_name = "plan-" + snapshot_name
@@ -96,17 +121,22 @@ def main() -> int:
             ))
             transition_rows.append(transition_row)
             action_rows.extend(action_status_rows(idx, plan_name, plan))
+            readiness_rows.extend(runtime_readiness_rows(idx, plan_name, plan, phase="experiment"))
             gpu_rows.extend(gpu_count_rows_from_plan(args.namespace, idx, plan_name, plan))
             allocation_snapshots.append(target_allocation_snapshot(idx, plan_name, plan))
-            traffic.enter_steady()
-            print(f"epoch {idx} transition executed; steady {args.steady_seconds:.1f}s", flush=True)
-            time.sleep(max(0.0, args.steady_seconds))
+            if traffic is not None:
+                traffic.enter_steady()
+                print(f"epoch {idx} transition executed; steady {args.steady_seconds:.1f}s", flush=True)
+                time.sleep(max(0.0, args.steady_seconds))
+            else:
+                print(f"epoch {idx} transition executed; no traffic/steady replay", flush=True)
         finally:
-            traffic.stop()
+            if traffic is not None:
+                traffic.stop()
         source = dict(target)
-        write_outputs(out_dir, request_rows, route_rows, transition_rows, action_rows, gpu_rows, allocation_snapshots, failures)
+        write_outputs(out_dir, request_rows, route_rows, transition_rows, action_rows, readiness_rows, gpu_rows, allocation_snapshots, failures)
 
-    write_outputs(out_dir, request_rows, route_rows, transition_rows, action_rows, gpu_rows, allocation_snapshots, failures)
+    write_outputs(out_dir, request_rows, route_rows, transition_rows, action_rows, readiness_rows, gpu_rows, allocation_snapshots, failures)
     write_json(out_dir / "final_registry.json", kubectl_json(["get", "physicalgpuregistry", "default", "-n", args.namespace, "-o", "json"]))
     print(f"\nREAL_3GPU_K8S_RESULT_DIR={out_dir}", flush=True)
     return 0
@@ -117,7 +147,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--namespace", default="or-sim")
     parser.add_argument("--router-url", default="http://127.0.0.1:18080")
     parser.add_argument("--planner", default="ours")
-    parser.add_argument("--steady-seconds", type=float, default=300.0)
+    parser.add_argument("--steady-seconds", type=float, default=150.0)
     parser.add_argument("--transition-timeout-s", type=float, default=1800.0)
     parser.add_argument("--infer-timeout-s", type=float, default=1800.0)
     parser.add_argument("--traffic-poll-s", type=float, default=1.0)
@@ -126,6 +156,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-id", default="")
     parser.add_argument("--stages-json", default="")
     parser.add_argument("--skip-reset", action="store_true")
+    parser.add_argument("--warmup", dest="warmup", action="store_true", default=True)
+    parser.add_argument("--no-warmup", dest="warmup", action="store_false")
+    parser.add_argument("--no-traffic", action="store_true", help="Execute planning/transition only; do not generate requests or steady traffic.")
     return parser.parse_args()
 
 
@@ -137,12 +170,27 @@ def load_stages(args: argparse.Namespace) -> list[dict[str, float]]:
     return stages
 
 
+def slo_for_workload(workload: str) -> dict[str, Any]:
+    key = WORKLOAD_SLO_KEYS.get(workload, workload)
+    if key not in EVALUATION_SLOS:
+        raise KeyError(f"No evaluation SLO registered for workload {workload!r}")
+    return dict(EVALUATION_SLOS[key])
+
+
 def create_arrival_snapshot(namespace: str, epoch: str, source: dict[str, float], target: dict[str, float], planner: str) -> str:
     name = sanitize(epoch)
-    slo = {
-        workload: {"demandRate": target[workload], "latencyMs": REGISTERED_SLO_MS[workload]}
-        for workload in WORKLOADS
-    }
+    slo = {}
+    for workload in WORKLOADS:
+        config = slo_for_workload(workload)
+        row = {
+            "demandRate": target[workload],
+            "requestClass": config["requestClass"],
+            "latencyMs": config["latencyMs"],
+        }
+        if config.get("tpotMs") is not None:
+            row["ttftMs"] = config["latencyMs"]
+            row["tpotMs"] = config["tpotMs"]
+        slo[workload] = row
     body = {
         "apiVersion": "mig.or-sim.io/v1alpha1",
         "kind": "ArrivalSnapshot",
@@ -165,16 +213,17 @@ def create_arrival_snapshot(namespace: str, epoch: str, source: dict[str, float]
             "observedAt": now_rfc3339(),
             "triggerReason": "real_3gpu_continuous_trace",
             "transitionDemandPolicy": "min",
+            "forceReplan": True,
             "profileCatalogRef": "default",
             "currentAllocationRef": "physicalgpuregistry/default",
-            "registeredSLOMs": REGISTERED_SLO_MS,
+            "registeredSLOMs": {workload: slo_for_workload(workload)["latencyMs"] for workload in WORKLOADS},
             "sourceArrival": source,
             "targetArrival": target,
             "slo": slo,
             "placement": {"nodes": ["ampere", "rtx1-worker"]},
         },
     }
-    kubectl_apply(body)
+    kubectl_create(body)
     return name
 
 
@@ -198,10 +247,22 @@ def ensure_empty_cluster(args: argparse.Namespace, run_id: str, out_dir: Path) -
     if args.skip_reset:
         return
     registry = kubectl_json(["get", "physicalgpuregistry", "default", "-n", args.namespace, "-o", "json"])
+    dirty_gpus = dirty_physical_gpus(registry)
+    if dirty_gpus:
+        names = ", ".join(gpu["physicalGpuId"] for gpu in dirty_gpus)
+        print(f"repairing dirty GPUs before reset: {names}", flush=True)
+        for gpu in dirty_gpus:
+            plan_name = create_deep_repair_plan(args.namespace, run_id, gpu)
+            plan = wait_plan(args.namespace, plan_name, timeout_s=args.transition_timeout_s)
+            write_json(out_dir / f"{plan_name}.json", plan)
+            if plan_phase(plan) != "Executed":
+                raise RuntimeError(f"{plan_name} failed: " + str((plan.get("status") or {}).get("message")))
+        registry = kubectl_json(["get", "physicalgpuregistry", "default", "-n", args.namespace, "-o", "json"])
+
     logical_count = int(((registry.get("status") or {}).get("currentAllocation") or {}).get("logicalGpuCount") or 0)
     routes = get_json(args.router_url.rstrip("/") + "/routes")
     route_count = len(routes.get("routes") or [])
-    if logical_count == 0 and route_count == 0:
+    if logical_count == 0 and route_count == 0 and not dirty_physical_gpus(registry):
         print("cluster already empty", flush=True)
         return
     print(f"resetting cluster to empty: logicalGpuCount={logical_count} routeCount={route_count}", flush=True)
@@ -212,6 +273,199 @@ def ensure_empty_cluster(args: argparse.Namespace, run_id: str, out_dir: Path) -
     if plan_phase(plan) != "Executed":
         raise RuntimeError("reset-to-zero plan failed: " + str((plan.get("status") or {}).get("message")))
     cleanup_router_routes(args.router_url.rstrip("/"))
+
+
+def run_warmup(args: argparse.Namespace, run_id: str, out_dir: Path) -> None:
+    if args.skip_reset:
+        print("skipping warm-up because --skip-reset is set", flush=True)
+        return
+    print("\n=== warm-up/prepull: pulling runtime images and initializing runtimes ===", flush=True)
+    registry = kubectl_json(["get", "physicalgpuregistry", "default", "-n", args.namespace, "-o", "json"])
+    nodes = gpu_node_names(registry)
+    if nodes:
+        for node in nodes:
+            for image_kind, image in runtime_warmup_images().items():
+                name = warmup_pod_name(run_id, image_kind, node)
+                create_image_pull_pod(args.namespace, name, node, image)
+                wait_pod_succeeded(args.namespace, name, timeout_s=600.0)
+        write_json(out_dir / "warmup_prepull.json", {"nodes": nodes, "images": runtime_warmup_images()})
+    else:
+        print("warm-up/prepull: no GPU nodes found in registry; skipping image pull pods", flush=True)
+
+    zero = {workload: 0.0 for workload in WORKLOADS}
+    target = dict(zero)
+    target.update({"llama": 0.05, "gpt2": 0.05, "resnet50": 50.0})
+    snapshot = create_arrival_snapshot(args.namespace, f"{run_id}-warmup", zero, target, args.planner)
+    plan = wait_plan(args.namespace, "plan-" + snapshot, timeout_s=args.transition_timeout_s)
+    write_json(out_dir / "warmup_plan.json", plan)
+    write_csv(out_dir / "warmup_runtime_readiness.csv", runtime_readiness_rows(-1, "plan-" + snapshot, plan, phase="warmup"))
+    if plan_phase(plan) != "Executed":
+        raise RuntimeError("warm-up plan failed: " + str((plan.get("status") or {}).get("message")))
+    ensure_empty_cluster(args, f"{run_id}-post-warmup", out_dir)
+
+
+def runtime_warmup_images() -> dict[str, str]:
+    return {
+        "vision": "localhost:10690/migrant-model-runtime:torchvision-profile-20260714a",
+        "gpt2": "localhost:10690/migrant-model-runtime:gpt2-medium-baked-20260714d",
+        "llama": "localhost:10690/migrant-model-runtime:llama32-3b-baked-20260714a",
+    }
+
+
+def warmup_pod_name(run_id: str, image_kind: str, node: str) -> str:
+    digest = hashlib.sha1(f"{run_id}|{image_kind}|{node}".encode("utf-8")).hexdigest()[:10]
+    return sanitize(f"warmup-{image_kind}-{node}-{digest}")
+
+
+def gpu_node_names(registry: dict[str, Any]) -> list[str]:
+    nodes: set[str] = set()
+    for raw in ((registry.get("status") or {}).get("bindings") or {}).values():
+        binding = raw if isinstance(raw, dict) else {}
+        node = str(binding.get("node") or binding.get("nodeName") or "")
+        if node:
+            nodes.add(node)
+    return sorted(nodes)
+
+
+def create_image_pull_pod(namespace: str, name: str, node: str, image: str) -> None:
+    body = {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "app.kubernetes.io/name": "migrant-warmup",
+                "mig.or-sim.io/component": "real-3gpu-k8s-runner",
+            },
+        },
+        "spec": {
+            "restartPolicy": "Never",
+            "nodeSelector": {"kubernetes.io/hostname": node},
+            "tolerations": [{"operator": "Exists"}],
+            "containers": [{
+                "name": "pull",
+                "image": image,
+                "imagePullPolicy": "IfNotPresent",
+                "command": ["sh", "-c", "true"],
+            }],
+        },
+    }
+    kubectl(["delete", "pod", name, "-n", namespace, "--ignore-not-found=true"], check=False)
+    kubectl_create(body)
+
+
+def wait_pod_succeeded(namespace: str, name: str, timeout_s: float) -> None:
+    deadline = time.time() + timeout_s
+    last_phase = ""
+    while time.time() < deadline:
+        pod = kubectl_json(["get", "pod", name, "-n", namespace, "-o", "json"], check=False)
+        if pod:
+            phase = str((pod.get("status") or {}).get("phase") or "")
+            if phase != last_phase:
+                print(f"{name}: phase={phase}", flush=True)
+                last_phase = phase
+            if phase == "Succeeded":
+                return
+            if phase == "Failed":
+                raise RuntimeError(f"warm-up image pull pod {name} failed")
+        time.sleep(2.0)
+    raise TimeoutError(f"timed out waiting for warm-up image pull pod {name}; last phase={last_phase}")
+
+
+def dirty_physical_gpus(registry: dict[str, Any]) -> list[dict[str, Any]]:
+    status = registry.get("status") or {}
+    bindings = (status.get("bindings") or {})
+    dirty = []
+    for physical_id, raw in sorted(bindings.items()):
+        binding = raw if isinstance(raw, dict) else {}
+        state = str(binding.get("state") or "")
+        cleanliness = str(binding.get("cleanliness") or "")
+        has_binding = bool(binding.get("activeLogicalGpuId") or binding.get("pendingLogicalGpuId") or binding.get("logicalBinding"))
+        has_mig = bool(binding.get("migDevices") or binding.get("logicalMigSlots"))
+        has_runtime = bool(binding.get("runtimeBindings"))
+        if state != "available" or cleanliness not in {"", "empty"} or has_binding or has_mig or has_runtime:
+            gpu = dict(binding)
+            gpu["physicalGpuId"] = str(gpu.get("physicalGpuId") or physical_id)
+            dirty.append(gpu)
+    return dirty
+
+
+def create_deep_repair_plan(namespace: str, run_id: str, gpu: dict[str, Any]) -> str:
+    physical_id = str(gpu.get("physicalGpuId") or "")
+    node = str(gpu.get("node") or gpu.get("nodeName") or physical_id.split("-gpu", 1)[0])
+    gpu_index = int(gpu.get("gpuIndex") if gpu.get("gpuIndex") is not None else gpu.get("deviceIndex") or 0)
+    safe_physical = sanitize(physical_id)
+    name = sanitize(f"{run_id}-repair-{safe_physical}-{int(time.time())}")
+    body = {
+        "apiVersion": "mig.or-sim.io/v1alpha1",
+        "kind": "MigActionPlan",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "app.kubernetes.io/name": "migrant-go",
+                "mig.or-sim.io/component": "real-3gpu-k8s-runner",
+                "mig.or-sim.io/plan-type": "repair",
+            },
+        },
+        "spec": {
+            "abstractActions": [],
+            "actionCount": 3,
+            "actionDag": {
+                "format": "migrant.action-dag/v1",
+                "name": name,
+                "nodes": [
+                    {
+                        "id": f"repair-delete-instances-{safe_physical}",
+                        "index": 0,
+                        "phase": 0,
+                        "type": "delete_instance",
+                        "action": repair_action("delete_instance", node, gpu_index, physical_id),
+                    },
+                    {
+                        "id": f"repair-clear-template-{safe_physical}",
+                        "index": 1,
+                        "phase": 1,
+                        "type": "clear_template",
+                        "dependsOn": [f"repair-delete-instances-{safe_physical}"],
+                        "action": repair_action("clear_template", node, gpu_index, physical_id),
+                    },
+                    {
+                        "id": f"repair-return-gpu-{safe_physical}",
+                        "index": 2,
+                        "phase": 2,
+                        "type": "return_gpu",
+                        "dependsOn": [f"repair-clear-template-{safe_physical}"],
+                        "action": repair_action("return_gpu", node, gpu_index, physical_id),
+                    },
+                ],
+            },
+            "currentAllocationRef": "physicalgpuregistries/default",
+            "executor": "go-transition-executor",
+            "phaseGate": "auto",
+            "plannerMetadata": {
+                "planner": "real-3gpu-k8s-runner",
+                "reason": f"Delete residual runtimes and clear {physical_id} before experiment reset",
+            },
+            "summary": {"desiredRuntimes": [], "planType": "repair", "sourceGpuCount": 0, "targetGpuCount": 0},
+            "targetGpuCount": 0,
+        },
+    }
+    kubectl_create(body)
+    return name
+
+
+def repair_action(action_type: str, node: str, gpu_index: int, physical_id: str) -> dict[str, Any]:
+    return {
+        "type": action_type,
+        "abstractAction": "Deep Repair Dirty GPU",
+        "node": node,
+        "gpuIndex": gpu_index,
+        "gpu": physical_id,
+        "physicalGpuId": physical_id,
+        "physical_gpu_id": physical_id,
+    }
 
 
 class TrafficDriver:
@@ -242,6 +496,8 @@ class TrafficDriver:
         self.started = 0.0
         self.carry = {workload: 0.0 for workload in WORKLOADS}
         self.seq = {workload: 0 for workload in WORKLOADS}
+        self.route_lock = threading.Lock()
+        self.active_routes: dict[str, list[dict[str, Any]]] = {}
 
     def start(self) -> None:
         self.started = time.monotonic()
@@ -261,7 +517,7 @@ class TrafficDriver:
 
     def run(self) -> None:
         next_route_sample = time.monotonic()
-        with ThreadPoolExecutor(max_workers=128) as pool:
+        with ThreadPoolExecutor(max_workers=256) as pool:
             futures = []
             cursor = time.monotonic()
             while not self.stop_event.is_set():
@@ -300,6 +556,8 @@ class TrafficDriver:
         self.carry[model] = desired - count
         if count <= 0:
             return []
+        if is_vision_workload(model):
+            return self.schedule_vision_batches(pool, model, count, start, end)
         interval = duration / count
         futures = []
         for idx in range(count):
@@ -320,10 +578,41 @@ class TrafficDriver:
             )
         return futures
 
+    def schedule_vision_batches(self, pool: ThreadPoolExecutor, model: str, logical_count: int, start: float, end: float) -> list[Any]:
+        duration = max(0.0, end - start)
+        batches = vision_batches_for_routes(logical_count, self.routes_for_model(model))
+        if not batches:
+            batches = [logical_count]
+        interval = duration / max(1, len(batches))
+        futures = []
+        for idx, batch_count in enumerate(batches):
+            target_at = start + (idx + 0.5) * interval
+            seq = self.seq.get(model, 0)
+            self.seq[model] = seq + int(batch_count)
+            futures.append(
+                pool.submit(
+                    send_request,
+                    self.router,
+                    self.stage,
+                    self.phase(),
+                    model,
+                    seq,
+                    target_at,
+                    self.infer_timeout_s,
+                    int(batch_count),
+                )
+            )
+        return futures
+
+    def routes_for_model(self, model: str) -> list[dict[str, Any]]:
+        with self.route_lock:
+            return [dict(route) for route in self.active_routes.get(model, [])]
+
     def sample_routes(self, relative_s: float) -> None:
         try:
             routes = get_json(self.router + "/routes", timeout_s=5.0).get("routes") or []
             by_model: dict[str, dict[str, Any]] = {}
+            active_by_model: dict[str, list[dict[str, Any]]] = {}
             sampled_at = time.time()
             input_rates = self.effective_rates()
             for route in routes:
@@ -334,6 +623,7 @@ class TrafficDriver:
                 model = str(route.get("model") or "")
                 if not model:
                     continue
+                active_by_model.setdefault(model, []).append(route)
                 row = by_model.setdefault(
                     model,
                     {
@@ -352,6 +642,8 @@ class TrafficDriver:
                 row["actualServiceRate"] += float(route.get("arrivalRate") or 0.0)
                 row["capacity"] += float(route.get("capacity") or 0.0)
                 row["routeCount"] += 1
+            with self.route_lock:
+                self.active_routes = active_by_model
             self.route_rows.extend(by_model.values())
         except Exception as exc:
             self.route_rows.append(
@@ -371,23 +663,48 @@ class TrafficDriver:
             )
 
 
-def send_request(router: str, stage: str, phase: str, model: str, seq: int, target_at: float, timeout_s: float) -> dict[str, Any]:
+def send_request(router: str, stage: str, phase: str, model: str, seq: int, target_at: float, timeout_s: float, logical_count: int = 1) -> dict[str, Any]:
+    logical_count = max(1, int(logical_count))
     sleep_until(target_at)
     sent = time.time()
     start = time.perf_counter()
-    row = {"stage": stage, "phase": phase, "model": model, "seq": seq, "sentAt": sent, "ok": False, "status": "", "latencyMs": "", "runtimeLatencyMs": "", "error": ""}
+    row = {
+        "stage": stage,
+        "phase": phase,
+        "model": model,
+        "seq": seq,
+        "logicalRequestCount": logical_count,
+        "sentAt": sent,
+        "ok": False,
+        "status": "",
+        "latencyMs": "",
+        "serviceLatencyMs": "",
+        "queueWaitMs": "",
+        "e2eLatencyMs": "",
+        "routerBatchSize": "",
+        "runtimeLatencyMs": "",
+        "ttftMs": "",
+        "tpotMs": "",
+        "error": "",
+    }
     try:
         body: dict[str, Any] = {"benchmark": True, "sentAt": sent}
-        if model == "gpt2":
-            body.update({"prompt_len": 64, "output_tokens": 64, "batch": 1, "requestClass": REQUEST_CLASSES[model]})
-        elif model == "llama":
-            body.update({"prompt_len": 1024, "output_tokens": 128, "batch": 1, "requestClass": REQUEST_CLASSES[model]})
-        elif model == "resnet50":
-            body.update({"requestClass": REQUEST_CLASSES[model]})
+        config = slo_for_workload(model)
+        body.update({"requestClass": config["requestClass"]})
+        if is_vision_workload(model) and logical_count > 1:
+            body.update({"driverBatched": True, "logicalRequestCount": logical_count, "batch": logical_count})
+        if config.get("promptLen") is not None:
+            body.update({"prompt_len": int(config["promptLen"]), "output_tokens": int(config["outputTokens"]), "batch": 1})
         resp = post_json(router + "/infer/" + model, body, timeout_s=timeout_s)
         row["ok"] = True
         row["status"] = 200
         row["runtimeLatencyMs"] = resp.get("runtimeLatencyMs", "")
+        row["serviceLatencyMs"] = first_present(resp, "serviceLatencyMs", "runtimeLatencyMs", "latencyMs")
+        row["queueWaitMs"] = first_present(resp, "queueWaitMs")
+        row["e2eLatencyMs"] = first_present(resp, "e2eLatencyMs")
+        row["routerBatchSize"] = first_present(resp, "routerBatchSize")
+        row["ttftMs"] = first_present(resp, "ttftMs", "ttft_ms", "runtimeTtftMs")
+        row["tpotMs"] = first_present(resp, "tpotMs", "tpot_ms", "runtimeTpotMs")
     except urllib.error.HTTPError as exc:
         row["status"] = exc.code
         row["error"] = str(exc)
@@ -395,6 +712,64 @@ def send_request(router: str, stage: str, phase: str, model: str, seq: int, targ
         row["error"] = str(exc)
     row["latencyMs"] = round((time.perf_counter() - start) * 1000.0, 6)
     return row
+
+
+def is_vision_workload(model: str) -> bool:
+    return model in {"resnet50", "vgg16", "vit_base", "resnet50_image", "vgg16_image", "vit_base_image"} or str(model).endswith("_image")
+
+
+def vision_batches_for_routes(logical_count: int, routes: list[dict[str, Any]]) -> list[int]:
+    logical_count = max(0, int(logical_count))
+    if logical_count <= 0:
+        return []
+    active = [route for route in routes if route.get("active") and route.get("acceptingNew") and not route.get("draining")]
+    if not active:
+        raise RuntimeError("vision workload has demand but no active route with real batch metadata")
+    weights = []
+    for route in active:
+        weight = optional_float(route.get("capacity"))
+        if weight is None or weight <= 0:
+            weight = optional_float(route.get("weight"))
+        if weight is None or weight <= 0:
+            weight = 1.0
+        batch = int(optional_float(route.get("driverBatchSize")) or optional_float(route.get("batchSize")) or 0)
+        if batch <= 0:
+            raise RuntimeError(
+                "vision route is missing a real batch size: "
+                f"runtimeId={route.get('runtimeId')} model={route.get('model')} "
+                f"batchSize={route.get('batchSize')} driverBatchSize={route.get('driverBatchSize')}"
+            )
+        weights.append({"weight": weight, "batch": max(1, batch)})
+    total_weight = sum(item["weight"] for item in weights)
+    remaining = logical_count
+    assigned = []
+    fractions = []
+    for idx, item in enumerate(weights):
+        exact = logical_count * item["weight"] / total_weight if total_weight > 0 else logical_count / len(weights)
+        whole = int(math.floor(exact))
+        assigned.append(whole)
+        remaining -= whole
+        fractions.append((exact - whole, idx))
+    for _, idx in sorted(fractions, reverse=True):
+        if remaining <= 0:
+            break
+        assigned[idx] += 1
+        remaining -= 1
+    batches: list[int] = []
+    for count, item in zip(assigned, weights, strict=False):
+        batches.extend(chunk_count(count, item["batch"]))
+    return batches
+
+
+def chunk_count(count: int, chunk_size: int) -> list[int]:
+    count = max(0, int(count))
+    chunk_size = max(1, int(chunk_size))
+    out = []
+    while count > 0:
+        take = min(chunk_size, count)
+        out.append(take)
+        count -= take
+    return out
 
 
 def p95_slo_metrics_for_stage(
@@ -406,7 +781,7 @@ def p95_slo_metrics_for_stage(
 ) -> dict[str, Any]:
     window_start = parse_rfc3339_seconds(transition_started_at)
     window_end = parse_rfc3339_seconds(transition_finished_at)
-    by_model_bucket: dict[str, dict[int, list[float]]] = {model: {} for model in WORKLOADS}
+    by_model_bucket: dict[str, dict[int, dict[str, list[float]]]] = {model: {} for model in WORKLOADS}
     for row in request_rows:
         if row.get("stage") != stage or row.get("phase") != "transition":
             continue
@@ -415,7 +790,7 @@ def p95_slo_metrics_for_stage(
             continue
         try:
             sent_at = float(row.get("sentAt"))
-            latency = float(row.get("latencyMs"))
+            latency = float(first_present(row, "serviceLatencyMs", "latencyMs"))
         except (TypeError, ValueError):
             continue
         if window_start is not None and sent_at < window_start:
@@ -423,20 +798,53 @@ def p95_slo_metrics_for_stage(
         if window_end is not None and sent_at > window_end:
             continue
         bucket = int(math.floor(sent_at / bucket_seconds))
-        by_model_bucket[model].setdefault(bucket, []).append(latency)
+        metrics = by_model_bucket[model].setdefault(bucket, {"latency": [], "ttft": [], "tpot": []})
+        logical_count = logical_request_count(row)
+        metrics["latency"].extend([latency] * logical_count)
+        ttft = optional_float(row.get("ttftMs"))
+        tpot = optional_float(row.get("tpotMs"))
+        config = slo_for_workload(model)
+        if ttft is not None:
+            metrics["ttft"].extend([ttft] * logical_count)
+        elif config.get("tpotMs") is not None:
+            metrics["ttft"].extend([latency] * logical_count)
+        if tpot is not None:
+            metrics["tpot"].extend([tpot] * logical_count)
 
     intervals: list[tuple[float, float]] = []
     by_model: dict[str, Any] = {}
     for model, buckets in by_model_bucket.items():
-        slo_ms = REGISTERED_SLO_MS[model]
+        config = slo_for_workload(model)
+        latency_slo_ms = float(config["latencyMs"])
+        tpot_slo_ms = config.get("tpotMs")
         violating = []
         p95_values = []
+        ttft_p95_values = []
+        tpot_p95_values = []
+        epoch_latency_values: list[float] = []
+        epoch_ttft_values: list[float] = []
+        epoch_tpot_values: list[float] = []
         request_count = 0
-        for bucket, values in sorted(buckets.items()):
-            request_count += len(values)
-            p95 = percentile(values, 95.0)
-            p95_values.append(p95)
-            if p95 > slo_ms:
+        for bucket, metric_values in sorted(buckets.items()):
+            latency_values = metric_values.get("latency") or []
+            ttft_values = metric_values.get("ttft") or []
+            tpot_values = metric_values.get("tpot") or []
+            request_count += len(latency_values)
+            epoch_latency_values.extend(latency_values)
+            epoch_ttft_values.extend(ttft_values)
+            epoch_tpot_values.extend(tpot_values)
+            latency_p95 = percentile(latency_values, 95.0) if latency_values else 0.0
+            ttft_p95 = percentile(ttft_values, 95.0) if ttft_values else 0.0
+            tpot_p95 = percentile(tpot_values, 95.0) if tpot_values else 0.0
+            p95_values.append(latency_p95)
+            if ttft_values:
+                ttft_p95_values.append(ttft_p95)
+            if tpot_values:
+                tpot_p95_values.append(tpot_p95)
+            latency_violated = latency_p95 > latency_slo_ms
+            ttft_violated = bool(ttft_values) and ttft_p95 > latency_slo_ms
+            tpot_violated = tpot_slo_ms is not None and bool(tpot_values) and tpot_p95 > float(tpot_slo_ms)
+            if latency_violated or ttft_violated or tpot_violated:
                 start = bucket * bucket_seconds
                 end = start + bucket_seconds
                 clipped_start = max(start, window_start) if window_start is not None else start
@@ -447,27 +855,130 @@ def p95_slo_metrics_for_stage(
                 violating.append({
                     "bucketStart": round(clipped_start, 6),
                     "bucketEnd": round(clipped_end, 6),
-                    "p95LatencyMs": round(p95, 3),
-                    "requestCount": len(values),
+                    "p95LatencyMs": round(latency_p95, 3),
+                    "p95TtftMs": round(ttft_p95, 3) if ttft_values else "",
+                    "p95TpotMs": round(tpot_p95, 3) if tpot_values else "",
+                    "latencyViolated": latency_violated,
+                    "ttftViolated": ttft_violated,
+                    "tpotViolated": tpot_violated,
+                    "requestCount": len(latency_values),
                 })
+        epoch_latency_p95 = percentile(epoch_latency_values, 95.0) if epoch_latency_values else 0.0
+        epoch_ttft_p95 = percentile(epoch_ttft_values, 95.0) if epoch_ttft_values else 0.0
+        epoch_tpot_p95 = percentile(epoch_tpot_values, 95.0) if epoch_tpot_values else 0.0
+        epoch_latency_violated = bool(epoch_latency_values) and epoch_latency_p95 > latency_slo_ms
+        epoch_ttft_violated = bool(epoch_ttft_values) and epoch_ttft_p95 > latency_slo_ms
+        epoch_tpot_violated = tpot_slo_ms is not None and bool(epoch_tpot_values) and epoch_tpot_p95 > float(tpot_slo_ms)
+        epoch_p95_violated = epoch_latency_violated or epoch_ttft_violated or epoch_tpot_violated
         by_model[model] = {
-            "latencySLOMs": slo_ms,
+            "latencySLOMs": latency_slo_ms,
+            "requestClass": config["requestClass"],
+            "ttftSLOMs": latency_slo_ms if config.get("tpotMs") is not None else None,
+            "tpotSLOMs": tpot_slo_ms,
             "bucketSeconds": bucket_seconds,
             "requestCount": request_count,
             "bucketCount": len(buckets),
             "violatingBucketCount": len(violating),
             "p95SLOViolationSeconds": round(union_seconds([(float(v["bucketStart"]), float(v["bucketEnd"])) for v in violating]), 6),
             "maxBucketP95LatencyMs": round(max(p95_values), 3) if p95_values else 0.0,
+            "maxBucketP95TtftMs": round(max(ttft_p95_values), 3) if ttft_p95_values else 0.0,
+            "maxBucketP95TpotMs": round(max(tpot_p95_values), 3) if tpot_p95_values else 0.0,
+            "epochP95LatencyMs": round(epoch_latency_p95, 3) if epoch_latency_values else 0.0,
+            "epochP95TtftMs": round(epoch_ttft_p95, 3) if epoch_ttft_values else 0.0,
+            "epochP95TpotMs": round(epoch_tpot_p95, 3) if epoch_tpot_values else 0.0,
+            "epochP95Violated": epoch_p95_violated,
+            "epochP95LatencyViolated": epoch_latency_violated,
+            "epochP95TtftViolated": epoch_ttft_violated,
+            "epochP95TpotViolated": epoch_tpot_violated,
             "violatingBuckets": violating[:20],
             "truncatedViolatingBuckets": max(0, len(violating) - 20),
         }
 
-    return {
+    out = {
         "sloViolationDurationSec": round(union_seconds(intervals), 6),
         "sloViolationP95BucketSec": round(union_seconds(intervals), 6),
         "sloP95BucketSeconds": bucket_seconds,
         "sloP95ByModel": json.dumps(by_model, sort_keys=True, separators=(",", ":")),
     }
+    out.update(request_slo_metrics_for_stage(stage, request_rows, transition_started_at, transition_finished_at))
+    return out
+
+
+def request_slo_metrics_for_stage(
+    stage: str,
+    request_rows: list[dict[str, Any]],
+    transition_started_at: Any = None,
+    transition_finished_at: Any = None,
+) -> dict[str, Any]:
+    window_start = parse_rfc3339_seconds(transition_started_at)
+    window_end = parse_rfc3339_seconds(transition_finished_at)
+    by_model: dict[str, dict[str, Any]] = {
+        model: {"requestCount": 0, "violationCount": 0, "errorCount": 0}
+        for model in WORKLOADS
+    }
+    total = 0
+    violated = 0
+    errors = 0
+    for row in request_rows:
+        if row.get("stage") != stage or row.get("phase") != "transition":
+            continue
+        model = str(row.get("model") or "")
+        if model not in by_model:
+            continue
+        try:
+            sent_at = float(row.get("sentAt"))
+        except (TypeError, ValueError):
+            continue
+        if window_start is not None and sent_at < window_start:
+            continue
+        if window_end is not None and sent_at > window_end:
+            continue
+        logical_count = logical_request_count(row)
+        failed = not bool(row.get("ok")) or str(row.get("status") or "") not in {"", "200"}
+        is_violation = request_violates_slo(model, row) or failed
+        by_model[model]["requestCount"] += logical_count
+        total += logical_count
+        if failed:
+            by_model[model]["errorCount"] += logical_count
+            errors += logical_count
+        if is_violation:
+            by_model[model]["violationCount"] += logical_count
+            violated += logical_count
+
+    for model, stats in by_model.items():
+        count = int(stats["requestCount"])
+        stats["violationRate"] = round(float(stats["violationCount"]) / count, 6) if count else 0.0
+        stats["latencySLOMs"] = slo_for_workload(model)["latencyMs"]
+        stats["tpotSLOMs"] = slo_for_workload(model).get("tpotMs")
+    return {
+        "sloTransitionRequestCount": total,
+        "sloViolationRequestCount": violated,
+        "sloRequestErrorCount": errors,
+        "sloViolationRate": round(float(violated) / total, 6) if total else 0.0,
+        "sloViolationRateByModel": json.dumps(by_model, sort_keys=True, separators=(",", ":")),
+    }
+
+
+def request_violates_slo(model: str, row: dict[str, Any]) -> bool:
+    config = slo_for_workload(model)
+    latency_slo_ms = float(config["latencyMs"])
+    tpot_slo_ms = config.get("tpotMs")
+    service_latency = optional_float(first_present(row, "serviceLatencyMs", "latencyMs"))
+    ttft = optional_float(first_present(row, "ttftMs", "ttft_ms", "runtimeTtftMs"))
+    tpot = optional_float(first_present(row, "tpotMs", "tpot_ms", "runtimeTpotMs"))
+    if tpot_slo_ms is None:
+        return service_latency is not None and service_latency > latency_slo_ms
+    ttft_value = ttft if ttft is not None else service_latency
+    ttft_bad = ttft_value is not None and ttft_value > latency_slo_ms
+    tpot_bad = tpot is not None and tpot > float(tpot_slo_ms)
+    return bool(ttft_bad or tpot_bad)
+
+
+def logical_request_count(row: dict[str, Any]) -> int:
+    try:
+        return max(1, int(float(row.get("logicalRequestCount") or 1)))
+    except (TypeError, ValueError):
+        return 1
 
 
 def percentile(values: list[float], pct: float) -> float:
@@ -476,6 +987,23 @@ def percentile(values: list[float], pct: float) -> float:
     ordered = sorted(values)
     rank = max(0, min(len(ordered) - 1, math.ceil((pct / 100.0) * len(ordered)) - 1))
     return ordered[rank]
+
+
+def optional_float(value: Any) -> float | None:
+    try:
+        if value in ("", None):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def first_present(row: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        value = row.get(key)
+        if value not in ("", None):
+            return value
+    return ""
 
 
 def union_seconds(intervals: list[tuple[float, float]]) -> float:
@@ -497,6 +1025,14 @@ def transition_metric_row(epoch: int, plan_name: str, plan: dict[str, Any]) -> d
     summary = spec.get("summary") or {}
     execution = status.get("transitionExecution") or {}
     metrics = execution.get("metrics") or {}
+    action_summary = metrics.get("actionSummary") or {}
+    dag_node_count = spec.get("actionCount")
+    pod_create_count = int(action_summary.get("createdInstanceCount") or 0)
+    pod_delete_count = int(action_summary.get("deletedInstanceCount") or 0)
+    mig_reconfig_op_count = int(action_summary.get("reconfigurationNodes") or 0)
+    mig_partition_create_count = int(action_summary.get("createdMIGSlotCount") or 0)
+    mig_partition_delete_count = int(action_summary.get("deletedMIGSlotCount") or 0)
+    physical_action_count = pod_create_count + pod_delete_count + mig_reconfig_op_count
     router_slo = metrics.get("routerSLO") or metrics.get("routerMonitorFinal") or metrics.get("routerMonitor") or {}
     slo_models = router_slo.get("models") or {}
     violation_excess = sum(
@@ -525,7 +1061,14 @@ def transition_metric_row(epoch: int, plan_name: str, plan: dict[str, Any]) -> d
         "plan": plan_name,
         "phase": status.get("phase"),
         "message": status.get("message"),
-        "actionCount": spec.get("actionCount"),
+        "actionCount": physical_action_count,
+        "physicalActionCount": physical_action_count,
+        "dagNodeCount": dag_node_count,
+        "podCreateCount": pod_create_count,
+        "podDeleteCount": pod_delete_count,
+        "migReconfigOpCount": mig_reconfig_op_count,
+        "migPartitionCreateCount": mig_partition_create_count,
+        "migPartitionDeleteCount": mig_partition_delete_count,
         "sourceGpuCount": summary.get("sourceGpuCount"),
         "targetGpuCount": summary.get("targetGpuCount"),
         "planner": summary.get("planner"),
@@ -584,6 +1127,53 @@ def action_status_rows(epoch: int, plan_name: str, plan: dict[str, Any]) -> list
     for action in (plan.get("status") or {}).get("actionStatuses") or []:
         if isinstance(action, dict):
             rows.append({"epoch": epoch, "plan": plan_name, **action})
+    return rows
+
+
+def runtime_readiness_rows(epoch: int, plan_name: str, plan: dict[str, Any], phase: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for action in (plan.get("status") or {}).get("actionStatuses") or []:
+        if not isinstance(action, dict):
+            continue
+        readiness = action.get("runtimeReadiness") or {}
+        if not isinstance(readiness, dict):
+            continue
+        durations = action.get("durationsSeconds") or {}
+        for runtime_id, raw in readiness.items():
+            item = raw if isinstance(raw, dict) else {}
+            row = {
+                "phase": phase,
+                "epoch": epoch,
+                "plan": plan_name,
+                "actionId": action.get("id"),
+                "actionType": action.get("type"),
+                "runtimeId": runtime_id,
+                "model": item.get("model"),
+                "node": item.get("node"),
+                "gpu": item.get("gpu"),
+                "profile": item.get("profile"),
+                "slotResource": item.get("slotResource"),
+                "deviceResource": item.get("deviceResource"),
+                "hostPort": item.get("hostPort"),
+                "pod": item.get("pod"),
+                "containerReady": item.get("containerReady"),
+                "runtimeReadyAndCUDAVerifySec": durations.get("runtimeReadyAndCUDAVerify"),
+                "podCreatedSinceDeploymentSec": item.get("podCreatedAtSinceDeploymentSeconds"),
+                "podScheduledSinceDeploymentSec": item.get("podScheduledAtSinceDeploymentSeconds"),
+                "podStartSinceDeploymentSec": item.get("podStartTimeSinceDeploymentSeconds"),
+                "containerStartedSinceDeploymentSec": item.get("containerStartedAtSinceDeploymentSeconds"),
+                "healthReadySinceDeploymentSec": item.get("healthReadyAtSinceDeploymentSeconds"),
+                "cudaProcessFoundSinceDeploymentSec": item.get("cudaProcessFoundAtSinceDeploymentSeconds"),
+                "healthModelId": item.get("healthModelId"),
+                "healthRuntimeMode": item.get("healthRuntimeMode"),
+                "healthDevice": item.get("healthDevice"),
+                "healthLoaded": item.get("healthLoaded"),
+            }
+            load_timings = item.get("loadTimings") if isinstance(item.get("loadTimings"), dict) else {}
+            for key, value in load_timings.items():
+                row[f"loadTiming_{key}"] = value
+            row["runtimeWaitSec"] = first_present(row, "cudaProcessFoundSinceDeploymentSec", "healthReadySinceDeploymentSec", "containerStartedSinceDeploymentSec")
+            rows.append(row)
     return rows
 
 
@@ -728,6 +1318,7 @@ def write_outputs(
     routes: list[dict[str, Any]],
     transitions: list[dict[str, Any]],
     actions: list[dict[str, Any]],
+    readiness: list[dict[str, Any]],
     gpu: list[dict[str, Any]],
     allocations: list[dict[str, Any]],
     failures: list[dict[str, Any]],
@@ -737,6 +1328,7 @@ def write_outputs(
     write_csv(out_dir / "service_rate_samples.csv", routes)
     write_csv(out_dir / "transition_metrics.csv", transitions)
     write_csv(out_dir / "action_statuses.csv", actions)
+    write_csv(out_dir / "runtime_readiness.csv", readiness)
     write_csv(out_dir / "gpu_counts.csv", gpu)
     write_csv(out_dir / "allocation_similarity.csv", allocation_similarity_rows(allocations))
     write_json(out_dir / "target_allocations.json", allocations)
@@ -792,6 +1384,15 @@ def kubectl_apply(body: dict[str, Any]) -> None:
     proc = subprocess.run(["kubectl", "apply", "-f", "-"], input=json.dumps(body), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if proc.returncode != 0:
         raise RuntimeError(f"kubectl apply failed: {proc.stderr.strip()}")
+    print(proc.stdout.strip(), flush=True)
+
+
+def kubectl_create(body: dict[str, Any]) -> None:
+    proc = subprocess.run(["kubectl", "create", "-f", "-"], input=json.dumps(body), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if proc.returncode != 0:
+        name = ((body.get("metadata") or {}).get("name") or "").strip()
+        hint = f" Object {name!r} already exists; choose a fresh --run-id." if "AlreadyExists" in proc.stderr else ""
+        raise RuntimeError(f"kubectl create failed: {proc.stderr.strip()}{hint}")
     print(proc.stdout.strip(), flush=True)
 
 
@@ -853,10 +1454,10 @@ def plan_phase(plan: dict[str, Any]) -> str:
 
 
 def sanitize(value: str) -> str:
-    out = []
-    for ch in value.lower():
-        out.append(ch if ch.isalnum() or ch == "-" else "-")
-    return "".join(out).strip("-")[:63]
+	out = []
+	for ch in value.lower():
+		out.append(ch if ch.isalnum() or ch == "-" else "-")
+	return "".join(out).strip("-")[:63].strip("-")
 
 
 def now_rfc3339() -> str:

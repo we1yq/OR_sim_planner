@@ -1,0 +1,21 @@
+apiVersion: mig.or-sim.io/v1alpha1
+kind: WorkloadRequest
+metadata:
+  name: llama_p2048_o64
+  namespace: or-sim
+spec:
+  model: llama
+  modelKey: llama
+  placementGroup: llama
+  family: llm
+  arrivalRate: 0
+  requestClass: p2048/o64
+  allowedBatches:
+  - 1
+  priority: normal
+  slo:
+    ttftMs: 250.0
+    tpotMs: 35.0
+  requestShape:
+    promptLen: 2048
+    outputTokens: 64

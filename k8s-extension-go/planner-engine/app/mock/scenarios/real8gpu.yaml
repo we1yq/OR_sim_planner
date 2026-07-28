@@ -1,0 +1,52 @@
+name: real8gpu
+description: 8GPU 24h trace fixture with class-level LLM request workloads.
+policyRef: ../policies/migrant-default.yaml
+migRulesRef: ../mig-rules/a100-40gb.yaml
+sourceStateRef: ../gpu-states/migrant-empty-9-a100.yaml
+targetStateRef: target0
+workloadOrder:
+- resnet50_image
+- vgg16_image
+- vit_base_image
+- gpt2_p64_o64
+- gpt2_p512_o512
+- llama_p1024_o128
+- llama_p2048_o64
+workloadRefs:
+  resnet50_image: ../../manifests/examples/workloadrequests/resnet50_image.yaml
+  vgg16_image: ../../manifests/examples/workloadrequests/vgg16_image.yaml
+  vit_base_image: ../../manifests/examples/workloadrequests/vit_base_image.yaml
+  gpt2_p64_o64: ../../manifests/examples/workloadrequests/gpt2_p64_o64.yaml
+  gpt2_p512_o512: ../../manifests/examples/workloadrequests/gpt2_p512_o512.yaml
+  llama_p1024_o128: ../../manifests/examples/workloadrequests/llama_p1024_o128.yaml
+  llama_p2048_o64: ../../manifests/examples/workloadrequests/llama_p2048_o64.yaml
+profileCatalogRefs:
+  resnet50_image: ../profile-catalogs/resnet50_image.yaml
+  vgg16_image: ../profile-catalogs/vgg16_image.yaml
+  vit_base_image: ../profile-catalogs/vit_base_image.yaml
+  gpt2_p64_o64: ../profile-catalogs/gpt2_p64_o64.yaml
+  gpt2_p512_o512: ../profile-catalogs/gpt2_p512_o512.yaml
+  llama_p1024_o128: ../profile-catalogs/llama_p1024_o128.yaml
+  llama_p2048_o64: ../profile-catalogs/llama_p2048_o64.yaml
+sourceArrival:
+  resnet50_image: 0
+  vgg16_image: 0
+  vit_base_image: 0
+  gpt2_p64_o64: 0
+  gpt2_p512_o512: 0
+  llama_p1024_o128: 0
+  llama_p2048_o64: 0
+targetArrival:
+  resnet50_image: 0
+  vgg16_image: 0
+  vit_base_image: 0
+  gpt2_p64_o64: 0
+  gpt2_p512_o512: 0
+  llama_p1024_o128: 0
+  llama_p2048_o64: 0
+transition:
+  from: source0
+  to: target0
+  kind: continuous_trace
+  notes:
+  - ArrivalSnapshot overrides sourceArrival and targetArrival each epoch.

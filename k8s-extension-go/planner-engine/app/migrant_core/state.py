@@ -25,6 +25,10 @@ class MigInstance:
     batch: int | None = None
     model_key: str | None = None
     placement_group: str | None = None
+    runtime_model: str | None = None
+    request_class: str | None = None
+    prompt_len: int | None = None
+    output_tokens: int | None = None
     mu: float = 0.0
     preserved: bool = False
 
@@ -103,6 +107,10 @@ def copy_inst_payload(dst_inst: MigInstance, src_inst: MigInstance | None) -> No
         dst_inst.batch = None
         dst_inst.model_key = None
         dst_inst.placement_group = None
+        dst_inst.runtime_model = None
+        dst_inst.request_class = None
+        dst_inst.prompt_len = None
+        dst_inst.output_tokens = None
         dst_inst.mu = 0.0
         dst_inst.preserved = False
         return
@@ -110,6 +118,10 @@ def copy_inst_payload(dst_inst: MigInstance, src_inst: MigInstance | None) -> No
     dst_inst.batch = src_inst.batch
     dst_inst.model_key = src_inst.model_key
     dst_inst.placement_group = src_inst.placement_group
+    dst_inst.runtime_model = src_inst.runtime_model
+    dst_inst.request_class = src_inst.request_class
+    dst_inst.prompt_len = src_inst.prompt_len
+    dst_inst.output_tokens = src_inst.output_tokens
     dst_inst.mu = float(src_inst.mu)
     dst_inst.preserved = bool(getattr(src_inst, "preserved", False))
 

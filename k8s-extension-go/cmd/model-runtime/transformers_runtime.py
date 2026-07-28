@@ -38,8 +38,8 @@ class RuntimeState:
         self.model_id = env("MODEL_ID", MODEL_ALIASES.get(self.model_name, self.model_name))
         self.runtime_id = env("OR_SIM_RUNTIME_ID", self.model_name)
         self.batch_size = env_int("BATCH_SIZE", 1)
-        self.prompt_len = env_int("PROMPT_LEN", 64)
-        self.output_tokens = env_int("OUTPUT_TOKENS", 64)
+        self.prompt_len = env_positive_int("PROMPT_LEN", 64)
+        self.output_tokens = env_positive_int("OUTPUT_TOKENS", 64)
         self.dtype_name = env("MODEL_DTYPE", "float16")
         self.warmup_iters = env_int("LLM_WARMUP_ITERS", 1)
         self.started_at = time.time()
@@ -54,33 +54,54 @@ class RuntimeState:
         self.last_service_ms = 0.0
         self.device = "cuda" if torch is not None and torch.cuda.is_available() else "cpu"
         self.load_error = ""
+        self.load_timings: dict[str, float] = {}
         self.tokenizer = None
         self.model = None
         self.prompt_input_ids = None
         self.load_model()
 
     def load_model(self) -> None:
+        total_started = time.perf_counter()
         if IMPORT_ERROR:
             self.load_error = IMPORT_ERROR
+            self.load_timings["totalLoadSec"] = time.perf_counter() - total_started
             return
         try:
             token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
             dtype = self.resolve_dtype()
+            self.load_timings["startToLoadModelSec"] = time.time() - self.started_at
+            started = time.perf_counter()
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, token=token)
+            self.load_timings["tokenizerFromPretrainedSec"] = time.perf_counter() - started
             if self.tokenizer.pad_token_id is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
             kwargs: dict[str, Any] = {"token": token}
             if self.device == "cuda":
                 kwargs["torch_dtype"] = dtype
                 kwargs["device_map"] = "cuda"
+            started = time.perf_counter()
             self.model = AutoModelForCausalLM.from_pretrained(self.model_id, **kwargs)
+            self.load_timings["modelFromPretrainedSec"] = time.perf_counter() - started
+            started = time.perf_counter()
             self.model.eval()
             if self.device != "cuda":
                 self.model.to(self.device)
+            if self.device == "cuda":
+                torch.cuda.synchronize()
+            self.load_timings["modelEvalAndDeviceSyncSec"] = time.perf_counter() - started
+            started = time.perf_counter()
             self.prompt_input_ids = self.make_prompt(self.prompt_len, self.batch_size)
+            if self.device == "cuda":
+                torch.cuda.synchronize()
+            self.load_timings["promptBuildSec"] = time.perf_counter() - started
+            started = time.perf_counter()
             self.warmup()
+            self.load_timings["warmupSec"] = time.perf_counter() - started
         except Exception as exc:
             self.load_error = str(exc)
+        finally:
+            self.load_timings["totalLoadSec"] = time.perf_counter() - total_started
+            self.load_timings["loadedAtSinceStartSec"] = time.time() - self.started_at
 
     def resolve_dtype(self):
         if self.dtype_name.lower() in {"bfloat16", "bf16"}:
@@ -230,6 +251,7 @@ class RuntimeState:
                 "lastTtftMs": self.last_ttft_ms,
                 "lastTpotMs": self.last_tpot_ms,
                 "lastRuntimeLatencyMs": self.last_service_ms,
+                "loadTimings": dict(self.load_timings),
                 "migUuid": os.environ.get("OR_SIM_MIG_UUID", ""),
                 "slotResource": os.environ.get("OR_SIM_SLOT_RESOURCE", ""),
                 "deviceResource": os.environ.get("OR_SIM_DEVICE_RESOURCE", ""),
@@ -286,6 +308,11 @@ def env_int(key: str, fallback: int) -> int:
         return int(os.environ.get(key, ""))
     except ValueError:
         return fallback
+
+
+def env_positive_int(key: str, fallback: int) -> int:
+    value = env_int(key, fallback)
+    return value if value > 0 else fallback
 
 
 def int_value(value: Any, fallback: int) -> int:

@@ -161,6 +161,16 @@ spec:
               value: http://runtime-router:8080
             - name: MODEL_RUNTIME_IMAGE
               value: localhost:10690/migrant-model-runtime:go
+            - name: RUNTIME_TERMINATION_GRACE_SECONDS
+              value: "2"
+            - name: VISION_MODEL_RUNTIME_IMAGE
+              value: localhost:10690/migrant-model-runtime:torchvision-20260602
+            - name: VISION_RUNTIME_MODE
+              value: torchvision
+            - name: LLM_MODEL_RUNTIME_IMAGE
+              value: localhost:10690/migrant-model-runtime:llm-transformers-20260622
+            - name: LLM_RUNTIME_MODE
+              value: transformers
           ports:
             - containerPort: 8080
           readinessProbe:

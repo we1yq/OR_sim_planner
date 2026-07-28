@@ -124,6 +124,62 @@ func TestLogicalThreeGSlotMatchesPhysicalResource(t *testing.T) {
 	}
 }
 
+func TestValidatePhysicalAcquireLifecycleRejectsDuplicateAcquire(t *testing.T) {
+	actions := []actionNode{
+		{
+			ID:   "a0000_allocate_bridge",
+			Type: "allocate_gpu",
+			Action: map[string]any{
+				"type":            "allocate_gpu",
+				"physical_gpu_id": "ampere-gpu0",
+			},
+		},
+		{
+			ID:   "a0001_allocate_temp",
+			Type: "allocate_gpu",
+			Action: map[string]any{
+				"type":            "allocate_gpu",
+				"physical_gpu_id": "ampere-gpu0",
+			},
+		},
+	}
+	if err := validatePhysicalAcquireLifecycle(actions); err == nil {
+		t.Fatal("duplicate physical GPU acquire before return_gpu must be rejected")
+	}
+}
+
+func TestValidatePhysicalAcquireLifecycleAllowsReuseAfterReturn(t *testing.T) {
+	actions := []actionNode{
+		{
+			ID:   "a0000_allocate_temp",
+			Type: "allocate_gpu",
+			Action: map[string]any{
+				"type":            "allocate_gpu",
+				"physical_gpu_id": "ampere-gpu0",
+			},
+		},
+		{
+			ID:   "a0001_return_temp",
+			Type: "return_gpu",
+			Action: map[string]any{
+				"type":            "return_gpu",
+				"physical_gpu_id": "ampere-gpu0",
+			},
+		},
+		{
+			ID:   "a0002_allocate_later",
+			Type: "allocate_gpu",
+			Action: map[string]any{
+				"type":            "allocate_gpu",
+				"physical_gpu_id": "ampere-gpu0",
+			},
+		},
+	}
+	if err := validatePhysicalAcquireLifecycle(actions); err != nil {
+		t.Fatalf("reuse after return_gpu should be allowed: %v", err)
+	}
+}
+
 func TestParseGPUUUIDFromNvidiaSMIL(t *testing.T) {
 	out := `GPU 0: NVIDIA A100-PCIE-40GB (UUID: GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac)
   MIG 1g.5gb      Device  0: (UUID: MIG-a9aaa9b9-3415-5b83-baab-d52b391db3ac)

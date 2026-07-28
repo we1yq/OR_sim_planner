@@ -57,7 +57,16 @@ def extract_instance_demands_from_milp(
     if missing_opt_idxs:
         raise ValueError(f"Option dataframe is missing x_sol opt_idx values: {missing_opt_idxs}")
 
-    agg = defaultdict(lambda: {"count": 0, "mu": None, "modelKey": None, "placementGroup": None})
+    agg = defaultdict(lambda: {
+        "count": 0,
+        "mu": None,
+        "modelKey": None,
+        "placementGroup": None,
+        "runtimeModel": None,
+        "requestClass": None,
+        "promptLen": None,
+        "outputTokens": None,
+    })
     for _, row in chosen.iterrows():
         opt_idx = int(row["opt_idx"])
         cnt = int(x_sol.get(opt_idx, 0))
@@ -70,6 +79,15 @@ def extract_instance_demands_from_milp(
         agg[key]["placementGroup"] = str(
             row.get("placementGroup") or row.get("modelKey") or row["workload"]
         )
+        agg[key]["runtimeModel"] = str(row.get("runtimeModel") or row["workload"])
+        if row.get("requestClass") is not None:
+            agg[key]["requestClass"] = str(row.get("requestClass"))
+        shape = row.get("requestShape")
+        if isinstance(shape, dict):
+            if shape.get("promptLen") is not None:
+                agg[key]["promptLen"] = int(shape["promptLen"])
+            if shape.get("outputTokens") is not None:
+                agg[key]["outputTokens"] = int(shape["outputTokens"])
 
     out = []
     for (workload, profile, batch), info in sorted(agg.items()):
@@ -78,6 +96,10 @@ def extract_instance_demands_from_milp(
                 "workload": workload,
                 "modelKey": info.get("modelKey") or workload,
                 "placementGroup": info.get("placementGroup") or info.get("modelKey") or workload,
+                "runtimeModel": info.get("runtimeModel") or workload,
+                "requestClass": info.get("requestClass"),
+                "promptLen": info.get("promptLen"),
+                "outputTokens": info.get("outputTokens"),
                 "profile": profile,
                 "batch": int(batch),
                 "count": int(info["count"]),
@@ -139,6 +161,10 @@ def _expand_demands_with_ids(instance_demands: list[dict[str, Any]]) -> list[dic
                         or demand.get("modelKey")
                         or demand["workload"]
                     ),
+                    "runtimeModel": demand.get("runtimeModel") or demand["workload"],
+                    "requestClass": demand.get("requestClass"),
+                    "promptLen": demand.get("promptLen"),
+                    "outputTokens": demand.get("outputTokens"),
                     "profile": demand["profile"],
                     "batch": int(demand["batch"]),
                     "mu": float(demand["mu"]),

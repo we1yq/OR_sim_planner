@@ -263,7 +263,7 @@ def _normalized_instance_rows(gpu: GPUState, slice_count: int = 7) -> tuple:
         start = int(inst.start)
         end = int(inst.end)
         if start > cur:
-            rows.append((cur, start, "void", None, None, None, None))
+            rows.append((cur, start, "void", None, None, None, None, None, None, None, None))
         rows.append(
             (
                 start,
@@ -272,12 +272,16 @@ def _normalized_instance_rows(gpu: GPUState, slice_count: int = 7) -> tuple:
                 inst.workload,
                 getattr(inst, "model_key", None),
                 getattr(inst, "placement_group", None),
+                getattr(inst, "runtime_model", None),
+                getattr(inst, "request_class", None),
+                getattr(inst, "prompt_len", None),
+                getattr(inst, "output_tokens", None),
                 None if inst.batch is None else int(inst.batch),
             )
         )
         cur = max(cur, end)
     if cur < slice_count:
-        rows.append((cur, slice_count, "void", None, None, None, None))
+        rows.append((cur, slice_count, "void", None, None, None, None, None, None, None, None))
     return tuple(rows)
 
 
@@ -318,6 +322,10 @@ def target_geometry_only_gpu(target_gpu: GPUState) -> GPUState:
         inst.batch = None
         inst.model_key = None
         inst.placement_group = None
+        inst.runtime_model = None
+        inst.request_class = None
+        inst.prompt_len = None
+        inst.output_tokens = None
         inst.mu = 0.0
         inst.preserved = False
     return gpu

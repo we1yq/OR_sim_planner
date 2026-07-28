@@ -1,0 +1,13 @@
+case_id,action_type,executor_action,profile,template,source_template,target_template,workload,runtime_model,request_class,slot,create_spec,delete_spec,preserve_spec
+create-instance-resnet50-1g,create_instance,place_instance+activate_instance_route,1g,,,,resnet50,resnet50,image-batches,"[0, 1, ""1g""]",,,
+delete-instance-resnet50-1g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,1g,,,,resnet50,resnet50,image-batches,"[0, 1, ""1g""]",,,
+create-instance-resnet50-3g,create_instance,place_instance+activate_instance_route,3g,,,,resnet50,resnet50,image-batches,"[0, 4, ""3g""]",,,
+delete-instance-resnet50-3g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,3g,,,,resnet50,resnet50,image-batches,"[0, 4, ""3g""]",,,
+create-instance-gpt2_p64_o64-1g,create_instance,place_instance+activate_instance_route,1g,,,,gpt2_p64_o64,gpt2,p64/o64,"[0, 1, ""1g""]",,,
+delete-instance-gpt2_p64_o64-1g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,1g,,,,gpt2_p64_o64,gpt2,p64/o64,"[0, 1, ""1g""]",,,
+create-instance-gpt2_p64_o64-3g,create_instance,place_instance+activate_instance_route,3g,,,,gpt2_p64_o64,gpt2,p64/o64,"[0, 4, ""3g""]",,,
+delete-instance-gpt2_p64_o64-3g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,3g,,,,gpt2_p64_o64,gpt2,p64/o64,"[0, 4, ""3g""]",,,
+create-instance-llama_p1024_o128-1g,create_instance,place_instance+activate_instance_route,1g,,,,llama_p1024_o128,llama,p1024/o128,"[0, 1, ""1g""]",,,
+delete-instance-llama_p1024_o128-1g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,1g,,,,llama_p1024_o128,llama,p1024/o128,"[0, 1, ""1g""]",,,
+create-instance-llama_p1024_o128-3g,create_instance,place_instance+activate_instance_route,3g,,,,llama_p1024_o128,llama,p1024/o128,"[0, 4, ""3g""]",,,
+delete-instance-llama_p1024_o128-3g,delete_instance,deactivate_instance_route+wait_instance_drain+delete_instance,3g,,,,llama_p1024_o128,llama,p1024/o128,"[0, 4, ""3g""]",,,

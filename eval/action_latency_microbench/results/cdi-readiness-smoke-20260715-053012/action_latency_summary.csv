@@ -1,0 +1,8 @@
+action_type,executor_action,profile,template,source_template,target_template,n,median_sec,p95_sec,mean_sec,std_sec
+create_instance,activate_instance_route,1g,,,,1,9.998076,9.998076,9.998076,0.0
+create_instance,place_instance,1g,,,,1,0.788781,0.788781,0.788781,0.0
+create_serving_instance,place_instance+activate_instance_route,1g,,,,1,10.786897000000002,10.786897000000002,10.786897000000002,0.0
+delete_instance,deactivate_instance_route,1g,,,,1,0.013299,0.013299,0.013299,0.0
+delete_instance,delete_instance,1g,,,,1,32.290078,32.290078,32.290078,0.0
+delete_instance,wait_instance_drain,1g,,,,1,0.012915,0.012915,0.012915,0.0
+delete_serving_instance,deactivate_instance_route+wait_instance_drain+delete_instance,1g,,,,1,32.316362999999996,32.316362999999996,32.316362999999996,0.0

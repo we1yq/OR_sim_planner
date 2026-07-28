@@ -117,6 +117,10 @@ def _target_geometry_only_gpu(target_gpu: GPUState) -> GPUState:
         inst.batch = None
         inst.model_key = None
         inst.placement_group = None
+        inst.runtime_model = None
+        inst.request_class = None
+        inst.prompt_len = None
+        inst.output_tokens = None
         inst.mu = 0.0
         inst.preserved = False
     return gpu
@@ -153,6 +157,10 @@ def _action(action_type: str, **kwargs: Any) -> dict[str, Any]:
 def _model_affinity_fields(inst: MigInstance) -> dict[str, Any]:
     return {
         "modelKey": getattr(inst, "model_key", None) or inst.workload,
+        "runtimeModel": getattr(inst, "runtime_model", None) or inst.workload,
+        "requestClass": getattr(inst, "request_class", None),
+        "promptLen": getattr(inst, "prompt_len", None),
+        "outputTokens": getattr(inst, "output_tokens", None),
         "placementGroup": (
             getattr(inst, "placement_group", None)
             or getattr(inst, "model_key", None)
@@ -481,9 +489,6 @@ def simulate_transition_actions(
         if action_type == "deactivate_instance_route":
             runtime = _get_runtime_entry(executed_state, int(action["gpu_id"]), tuple(action["slot"]))
             runtime["accepting_new"] = False
-            if action.get("routerQueueRedispatch"):
-                runtime["queued"] = 0
-                runtime["rerouted_to"] = action.get("to")
             continue
 
         if action_type == "wait_instance_drain":
@@ -494,6 +499,7 @@ def simulate_transition_actions(
             rounds = max(int(action.get("rounds", 1)), int(runtime.get("inflight", 0)))
             _start_drain(executed_state, gpu_id, slot, rounds=rounds)
             runtime["inflight"] = rounds
+            runtime["queued"] = 0
             continue
 
         if action_type == "mark_reconfig_target_prepared":
@@ -733,78 +739,48 @@ def plan_full_action_plan(
         item_type: str,
         item_id: str,
         safe_after_drain: bool = True,
-        reroute_title: str = "reroute_old_queue",
         stop_new: bool = True,
     ) -> tuple[list[dict[str, Any]], str, str, str | None]:
         runtime = _get_runtime_entry(source_state, gpu_id, slot)
         remaining = _get_drain_remaining(source_state, gpu_id, slot)
-        candidates = _reroute_destination_candidates(
-            source_state,
-            target_state,
-            workload,
-            exclude_gpu_id=gpu_id,
-            exclude_slot=slot,
-        )
-        reroute_candidate = candidates[0] if candidates else None
-        reroute_destination = _reroute_destination_label(candidates)
-        queue_transfer_id = f"gpu{gpu_id}_{slot[0]}_{slot[1]}_{slot[2]}_{workload}"
         local_actions = []
         phase = "post_drain_ready"
         status = "ready"
         blocked_by = None
-        if (
-            int(runtime.get("queued", 0)) > 0
-            or int(runtime.get("inflight", 0)) > 0
-            or bool(runtime.get("accepting_new", True))
-        ) and reroute_destination is None:
-            phase = "reroute_destination_ready"
+        queued = int(runtime.get("queued", 0))
+        inflight = int(runtime.get("inflight", 0))
+        if stop_new and bool(runtime.get("accepting_new", True)):
+            phase = "deactivate_instance_route"
+            local_actions.append(
+                _action(
+                    "deactivate_instance_route",
+                    gpu_id=gpu_id,
+                    physical_gpu_id=physical_id,
+                    slot=slot,
+                    workload=workload,
+                )
+            )
+            status = "in_progress"
+        if remaining is None and (inflight > 0 or queued > 0):
+            local_actions.append(
+                _action(
+                    "wait_instance_drain",
+                    gpu_id=gpu_id,
+                    physical_gpu_id=physical_id,
+                    slot=slot,
+                    workload=workload,
+                    rounds=max(1, inflight + queued),
+                    queued=queued,
+                    inflight=inflight,
+                )
+            )
+            phase = "drain_old"
             status = "blocked"
-            blocked_by = "no_reroute_destination_capacity"
-        else:
-            if stop_new and bool(runtime.get("accepting_new", True)):
-                redispatch_fields = {}
-                if int(runtime.get("queued", 0)) > 0:
-                    redispatch_fields = {
-                        "queued": int(runtime.get("queued", 0)),
-                        "to": reroute_destination,
-                        "target_gpu_id": (reroute_candidate or {}).get("gpu_id"),
-                        "target_physical_gpu_id": (reroute_candidate or {}).get("physical_gpu_id"),
-                        "target_slot": (reroute_candidate or {}).get("slot"),
-                        "queue_transfer_id": queue_transfer_id,
-                        "routerQueueRedispatch": True,
-                    }
-                    phase = reroute_title
-                else:
-                    phase = "deactivate_instance_route"
-                local_actions.append(
-                    _action(
-                        "deactivate_instance_route",
-                        gpu_id=gpu_id,
-                        physical_gpu_id=physical_id,
-                        slot=slot,
-                        workload=workload,
-                        **redispatch_fields,
-                    )
-                )
-                status = "in_progress"
-            if remaining is None and int(runtime.get("inflight", 0)) > 0:
-                local_actions.append(
-                    _action(
-                        "wait_instance_drain",
-                        gpu_id=gpu_id,
-                        physical_gpu_id=physical_id,
-                        slot=slot,
-                        workload=workload,
-                        rounds=int(runtime.get("inflight", 0)),
-                    )
-                )
-                phase = "drain_old"
-                status = "blocked"
-                blocked_by = "drain_started"
-            elif remaining is not None and int(remaining) > 0:
-                phase = "drain_old"
-                status = "blocked"
-                blocked_by = "inflight_tasks_not_zero"
+            blocked_by = "drain_started"
+        elif remaining is not None and int(remaining) > 0:
+            phase = "drain_old"
+            status = "blocked"
+            blocked_by = "inflight_tasks_not_zero"
         plan_items.append(
             _plan_item(
                 item_id=item_id,
@@ -816,9 +792,8 @@ def plan_full_action_plan(
                 physical_gpu_id=physical_id,
                 slot=slot,
                 workload=workload,
-                reroute_destination=reroute_destination,
-                queued=int(runtime.get("queued", 0)),
-                inflight=int(runtime.get("inflight", 0)),
+                queued=queued,
+                inflight=inflight,
                 drain_remaining=remaining,
                 capacity_safe=bool(safe_after_drain),
             )
@@ -902,7 +877,6 @@ def plan_full_action_plan(
             gpu_stop_added = False
             slot_blocked = False
             any_stop = False
-            any_reroute = False
             any_drain = False
             for inst in _nonfree_instances(src_gpu):
                 slot = (inst.start, inst.end, inst.profile)
@@ -918,11 +892,10 @@ def plan_full_action_plan(
                 )
                 phase_actions.extend(acts)
                 any_stop = any_stop or gpu_stop_added
-                any_reroute = any_reroute or any(action.get("routerQueueRedispatch") for action in acts)
                 any_drain = any_drain or phase == "drain_old"
                 slot_blocked = slot_blocked or status == "blocked"
-            if slot_blocked or any_stop or any_reroute or any_drain:
-                phase = "drain_old_gpu" if any_drain else ("reroute_old_queue" if any_reroute else ("stop_accepting_old_gpu" if any_stop else "reroute_destination_ready"))
+            if slot_blocked or any_stop or any_drain:
+                phase = "drain_old_gpu" if any_drain else ("stop_accepting_old_gpu" if any_stop else "post_drain_ready")
                 blocked_actions.append({"type": "defer_remove_gpu", "gpu_id": gpu_id, "physical_gpu_id": physical_id, "phase": phase})
                 plan_items.append(
                     _plan_item(
@@ -1052,7 +1025,6 @@ def plan_full_action_plan(
                     )
             slot_blocked = False
             any_stop = False
-            any_reroute = False
             any_drain = False
             gpu_slots = [
                 (inst.start, inst.end, inst.profile)
@@ -1073,14 +1045,13 @@ def plan_full_action_plan(
                 )
                 phase_actions.extend(acts)
                 any_stop = any_stop or gpu_stop_added
-                any_reroute = any_reroute or any(action.get("routerQueueRedispatch") for action in acts)
                 any_drain = any_drain or phase == "drain_old"
                 slot_blocked = slot_blocked or status == "blocked"
-            if slot_blocked or any_stop or any_reroute or any_drain:
+            if slot_blocked or any_stop or any_drain:
                 if in_place_ok:
-                    phase = "drain_old_side" if any_drain else ("reroute_old_queue" if any_reroute else ("shift_routing" if any_stop else "in_place_reconfigure"))
+                    phase = "drain_old_side" if any_drain else ("shift_routing" if any_stop else "in_place_reconfigure")
                 else:
-                    phase = "drain_old_side" if any_drain else ("reroute_old_queue" if any_reroute else ("shift_routing" if any_stop else ("prepare_target_side" if not prepared else "target_side_prepared")))
+                    phase = "drain_old_side" if any_drain else ("shift_routing" if any_stop else ("prepare_target_side" if not prepared else "target_side_prepared"))
                 blocked_actions.append({"type": "defer_remove_gpu", "gpu_id": gpu_id, "physical_gpu_id": old_physical_id, "phase": phase})
                 plan_items.append(
                     _plan_item(

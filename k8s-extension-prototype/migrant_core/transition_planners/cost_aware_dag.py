@@ -37,9 +37,7 @@ class CandidateScore:
     peak_active_gpu: int
     service_risk: int
     queued_wait: int
-    reroute_backlog_seconds: float
     drain_rounds: int
-    reroutes: int
     bridges: int
     pod_deletes: int
     reconfig_seconds: float
@@ -53,10 +51,8 @@ class CandidateScore:
             self.peak_active_gpu,
             self.service_risk,
             self.queued_wait,
-            self.reroute_backlog_seconds,
             self.drain_rounds,
             self.reconfig_seconds,
-            self.reroutes,
             self.bridges,
             self.pod_deletes,
             self.action_count,
@@ -68,9 +64,7 @@ class CandidateScore:
             "peakActiveGpu": self.peak_active_gpu,
             "serviceRisk": self.service_risk,
             "queuedWait": self.queued_wait,
-            "rerouteBacklogSeconds": self.reroute_backlog_seconds,
             "drainRounds": self.drain_rounds,
-            "reroutes": self.reroutes,
             "bridges": self.bridges,
             "podDeletes": self.pod_deletes,
             "reconfigSeconds": self.reconfig_seconds,
@@ -124,7 +118,6 @@ def run(
     actions = _annotate_effects(actions, current_state, target_state, required)
     _add_capacity_dependency_edges(actions, current_state, required)
     actions = basic_dag._coalesce_slot_delete_pods(actions)
-    basic_dag._assert_reroute_destinations_stable(current_state, target_state, actions)
     planned_state = basic_dag._planned_state_for_actions(current_state, target_state, actions)
     executed_state = simulate_transition_actions(
         source_state=current_state,
@@ -414,10 +407,10 @@ def _append_cost_aware_workload_replacement(
         root,
     )
     has_bridge = any(action.get("type") == "bridge_place_instance" for action in direct_actions)
-    has_reroute = any(action.get("routerQueueRedispatch") for action in direct_actions)
     safe = safe_after_removing_instance(source_state, src, required)
-    mode = "bridge_workload_replacement" if has_bridge else ("reroute_workload_replacement" if has_reroute else "direct_workload_replacement")
-    candidates.append((mode, physical_id, direct_actions, direct_items, safe or has_reroute or has_bridge))
+    mode = "bridge_workload_replacement" if has_bridge else "direct_workload_replacement"
+    feasible = safe or has_bridge or not any(str(action.get("type", "")).startswith("defer_") for action in direct_actions)
+    candidates.append((mode, physical_id, direct_actions, direct_items, feasible))
 
     chosen = _choose_candidate(source_state, actions, candidates)
     mode, _, chosen_actions, chosen_items, _ = chosen
@@ -489,9 +482,7 @@ def _score_actions(source_state: ClusterState, actions: list[dict[str, Any]], fe
         peak_active_gpu=basic_dag._peak_serving_gpu_from_actions(source_state, actions),
         service_risk=0 if feasible else 1,
         queued_wait=sum(_queued_wait(action) for action in actions),
-        reroute_backlog_seconds=round(sum(_reroute_backlog_seconds(action) for action in actions), 6),
         drain_rounds=sum(int(action.get("rounds", 0) or 0) for action in actions if action.get("type") == "mark_draining_instance"),
-        reroutes=sum(1 for action in actions if action.get("routerQueueRedispatch")),
         bridges=sum(1 for action in actions if action.get("type") == "bridge_place_instance"),
         pod_deletes=sum(1 for action in actions if action.get("type") in {"delete_pods", "delete_bridge_pod"}),
         reconfig_seconds=sum(_estimated_reconfig_seconds(action) for action in actions),
@@ -503,12 +494,6 @@ def _queued_wait(action: dict[str, Any]) -> int:
     if action.get("type") == "mark_draining_instance":
         return max(0, int(action.get("rounds", 0) or 0) - int(action.get("inflight", 0) or 0))
     return 0
-
-
-def _reroute_backlog_seconds(action: dict[str, Any]) -> float:
-    if not action.get("routerQueueRedispatch"):
-        return 0.0
-    return max(0.0, float(action.get("estimatedBacklogDrainSeconds", 0.0) or 0.0))
 
 
 def _estimated_reconfig_seconds(action: dict[str, Any]) -> float:

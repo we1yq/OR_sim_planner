@@ -349,6 +349,19 @@ func runHTTPAPI(addr, lockPath string) error {
 		res = attachDevicePluginRefresh(res)
 		writeResult(w, res)
 	})
+	mux.HandleFunc("/cdi-ready", func(w http.ResponseWriter, r *http.Request) {
+		migUUID := strings.TrimSpace(r.URL.Query().Get("migUuid"))
+		if migUUID == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"success": false, "ready": false, "message": "migUuid is required"})
+			return
+		}
+		ready, message := cdiDeviceReady(migUUID)
+		status := http.StatusOK
+		if !ready {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]any{"success": ready, "ready": ready, "migUuid": normalizeMIGUUID(migUUID), "message": message})
+	})
 	mux.HandleFunc("/processes", func(w http.ResponseWriter, r *http.Request) {
 		migUUID := strings.TrimSpace(r.URL.Query().Get("migUuid"))
 		if migUUID != "" {
@@ -599,12 +612,16 @@ func patchSlots(gpuIndex, deleteArg, createArg, preserveArg string) result {
 	if err != nil {
 		return result{Command: command, GPUIndex: gpuIndex, Success: false, Message: err.Error() + "\n" + rawGI}
 	}
+	beforeSlots := migSlotsFromObservation(before, instances, gpuIndex)
 	for idx := range deleteSpecs {
 		match := findInstanceBySlot(instances, deleteSpecs[idx])
 		if match == nil {
 			return result{Command: command, GPUIndex: gpuIndex, Success: false, NvidiaSMIL: before, Message: "delete slot does not exist: " + formatSlot(deleteSpecs[idx])}
 		}
 		deleteSpecs[idx].InstanceID = match.InstanceID
+		if deleteSpecs[idx].MIGUUID == "" {
+			deleteSpecs[idx].MIGUUID = migUUIDForSlot(beforeSlots, deleteSpecs[idx])
+		}
 	}
 	for _, spec := range preserveSpecs {
 		if findInstanceBySlot(instances, spec) == nil {
@@ -746,6 +763,31 @@ func refreshCDI(gpuIndex string) result {
 	}
 	elapsed = time.Since(start).Seconds()
 	return result{Command: command, GPUIndex: gpuIndex, CreateSeconds: elapsed, Success: true, Message: "refreshed " + outputPath}
+}
+
+func cdiDeviceReady(migUUID string) (bool, string) {
+	normalized := normalizeMIGUUID(migUUID)
+	specPath := "/host/var/run/cdi/management.nvidia.com-gpu.yaml"
+	spec, err := os.ReadFile(specPath)
+	if err != nil {
+		return false, err.Error()
+	}
+	text := string(spec)
+	if strings.Contains(text, "name: "+normalized) || strings.Contains(text, "="+normalized) || strings.Contains(text, normalized) {
+		return true, "found " + normalized + " in " + specPath
+	}
+	return false, normalized + " not found in " + specPath
+}
+
+func normalizeMIGUUID(migUUID string) string {
+	migUUID = strings.TrimSpace(migUUID)
+	if migUUID == "" {
+		return ""
+	}
+	if strings.HasPrefix(migUUID, "MIG-") {
+		return migUUID
+	}
+	return "MIG-" + migUUID
 }
 
 func destroyMIG(gpuIndex string) error {
@@ -915,6 +957,9 @@ func migLocationByUUID(migUUID string) (string, string, string, string, error) {
 func listGPUInstances(gpuIndex string) ([]gpuInstance, string, error) {
 	out, err := run("nvidia-smi", "mig", "-lgi", "-i", gpuIndex)
 	if err != nil {
+		if strings.Contains(out, "No GPU instances found") {
+			return []gpuInstance{}, out, nil
+		}
 		return nil, out, err
 	}
 	instances := []gpuInstance{}
@@ -1053,6 +1098,15 @@ func findInstanceBySlot(instances []gpuInstance, spec slotSpec) *gpuInstance {
 		}
 	}
 	return nil
+}
+
+func migUUIDForSlot(slots []migSlot, spec slotSpec) string {
+	for _, slot := range slots {
+		if slot.SlotStart == spec.Start && slot.SlotEnd == spec.Start+spec.Size && canonicalProfile(slot.Profile) == spec.Profile {
+			return slot.MIGDeviceUUID
+		}
+	}
+	return ""
 }
 
 func createSpecArg(specs []slotSpec) string {
