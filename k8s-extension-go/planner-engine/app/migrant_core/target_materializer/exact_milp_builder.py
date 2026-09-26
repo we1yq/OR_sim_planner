@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 from .global_objective import profile_compatible
+from .physical_capacity import assign_physical_capacity
 from .templates import (
     PhysicalLayout,
     current_gpu_physical_layout_key,
@@ -18,6 +19,7 @@ from ..state import ClusterState, GPUState, MigInstance, assert_valid_cluster_st
 
 
 EMPTY_PROFILES = {"void", "unusable"}
+STAGE2_OBJECTIVE_ORDER = ("exact_workload",)
 
 
 def _is_empty_gpu(gpu: GPUState) -> bool:
@@ -200,6 +202,24 @@ def _normalize_demand_types(instance_demands: list[dict[str, Any]]) -> list[dict
     return demand_types
 
 
+def _extract_specific_assignments(
+    variables: dict[tuple[int, int, int, int], Any],
+    demand_types: list[dict[str, Any]],
+) -> dict[tuple[int, int, int], dict[str, Any]]:
+    assigned: dict[tuple[int, int, int], dict[str, Any]] = {}
+    for (type_idx, gpu_id, layout_id, slot_idx), var in variables.items():
+        if var.X <= 0.5:
+            continue
+        key = (gpu_id, layout_id, slot_idx)
+        if key in assigned:
+            raise RuntimeError(
+                f"Multiple demand types assigned to preserved slot {key}: "
+                f"{assigned[key]} and {demand_types[type_idx]}"
+            )
+        assigned[key] = demand_types[type_idx]
+    return assigned
+
+
 def build_target_state_exact_milp(
     milp_res: dict[str, Any],
     prev_state: ClusterState | None = None,
@@ -208,7 +228,8 @@ def build_target_state_exact_milp(
     arrival_rate: list[float] | tuple[float, ...] | None = None,
     time_limit_s: float | None = None,
     mip_gap: float | None = 0.0,
-    threads: int | None = None,
+    threads: int | None = 8,
+    seed: int | None = 1,
     verbose: bool = False,
 ) -> ClusterState:
     try:
@@ -230,6 +251,7 @@ def build_target_state_exact_milp(
         time_limit_s=time_limit_s,
         mip_gap=mip_gap,
         threads=threads,
+        seed=seed,
         verbose=verbose,
     )
 
@@ -280,6 +302,7 @@ def _build_target_state_exact_milp_aggregated(
     time_limit_s: float | None,
     mip_gap: float | None,
     threads: int | None,
+    seed: int | None,
     verbose: bool,
 ) -> ClusterState:
     start_time = time.time()
@@ -315,7 +338,8 @@ def _build_target_state_exact_milp_aggregated(
     model = gp.Model("stage2_exact_global_milp_aggregated")
     if not verbose:
         model.Params.OutputFlag = 0
-    model.Params.Seed = 1
+    if seed is not None:
+        model.Params.Seed = int(seed)
     if time_limit_s is not None:
         model.Params.TimeLimit = float(time_limit_s)
     if mip_gap is not None:
@@ -379,6 +403,26 @@ def _build_target_state_exact_milp_aggregated(
                         name=f"y_{type_idx}_{gpu_id}_{layout.layout_id}_{slot_idx}",
                     )
 
+    physical_mu = {
+        (str(row["workload"]), str(row["profile"]), int(row["batch"])): float(row["mu"])
+        for row in feasible_option_df.to_dict("records")
+    }
+    required_capacity = _arrival_dict_from_milp(
+        milp_res, workload_names=workload_names, arrival_rate=arrival_rate)
+    for workload, required in required_capacity.items():
+        terms = []
+        for assignments in (c_cur, c_new):
+            for (idx, _, profile), var in assignments.items():
+                demand = demand_types[idx]
+                if demand["workload"] == workload:
+                    terms.append(physical_mu[(workload, profile, demand["batch"])] * var)
+        for (idx, _, layout_id, slot_idx), var in y.items():
+            demand = demand_types[idx]
+            if demand["workload"] == workload:
+                profile = layouts[layout_id].slots[slot_idx][2]
+                terms.append(physical_mu[(workload, profile, demand["batch"])] * var)
+        model.addConstr(gp.quicksum(terms) >= float(required), name=f"physical_capacity_{workload}")
+
     model.addConstr(
         gp.quicksum(q.values()) + gp.quicksum(new_count.values()) == gpu_count,
         name="fixed_gpu_count",
@@ -406,8 +450,17 @@ def _build_target_state_exact_milp_aggregated(
             name=f"demand_type_count_{type_idx}",
         )
 
+    preserve_slot_terms: dict[tuple[int, int, int], list[Any]] = {}
     for (type_idx, gpu_id, layout_id, slot_idx), var in y.items():
         model.addConstr(var <= z[(gpu_id, layout_id)], name=f"preserve_slot_active_{type_idx}_{gpu_id}_{layout_id}_{slot_idx}")
+        preserve_slot_terms.setdefault((gpu_id, layout_id, slot_idx), []).append(var)
+
+    # Different batches (or exact/upgrade types) must not share a physical slot.
+    for (gpu_id, layout_id, slot_idx), terms in preserve_slot_terms.items():
+        model.addConstr(
+            gp.quicksum(terms) <= z[(gpu_id, layout_id)],
+            name=f"preserve_slot_exclusive_{gpu_id}_{layout_id}_{slot_idx}",
+        )
 
     for gpu_id in modeled_gpu_ids:
         for profile in profiles:
@@ -495,39 +548,8 @@ def _build_target_state_exact_milp_aggregated(
         )
 
     model.ModelSense = GRB.MAXIMIZE
-    cold_workload_gpu = {}
-    cold_workload_gpu_incidence = None
     if cold_start_mode:
-        workloads = sorted({str(demand["workload"]) for demand in demand_types})
-        max_count_by_workload = {
-            workload: sum(int(demand["count"]) for demand in demand_types if str(demand["workload"]) == workload)
-            for workload in workloads
-        }
-        for workload in workloads:
-            for gpu_id in modeled_gpu_ids:
-                cold_workload_gpu[(workload, gpu_id)] = model.addVar(
-                    vtype=GRB.BINARY,
-                    name=f"cold_workload_gpu_{workload}_{gpu_id}",
-                )
-                assign_terms = [
-                    var
-                    for (type_idx, gid, _), var in c_cur.items()
-                    if gid == gpu_id and str(demand_types[type_idx]["workload"]) == workload
-                ]
-                model.addConstr(
-                    gp.quicksum(assign_terms) <= max_count_by_workload[workload] * cold_workload_gpu[(workload, gpu_id)],
-                    name=f"cold_workload_gpu_active_{workload}_{gpu_id}",
-                )
-        cold_workload_gpu_incidence = gp.quicksum(cold_workload_gpu.values())
-        model.setObjectiveN(
-            -cold_workload_gpu_incidence,
-            index=0,
-            priority=1,
-            weight=1.0,
-            abstol=0.0,
-            reltol=0.0,
-            name="cold_workload_collocation",
-        )
+        model.setObjective(0.0)
     else:
         p_gpu = gp.quicksum(a.values())
         p_exact = gp.quicksum(
@@ -544,10 +566,15 @@ def _build_target_state_exact_milp_aggregated(
             for layout in layouts
         )
 
-        model.setObjectiveN(p_gpu, index=0, priority=4, weight=1.0, abstol=0.0, reltol=0.0, name="whole_gpu")
-        model.setObjectiveN(p_exact, index=1, priority=3, weight=1.0, abstol=0.0, reltol=0.0, name="exact_workload")
-        model.setObjectiveN(p_upgrade, index=2, priority=2, weight=1.0, abstol=0.0, reltol=0.0, name="upgrade_workload")
-        model.setObjectiveN(p_mig, index=3, priority=1, weight=1.0, abstol=0.0, reltol=0.0, name="mig_placement")
+        model.setObjectiveN(
+            p_exact,
+            index=0,
+            priority=1,
+            weight=1.0,
+            abstol=0.0,
+            reltol=0.0,
+            name="exact_workload",
+        )
 
     model.optimize()
     status = _status_name(model.Status, GRB)
@@ -562,10 +589,7 @@ def _build_target_state_exact_milp_aggregated(
             raise RuntimeError(f"GPU {gpu_id} has {len(selected)} selected layouts")
         selected_layout_by_gpu[gpu_id] = selected[0]
 
-    assigned_specific: dict[tuple[int, int, int], dict[str, Any]] = {}
-    for (type_idx, gpu_id, layout_id, slot_idx), var in y.items():
-        if var.X > 0.5:
-            assigned_specific[(gpu_id, layout_id, slot_idx)] = demand_types[type_idx]
+    assigned_specific = _extract_specific_assignments(y, demand_types)
 
     remaining_cur: dict[tuple[int, int, str], list[dict[str, Any]]] = {}
     for (type_idx, gpu_id, profile), var in c_cur.items():
@@ -642,9 +666,7 @@ def _build_target_state_exact_milp_aggregated(
     target.metadata["build_method"] = "exact_global_milp_aggregated"
 
     if cold_start_mode:
-        score_tuple = (
-            -int(round(cold_workload_gpu_incidence.getValue())) if cold_workload_gpu_incidence is not None else 0,
-        )
+        score_tuple = (0,)
     else:
         score_tuple = (
             int(round(p_gpu.getValue())),
@@ -659,12 +681,16 @@ def _build_target_state_exact_milp_aggregated(
         "upgrade_preserve": 0 if cold_start_mode else score_tuple[2],
         "mig_preserve": 0 if cold_start_mode else score_tuple[3],
         "score_tuple": score_tuple,
-        "objective_mode": "cold_start_collocation" if cold_start_mode else "transition_preservation",
-        "cold_workload_gpu_incidence": -score_tuple[0] if cold_start_mode else None,
+        "objective_mode": ("cold_start_feasibility" if cold_start_mode else "transition_preservation"),
+        "objective_order": tuple(STAGE2_OBJECTIVE_ORDER),
+        "cold_workload_gpu_incidence": None,
         "elapsed_time_sec": elapsed,
         "solver_status": status,
         "mip_gap": _safe_mip_gap(model),
         "optimality_proven": bool(model.Status == GRB.OPTIMAL),
+        "gurobi_threads": int(threads) if threads is not None else 0,
+        "gurobi_seed": int(seed) if seed is not None else None,
+        "configured_mip_gap": float(mip_gap) if mip_gap is not None else None,
         "num_vars": int(model.NumVars),
         "num_constraints": int(model.NumConstrs),
         "gpu_count": int(gpu_count),
@@ -684,6 +710,7 @@ def _build_target_state_exact_milp_aggregated(
     target.metadata["stage2_demand_count"] = int(demand_count)
     target.metadata["stage2_demand_type_count"] = int(len(demand_types))
 
+    assign_physical_capacity(target, feasible_option_df)
     assert_valid_cluster_state(target)
     _assign_target_physical_metadata(target, prev_state)
     return target

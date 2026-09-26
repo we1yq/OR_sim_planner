@@ -24,9 +24,9 @@ from ...state import (
 )
 
 
-def gpu_template_signature(gpu: GPUState) -> tuple[int, ...]:
-    gpu.sort_instances()
-    return tuple(sorted(PROFILE_SIZE[inst.profile] for inst in gpu.instances if inst.profile not in {"void", "unusable"}))
+def gpu_template_signature(gpu: GPUState) -> tuple[tuple[int, int, str], ...]:
+    return tuple(sorted((inst.start, inst.end, inst.profile) for inst in gpu.instances
+                        if inst.profile not in {"void", "unusable"}))
 
 
 def same_template(src_gpu: GPUState | None, tgt_gpu: GPUState | None) -> bool:
@@ -51,8 +51,8 @@ def classify_gpu_change(src_gpu: GPUState | None, tgt_gpu: GPUState | None) -> s
     if src_gpu is None and tgt_gpu is None:
         return "none"
     if same_template(src_gpu, tgt_gpu):
-        src_slots = {slot_key(inst): instance_payload(inst) for inst in src_gpu.instances}
-        tgt_slots = {slot_key(inst): instance_payload(inst) for inst in tgt_gpu.instances}
+        src_slots = {slot_key(inst): instance_payload(inst) for inst in src_gpu.instances if inst.profile not in {"void", "unusable"}}
+        tgt_slots = {slot_key(inst): instance_payload(inst) for inst in tgt_gpu.instances if inst.profile not in {"void", "unusable"}}
         if src_slots == tgt_slots:
             return "keep_gpu"
         return "instance_diff"
@@ -63,8 +63,8 @@ def diff_instances_within_same_template(
     src_gpu: GPUState,
     tgt_gpu: GPUState,
 ) -> list[dict[str, Any]]:
-    src_by_slot = {slot_key(inst): inst for inst in src_gpu.instances}
-    tgt_by_slot = {slot_key(inst): inst for inst in tgt_gpu.instances}
+    src_by_slot = {slot_key(inst): inst for inst in src_gpu.instances if inst.profile not in {"void", "unusable"}}
+    tgt_by_slot = {slot_key(inst): inst for inst in tgt_gpu.instances if inst.profile not in {"void", "unusable"}}
     all_slots = sorted(set(src_by_slot) | set(tgt_by_slot))
     out = []
     for slot in all_slots:
@@ -260,6 +260,8 @@ def _normalized_instance_rows(gpu: GPUState, slice_count: int = 7) -> tuple:
     rows = []
     cur = 0
     for inst in sorted(gpu.instances, key=lambda x: (x.start, x.end, x.profile)):
+        if inst.profile == "void":
+            continue
         start = int(inst.start)
         end = int(inst.end)
         if start > cur:

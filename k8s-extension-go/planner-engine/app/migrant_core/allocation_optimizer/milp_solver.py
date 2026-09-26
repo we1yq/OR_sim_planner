@@ -27,38 +27,6 @@ def _profile_size_from_name(profile: str) -> int:
     return int(profile.replace("g", ""))
 
 
-def prune_dominated_options(feasible_option_df: Any) -> Any:
-    df = feasible_option_df.copy()
-    keep_mask = [True] * len(df)
-
-    for _, group in df.groupby("w_idx", sort=False):
-        rows = group[["opt_idx", "mu", "profile"]].copy()
-        rows["size"] = rows["profile"].map(_profile_size_from_name).astype(int)
-
-        idxs = rows.index.tolist()
-        for idx in idxs:
-            if not keep_mask[idx]:
-                continue
-            mu_i = float(rows.loc[idx, "mu"])
-            size_i = int(rows.loc[idx, "size"])
-
-            dominated = False
-            for other_idx in idxs:
-                if idx == other_idx:
-                    continue
-                mu_j = float(rows.loc[other_idx, "mu"])
-                size_j = int(rows.loc[other_idx, "size"])
-
-                if (mu_j >= mu_i and size_j <= size_i) and (mu_j > mu_i or size_j < size_i):
-                    dominated = True
-                    break
-
-            if dominated:
-                keep_mask[idx] = False
-
-    return df.loc[keep_mask].copy().reset_index(drop=True)
-
-
 def compute_elastic_up_by_opt(base_option_df: Any) -> dict[int, float]:
     base_df = base_option_df.copy()
     delta_map = {}
@@ -147,10 +115,10 @@ def solve_milp_gurobi_batch_unified(
     profile_order: list[str] = PROFILE_ORDER,
     n_workloads: int | None = None,
     time_limit_s: float | None = None,
-    mip_gap: float | None = None,
-    threads: int | None = None,
+    mip_gap: float | None = 0.0,
+    threads: int | None = 8,
+    seed: int | None = 1,
     verbose: bool = False,
-    apply_option_pruning: bool = True,
     warm_start_res: dict[str, Any] | None = None,
     current_workload_profile_counts: dict[tuple[str, str], int] | None = None,
 ) -> dict[str, Any]:
@@ -169,10 +137,7 @@ def solve_milp_gurobi_batch_unified(
     base_df = feasible_option_df.copy()
     elastic_up_map = compute_elastic_up_by_opt(base_df)
 
-    if apply_option_pruning:
-        df = prune_dominated_options(base_df).reset_index(drop=True)
-    else:
-        df = base_df.reset_index(drop=True)
+    df = base_df.reset_index(drop=True)
 
     df["elastic_up"] = df["opt_idx"].map(lambda opt_idx: float(elastic_up_map.get(int(opt_idx), 0.0)))
 
@@ -214,6 +179,8 @@ def solve_milp_gurobi_batch_unified(
         model.Params.MIPGap = float(mip_gap)
     if threads is not None:
         model.Params.Threads = int(threads)
+    if seed is not None:
+        model.Params.Seed = int(seed)
 
     y = model.addVars(template_ids, vtype=GRB.INTEGER, lb=0, name="y")
 
@@ -413,6 +380,10 @@ def solve_milp_gurobi_batch_unified(
         "stage1_objective_mode": "logical_delta" if logical_delta is not None else "headroom_only",
         "total_instances": int(round(total_instances.X)),
         "used_profile_types": used_profile_types,
+        "optimality_proven": bool(model.Status == GRB.OPTIMAL),
+        "gurobi_threads": int(threads) if threads is not None else 0,
+        "gurobi_seed": int(seed) if seed is not None else None,
+        "configured_mip_gap": float(mip_gap) if mip_gap is not None else None,
         "effective_option_df": df,
         "arrival_rate": list(arrival_rate),
     }

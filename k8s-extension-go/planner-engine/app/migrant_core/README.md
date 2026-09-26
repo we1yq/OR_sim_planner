@@ -14,9 +14,9 @@ Runtime contents:
 - `physical_ids.py`: physical GPU ID map, canonical GPU ID handling, and
   `free_pool_lifo` behavior.
 - `allocation_optimizer/milp_solver.py`: notebook-derived real Gurobi MILP
-  solver and direct helper functions, including dominated-option pruning,
-  elastic-up scoring, capacity aggregation, allocation extraction, warm start
-  support, and multi-objective optimization.
+  solver and direct helper functions, including elastic-up scoring, capacity
+  aggregation, allocation extraction, warm start support, and multi-objective
+  optimization.
 - `allocation_optimizer/milp_extraction.py`: notebook-derived MILP result
   extraction helpers for template expansion, instance-demand aggregation,
   arrival dictionaries, profile need counts, expanded demand IDs, and MILP
@@ -24,11 +24,11 @@ Runtime contents:
 - `target_materializer/templates.py`: notebook abstract templates, physical
   realizations, interval expansion helpers, and the fragment-free physical
   layout catalog used by exact Stage 2.
-- `target_materializer/global_objective.py`: evaluator for the exact Stage 2
-  lexicographic objective.
+- `target_materializer/global_objective.py`: evaluator for the legacy exact
+  Stage 2 lexicographic objective.
 - `target_materializer/exact_milp_builder.py`: aggregated exact global Stage 2
   MILP that materializes a `ClusterState` from Stage 1 GPU count and demand
-  instances.
+  instances while preserving exact workload placements when possible.
 - `target_materializer/target_builder.py`: public
   `build_target_state_from_milp` API that dispatches to exact Stage 2 and
   returns build metrics.

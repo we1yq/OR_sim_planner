@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 from .internal.partial_reconfig import build_partial_reconfig_plan
+from .internal.physical_lifetimes import bind_physical_lifetimes
 from ..physical_ids import PHYSICAL_ID_POOL, bootstrap_physical_ids_for_state, ensure_state_metadata, get_physical_id
 from ..state import PROFILE_SIZE, ClusterState, GPUState, MigInstance, deepcopy_state, get_inst_by_slot, gpu_map_by_id
 from .internal.state_diff import (
@@ -74,6 +75,7 @@ def run(
     actions = _prepare_capacity_safe_actions(actions, plan_items, current_state, target_state, required)
     _assert_executable_actions(actions)
     _add_physical_reuse_dependency_edges(actions)
+    actions = bind_physical_lifetimes(actions, plan_items, current_state)
     actions = action_builder._preserve_independent_slot_deletes(actions)
     planned_state = action_builder._planned_state_for_actions(current_state, target_state, actions)
     executed_state = simulate_transition_actions(
@@ -84,8 +86,12 @@ def run(
     )
     executed_state = action_builder._drop_available_physical_gpus(executed_state)
     dag = build_phased_action_plan(actions, plan_items=plan_items, name=f"{stage_name}-final")
+    if any(phase.get("warning") for phase in dag.get("phases", [])):
+        raise RuntimeError("stage3 produced a cyclic dependency graph")
     peak_active_gpu = action_builder._peak_serving_gpu_from_actions(current_state, actions)
     reached_target = matches_target_state(executed_state, target_state)
+    if not reached_target:
+        raise RuntimeError("stage3 simulated execution did not reach target")
     final_plan = {
         "stage_name": stage_name,
         "required": required,
@@ -290,7 +296,7 @@ def _append_temporary_capacity_actions(
 ) -> bool:
     added = False
     existing_temp = {
-        (str(action.get("protectsWorkload") or action.get("workload")), tuple(action.get("protectsSlot") or ()))
+        (action.get("protectsGpuId"), str(action.get("protectsWorkload") or action.get("workload")), tuple(action.get("protectsSlot") or ()))
         for action in actions
         if action.get("temporaryCapacity") and action.get("type") == "activate_instance_route"
     }
@@ -307,8 +313,9 @@ def _append_temporary_capacity_actions(
     occupied_temp_physical_ids = {
         str(action["physical_gpu_id"])
         for action in actions
-        if action.get("temporaryCapacity") and action.get("physical_gpu_id") is not None
+        if action.get("physical_gpu_id") is not None
     }
+    handled = set()
     for consumer in consumers:
         for record in list(consumer.get("consumesCapacity") or []):
             workload = record.get("workload")
@@ -317,7 +324,12 @@ def _append_temporary_capacity_actions(
             source_inst = _source_instance_for_capacity_record(source_state, consumer, record)
             if source_inst is None:
                 continue
-            if (str(workload), (source_inst.start, source_inst.end, source_inst.profile)) in existing_temp:
+            protected_key = (int(consumer["gpu_id"]), str(workload), (source_inst.start, source_inst.end, source_inst.profile))
+            if protected_key in handled:
+                continue
+            handled.add(protected_key)
+            deficit = dict(consumer.get("capacityGate") or {}).get("blockedCapacityDeficit", {}).get(str(workload), 0.0)
+            if protected_key in existing_temp and float(deficit) <= 1e-9:
                 continue
             occupied_physical_at_consumer = set(occupied_temp_physical_ids)
             occupied_physical_at_consumer.update(_acquired_physical_ids_before_action(actions, consumer))
@@ -331,10 +343,11 @@ def _append_temporary_capacity_actions(
             )
             if temp is None:
                 continue
+            temp["protectsGpuId"] = int(consumer["gpu_id"])
             temp_actions, temp_item = _temporary_capacity_actions(temp, source_inst)
             actions.extend(temp_actions)
             plan_items.append(temp_item)
-            existing_temp.add((str(workload), (source_inst.start, source_inst.end, source_inst.profile)))
+            existing_temp.add(protected_key)
             occupied_temp_slots.add((int(temp["gpu_id"]), tuple(temp["slot"])))
             occupied_temp_gpu_ids.add(int(temp["gpu_id"]))
             occupied_temp_physical_ids.add(str(temp["physical_gpu_id"]))
@@ -477,13 +490,9 @@ def _new_temp_gpu_target(
     ]
     if str(source_state.metadata.get("source", "")).startswith("go-cluster-state-manager"):
         candidates = list(free_pool)
-        if not candidates:
-            return None
     else:
         never_seen = [pid for pid in PHYSICAL_ID_POOL if pid not in active_pids and pid not in free_pool and pid not in occupied_temp_physical_ids]
         candidates = list(free_pool) + never_seen
-    if not candidates:
-        return None
     used_gpu_ids = set(src_map) | set(target_map) | set(occupied_temp_gpu_ids)
     temp_gpu_id = max(used_gpu_ids | {0}) + 1000
     while temp_gpu_id in used_gpu_ids:
@@ -491,7 +500,9 @@ def _new_temp_gpu_target(
     return {
         "kind": "temp_gpu",
         "gpu_id": temp_gpu_id,
-        "physical_gpu_id": candidates[0],
+        # A provisional lifetime is not a claim that an extra device exists.
+        # The final binder must assign it an observed device or reject the plan.
+        "physical_gpu_id": candidates[0] if candidates else f"__stage3_temp_{temp_gpu_id}",
         "slot": (0, PROFILE_SIZE.get(source_inst.profile, source_inst.end - source_inst.start), source_inst.profile),
     }
 
@@ -507,6 +518,7 @@ def _temporary_capacity_actions(temp: dict[str, Any], source_inst: MigInstance) 
         "temporaryCapacity": True,
         "purpose": "bridge_workload_replacement",
         "protectsWorkload": source_inst.workload,
+        "protectsGpuId": temp.get("protectsGpuId"),
         "protectsSlot": [source_inst.start, source_inst.end, source_inst.profile],
     }
     instance = {
@@ -977,6 +989,8 @@ def _add_capacity_dependency_edges(
                 seen_producer_keys.add((str(workload), str(key)))
 
     for action in actions:
+        if action.get("cleanupTemporaryCapacity"):
+            continue
         consumed_by_workload = _sum_capacity(list(action.get("consumesCapacity") or []))
         if not consumed_by_workload:
             continue
@@ -1029,7 +1043,7 @@ def _add_capacity_dependency_edges(
         if selected:
             gate["selectedProducerActionKeys"] = selected
             action["capacityGate"] = gate
-        if blocked and not action.get("cleanupTemporaryCapacity"):
+        if blocked:
             action["blockedByCapacity"] = True
             action["capacityGate"] = {**gate, "blockedCapacityDeficit": blocked}
     _add_cumulative_capacity_dependency_edges(actions, source_state, required)
@@ -1055,12 +1069,17 @@ def _add_cumulative_capacity_dependency_edges(
     selected_producers: dict[str, set[str]] = {}
     selected_capacity: dict[str, dict[str, float]] = {}
     for action in actions:
+        if action.get("cleanupTemporaryCapacity"):
+            continue
         consumed_by_workload = _sum_capacity(list(action.get("consumesCapacity") or []))
         if not consumed_by_workload:
             continue
         deps = set(str(key) for key in list(action.get("dependsOnActionKeys") or []))
         gate = dict(action.get("capacityGate") or {})
         selected = dict(gate.get("selectedProducerActionKeys") or {})
+        # The cumulative pass supersedes the independent precheck.
+        action.pop("blockedByCapacity", None)
+        gate.pop("blockedCapacityDeficit", None)
         blocked: dict[str, float] = {}
         for workload, consumed_mu in consumed_by_workload.items():
             workload = str(workload)
@@ -1114,7 +1133,7 @@ def _add_cumulative_capacity_dependency_edges(
                     if needed <= 1e-9:
                         break
             remaining_after = virtual_capacity.get(workload, 0.0) - float(consumed_mu)
-            if needed > 1e-9 and not action.get("cleanupTemporaryCapacity"):
+            if needed > 1e-9:
                 blocked[workload] = needed
             virtual_capacity[workload] = remaining_after
         if deps:
@@ -1125,6 +1144,35 @@ def _add_cumulative_capacity_dependency_edges(
         if blocked:
             action["blockedByCapacity"] = True
             action["capacityGate"] = {**gate, "blockedCapacityDeficit": blocked}
+    _add_cleanup_capacity_gates(actions, source_state, required)
+
+
+def _add_cleanup_capacity_gates(
+    actions: list[dict[str, Any]],
+    source_state: ClusterState,
+    required: dict[str, float],
+) -> None:
+    # Cleanup waits for all effects on its workload, not unrelated work.
+    # Count each workload's completed effects once before removing temporaries.
+    capacity = dict(provided_by_workload(source_state))
+    for action in actions:
+        if action.get("cleanupTemporaryCapacity"):
+            continue
+        for field, sign in (("producesCapacity", 1), ("consumesCapacity", -1)):
+            for workload, mu in _sum_capacity(list(action.get(field) or [])).items():
+                capacity[workload] = capacity.get(workload, 0.0) + sign * mu
+    for action in actions:
+        if not action.get("cleanupTemporaryCapacity"):
+            continue
+        blocked = {}
+        for workload, mu in _sum_capacity(list(action.get("consumesCapacity") or [])).items():
+            capacity[workload] = capacity.get(workload, 0.0) - mu
+            deficit = float(required.get(workload, 0.0)) - capacity[workload]
+            if deficit > 1e-9:
+                blocked[workload] = deficit
+        if blocked:
+            action["blockedByCapacity"] = True
+            action["capacityGate"] = {**dict(action.get("capacityGate") or {}), "blockedCapacityDeficit": blocked}
 
 
 def _assert_executable_actions(actions: list[dict[str, Any]]) -> None:
@@ -1180,11 +1228,13 @@ def _assert_physical_acquire_lifecycle(actions: list[dict[str, Any]]) -> None:
 
 
 def _add_temporary_cleanup_dependency_edges(actions: list[dict[str, Any]]) -> None:
-    non_cleanup_keys = {
-        str(action["actionKey"])
-        for action in actions
-        if action.get("actionKey") is not None and not action.get("cleanupTemporaryCapacity")
-    }
+    non_cleanup_keys_by_workload: dict[str, set[str]] = {}
+    for action in actions:
+        if action.get("actionKey") is None or action.get("cleanupTemporaryCapacity"):
+            continue
+        for field in ("producesCapacity", "consumesCapacity"):
+            for record in action.get(field) or []:
+                non_cleanup_keys_by_workload.setdefault(str(record["workload"]), set()).add(str(action["actionKey"]))
     temp_root_by_activation_key: dict[str, str] = {}
     cleanup_by_temp_root: dict[str, list[dict[str, Any]]] = {}
     final_activation_by_root: dict[str, str] = {}
@@ -1221,7 +1271,9 @@ def _add_temporary_cleanup_dependency_edges(actions: list[dict[str, Any]]) -> No
 
     for temp_root, cleanup_actions in cleanup_by_temp_root.items():
         deps_to_add = deps_by_temp_root.get(temp_root, set())
-        deps_to_add.update(non_cleanup_keys)
+        for cleanup in cleanup_actions:
+            for record in cleanup.get("consumesCapacity") or []:
+                deps_to_add.update(non_cleanup_keys_by_workload.get(str(record["workload"]), set()))
         if not deps_to_add:
             continue
         for cleanup in cleanup_actions:
@@ -1357,26 +1409,21 @@ def _node_reaches(src_node: str, dst_node: str, context: dict[str, Any]) -> bool
 
 
 def _add_physical_reuse_dependency_edges(actions: list[dict[str, Any]]) -> None:
-    pending_release_key: str | None = None
-    pending_release_physical: str | None = None
+    pending_releases: dict[str, str] = {}
     for action in actions:
         effect = dict(action.get("physicalGpuEffect") or {})
         if effect.get("type") == "release" and action.get("actionKey") is not None:
-            pending_release_key = str(action["actionKey"])
-            pending_release_physical = str(effect.get("physicalGpuId"))
+            pending_releases[str(effect.get("physicalGpuId"))] = str(action["actionKey"])
             continue
+        physical_id = str(effect.get("physicalGpuId"))
+        pending_release_key = pending_releases.get(physical_id)
         if effect.get("type") != "acquire" or pending_release_key is None:
-            continue
-        if pending_release_physical is None or str(effect.get("physicalGpuId")) != pending_release_physical:
-            continue
-        if action.get("capacityUrgent"):
             continue
         deps = set(str(key) for key in list(action.get("dependsOnActionKeys") or []))
         deps.add(pending_release_key)
         action["dependsOnActionKeys"] = sorted(deps)
         action["physicalGpuEffect"] = {**effect, "reuseDependencyActionKey": pending_release_key}
-        pending_release_key = None
-        pending_release_physical = None
+        pending_releases.pop(physical_id)
 
 
 def _effects_for_action(
@@ -1403,11 +1450,24 @@ def _effects_for_action(
         out["routeEffect"] = {
             "type": "deactivate_instance_route",
         }
+    elif action_type == "apply_batch":
+        old = _sum_capacity(_capacity_for_action_source(action, source_map))
+        new = _sum_capacity(_capacity_for_action_target(action, target_map))
+        consumed = [{"workload": workload, "mu": mu - new.get(workload, 0.0)}
+                    for workload, mu in old.items() if mu > new.get(workload, 0.0)]
+        if consumed:
+            out["consumesCapacity"] = consumed
+            out["capacityGate"] = _capacity_gate(consumed, required)
     elif action_type == "activate_instance_route":
         produced = _temporary_capacity_record(action) if action.get("temporaryCapacity") else _capacity_for_action_target(action, target_map)
+        if action.get("transitionMode") in {"batch_change", "preserved_slot_batch_change"}:
+            old = _sum_capacity(_capacity_for_action_source(action, source_map))
+            new = _sum_capacity(produced)
+            produced = [{"workload": workload, "mu": mu - old.get(workload, 0.0)}
+                        for workload, mu in new.items() if mu > old.get(workload, 0.0)]
+        out["routeEffect"] = {"type": "activate_route"}
         if produced:
             out["producesCapacity"] = produced
-            out["routeEffect"] = {"type": "activate_route"}
     elif action_type.startswith("defer_"):
         out["blockedByCapacity"] = bool(action.get("blockedByCapacity", True))
         out["requiredRate"] = dict(required)
