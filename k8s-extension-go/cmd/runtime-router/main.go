@@ -109,6 +109,7 @@ type routerState struct {
 	metrics         map[string]*modelMetrics
 	endpointMetrics map[string]*modelMetrics
 	batchers        map[string]*endpointBatcher
+	routeGCFailures map[string]int
 	monitor         monitorState
 	window          time.Duration
 	visionBatchWait time.Duration
@@ -147,6 +148,7 @@ func main() {
 		metrics:         map[string]*modelMetrics{},
 		endpointMetrics: map[string]*modelMetrics{},
 		batchers:        map[string]*endpointBatcher{},
+		routeGCFailures: map[string]int{},
 		monitor:         monitorState{Stats: map[string]*monitorStats{}},
 		window:          window,
 		visionBatchWait: visionBatchWait,
@@ -161,7 +163,8 @@ func main() {
 	}
 	go state.routeGCLoop(
 		durationEnv("ROUTE_GC_INTERVAL", 30*time.Second),
-		durationEnv("ROUTE_GC_TIMEOUT", 500*time.Millisecond),
+		durationEnv("ROUTE_GC_TIMEOUT", 3*time.Second),
+		positiveIntEnv("ROUTE_GC_FAILURE_THRESHOLD", 3),
 	)
 
 	mux := http.NewServeMux()
@@ -795,14 +798,14 @@ func (s *routerState) runtimeMetrics(endpoint string) map[string]any {
 	return out
 }
 
-func (s *routerState) routeGCLoop(interval, timeout time.Duration) {
+func (s *routerState) routeGCLoop(interval, timeout time.Duration, failureThreshold int) {
 	if interval <= 0 {
 		return
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
-		if removed, err := s.gcStaleRoutes(timeout); err != nil {
+		if removed, err := s.gcStaleRoutes(timeout, failureThreshold); err != nil {
 			log.Printf("runtime-router route GC failed: %v", err)
 		} else if removed > 0 {
 			log.Printf("runtime-router route GC removed %d stale endpoint(s)", removed)
@@ -810,7 +813,7 @@ func (s *routerState) routeGCLoop(interval, timeout time.Duration) {
 	}
 }
 
-func (s *routerState) gcStaleRoutes(timeout time.Duration) (int, error) {
+func (s *routerState) gcStaleRoutes(timeout time.Duration, failureThreshold int) (int, error) {
 	s.mu.RLock()
 	routes := s.copyRoutesLocked()
 	s.mu.RUnlock()
@@ -832,7 +835,8 @@ func (s *routerState) gcStaleRoutes(timeout time.Duration) (int, error) {
 			if err == nil && resp != nil {
 				_ = resp.Body.Close()
 			}
-			if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 500 {
+			healthy := err == nil && resp != nil && resp.StatusCode >= 200 && resp.StatusCode < 500
+			if s.routeHealthFailed(endpoint.RuntimeID, healthy, failureThreshold) {
 				stale = append(stale, staleEndpoint{model: model, runtimeID: endpoint.RuntimeID})
 			}
 		}
@@ -849,6 +853,7 @@ func (s *routerState) gcStaleRoutes(timeout time.Duration) (int, error) {
 			delete(s.routes, item.model)
 		}
 		removed += before - len(s.routes[item.model])
+		delete(s.routeGCFailures, item.runtimeID)
 	}
 	updated := s.copyRoutesLocked()
 	s.mu.Unlock()
@@ -856,6 +861,23 @@ func (s *routerState) gcStaleRoutes(timeout time.Duration) (int, error) {
 		return 0, nil
 	}
 	return removed, s.persistRoutes(updated)
+}
+
+func (s *routerState) routeHealthFailed(runtimeID string, healthy bool, threshold int) bool {
+	if threshold < 1 {
+		threshold = 1
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.routeGCFailures == nil {
+		s.routeGCFailures = map[string]int{}
+	}
+	if healthy {
+		delete(s.routeGCFailures, runtimeID)
+		return false
+	}
+	s.routeGCFailures[runtimeID]++
+	return s.routeGCFailures[runtimeID] >= threshold
 }
 
 func (s *routerState) routeFor(model string) (routeEndpoint, bool) {
@@ -1192,6 +1214,19 @@ func durationEnv(key string, fallback time.Duration) time.Duration {
 	parsed, err := time.ParseDuration(value)
 	if err != nil {
 		log.Printf("invalid %s=%q, using %s", key, value, fallback)
+		return fallback
+	}
+	return parsed
+}
+
+func positiveIntEnv(key string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 1 {
+		log.Printf("invalid %s=%q, using %d", key, value, fallback)
 		return fallback
 	}
 	return parsed

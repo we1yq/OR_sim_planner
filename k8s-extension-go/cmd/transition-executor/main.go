@@ -101,6 +101,9 @@ func reconcile(client *kube.Client, router string) error {
 		if asString(spec["executor"]) != "go-transition-executor" || phase == "Executed" || phase == "Failed" {
 			continue
 		}
+		if !executionGateOpen(asString(spec["phaseGate"])) {
+			continue
+		}
 		trace := newExecutionTrace()
 		trace.Mark("executorStartedAt")
 		patchExecutionStatus(client, name, "Executing", "transition execution started", trace, nil)
@@ -111,35 +114,32 @@ func reconcile(client *kube.Client, router string) error {
 		}
 		runtimes := parseRuntimes(spec)
 		actions := parseActionNodes(spec)
-		if len(actions) == 0 {
-			trace.Mark("executorFinishedAt")
-			closeRouterMonitor(trace, router, name)
-			_, err = client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
-				"status": map[string]any{"phase": "Executed", "message": "empty action DAG; no-op plan", "transitionExecution": trace.Status(nil)},
-			}, nil)
-			if err != nil {
-				return err
-			}
-			continue
-		}
 		sourceGpuCount := intNumber(asMap(spec["summary"])["sourceGpuCount"])
 		targetGpuCount := firstNonZeroInt(intNumber(asMap(spec["summary"])["targetGpuCount"]), intNumber(spec["targetGpuCount"]))
 		trace.SetMetric("gpuCountBaseline", map[string]any{"source": sourceGpuCount, "target": targetGpuCount})
-		verification, actionStatuses, err := executeActionDAG(client, router, nodes, runtimes, actions, name, sourceGpuCount, trace)
-		trace.Mark("executorFinishedAt")
-		closeRouterMonitor(trace, router, name)
-		if err != nil {
-			_, patchErr := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
-				"status": map[string]any{"phase": "Failed", "message": err.Error(), "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
-			}, nil)
-			if patchErr != nil {
-				return patchErr
+		verification := map[string]any{}
+		actionStatuses := []map[string]any{}
+		if len(actions) > 0 {
+			verification, actionStatuses, err = executeActionDAG(client, router, nodes, runtimes, actions, name, sourceGpuCount, trace)
+			if err != nil {
+				trace.Mark("executorFinishedAt")
+				closeRouterMonitor(trace, router, name)
+				_, patchErr := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
+					"status": map[string]any{"phase": "Failed", "message": err.Error(), "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
+				}, nil)
+				if patchErr != nil {
+					return patchErr
+				}
+				continue
 			}
-			continue
 		}
+		trace.Mark("finalValidationStartedAt")
 		finalVerification, err := validateFinalTargetAllocation(client, spec)
+		trace.Mark("finalValidationFinishedAt")
 		trace.SetMetric("finalValidation", finalVerification)
 		if err != nil {
+			trace.Mark("executorFinishedAt")
+			closeRouterMonitor(trace, router, name)
 			_, patchErr := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
 				"status": map[string]any{"phase": "Failed", "message": err.Error(), "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
 			}, nil)
@@ -149,6 +149,8 @@ func reconcile(client *kube.Client, router string) error {
 			continue
 		}
 		if err := persistFinalLogicalBindings(client, name, spec); err != nil {
+			trace.Mark("executorFinishedAt")
+			closeRouterMonitor(trace, router, name)
 			_, patchErr := client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
 				"status": map[string]any{"phase": "Failed", "message": err.Error(), "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
 			}, nil)
@@ -157,14 +159,30 @@ func reconcile(client *kube.Client, router string) error {
 			}
 			continue
 		}
+		trace.Mark("finalValidationPassedAt")
+		trace.Mark("executorFinishedAt")
+		closeRouterMonitor(trace, router, name)
+		message := "action DAG executed by Go transition executor"
+		if len(actions) == 0 {
+			message = "empty action DAG validated by Go transition executor"
+		}
 		_, err = client.PatchMerge(kube.NamespacedResourceName(client.Namespace(), "migactionplans", name)+"/status", map[string]any{
-			"status": map[string]any{"phase": "Executed", "message": "action DAG executed by Go transition executor", "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
+			"status": map[string]any{"phase": "Executed", "message": message, "transitionExecution": trace.Status(verification), "actionStatuses": actionStatuses},
 		}, nil)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func executionGateOpen(gate string) bool {
+	switch gate {
+	case "", "auto", "approved":
+		return true
+	default:
+		return false
+	}
 }
 
 type executionTrace struct {
@@ -860,15 +878,10 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 		trace.SetMetric("nodeAgentRegisteredTargetResources", transactionReady)
 		trace.SetMetric("nodeAgentRegisteredTargetMissing", transactionMissing)
 		trace.Mark("allocatableWaitStartedAt")
-		waitMetrics, err := waitForAllocatableTargets(client, targets, 2*time.Second, 1)
+		waitMetrics, err := waitForAllocatableTargets(client, targets, 30*time.Second, 2)
 		trace.Mark("allocatableWaitFinishedAt")
 		for key, value := range waitMetrics {
 			trace.SetMetric(key, value)
-		}
-		if err != nil && transactionReady {
-			trace.SetMetric("allocatableWaitBypassedAfterNodeAgentRegistration", true)
-			trace.SetMetric("allocatableWaitBypassReason", err.Error())
-			return nil
 		}
 		return err
 	case "place_instance":
@@ -2490,11 +2503,6 @@ func nodeAgentRegisteredTargets(body map[string]any, targets []allocatableTarget
 	for _, raw := range asSlice(asMap(body["devicePluginRefresh"])["registeredResources"]) {
 		registered[asString(raw)] = true
 	}
-	if len(registered) == 0 {
-		for _, raw := range asSlice(body["expectedResources"]) {
-			registered[asString(raw)] = true
-		}
-	}
 	missing := []string{}
 	for _, target := range targets {
 		if !registered[target.Resource] {
@@ -3293,10 +3301,21 @@ func labelValue(value string) string {
 }
 
 func runtimeModel(rt system.ModelRuntimeSpec) string {
-	if strings.TrimSpace(rt.RuntimeModel) != "" {
-		return strings.TrimSpace(rt.RuntimeModel)
+	model := strings.TrimSpace(rt.RuntimeModel)
+	if model == "" {
+		model = strings.TrimSpace(rt.Model)
 	}
-	return rt.Model
+	lower := strings.ToLower(model)
+	switch {
+	case strings.HasPrefix(lower, "gpt2_"):
+		return "gpt2"
+	case strings.HasPrefix(lower, "llama_"):
+		return "llama"
+	case strings.HasSuffix(lower, "_image"):
+		return strings.TrimSuffix(lower, "_image")
+	default:
+		return model
+	}
 }
 
 func runtimeImage(rt system.ModelRuntimeSpec) string {

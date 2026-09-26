@@ -144,6 +144,7 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 		plannerName = firstNonEmpty(planInput.Planner, asString(asMap(planned["metadata"])["planner"]), "ours")
 	}
 	plannerMetrics := asMap(asMap(planned["metadata"])["metrics"])
+	phaseGate := requestedPhaseGate(spec)
 	body := map[string]any{
 		"apiVersion": "mig.or-sim.io/v1alpha1",
 		"kind":       "MigActionPlan",
@@ -157,7 +158,7 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 		},
 		"spec": map[string]any{
 			"executor":                 "go-transition-executor",
-			"phaseGate":                "auto",
+			"phaseGate":                phaseGate,
 			"actionCount":              actionCount,
 			"targetGpuCount":           uniqueGPUCountFromMaps(finalRuntimes),
 			"plannerMetadata":          planned["metadata"],
@@ -189,6 +190,15 @@ func createPlan(client *kube.Client, plannerURL string, snap map[string]any, pla
 		"status": map[string]any{"phase": "Planned", "message": "planned by planner-engine using planner=" + plannerName},
 	}, nil)
 	return err
+}
+
+func requestedPhaseGate(snapshotSpec map[string]any) string {
+	switch asString(snapshotSpec["phaseGate"]) {
+	case "manual", "hold":
+		return "manual"
+	default:
+		return "auto"
+	}
 }
 
 func plannerFailure(planned map[string]any) bool {

@@ -138,6 +138,14 @@ def plan_scenario_as_migplan_status(
         **_transition_runtime_kwargs(scenario.transition),
     )
     transition_res["requested_transition_planner"] = transition_planner_name
+    # Stage3 binds provisional logical/bridge lifetimes to concrete physical
+    # GPUs.  That binding is authoritative for executor validation; the Stage2
+    # target still carries its pre-transition physical prediction and may name
+    # a source GPU that Stage3 deliberately replaces with an idle GPU.
+    target_state = transition_res.get("final_plan", {}).get(
+        "planned_state",
+        transition_res.get("executed_state", target_state),
+    )
     canonical_next = canonicalize_state_for_next_round(transition_res["executed_state"])
     return _migplan_status_from_results(
         scenario=scenario,

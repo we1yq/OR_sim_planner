@@ -828,15 +828,29 @@ def _planned_state_for_actions(
     actions: list[dict[str, Any]],
 ) -> ClusterState:
     planned = deepcopy_state(target_state)
-    target_pid_map: dict[int, str] = {}
+    target_gpu_ids = {int(gpu.gpu_id) for gpu in planned.real_gpus()}
+    target_pid_map: dict[int, str] = {
+        int(gpu_id): str(physical_id)
+        for gpu_id, physical_id in dict(planned.metadata.get("physical_id_map", {})).items()
+        if int(gpu_id) in target_gpu_ids and physical_id is not None
+    }
+    binding_priority: dict[int, int] = {}
+    action_priority = {
+        "activate_instance_route": 1,
+        "place_instance": 2,
+        "bind_target_gpu": 3,
+    }
     for action in actions:
         action_type = action.get("type")
         gpu_id = action.get("gpu_id")
         physical_id = action.get("physical_gpu_id")
         if gpu_id is None or physical_id is None:
             continue
-        if action_type in {"bind_target_gpu", "activate_instance_route", "place_instance"}:
-            target_pid_map[int(gpu_id)] = str(physical_id)
+        priority = action_priority.get(str(action_type), 0)
+        logical_id = int(gpu_id)
+        if priority > binding_priority.get(logical_id, 0):
+            target_pid_map[logical_id] = str(physical_id)
+            binding_priority[logical_id] = priority
     if not target_pid_map:
         target_pid_map = {
             int(gpu.gpu_id): get_physical_id(source_state, int(gpu.gpu_id))

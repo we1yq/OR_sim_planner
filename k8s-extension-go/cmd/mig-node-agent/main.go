@@ -810,6 +810,17 @@ func destroyMIG(gpuIndex string) error {
 		}
 		return errors.New(strings.Join(errs, "\n"))
 	}
+	instances, rawInstances, instanceErr := listGPUInstances(gpuIndex)
+	if instanceErr != nil {
+		return fmt.Errorf("verify GPU instances after destroy: %w: %s", instanceErr, strings.TrimSpace(rawInstances))
+	}
+	if len(instances) > 0 {
+		ids := make([]string, 0, len(instances))
+		for _, instance := range instances {
+			ids = append(ids, instance.InstanceID)
+		}
+		return fmt.Errorf("target GPU still has GPU instances after destroy: %s", strings.Join(ids, ","))
+	}
 	return nil
 }
 

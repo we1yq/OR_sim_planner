@@ -5,7 +5,22 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"or-sim/k8s-extension-go/internal/system"
 )
+
+func TestExecutionGate(t *testing.T) {
+	for _, gate := range []string{"", "auto", "approved"} {
+		if !executionGateOpen(gate) {
+			t.Fatalf("gate %q should permit execution", gate)
+		}
+	}
+	for _, gate := range []string{"manual", "hold", "blocked"} {
+		if executionGateOpen(gate) {
+			t.Fatalf("gate %q should hold execution", gate)
+		}
+	}
+}
 
 func TestMissingRouteAlreadyDeactivatedAndDrained(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -204,5 +219,60 @@ func TestProcessesForUUID(t *testing.T) {
 	}
 	if got := processesForUUID(payload, "MIG-child"); len(got) != 0 {
 		t.Fatalf("unexpected child process fallback hit: %#v", got)
+	}
+}
+
+func TestNodeAgentRegisteredTargetsRequiresRegisteredResources(t *testing.T) {
+	targets := []allocatableTarget{{Node: "ampere", Resource: "or-sim.io/mig-new"}}
+	body := map[string]any{
+		"expectedResources": []any{"or-sim.io/mig-new"},
+	}
+	ready, missing := nodeAgentRegisteredTargets(body, targets)
+	if ready {
+		t.Fatal("expectedResources must not be treated as kubelet registration evidence")
+	}
+	if len(missing) != 1 || missing[0] != "ampere/or-sim.io/mig-new" {
+		t.Fatalf("unexpected missing targets: %#v", missing)
+	}
+}
+
+func TestNodeAgentRegisteredTargetsAcceptsRefreshRegistration(t *testing.T) {
+	targets := []allocatableTarget{{Node: "ampere", Resource: "or-sim.io/mig-new"}}
+	body := map[string]any{
+		"devicePluginRefresh": map[string]any{
+			"registeredResources": []any{"or-sim.io/mig-new"},
+		},
+	}
+	ready, missing := nodeAgentRegisteredTargets(body, targets)
+	if !ready || len(missing) != 0 {
+		t.Fatalf("expected refresh registration to be diagnostic-ready, ready=%v missing=%#v", ready, missing)
+	}
+}
+
+func TestRuntimeModelSeparatesWorkloadClassFromLoadedModel(t *testing.T) {
+	cases := []struct {
+		workload string
+		want     string
+	}{
+		{workload: "resnet50_image", want: "resnet50"},
+		{workload: "vgg16_image", want: "vgg16"},
+		{workload: "vit_base_image", want: "vit_base"},
+		{workload: "gpt2_p64_o64", want: "gpt2"},
+		{workload: "llama_p1024_o128", want: "llama"},
+	}
+	for _, tc := range cases {
+		rt := system.ModelRuntimeSpec{Model: tc.workload}
+		if got := runtimeModel(rt); got != tc.want {
+			t.Errorf("runtimeModel(%q)=%q, want %q", tc.workload, got, tc.want)
+		}
+	}
+
+	rt := system.ModelRuntimeSpec{Model: "vit_base_image", RuntimeModel: "vit_b_16"}
+	if got := runtimeModel(rt); got != "vit_b_16" {
+		t.Fatalf("explicit runtimeModel must win, got %q", got)
+	}
+	rt = system.ModelRuntimeSpec{Model: "vit_base_image", RuntimeModel: "vit_base_image"}
+	if got := runtimeModel(rt); got != "vit_base" {
+		t.Fatalf("explicit request-class runtimeModel must be normalized, got %q", got)
 	}
 }

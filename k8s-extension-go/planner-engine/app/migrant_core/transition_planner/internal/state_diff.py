@@ -288,7 +288,30 @@ def _normalized_instance_rows(gpu: GPUState, slice_count: int = 7) -> tuple:
 
 
 def matches_target_state(state: ClusterState, target_state: ClusterState) -> bool:
-    return state_semantic_signature(state) == state_semantic_signature(target_state)
+    cur_map = gpu_map_by_id(state)
+    target_map = gpu_map_by_id(target_state)
+    if set(cur_map) != set(target_map):
+        return False
+    return all(_gpu_matches_target(cur_map[gpu_id], target_map[gpu_id]) for gpu_id in target_map)
+
+
+def _gpu_matches_target(state_gpu: GPUState | None, target_gpu: GPUState | None) -> bool:
+    state_rows = gpu_semantic_signature(state_gpu)
+    target_rows = gpu_semantic_signature(target_gpu)
+    if state_rows is None or target_rows is None or len(state_rows) != len(target_rows):
+        return state_rows == target_rows
+    for state_row, target_row in zip(state_rows, target_rows):
+        # Geometry, profile, workload, and batch are always authoritative.
+        for index in (0, 1, 2, 3, 10):
+            if state_row[index] != target_row[index]:
+                return False
+        # Stage1 may omit runtime metadata that is reconstructed from the live
+        # registry. An omitted target value is a wildcard; an explicit value
+        # remains a strict request-class/runtime identity constraint.
+        for index in (4, 5, 6, 7, 8, 9):
+            if target_row[index] not in (None, "") and state_row[index] != target_row[index]:
+                return False
+    return True
 
 
 def mismatched_gpu_ids(state: ClusterState, target_state: ClusterState) -> list[int]:
@@ -298,7 +321,7 @@ def mismatched_gpu_ids(state: ClusterState, target_state: ClusterState) -> list[
     return [
         int(gpu_id)
         for gpu_id in all_ids
-        if gpu_semantic_signature(cur_map.get(gpu_id)) != gpu_semantic_signature(target_map.get(gpu_id))
+        if not _gpu_matches_target(cur_map.get(gpu_id), target_map.get(gpu_id))
     ]
 
 

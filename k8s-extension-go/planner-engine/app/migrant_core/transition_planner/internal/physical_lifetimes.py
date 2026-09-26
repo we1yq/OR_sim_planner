@@ -53,7 +53,20 @@ def bind_physical_lifetimes(actions, plan_items, source_state):
                 if old in bindings:
                     raise RuntimeError(f"overlapping planned physical lifetime: {old}")
                 if not free:
-                    raise RuntimeError("no physical GPU available for ready acquisition")
+                    ready_actions = [
+                        {
+                            "actionKey": nodes[ready_key]["action"].get("actionKey"),
+                            "type": nodes[ready_key]["action"].get("type"),
+                            "physicalGpuId": nodes[ready_key]["action"].get("physical_gpu_id"),
+                        }
+                        for _, _, ready_key in sorted(ready)
+                    ]
+                    raise RuntimeError(
+                        "no physical GPU available for ready acquisition: "
+                        f"actionKey={action.get('actionKey')!r}, requested={old!r}, "
+                        f"bindings={bindings!r}, owners={owners!r}, "
+                        f"releaseKeys={release_keys!r}, ready={ready_actions!r}"
+                    )
                 actual = free.pop(0)
                 bindings[old] = actual
                 owners[actual] = old

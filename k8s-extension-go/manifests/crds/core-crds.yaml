@@ -46,6 +46,8 @@ spec:
                   type: string
                 forceReplan:
                   type: boolean
+                phaseGate:
+                  type: string
                 epoch:
                   type: string
                 triggerReason:
@@ -64,6 +66,8 @@ spec:
                       items:
                         type: string
                 profileCatalogRef:
+                  type: string
+                scenarioPath:
                   type: string
                 calibrationOverlayRef:
                   type: string

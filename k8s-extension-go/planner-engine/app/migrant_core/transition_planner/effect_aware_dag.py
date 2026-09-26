@@ -11,7 +11,9 @@ from .internal.state_diff import (
     alloc_from_free_pool,
     classify_gpu_change,
     diff_instances_within_same_template,
+    gpu_semantic_signature,
     matches_target_state,
+    mismatched_gpu_ids,
     provided_by_workload,
     safe_after_removing_gpu,
     safe_after_removing_instance,
@@ -91,7 +93,18 @@ def run(
     peak_active_gpu = action_builder._peak_serving_gpu_from_actions(current_state, actions)
     reached_target = matches_target_state(executed_state, target_state)
     if not reached_target:
-        raise RuntimeError("stage3 simulated execution did not reach target")
+        current_map = gpu_map_by_id(executed_state)
+        target_map = gpu_map_by_id(target_state)
+        mismatch = {
+            gpu_id: {
+                "simulated": gpu_semantic_signature(current_map.get(gpu_id)),
+                "target": gpu_semantic_signature(target_map.get(gpu_id)),
+            }
+            for gpu_id in mismatched_gpu_ids(executed_state, target_state)
+        }
+        raise RuntimeError(
+            f"stage3 simulated execution did not reach target: mismatched_gpus={mismatch!r}"
+        )
     final_plan = {
         "stage_name": stage_name,
         "required": required,
@@ -188,7 +201,12 @@ def _build_effect_aware_actions(
         action_builder._append_delete_gpu_actions(actions, plan_items, source_state, target_state, gpu_id, required)
         physical_id = get_physical_id(source_state, gpu_id)
         if physical_id is not None:
-            free_pool.append(physical_id)
+            # alloc_from_free_pool() pops from the end.  A GPU released by this
+            # plan is not available until its delete chain completes, so keep
+            # it behind devices that are already idle at plan start.  Picking
+            # the future release first can create a false capacity cycle and
+            # unnecessary temporary-GPU lifetimes.
+            free_pool.insert(0, physical_id)
         decisions.append(_fixed_decision("remove_gpu", gpu_id, actions[before:]))
 
     for gpu_id in [gpu_id for gpu_id, kind in classified.items() if kind == "reconfiguration"]:
