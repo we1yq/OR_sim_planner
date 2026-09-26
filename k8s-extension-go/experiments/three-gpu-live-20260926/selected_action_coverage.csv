@@ -1,0 +1,17 @@
+action,count
+activate_instance_route,45
+allocate_gpu,6
+apply_batch,17
+bind_target_gpu,6
+clear_gpu_binding,4
+clear_template,4
+configure_full_template,6
+configure_partial_profile,3
+deactivate_instance_route,21
+delete_instance,21
+patch_batch_config,17
+place_instance,28
+register_mig_devices,9
+return_gpu,4
+verify_batch,17
+wait_instance_drain,21

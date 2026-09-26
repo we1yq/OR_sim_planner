@@ -1,0 +1,22 @@
+{
+  "planner_root": "/tmp/or-k8s-sync-20260926/k8s-extension-go/planner-engine/app",
+  "planner_commit": "e965f1118",
+  "trace": "/Users/weiyiqin/Downloads/OR_sim_planner/eval/results/section4_3_peak_trace_20260925/30min/demand.csv",
+  "trace_sha256": "9fd93bc4b457620d6b05294e0d3242dd8ba082ec0436eb91d359f25e9cd0c838",
+  "scales": "0.025,0.05,0.1,0.15,0.2,0.3,0.5,1",
+  "pool": [
+    "offline-nodeA-GPU0",
+    "offline-nodeA-GPU1",
+    "offline-nodeB-GPU0"
+  ],
+  "threads": 8,
+  "seed": 1,
+  "mip_gap": 0,
+  "limitations": [
+    "Synthetic device identities with 2+1 topology; no live node query.",
+    "Each round re-observes the complete idle-device inventory.",
+    "Assumed one inflight request per current replica for drain coverage; not measured traffic.",
+    "Cross-node model availability and runtime support require preflight.",
+    "Each failure breaks the chain; subsequent initialization is marked."
+  ]
+}
