@@ -1,257 +1,234 @@
-# 三卡集群执行手册：转换承诺与实际容量验证
+# 三卡集群执行手册 v2：单次连续实验、同口径 profiling、仅采集数据
 
-版本：2026-09-26。执行对象：控制平面上的 agent。本文是执行规格，不表示下述 harness 已实现。
+更新：2026-09-26。本版取代原三 seed 全流程方案；控制平面 agent 以本版为准。
+本文是执行规格，不表示 harness 已实现。禁止按旧计划继续安排额外重复或并发扫描。
 
-## 0. 任务边界与不可自行修改的事项
+## 0. 本轮范围和时间预算
 
-1. 集群两个 worker，共三张 A100，分布为 2+1；不得使用其他业务的 GPU。
-2. 基准代码提交 e965f1118。先核对 HEAD、工作区差异及运行镜像 digest；有后续修复时记录 diff 并重新离线验证，不自行 reset 用户改动。
-3. 本轮测 SliceWise，不运行 baseline，不重跑论文离线实验，不修改正文。
-4. 允许 target 使用三张；所有转换过程中实际占用也必须不超过三张。不固定扣除一张备用 GPU。
-5. 不修改 catalog、SLO、batch 选项、模型请求形状或某一类 workload 的相对需求。
-6. 禁止把离线 pickle 中的占位物理 ID 提交给集群。正式计划必须来自真实观测快照。
-7. 先检查集群独占权。发现其他用户的实例或不明占用，停止并报告，不能清空它们。
-8. 自动失败重试不得改变统计口径。保存每次失败、重试与恢复，不能只保留成功尝试。
+- 只跑 seed=71 的一次完整12轮序列：1次初始化、11次非空源转换。
+- 不跑 seed=113/197，不做代表性 Partial/Bridge 局部重复，不做 Poisson、SW-C、独立共置扫描。
+- seed=71只决定开环发流的起始相位；Gurobi Seed=1始终不变，不改变demand。
+- 稳定期沿用原profiling的推理计时方法，取消所有逐档并发搜索，不宣称测得端到端最大吞吐。
+- 控制平面只实现/核查采集工具、执行实验、导出原始数据和表格/文字报告。不要画图，不要安装绘图库，不生成PDF/PNG/SVG或绘图脚本。
+- 数据回到用户当前主机后，由当前主机另行分析和画图。不要把绘图纳入集群耗时。
+- 目标是在环境和harness已就绪的前提下约1–2小时得到首版数据，不是完成保证。
+- 已在跑的安全转换正常完成，不强制中断；复用同输入、同代码和相同测量口径的已完成数据，并标记沿用来源。旧并发压测数据不能冒充新版profiling。
+- 记录总耗时与每轮耗时；预估将超过2小时及时报告剩余任务，不擅自缩短测量、删工作负载或绕过drain。
 
-## 1. 输入交接
+预算参考：环境/复用冒烟10–15分钟；11轮source对照11分钟；12轮target稳态6分钟；12轮profiling至少12分钟；预热/排空/规划/真实转换和数据导出占余量。模型加载、慢请求或缺失harness可增加时间，必须如实报告。
 
-以下路径均相对于仓库根目录。只拉取 k8s-extension-go 的控制平面未必有 eval 文件，缺失时先从本地工作区传递这几个文件；不得用旧 runner 内置 trace 代替。
+## 1. 冻结输入与版本
 
-- eval/results/three_gpu_screen_20260926_v2/selected_demand.csv
-- eval/results/three_gpu_screen_20260926_v2/catalog.csv
-- eval/results/three_gpu_screen_20260926_v2/manifest.json
-- eval/results/three_gpu_screen_20260926_v2/selected_rounds.csv
-- eval/results/three_gpu_screen_20260926_v2/selected_action_coverage.csv
-- eval/reports/three_gpu_offline_screen_20260926.md
-- 本执行手册。
+所有正式输入在本手册所在目录 k8s-extension-go/experiments/three-gpu-live-20260926/：
+- selected_demand.csv：唯一正式需求输入，12行，七个workload，单位req/s。
+- catalog.csv：84个SLO-qualified多batch选项。
+- selected_rounds.csv、selected_action_coverage.csv、selected_physical_prefix_audit.csv：离线核查参考。
+- manifest.json：离线溯源，里面的Mac临时路径不是集群执行路径。
+- original_30min_demand.csv、three_gpu_offline_screen_20260926.md：来源与筛选记录。
+- SHA256SUMS：传输后核对，不自行重新生成demand。
 
-在控制平面计算并保存所有输入的 SHA256，交接双方核对。不要重新生成或四舍五入 demand。
+需求已乘0.2，不能再次缩放。selected_demand.csv的live_round=1..12；round=原trace R4..R15。
+第一行从空实验分配初始化，不需要先执行原R1–R3。原hour不是实机等待时间。
+离线target GPU数为3,3,3,2,1,1,1,1,2,1,2,2，仅作参考，不强制不同机器的等价最优解一致。
 
-输入为 §4.3 的 30 分钟窗口峰值需求，七个 workload 统一乘 0.2，连续选择原 trace R4–R15。
-selected_demand.csv 的 live_round=1..12 为本次编号；round=4..15 为原 trace 编号。
-原窗口为相对时间 [1.5h,7.5h)，实机不等待半小时推进，按本手册的测量阶段推进。
-live R1 从空集群初始化，live R2–R12 为 11 次转换。
-离线 target GPU 数为 3,3,3,2,1,1,1,1,2,1,2,2；这是参考，不强迫同机以外的等价最优解逐位一致。
+保留七个独立workload key：
+resnet50_image、vgg16_image、vit_base_image、gpt2_p64_o64、gpt2_p512_o512、llama_p1024_o128、llama_p2048_o64。
+不能合并GPT-2或Llama的请求形状，不能改成旧runner的三个模型简写。
 
-workload 必须保留以下七个独立 key，不能合并成 gpt2/llama：
+正式planner基准commit为e965f1118；实际运行HEAD、diff和镜像digest另行保存，有后续修复则重新核查。
+两个worker共三张A100（2+1）；target可用三张，但转换全过程不能用第四张。
+所有物理ID必须来自真实观测；不能提交离线pickle中的占位ID。
+不修改catalog、SLO、batch菜单、请求形状或需求比例。不得清空其他用户的资源。
 
-- resnet50_image
-- vgg16_image
-- vit_base_image
-- gpt2_p64_o64
-- gpt2_p512_o512
-- llama_p1024_o128
-- llama_p2048_o64
+## 2. 开跑前的必要核查
 
-每个 replica 的预测吞吐按 (workload, 最终物理 profile, batch) 从冻结 catalog 精确查找。
-缺失、重复或单位不匹配均停止；不能把逻辑 3g 的 mu 用于物理 4g。
+1. 确认测试床独占权、namespace、context、真实GPU库存与健康状态。
+2. 记录控制平面和两个worker的CPU/内存/OS/kernel、GPU型号/显存/UUID/MIG模式、驱动/CUDA/Kubernetes/GPU Operator/device plugin/container runtime版本。
+3. 保存planner、executor、router、MIG agent、runtime镜像digest，核对七种请求类型在两个节点的部署能力。
+4. 核查原profiling入口、模型/精度/预处理、batch、token长度、warmup和计时边界。在readiness.md写出实际执行命令和源码位置，不能根据名称猜测一致。
+5. 日志需有动作、请求、replica生命周期和路由/batch生效事件，不能只采集日志末尾若干行。
+6. 先核查可用的同版本冒烟记录。缺失关键就绪/batch/设备释放证据时补最小安全检查；不为了增加策略覆盖额外构造整套实验。
+7. In-place未在离线片段中触发。若无已有验证，报告未覆盖，不为本次新增独立In-place实验；发现运行必要的安全前置条件未满足则停止，而不是冒险执行。
+8. 三卡离线预检使用真实设备库存，target<=3、所有拓扑前缀峰值<=3、容量依赖审计通过。每轮实际执行前刷新source，状态不符时作废旧计划并重规划。
 
-## 2. 先交付运行能力，再执行实验
+readiness.md列出ready/blocker及实际harness入口。旧eval/3gpu_test/real_3gpu_k8s_experiment.py仅供参考，不能默认符合本版协议。
+原profiling可能使用独立脚本/Pod；不能直接运行会重配或独占设备的旧profile matrix。应复用计时逻辑，在已部署target的replica内测量，保持布局不变。
+缺失必要工具先补齐并测试，时间不足应报告，不静默替代测量方法。
 
-旧 eval/3gpu_test/real_3gpu_k8s_experiment.py 只能作为实现参考：它含旧 workload 简写和旧流量流程，不能直接当成本协议已实现的入口。
-参考正式实现：k8s-extension-go/cmd/transition-executor/main.go、cmd/cluster-state-manager（以仓库实际路径为准）、cmd/model-runtime、planner-engine/app。
+所有主机记录时钟同步offset，目标绝对值<=10ms；跨主机时序保留误差。同进程耗时用monotonic，事件用UTC时间。
+Stage1/2 Threads=8、Seed=1、MIPGap=0，仅OPTIMAL；本轮不与其他规划压测并行。无新增求解时限，遇耗时异常报告。
+环境/日志不能包含license token、密码或访问密钥。
 
-执行 agent 先实现或核查以下功能，并生成 readiness.md，列出实际入口命令、API/CRD 名称、日志位置和未满足项：
+## 3. 发送与请求规则
 
-| 功能 | 必须具备的行为 |
+转换和稳态服务测试均经正式router，开环按预设时间发送，不等待上一请求完成。
+profiling是独立阶段，可在实际replica内部计时，不经过路由的测量必须标明范围。
+
+固定间隔d>0：offset=phi+n/d，phi由seed71与workload稳定hash在[0,1/d)生成。
+每轮source control与transition使用同一发送文件、payload、offset，attempt ID区分阶段。
+d=0不发请求；不提高LLM最低流量。语言使用与catalog一致的prompt/output长度和tokenizer，视觉输入及预处理一致。
+保存payload hash、实际token数；一张图片/一条生成请求为一个逻辑样本，不把一整个batch当成一个样本。
+
+单请求超时900秒，执行watchdog1800秒；它们是异常上限，不是每轮固定等待。
+客户端自动重试关闭，服务端/执行器重试需单独记录。
+客户端pending安全上限每workload256、总计1024。达到上限停止新增并标measurement_invalid，不静默限速变闭环。
+记录scheduled_send/actual_send；漏发即质量异常。p99发送lag需<=max(10ms,min(100ms,0.05/d))；超出则保留结果并标发流器异常。
+不因吞吐低、失败或容量不达标而删结果或换seed。
+
+请求计数：
+N_pending=N_sent-N_success-N_failure；超时属于failure，完整响应才算LLM success。
+N_pending包含正常在途请求，不叫排队。已有router/runtime队列计数可原样保留，但本轮不新增排队/路由算法分析。
+
+## 4. 单次12轮执行状态机
+
+### live R1：初始化
+
+从空实验分配执行第一行target，保存初始化动作和峰值，核验实际target。
+目标就绪后按D_new开环运行30秒，停止新请求并排空，再执行第5节profiling。
+初始化承诺为0，不计算容量比，不计入11次非空源转换；仍计入收敛、动作和稳定期容量统计。
+
+### live R2–R12：每轮固定顺序
+
+1. SOURCE_CHECK：确认上一轮profiling结束、请求排空、布局及batch未变化。上一轮30秒target稳态已承担旧需求测试，不再额外重复120秒旧需求段。
+2. SOURCE_CONTROL：保持source不变，以commitment=min(D_old,D_new)发送60秒。记录相同发送文件的source对照，勿触发规划执行。
+3. DRAIN：停止新增，等待本阶段请求终结及可观测队列排空。正常为空时立即继续；超过900秒停止本次运行，记录未完成请求。
+4. PLAN_VALIDATE：从真实source规划target/DAG，保存规划时间；检查容量依赖和三卡上限，未经通过不执行。
+5. TRANSITION：coordinator同步释放开环发送与executor；承诺发流从首个动作之前/同时开始。保存barrier和首动作时间；已进入该阶段的请求不能丢弃。
+6. TARGET_REACHED：全部动作完成且独立状态核对通过才结束转换；立即切换D_new发流30秒。转换遗留请求继续追踪，用phase区分新旧请求。
+7. DRAIN：停止新增并排空，保存全部请求终态。
+8. PROFILE_TARGET：执行第5节；结束后停止profile worker，确认实际batch/layout未变化、无遗留请求。
+9. 保存最终快照和逐轮汇总，再进入下一轮。
+
+SOURCE_CONTROL是配对的单次测量，不是额外Partial/Bridge局部重复；每次转换只执行一次。
+若转换超过60秒，承诺发流按相同规则继续到结束。source配对范围仅前60秒，尾部明确标unpaired，不重做转换或恢复source补测。
+遇动作失败、目标不符或1800秒watchdog，不进入下一轮。安全停止新请求并保全状态，不能直接重放整个部分执行的DAG。
+不存在“跑完再多一个seed”“有余量追加局部重复”的步骤。
+
+## 5. 稳定期：沿用profiling口径验证实际容量
+
+目的：在最终target实际共置条件下，验证各workload的推理容量是否达到catalog预测及目标需求。
+不是端到端吞吐极限搜索，不做并发加倍扫描，也不把模型内计时误称HTTP完成吞吐。
+
+### 固定方法
+
+- 保持最终target的GPU、MIG、replica、batch不变；不重新部署profiling专用副本，不遍历未选中的catalog配置。
+- 停止开环服务测试，确保遗留请求排空。每个实际replica只启用一个连续benchmark worker；所有replica同时测量。
+- 沿用原profiling同样的输入生成、精度、batch、token长度、warmup、CUDA同步/计时方法。将具体参数写入profile_protocol.json。
+- 不用旧累计runtime均值直接当本轮样本；重置本轮测量窗口或按原始样本计算。
+- 每个replica先执行原profiling规定的warmup次数。全部完成后通过统一barrier开始60秒采样。若原预热参数无法查证，列blocker，不随意声称“同口径”。
+- worker连续执行完整batch，中间不主动sleep；只在计时范围内测原profile定义的推理/生成过程，排除客户端排队和路由耗时。
+- 60秒到达后不启动新的batch，允许已开始的batch完整结束，保存超出窗口的实际结束时间。所有worker完成后才能进入下一轮。
+- 保存每个完整batch的起止、逻辑样本数、纯推理时间、实际profile/batch及错误。不要用低于一个完整batch的截断时间计算吞吐。
+- 所有replica必须在共同采样区间活跃，记录起止偏差、设备利用率（可用时）和worker间空隙。空隙显著或worker饥饿则标测量质量问题，不宣称已饱和。
+- OOM、GPU错误、runtime退出等原样保存并停止后续轮次，不能换batch隐藏问题。
+- 60秒内没有完整样本则填insufficient_samples，不把缺失写0，也不自动加长或换输入。
+- runtime无法在不改变target的条件下执行同口径profile时，先修测量接口或报告阻塞，不改用并发扫描替代。
+
+### 计算
+
+mu_measured_replica = sum(完整batch逻辑样本数) / sum(这些batch按原profile边界计的推理秒数)。
+对于固定batch，等价于batch_size/平均batch推理时间。原profile若使用其他聚合，先核对并记录差异，不能混用。
+每个workload：
+C_pred=sum(最终各replica对应catalog_mu)；
+C_measured=sum(本轮同时测量各replica的mu_measured_replica)；
+D=本轮目标需求。
+报告C_measured/D、C_measured/C_pred；分母为0记null。缺失replica样本时整体标不完整，不能只加成功者后称完整容量。
+另存每replica完整样本数量、计时总和、观测墙钟跨度、失败数、实际batch，便于主机复算。
+
+这验证的是profile口径的推理容量，不包括网络、路由、排队；不能称“实测端到端最大req/s”。
+吞吐>=D和>=C_pred分别记observed_met_demand和observed_met_prediction，没有默认95%宽限。
+只跑一次，按逐轮实际值报告，不制造跨运行误差线或三次中位数。LLM样本少必须给出样本数。
+
+## 6. 实例上下线：必须按workload分开记录
+
+GPT-2和Llama的不同请求形状分别统计，不能只按vision/LLM两大类或全部instance混算。
+每条记录含workload、family、runtime_id、Pod UID、node、GPU UUID、MIG UUID、slot、physical_profile、batch、round、action_id、attempt。
+
+上线事件：
+- deployment_create_started_at
+- deployment_created_at
+- pod_ready_at
+- model_cuda_verified_at
+- route_activation_ack_at
+
+下线事件：
+- route_stop_accepting_effective_at（未知时同时存请求/ACK区间）
+- drain_started_at
+- drain_completed_at
+- pod_delete_started_at
+- pod_gone_confirmed_at
+
+分开导出创建/就绪等待、路由激活、drain、删除，以及整段上线/下线耗时。
+整段上线=create_start→route_active；整段下线=stop_accepting→pod_gone。
+batch原地更新单列apply/verify耗时，不当作新Pod上线；不适用字段填null。
+某动作没有workload（整卡MIG配置等）标GPU-scope；另存受影响workload列表，不能将同一GPU动作伪复制为每workload独立样本。
+事件缺失填null并记录原因，不能拿动作结束时间冒充就绪/路由生效时间。
+各workload×action汇总样本数、中位数、最小/最大值；这里是本次运行内多实例动作的统计，不是跨重复统计。
+所有失败尝试和重试等待保存；成功耗时统计标明仅成功attempt，端到端转换耗时包括实际失败/等待。
+
+## 7. 转换期间容量核算与辅助请求记录
+
+承诺d_transition=min(D_old,D_new)。
+账本为已就绪且可接收新请求replica的catalog_mu之和；不是实时实测吞吐。
+新replica ready且路由生效后加容量；旧replica停止接收新请求时扣除，即使仍在drain。
+batch生效替换旧mu，不重复加整份容量。ready丢失或endpoint异常退出也记录。
+优先实际生效事件；只有请求/ACK时间则记录区间，增容按确认后、减容按最早可能时刻构造保守账本。
+未知事件标unknown；时间同步误差内的次序无法确定时标不确定，不能随意填充成0违规。
+输出每workload最低容量比、低于承诺的区间/持续时间及不确定区间。承诺0的比值为null。
+
+请求只作服务异常的辅助证据：记录发送准时性、成功、失败、超时及遗留请求最终状态。
+不将pending>0判为违反承诺，不以无失败单独证明容量安全。
+本轮不分析路由选点策略或排队机理；现成queue/inflight数据可保存供排查，不新建这方面实验。
+固定source对照用于保留相同发送条件的参考，不输出排队差值主结论。
+所有时序数据完整回传，由用户主机决定分析与画图；控制平面不画任何图。
+
+## 8. 必须导出的数据
+
+所有表包含run_id、live_round、trace_round、phase、traffic_seed=71；若保留repeat字段固定为1。
+UTC时间含精度和来源；同进程duration保存monotonic值。不要上传凭据。
+
+| 文件 | 必需内容 |
 |---|---|
-| 计划与执行分离 | 可以先产生/检查 DAG，再批准执行；对照期间不能自动执行待测转换 |
-| 实际状态读取 | 查询真实 GPU UUID、MIG UUID、slot、workload、batch、Pod UID、route endpoint、就绪状态 |
-| 开环发流 | 按保存的相对时间发送，不等待完成，不因拥塞自动减速 |
-| 配对重放 | source 与 transition 使用相同请求内容、相同发送偏移、相同逻辑请求编号 |
-| 饱和模式 | 与开环分开，实现第 7 节的并发扫描和固定并发测量 |
-| 请求追踪 | 每次尝试有唯一 ID，可关联发送、终态及客户端/服务端事件 |
-| 行为日志 | 记录完整 action event，不是只抓最后若干行日志 |
-| 队列观测 | 有 router/runtime 的 queued/inflight 则采集；没有则标 unavailable，不用客户端 outstanding 冒充 |
-| 执行失败 | 失败停止后续轮次，保存状态；不得在部分执行后盲目重放整个 DAG |
+| environment.json | 硬件/软件/镜像/commit/diff、设备拓扑、输入hash、时钟offset、求解参数 |
+| readiness.md | 前置核查、已复用冒烟及版本、实际执行命令、工具实现与限制 |
+| profile_protocol.json | 原profiling入口/版本、模型精度、请求形状、batch、warmup、CUDA同步、计时与聚合定义 |
+| planned_requests.csv | workload、sequence_id、payload_hash、发送offset、rate、seed |
+| requests.jsonl | 唯一attempt_id、sequence_id、workload、scheduled/actual_send、first_token、completion、status/error、实际token/样本数 |
+| actions.jsonl | plan_id、action_id/type、attempt、依赖、start/end/status、workload或GPU-scope、设备/slot、错误 |
+| replica_lifecycle.csv | 第6节全部身份与上线/下线事件、时序缺失标记 |
+| action_runtime_by_workload.csv | workload×action的成功/失败样本数、成功中位数和范围；batch更新单列 |
+| runtime_events.jsonl | ready/unready、route生效/撤销、batch生效及请求/ACK区间 |
+| gpu_events.jsonl | 物理GPU获取/释放实际时间、owner与关联action |
+| snapshots/ | 每轮前后原始资源、registry、GPU/MIG/Pod/route/batch和规范化diff |
+| plans/ | source/target/demand/DAG、规划时间、容量与三卡审计 |
+| profile_samples.csv | 每replica每完整batch的样本数、纯推理耗时、起止、实际配置与错误 |
+| capacity_results.csv | 每轮每workload的D、C_pred、C_measured、两个比值、样本数、完整性与单位 |
+| capacity_timeline.csv | 实际事件重建的catalog容量、commitment、比值、事件来源、不确定区间 |
+| transition_requests_summary.csv | 每轮每workload每阶段的发送/成功/失败/超时/pending、发流质量 |
+| round_summary.csv | reached_target、makespan、规划时间、动作/策略计数、GPU峰值/headroom、失败和数据质量 |
+| results.md | 单次运行完整结果和限制，不写英文正文，不嵌入新图 |
 
-若必要功能缺失，先补 harness 与单元测试，不能跳过后宣称已验证。产出真实可运行的命令，不猜测不存在的 CLI。
-
-## 3. 环境记录、权限和时间
-
-- 记录 namespace、kubectl context、控制平面与 worker CPU/内存/OS/kernel、GPU型号/显存/UUID/MIG模式、驱动、CUDA、Kubernetes、GPU Operator、device plugin、container runtime 版本。
-- 记录 planner/controller/executor/router/MIG agent/model runtime 的代码版本和镜像 digest，保存实际 Gurobi 参数。环境变量中的凭据不要写入报告。
-- 确认两节点均有七种 workload 所需的镜像和模型文件；确认 runtime 接受对应 prompt/output 长度和 batch。
-- 记录设备 UUID 到节点的映射、其他资源约束、当前占用和健康状态。所有请求经正式 router，而非绕过它直连 replica。
-- 负载生成器最好在非 GPU worker 的独立主机；若运行控制平面，记录 CPU/内存占用并单独验证它不成为瓶颈。
-- 所有主机启用时钟同步，记录开跑前后的 offset；目标绝对 offset <=10 ms。未达到时不做毫秒级跨主机事件先后结论。
-- 同进程持续时间用 monotonic clock；跨主机关联使用 UTC 纳秒时间和事件来源，并保留时间误差。
-- 正式 solver 使用 Threads=8、Seed=1、MIPGap=0，Stage 1/2 无求解时限，仅 OPTIMAL。不得在本轮与其他规划压测抢 CPU。
-
-## 4. 冒烟与真实三卡预检
-
-依次验证：batch 增大/减小、Partial、In-place、Bridge。每个从已知状态开始，完毕清理本次资源。
-batch 检查 Pod UID 是否保持、实际 batch、预测容量更新；不能只看 HTTP 200。
-Bridge 至少一个跨节点案例，验证目标路由生效、旧源释放、物理绑定最终正确。
-每例记录实际动作覆盖、DAG valid、reached_target、容量前缀审计、峰值物理占用。
-若三卡上构造不出某种安全案例，报告未覆盖，不能强行忽略容量保护。
-
-用真实空闲设备清单重新离线规划推荐 12 轮；初始 source 为空实验分配，GPU 库存仍为三张。
-每轮 target<=3、全过程峰值<=3、容量前缀审计通过、真实节点约束满足才接受。
-如果真实状态产生不同 placement 可以保留，但重新检查覆盖；若计划失败，停止并诊断，不静默换需求/换窗口。
-每次实际执行前再次刷新 source；如与计划 source 不一致则该计划作废，重规划并记录。
-
-## 5. 发送器统一规则
-
-### 5.1 请求形状
-
-视觉使用与 profiling 相同预处理及固定有效图片，保存内容 hash。
-语言使用固定的对应 prompt 长度、输出长度、tokenizer 与生成参数，校验实际 token 数；保存请求 payload hash。
-所有 workload 同时发送，不能逐 workload 分开测来逃避共置影响。
-
-### 5.2 开环模式
-
-三个主重复的 seed 分别为 71、113、197。
-固定间隔：workload 速率为 d>0 时，发送偏移为 phi+n/d；phi 从 [0,1/d) 由 seed 与 workload 稳定 hash 派生。
-同一轮 control/transition 使用同一个已保存的发送文件，payload、offset 完全相同，attempt ID 不同。
-d=0 不发流；不能为了制造请求加最小流量下限。每个 workload 的预计和实际请求数都要报告。
-默认配对文件长度 300 秒。transition 只发送到执行结束；对照使用相同时间长度的前缀作分析。
-
-单请求超时 900 秒，计划执行 watchdog 1800 秒。客户端自动请求重试关闭；服务端重试如存在必须追踪。
-客户端 outstanding 安全上限每 workload 256、总计 1024；这不是调速并发数。
-达到上限、发送线程阻塞或请求丢失时停止新增发送并标 measurement_invalid，记录原因，不悄悄变成闭环。
-每个请求记录 scheduled_send、actual_send；任何漏发使该次测量无效。
-发送抖动验收：p99 lag <= max(10 ms, min(100 ms, 0.05/d))，每 workload 分开检查。
-超过阈值的原始结果保留为发流器异常，不作为干净的配对比较。
-
-### 5.3 不能混淆的计数
-
-N_sent：实际发出的请求尝试数；N_success：成功完成；N_failure：明确错误/超时；N_pending=N_sent-N_success-N_failure。
-N_sent-N_success 还包含失败，不能称为排队；N_pending 包含正常执行中的请求，也不能称为 runtime queue。
-分别记录 client pending、router queued、runtime queued/inflight；缺失项填 null。
-LLM 的第一 token 不算请求完成，完整响应才计入完成数。
-
-## 6. 每次主重复的精确状态机
-
-三个重复串行执行，禁止相互抢资源。每次从空实验分配启动，全程记录事件。
-
-### 6.1 live R1：初始化
-
-从空实验分配规划并执行第一行 demand 的 target。
-记录动作和峰值、验证目标，执行第 7 节容量测试；初始化没有非零旧需求，不做转换承诺流量比较。
-R1 单列计入执行收敛和容量测试，不混入 11 次非空源转换的统计。
-
-### 6.2 live R2–R12：每轮固定顺序
-
-1. SOURCE_STEADY：在当前 source 上按旧需求开环发送 120 秒。保存完整指标。不能自动扩缩容。
-2. RESET_TRAFFIC：停止新增请求，等待客户端 pending 和可观测队列归零，最多 900 秒。未排空则停止本重复并保存状态。
-3. SOURCE_CONTROL：保持 source 不变，按 commitment=min(old,new) 重放保存的 300 秒序列。开始计时前确认无遗留请求。
-4. RESET_TRAFFIC：停止发送并排空，要求同上；确认 GPU/layout/Pod UID/route/batch 未改变。
-5. PLAN_VALIDATE：从当前真实快照生成 target+DAG，记录规划时间，完成容量与三卡峰值检查；不执行。
-6. TRANSITION：发流器与 executor 由同一 coordinator barrier 释放。发流器从 offset=0 按同一文件发 commitment；记录 barrier 与首个动作开始时间。承诺在首个动作之前生效，禁止执行后才补发流。
-7. TARGET_REACHED：以全部动作完成且独立实际状态核对通过为转换结束。停止 commitment 序列，切换到新需求，持续 120 秒。未完成的转换请求继续追踪，禁止丢弃。
-8. RESET_TRAFFIC：停止新增并排空，检查全部请求终态。
-9. CAPACITY_TEST：执行第 7 节饱和容量测试，然后排空；配置不得改变。
-10. 保存轮末快照、所有产物及本轮质量检查，再进入下一轮。
-
-SOURCE_STEADY → CONTROL 的速率变化与 drain 是测量边界，不属于待测转换。
-控制阶段不发旧需求而发 commitment，是为了与转换段严格配对；旧需求已在 SOURCE_STEADY 单独测量。
-
-如果转换超过 300 秒，发流器按相同固定间隔继续发送至结束，不能停在 300 秒。
-此时保存完整转换数据，但配对主分析只用前 300 秒，并明确未覆盖的尾部；不把这次失败隐藏或冒充全程有对照。
-若转换超过 1800 秒/动作失败，不执行下一轮。停止新请求、保存实际状态，按正常有序方式恢复，不绕过 drain。
-
-## 7. 最终 target 的饱和容量验证
-
-目的：测真实并发共置下的吞吐，分别比较 target demand 和预测容量。与转换流量试验分开。
-对每个活跃 workload：C_pred=sum(catalog_mu of final replicas)，D=本轮 demand，n=实际 replica 数。
-固定 GPU/MIG/replica/batch，不启用 autoscaler；所有活跃 workload 同时压测。
-
-### 7.1 并发扫描（闭环，只用于容量测试）
-
-使用每 workload 并发 c_i=n_i*2^j，j=0..7。相同 j 下所有 workload 同时运行，每个请求完成后立即补发。
-单次请求与前文相同，记录实际 batch 和响应 token。不要在负载生成器做额外 batch 合并。
-每级预热 30 秒、测量 60 秒；不同级之间停止新增并排空。记录每级吞吐、延迟、失败、资源使用。
-候选平台条件：每个活跃 workload 最近连续两次加倍的吞吐增长均在 [-5%,+5%]，且无请求失败。
-达到条件后停止扫描，选当前 j；这只是操作性平台判据，不是数学上的最大值证明。
-若 c_i 超过每 workload 256 或总计 1024，则不执行该级，记录上限；若到 j=7 仍无平台，标 plateau_not_confirmed。
-遇 OOM、GPU error、runtime 崩溃，保存失败，不将该级当零吞吐后取较优结果隐去。
-
-### 7.2 固定级测量
-
-若平台确认：在选定并发同时测 120 秒，预热 30 秒不计入。按该 120 秒内成功完成请求数/120 得到 C_measured。
-若平台未确认：在最大无失败且可执行的并发级同样测 120 秒，标 observed_at_tested_concurrency，不写“最大容量”。
-这里的闭环与转换开环是不同模式，在日志中强制标记。
-采集每个 workload 完成数、失败、TTFT/TPOT或视觉延迟、实际 batch、queued/inflight、客户端负载。
-报 C_measured/D 和 C_measured/C_pred，D=0 的前者为 null。
-所有 C_measured 必须来自同一个同时发流测量区间，不能把不同并发级各 workload 的单独最大值拼成容量向量。
-
-延迟/SLO仅作性能校验和边界：饱和闭环 throughput 达到预测不等于 SLO-qualified sustainable capacity。
-本实验不声称求出了 SLO 下精确最大请求率；若要这项结论，应另做开环负载扫描，不能混同。
-预先规定没有“95%就算达到”的宽限：实际测值>=D 或 >=C_pred 才分别记 observed_met_demand / observed_met_prediction。
-三次重复逐次报告，再报中位数与范围；重复值跨阈值时写结果混合，不单凭中位数宣布全部达到。
-
-## 8. 必须保存的数据表
-
-所有表包含 run_id、repeat、live_round、trace_round、phase。时间字段使用 UTC ns，持续时间另存 monotonic ns。
-
-| 文件 | 必需字段 |
-|---|---|
-| environment.json | 节点/GPU拓扑、版本、commit、镜像digest、输入hash、时钟offset、并发与超时 |
-| planned_requests.csv | workload、sequence_id、payload_hash、offset_ns、模式、seed |
-| requests.jsonl | attempt_id、sequence_id、workload、scheduled/actual_send、first_token、completed、status、error、token数、字节数 |
-| actions.jsonl | plan_id、action_id、type、attempt、depends_on、scheduled/start/end、status、错误、节点、物理/MIG UUID、slot |
-| runtime_events.jsonl | replica/Pod UID、workload、profile、batch、ready/unready、route add/remove ack、batch生效、事件发生及观测时间 |
-| queues.csv | 每100 ms记录client pending；router/runtime按支持频率且至少每1秒采样，缺失标null |
-| gpu_events.jsonl | UUID、allocation owner、获取/释放成功时间、关联action、source/target标识 |
-| snapshots/ | 每轮前后完整raw Kubernetes资源、registry、MIG/replica/route/batch及规范化对比结果 |
-| plans/ | source、target、demand、DAG、容量审计、实际设备三卡审计 |
-| round_summary.csv | reached_target、makespan、规划时间、重试、失败、headroom、动作统计、数据质量标记 |
-| capacity_results.csv | 并发级、平台判定、C_pred、D、C_measured、两个比值、请求数、失败、延迟、测量区间 |
-
-动作日志不能只记录一个最终耗时：失败尝试与重试等待分别保存。
-makespan = 最后完成/核验事件 - 第一个动作开始；另外报告提交至目标核验的端到端时间，不含本手册稳态/控制/压测阶段。
-GPU占用从获取生效到成功return，不能在移出路由、清除logical binding或发送release命令时提前扣除。
+makespan=首动作开始至全部动作及实际target核验完成；提交至完成的端到端耗时另列，不混入稳态/profile时段。
+物理GPU占用从获取生效至return成功，不能在route撤销或clear_binding时提前扣除。
 headroom=max(0,peak_reserved-max(source_gpu_count,target_gpu_count))。
+保留实际出现的全部动作类型；不能用离线229个动作或16类覆盖填代真实结果。
 
-## 9. 容量账本和请求分析
+## 9. 停止规则与结果边界
 
-### 9.1 容量账本不是实测容量
+- 发现他人资源、缺失模型/关键接口/日志、三卡计划不通过：不启动正式执行。
+- 动作失败、设备错误、target不符、无法排空：停止下一轮并报告，正常安全收尾，不硬删在途实例。
+- 发流器漏发/滞后、测量worker饥饿、事件丢失：标对应数据质量，保留原始记录；不得把异常样本删除后声称成功。
+- 性能低于预测/需求本身是结果，不以此重新挑选输入或seed。
+- 修改算法或runtime后换版本标签；已采数据不伪装同版本全序列。
+- 没有自动追加第二次全流程、局部重复、Poisson、SW-C或共置实验。
+- 单次连续实验不声称统计稳健性。全部成功时为12/12执行收敛，其中11次非空源转换；成功数必须来自实际记录。
+- 动作覆盖、策略覆盖、故障分支覆盖是不同概念。未触发In-place或某类动作就报告未覆盖。
 
-容量账本是已就绪、已路由 replica 的 catalog_mu 之和。
-新实例 ready AND route生效后才加；旧实例不再接受新请求时扣除，即使仍在drain。
-batch 生效后替换旧mu为新mu，不重复加整份容量。
-优先用 runtime/router 实际生效事件。只有请求/ACK时间时保留生效区间：增容取确认后，减容取可能最早时间。
-未知时间不能随意填 action end；不确定区间标 unknown，必要时输出上下界，不能宣称已经证明逐时刻实测安全。
-ready丢失、endpoint异常退出同样需要扣除；只记录正常动作不够。
-对承诺>0的 workload 计算容量比；承诺=0记null。
-跨主机时间误差以内的短暂缺口标时序不确定，不自动当违规，也不自动抹掉。
+## 10. 控制平面交付与回传
 
-### 9.2 配对流量主指标
-
-以 barrier 为0，截取 source control 与 transition 相同持续时间（最多300秒）。保留两端在途请求终态。
-每 workload 报请求数、成功/失败/超时、client pending峰值与面积(request-seconds)、排队峰值（如可得）、请求延迟摘要。
-报转换减对照的 pending峰值和面积差值；不要用“pending>0”判断容量不足。
-额外pending可能来自服务时长变化；持续增长也需结合发送准时性、稳定对照和恢复情况，不直接等同物理容量违规。
-最长完成间隔仅在至少两次成功完成时计算，否则null；同时报样本数与发送间隔，不称其对低请求率不敏感。
-固定10秒窗口画发送/完成吞吐作为辅助，保留部分窗口边界，不按结果调整窗口。
-低请求率LLM不单独提高需求；完整报告样本数及证据不足，不用catalog账本替代实测证据。
-
-## 10. 补充实验与授权边界
-
-主实验三次完成后，可做Poisson补充：选择首次实际出现Partial的转换和首次Bridge转换。
-从各自保存的source重新部署并核验；速率仍为commitment，seed=301和302，每例control/transition使用同一预生成Poisson序列。
-各跑一次，只报告探索性结果，不能与三次固定间隔结果混为一个均值。
-若状态无法精确恢复，停止该补充而不是换成另一个source。
-SW-C会故意降低保护，本轮默认不执行；必须另获用户对独占测试床故障注入的明确授权。
-不得用随机重启Pod或禁用其他资源/生命周期保护代替SW-C。
-
-## 11. 数据质量与停止规则
-
-- 前置条件缺失：不开始正式测量。
-- 第四张GPU、重复物理占用、计划容量审计失败：不批准执行。
-- 动作失败、设备错误、真实target不匹配、请求无法排空：停止本次重复，不开始下一轮。
-- 发流器漏发/限流/显著滞后、事件日志丢失：标对应测量无效，保留原始数据；先修工具再做新的带编号尝试。
-- C_measured低于预测、负载产生额外积压、请求失败：这是需要报告的结果，不能仅因此删数据或换seed。
-- 修正式算法/runtime后必须换版本标签；旧尝试不合并成同版本三次重复。
-- 禁止为追求0违规而修改mu、吞吐阈值、输入需求或丢弃慢请求。
-
-## 12. 最终交付
-
-输出目录统一为 cluster_results/<UTC-run-id>/，原始日志不可覆盖。
-交付 readiness.md、执行命令与 harness、环境/输入manifest、全部逐轮原始数据、results.md、可重跑的独立绘图脚本。
-报告至少包含：12轮初始化/转换区分、33次非空源转换的完成与失败、实际策略/动作覆盖、设备峰值、容量账本证据边界、配对流量结果、每个target的实测/预测/需求比较。
-33次是三次重复全部成功时的计划样本数，不是预先填写的成功数。
-单独列出In-place与batch/cross-node冒烟，不能混成trace中自然出现的覆盖。
-图为独立PDF，不预先拼版；用现有论文风格。原始生成与绘图严格分离。
-先完成环境与harness核查，汇报ready/blocker；只有全部必要前置项通过才执行三次正式序列。
+输出到cluster_results/<UTC-run-id>/，原始日志不能覆盖；保存采集harness和精确运行命令。
+生成上述CSV/JSON/JSONL和results.md及SHA256SUMS，完成行数/单位/ID关联/缺失字段检查。
+把原始数据和报告打包供当前主机获取；告知实际绝对路径、文件大小、校验和及传输方式。
+结果较大时日志压缩，但不能只回传汇总或只回传截图。
+控制平面不生成图片、PDF、图形预览或绘图脚本，不安装绘图库，不把画图列为完成条件。
+当前主机取得完整数据后另行绘图。本次禁止未经请求push大型结果、实验日志或修改论文。
