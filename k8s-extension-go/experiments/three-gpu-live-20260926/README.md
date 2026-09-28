@@ -16,6 +16,7 @@
 1. `cluster_execution_runbook_20260926.md`：完整执行计划、测量协议、日志字段和停止规则。
 2. `three_gpu_offline_screen_20260926.md`：本地离线筛选结果及边界。
 3. 按手册先做环境/harness核查和冒烟；不能直接提交离线占位设备ID。
+4. `SW_C_NEGATIVE_CONTROL.md`：SW-C 的显式开关、安全边界和执行命令。
 
 ## 正式输入
 

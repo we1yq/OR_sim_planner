@@ -39,6 +39,7 @@ def run(
     default_inflight: int = 1,
     override_existing_runtime_for_changed_slots: bool = False,
     transition_demand_policy: str = "min",
+    stage3_variant: str = "slicewise",
     **_: Any,
 ) -> dict[str, Any]:
     """Build a final transition DAG from explicit action effects.
@@ -51,6 +52,11 @@ def run(
     """
 
     start = time.perf_counter()
+    variant = str(stage3_variant).strip().lower().replace("_", "-")
+    if variant in {"default", "sw", "ours"}:
+        variant = "slicewise"
+    if variant not in {"slicewise", "sw-c"}:
+        raise ValueError(f"unsupported Stage 3 variant: {stage3_variant!r}")
     current_state = prepare_transition_runtime(
         source_state,
         target_state,
@@ -79,6 +85,9 @@ def run(
     _add_physical_reuse_dependency_edges(actions)
     actions = bind_physical_lifetimes(actions, plan_items, current_state)
     actions = action_builder._preserve_independent_slot_deletes(actions)
+    removed_capacity_edges = 0
+    if variant == "sw-c":
+        removed_capacity_edges = _remove_capacity_dependency_edges(actions)
     planned_state = action_builder._planned_state_for_actions(current_state, target_state, actions)
     executed_state = simulate_transition_actions(
         source_state=current_state,
@@ -127,6 +136,9 @@ def run(
             "overrideExistingChangedSlots": bool(override_existing_runtime_for_changed_slots),
             "transitionDemandPolicy": str(transition_demand_policy),
             "committedDemandPolicy": "component-wise min(source demand, target demand)",
+            "stage3Variant": variant,
+            "capacityDependenciesEnforced": variant != "sw-c",
+            "removedCapacityDependencyCount": int(removed_capacity_edges),
         },
         "effect_model": {
             "capacity": "producesCapacity/consumesCapacity annotate route activation and serving removal",
@@ -168,7 +180,37 @@ def run(
         "transition_planner_module": NAME,
         "max_iters_ignored": max_iters,
         "transition_demand_policy": str(transition_demand_policy),
+        "stage3_variant": variant,
+        "capacity_dependencies_enforced": variant != "sw-c",
+        "removed_capacity_dependency_count": int(removed_capacity_edges),
     }
+
+
+def _capacity_dependency_keys(action: dict[str, Any]) -> set[str]:
+    selected = dict(action.get("capacityGate") or {}).get("selectedProducerActionKeys") or {}
+    return {
+        str(key)
+        for keys in selected.values()
+        for key in (keys if isinstance(keys, list) else [keys])
+    }
+
+
+def _remove_capacity_dependency_edges(actions: list[dict[str, Any]]) -> int:
+    """Apply the paper's SW-C negative control without changing its actions."""
+
+    removed = 0
+    for action in actions:
+        capacity_keys = _capacity_dependency_keys(action)
+        if not capacity_keys:
+            continue
+        old = [str(key) for key in list(action.get("dependsOnActionKeys") or [])]
+        new = [key for key in old if key not in capacity_keys]
+        removed += len(old) - len(new)
+        if new:
+            action["dependsOnActionKeys"] = new
+        else:
+            action.pop("dependsOnActionKeys", None)
+    return int(removed)
 
 
 def _build_effect_aware_actions(

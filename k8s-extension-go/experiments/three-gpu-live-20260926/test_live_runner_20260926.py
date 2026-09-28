@@ -429,14 +429,38 @@ class KubectlBoundaryTests(unittest.TestCase):
         self.assertEqual(snapshot["spec"]["phaseGate"], "manual")  # type: ignore[index]
         self.assertIs(snapshot["spec"]["forceReplan"], True)  # type: ignore[index]
         self.assertEqual(snapshot["spec"]["transitionDemandPolicy"], "min")  # type: ignore[index]
+        self.assertEqual(snapshot["spec"]["stage3Variant"], "slicewise")  # type: ignore[index]
         self.assertEqual(tuple(snapshot["spec"]["targetDemand"]), runner.WORKLOAD_KEYS)  # type: ignore[index]
         self.assertEqual(snapshot["spec"]["scenarioPath"], "mock/scenarios/real8gpu.yaml")  # type: ignore[index]
         self.assertEqual(snapshot["spec"]["slo"]["gpt2_p512_o512"]["ttftMs"], 100.0)  # type: ignore[index]
         self.assertEqual(runner.WORKLOAD_CONTRACT["gpt2_p512_o512"]["promptLen"], 512)
         namespaced = runner.build_arrival_snapshot("snap-2", 1, zero, zero, namespace="custom-exp")
         self.assertEqual(namespaced["metadata"]["namespace"], "custom-exp")  # type: ignore[index]
+        sw_c = runner.build_arrival_snapshot("snap-3", 1, zero, zero, stage3_variant="sw-c")
+        self.assertEqual(sw_c["spec"]["stage3Variant"], "sw-c")  # type: ignore[index]
         generated = runner.snapshot_name_for_run("20260926T092447.387936Z", 1)
         self.assertRegex(generated, r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
+
+    def test_sw_c_execution_requires_explicit_unsafe_acknowledgement(self) -> None:
+        self.assertEqual(runner.main(["--execute", "--stage3-variant", "sw-c"]), 2)
+
+    def test_plan_audit_rejects_ignored_stage3_variant(self) -> None:
+        plan = plan_fixture()
+        missing = runner.audit_plan(
+            plan,
+            registry_fixture(),
+            expected_stage3_variant="sw-c",
+        )
+        self.assertFalse(missing["ok"])
+        plan["spec"]["plannerMetadata"]["planningTrace"] = {  # type: ignore[index]
+            "transition": {"stage3Variant": "sw-c"},
+        }
+        matched = runner.audit_plan(
+            plan,
+            registry_fixture(),
+            expected_stage3_variant="sw-c",
+        )
+        self.assertTrue(matched["ok"], matched["errors"])
 
     def test_independent_validation_waits_for_registry_stability(self) -> None:
         class FakeKube:

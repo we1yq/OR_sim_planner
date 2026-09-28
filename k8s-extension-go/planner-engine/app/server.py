@@ -192,6 +192,8 @@ def apply_planning_input(scenario: PlanningScenario, planning_input: dict[str, A
     transition["forceReplan"] = bool(planning_input.get("forceReplan", transition.get("forceReplan", False)))
     if planning_input.get("transitionDemandPolicy"):
         transition["transitionDemandPolicy"] = str(planning_input["transitionDemandPolicy"])
+    if planning_input.get("stage3Variant"):
+        transition["stage3Variant"] = str(planning_input["stage3Variant"])
     transition["arrivalSnapshot"] = {
         "epoch": planning_input.get("epoch"),
         "source": planning_input.get("source", "runtime-router"),

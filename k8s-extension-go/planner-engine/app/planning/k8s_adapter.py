@@ -788,6 +788,13 @@ def _planning_trace(
             "stageName": transition_res.get("stage_name"),
             "planner": transition_res.get("requested_transition_planner"),
             "plannerModule": transition_res.get("transition_planner_module", "transition.effect_aware_dag"),
+            "stage3Variant": transition_res.get("stage3_variant", "slicewise"),
+            "capacityDependenciesEnforced": bool(
+                transition_res.get("capacity_dependencies_enforced", True)
+            ),
+            "removedCapacityDependencyCount": int(
+                transition_res.get("removed_capacity_dependency_count", 0)
+            ),
             "elapsedSec": float(transition_res.get("elapsed_sec", 0.0)),
             "reachedTarget": bool(transition_res.get("reached_target", False)),
             "iterationCount": int(transition_res.get("iteration_count", 0)),
@@ -936,6 +943,8 @@ def _transition_runtime_kwargs(transition: dict[str, Any]) -> dict[str, Any]:
         kwargs["transition_demand_policy"] = str(transition["transitionDemandPolicy"])
     elif "transitionDemandPolicy" in runtime:
         kwargs["transition_demand_policy"] = str(runtime["transitionDemandPolicy"])
+    if "stage3Variant" in transition:
+        kwargs["stage3_variant"] = str(transition["stage3Variant"])
     return kwargs
 
 

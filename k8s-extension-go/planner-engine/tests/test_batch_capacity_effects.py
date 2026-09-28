@@ -5,7 +5,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
 from migrant_core.state import ClusterState, GPUState, MigInstance
-from migrant_core.transition_planner.effect_aware_dag import _effects_for_action, run
+from migrant_core.transition_planner.effect_aware_dag import (
+    _effects_for_action,
+    _remove_capacity_dependency_edges,
+    run,
+)
 
 
 class BatchCapacityEffectsTest(unittest.TestCase):
@@ -54,6 +58,56 @@ class BatchCapacityEffectsTest(unittest.TestCase):
                     produced = [record["mu"] for action in actions
                                 for record in action.get("producesCapacity", [])]
                     self.assertEqual(produced, [new_mu - old_mu])
+
+    def test_sw_c_removes_only_capacity_gate_dependencies(self):
+        actions = [
+            {"actionKey": "producer", "type": "activate_instance_route"},
+            {"actionKey": "resource", "type": "wait_for_resource"},
+            {
+                "actionKey": "consumer",
+                "type": "deactivate_instance_route",
+                "dependsOnActionKeys": ["resource", "producer"],
+                "capacityGate": {
+                    "selectedProducerActionKeys": {"A": ["producer"]},
+                },
+            },
+        ]
+        action_keys = [action["actionKey"] for action in actions]
+        removed = _remove_capacity_dependency_edges(actions)
+        self.assertEqual(removed, 1)
+        self.assertEqual([action["actionKey"] for action in actions], action_keys)
+        self.assertEqual(actions[2]["dependsOnActionKeys"], ["resource"])
+
+    def test_sw_c_keeps_target_and_action_multiset(self):
+        def state(gpu_id, physical_id):
+            return ClusterState(
+                [GPUState(gpu_id, source="real", instances=[
+                    MigInstance(0, 7, "7g", "A", 1, mu=5.0),
+                ])],
+                metadata={
+                    "physical_id_map": {gpu_id: physical_id},
+                    "source": "go-cluster-state-manager-test",
+                    "free_physical_gpu_pool": ["GPU-a", "GPU-b"],
+                },
+            )
+
+        def kwargs():
+            return {
+                "source_state": state(0, "GPU-a"),
+                "target_state": state(1, "GPU-b"),
+                "src_arrival": {"A": 5.0},
+                "tgt_arrival": {"A": 5.0},
+            }
+
+        sw = run(**kwargs())
+        sw_c = run(**kwargs(), stage3_variant="sw-c")
+        self.assertTrue(sw["reached_target"] and sw_c["reached_target"])
+        self.assertCountEqual(
+            [action["actionKey"] for action in sw["executed_actions"]],
+            [action["actionKey"] for action in sw_c["executed_actions"]],
+        )
+        self.assertGreater(sw_c["removed_capacity_dependency_count"], 0)
+        self.assertFalse(sw_c["capacity_dependencies_enforced"])
 
 
 if __name__ == "__main__":

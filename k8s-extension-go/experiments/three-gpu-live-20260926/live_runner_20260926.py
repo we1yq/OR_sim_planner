@@ -493,6 +493,14 @@ def _planner_makespan_seconds(plan: Mapping[str, Any]) -> float | None:
         return None
 
 
+def _planned_stage3_variant(plan: Mapping[str, Any]) -> str | None:
+    spec = _mapping(plan.get("spec"))
+    metadata = _mapping(spec.get("plannerMetadata"))
+    transition = _mapping(_mapping(metadata.get("planningTrace")).get("transition"))
+    value = _first(transition, "stage3Variant", "stage3_variant", default=None)
+    return str(value).strip().lower() if value is not None else None
+
+
 def _physical_ids_in_plan(plan: Mapping[str, Any]) -> set[str]:
     names = {"physicalGpuId", "physical_gpu_id", "physicalID", "physicalId"}
     found: set[str] = set()
@@ -547,6 +555,7 @@ def audit_plan(
     source_gpu_count: int | None = None,
     max_gpus: int = MAX_PHYSICAL_GPUS,
     require_nonzero_target: bool = False,
+    expected_stage3_variant: str | None = None,
 ) -> dict[str, Any]:
     """Return a strict audit report; only a complete ``ok`` is executable."""
 
@@ -554,6 +563,12 @@ def audit_plan(
     status = _planner_status(plan)
     if status != "OPTIMAL":
         errors.append(f"planner status must be OPTIMAL, got {status or 'missing'}")
+    planned_variant = _planned_stage3_variant(plan)
+    if expected_stage3_variant is not None and planned_variant != expected_stage3_variant:
+        errors.append(
+            "planner Stage 3 variant mismatch: "
+            f"requested {expected_stage3_variant}, got {planned_variant or 'missing'}"
+        )
     actions = _plan_actions(plan)
     ids = [_action_id(action) for action in actions]
     if len(ids) != len(set(ids)) or any(not action_id for action_id in ids):
@@ -594,6 +609,7 @@ def audit_plan(
     return {
         "ok": not errors,
         "plannerStatus": status,
+        "stage3Variant": planned_variant,
         "actionCount": len(actions),
         "physicalIds": sorted(plan_physical_ids),
         "targetGpuCount": target_gpu_count,
@@ -699,6 +715,7 @@ def build_arrival_snapshot(
     *,
     namespace: str = DEFAULT_NAMESPACE,
     placement_nodes: Sequence[str] = (),
+    stage3_variant: str = "slicewise",
 ) -> dict[str, Any]:
     validate_workload_contract()
     return {
@@ -710,6 +727,7 @@ def build_arrival_snapshot(
             "mode": "target",
             "planner": "ours",
             "planningMethod": "ours",
+            "stage3Variant": stage3_variant,
             "forceReplan": True,
             "phaseGate": "manual",
             "epoch": f"three-gpu-live-20260926-r{live_round:02d}",
@@ -729,7 +747,10 @@ def build_arrival_snapshot(
             "transitionDemandPolicy": "min",
             "registeredSLOMs": {key: max(spec["slo"].values()) for key, spec in WORKLOAD_CONTRACT.items()},
             "slo": {key: dict(spec["slo"]) for key, spec in WORKLOAD_CONTRACT.items()},
-            "notes": ["v2 manual gate; no automatic repair, delete, reset, or workload substitution"],
+            "notes": [
+                "v2 manual gate; no automatic repair, delete, reset, or workload substitution",
+                f"Stage 3 variant: {stage3_variant}",
+            ],
         },
     }
 
@@ -876,6 +897,7 @@ def _write_initial_outputs(ctx: RunContext, args: argparse.Namespace, hashes: Ma
         "router_url": ctx.router_url, "traffic_seed": TRAFFIC_SEED,
         "source_control_seconds": ctx.source_control_seconds, "target_steady_seconds": ctx.target_steady_seconds,
         "profile_seconds": ctx.profile_seconds, "input_sha256": dict(hashes),
+        "stage3_variant": getattr(args, "stage3_variant", "slicewise"),
         "solver": {"threads": 8, "seed": 1, "mip_gap": 0, "accepted_status": "OPTIMAL"},
     })
     _json_output(ctx.output_dir / "profile_protocol.json", {
@@ -2073,6 +2095,7 @@ def execute_experiment(
                 target_rates,
                 namespace=ctx.namespace,
                 placement_nodes=args.placement_nodes,
+                stage3_variant=args.stage3_variant,
             )
             _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_arrival_snapshot.json", snapshot)
             kube.apply(snapshot)
@@ -2088,6 +2111,7 @@ def execute_experiment(
                     live_round == 1
                     and sum(float(value) for value in target_rates.values()) > 0.0
                 ),
+                expected_stage3_variant=args.stage3_variant,
             )
             _save_plan_and_audit(ctx, live_round, plan, audit)
             # Persist the observed plan before any audit/approval failure can
@@ -2246,12 +2270,26 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--start-round", type=int, default=1, help="first live round to execute; default runs from R1")
     parser.add_argument("--end-round", type=int, default=ROUND_COUNT, help="last live round to execute; default runs through R12")
     parser.add_argument("--placement-node", dest="placement_nodes", action="append", default=[])
+    parser.add_argument(
+        "--stage3-variant",
+        choices=("slicewise", "sw-c"),
+        default="slicewise",
+        help="Stage 3 dependency variant; sw-c is an intentionally unsafe negative control",
+    )
+    parser.add_argument(
+        "--allow-unsafe-sw-c",
+        action="store_true",
+        help="required with --execute --stage3-variant sw-c",
+    )
     parser.add_argument("--controller-name", dest="controller_names", action="append", default=["planner-controller", "transition-executor", "cluster-state-manager", "runtime-router"])
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.execute and args.stage3_variant == "sw-c" and not args.allow_unsafe_sw_c:
+        print("SW-C execution requires --allow-unsafe-sw-c", file=sys.stderr)
+        return 2
     if min(args.source_control_seconds, args.target_steady_seconds, args.profile_seconds) <= 0:
         print("duration overrides must be positive", file=sys.stderr)
         return 2

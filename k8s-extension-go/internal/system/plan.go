@@ -15,6 +15,7 @@ type PlanningInput struct {
 	SLO                    map[string]any     `json:"slo,omitempty"`
 	RequestCount           map[string]int64   `json:"requestCount,omitempty"`
 	TransitionDemandPolicy string             `json:"transitionDemandPolicy,omitempty"`
+	Stage3Variant          string             `json:"stage3Variant,omitempty"`
 	ForceReplan            bool               `json:"forceReplan,omitempty"`
 	ProfileCatalogRef      string             `json:"profileCatalogRef"`
 	ScenarioPath           string             `json:"scenarioPath,omitempty"`

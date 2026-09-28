@@ -352,6 +352,7 @@ func planningInputFromSnapshot(spec map[string]any) system.PlanningInput {
 		SLO:                    slo,
 		RequestCount:           int64Map(spec["requestCount"]),
 		TransitionDemandPolicy: asString(spec["transitionDemandPolicy"]),
+		Stage3Variant:          asString(spec["stage3Variant"]),
 		ForceReplan:            asBool(spec["forceReplan"]),
 		ProfileCatalogRef:      asString(spec["profileCatalogRef"]),
 		ScenarioPath:           asString(spec["scenarioPath"]),
