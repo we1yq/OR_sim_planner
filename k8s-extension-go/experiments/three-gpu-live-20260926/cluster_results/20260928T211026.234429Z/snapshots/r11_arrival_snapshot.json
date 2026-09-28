@@ -1,0 +1,112 @@
+{
+  "apiVersion": "mig.or-sim.io/v1alpha1",
+  "kind": "ArrivalSnapshot",
+  "metadata": {
+    "labels": {
+      "experiment.or-sim.io/name": "three-gpu-live-20260926-v2"
+    },
+    "name": "live-v2-20260928t211026234429z-r11",
+    "namespace": "or-sim-exp"
+  },
+  "spec": {
+    "calibrationOverlayRef": "physicalgpuregistry/default",
+    "currentAllocationRef": "physicalgpuregistry/default",
+    "currentDemand": {
+      "gpt2_p512_o512": 0.0853080568720379,
+      "gpt2_p64_o64": 0.232258064516129,
+      "llama_p1024_o128": 0.0,
+      "llama_p2048_o64": 0.0,
+      "resnet50_image": 109.74604911579873,
+      "vgg16_image": 444.6504672897196,
+      "vit_base_image": 73.56037151702786
+    },
+    "epoch": "three-gpu-live-20260926-r11",
+    "forceReplan": true,
+    "mode": "target",
+    "notes": [
+      "v2 manual gate; no automatic repair, delete, reset, or workload substitution",
+      "Stage 3 variant: sw-c"
+    ],
+    "observedAt": "2026-09-28T21:20:56.403Z",
+    "phaseGate": "manual",
+    "placement": {
+      "nodes": []
+    },
+    "planner": "ours",
+    "planningMethod": "ours",
+    "profileCatalogRef": "default",
+    "registeredSLOMs": {
+      "gpt2_p512_o512": 100.0,
+      "gpt2_p64_o64": 50.0,
+      "llama_p1024_o128": 180.0,
+      "llama_p2048_o64": 250.0,
+      "resnet50_image": 100.0,
+      "vgg16_image": 100.0,
+      "vit_base_image": 300.0
+    },
+    "scenarioPath": "mock/scenarios/real8gpu.yaml",
+    "slo": {
+      "gpt2_p512_o512": {
+        "tpotMs": 20.0,
+        "ttftMs": 100.0
+      },
+      "gpt2_p64_o64": {
+        "tpotMs": 20.0,
+        "ttftMs": 50.0
+      },
+      "llama_p1024_o128": {
+        "tpotMs": 35.0,
+        "ttftMs": 180.0
+      },
+      "llama_p2048_o64": {
+        "tpotMs": 35.0,
+        "ttftMs": 250.0
+      },
+      "resnet50_image": {
+        "e2eMs": 100.0,
+        "latencyMs": 100.0
+      },
+      "vgg16_image": {
+        "e2eMs": 100.0,
+        "latencyMs": 100.0
+      },
+      "vit_base_image": {
+        "e2eMs": 300.0,
+        "latencyMs": 300.0
+      }
+    },
+    "source": "three-gpu-live-20260926-v2",
+    "sourceArrival": {
+      "gpt2_p512_o512": 0.0853080568720379,
+      "gpt2_p64_o64": 0.232258064516129,
+      "llama_p1024_o128": 0.0,
+      "llama_p2048_o64": 0.0,
+      "resnet50_image": 109.74604911579873,
+      "vgg16_image": 444.6504672897196,
+      "vit_base_image": 73.56037151702786
+    },
+    "stage3Variant": "sw-c",
+    "targetArrival": {
+      "gpt2_p512_o512": 0.0,
+      "gpt2_p64_o64": 0.0,
+      "llama_p1024_o128": 0.0,
+      "llama_p2048_o64": 0.1795511221945137,
+      "resnet50_image": 147.12836721576207,
+      "vgg16_image": 400.5084112149533,
+      "vit_base_image": 73.56037151702786
+    },
+    "targetDemand": {
+      "gpt2_p512_o512": 0.0,
+      "gpt2_p64_o64": 0.0,
+      "llama_p1024_o128": 0.0,
+      "llama_p2048_o64": 0.1795511221945137,
+      "resnet50_image": 147.12836721576207,
+      "vgg16_image": 400.5084112149533,
+      "vit_base_image": 73.56037151702786
+    },
+    "transitionDemandPolicy": "min",
+    "triggerReason": "frozen-selected-demand",
+    "unit": "requestsPerSecond",
+    "windowSeconds": 60
+  }
+}

@@ -1,0 +1,302 @@
+{
+  "finalValidation": {
+    "errors": [],
+    "observedPhysicalIds": [
+      "ampere-gpu0",
+      "ampere-gpu1",
+      "rtx1-worker-gpu0"
+    ],
+    "ok": true,
+    "routesObserved": 0,
+    "targetPhysicalIds": []
+  },
+  "registry": {
+    "apiVersion": "mig.or-sim.io/v1alpha1",
+    "kind": "PhysicalGpuRegistry",
+    "metadata": {
+      "creationTimestamp": "2026-07-09T20:36:19Z",
+      "generation": 2,
+      "labels": {
+        "app.kubernetes.io/name": "migrant-go"
+      },
+      "name": "default",
+      "namespace": "or-sim-exp",
+      "resourceVersion": "60757486",
+      "uid": "7b7f6249-da54-4ff3-ab32-55ac9f6c3e58"
+    },
+    "spec": {
+      "policy": {
+        "source": "cluster-state-manager"
+      }
+    },
+    "status": {
+      "activeQueue": [],
+      "availableQueue": [
+        "ampere-gpu0",
+        "ampere-gpu1",
+        "rtx1-worker-gpu0"
+      ],
+      "bindings": {
+        "ampere-gpu0": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 0,
+          "gpuIndex": 0,
+          "gpuUUID": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+          "gpuUuid": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "ampere",
+          "nodeName": "ampere",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "ampere-gpu0",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        },
+        "ampere-gpu1": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 1,
+          "gpuIndex": 1,
+          "gpuUUID": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+          "gpuUuid": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "ampere",
+          "nodeName": "ampere",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "ampere-gpu1",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        },
+        "rtx1-worker-gpu0": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 0,
+          "gpuIndex": 0,
+          "gpuUUID": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+          "gpuUuid": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "rtx1-worker",
+          "nodeName": "rtx1-worker",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "rtx1-worker-gpu0",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        }
+      },
+      "currentAllocation": {
+        "canonicalizedAt": "2026-09-28T21:10:13.348525916Z",
+        "format": "migrant.current-allocation/v1",
+        "freePhysicalGpuPool": [
+          "ampere-gpu0",
+          "ampere-gpu1",
+          "rtx1-worker-gpu0"
+        ],
+        "gpus": {},
+        "logicalGpuCount": 0,
+        "logicalGpus": [],
+        "metadata": {
+          "canonical_observed_physical_map": {},
+          "logical_id_map": {},
+          "physical_id_map": {}
+        },
+        "source": "cluster-state-manager"
+      },
+      "health": {
+        "observedAt": "2026-09-28T21:10:13.348534943Z",
+        "queueCounts": {
+          "active": 0,
+          "available": 3,
+          "transitioning": 0
+        },
+        "reasons": [],
+        "repairRequired": false,
+        "requiredActions": [],
+        "stable": true
+      },
+      "logicalBindingLedger": {
+        "available": true,
+        "bindings": {},
+        "lastPlanName": "plan-live-v2-20260928t205256842059z-r13",
+        "updatedAt": "2026-09-28T21:10:10.89456958Z",
+        "version": "migrant.logical-binding-ledger/v1"
+      },
+      "observedAt": "2026-09-28T21:10:13.359060282Z",
+      "phase": "Observed",
+      "profileCalibrationOverlay": {
+        "available": true,
+        "generatedAt": "2026-09-28T21:10:12.808573011Z",
+        "observations": [
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "llama_p1024_o128",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 153,
+            "sampleCount": 153,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "medium",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "gpt2_p512_o512",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 61,
+            "sampleCount": 61,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "medium",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "gpt2_p64_o64",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 77,
+            "sampleCount": 77,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "medium",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "llama_p2048_o64",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 70,
+            "sampleCount": 70,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "vgg16_image",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 283895,
+            "sampleCount": 283895,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "vit_base_image",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 73013,
+            "sampleCount": 73013,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "resnet50_image",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 93914,
+            "sampleCount": 93914,
+            "windowErrors": 0,
+            "windowRequests": 0
+          }
+        ]
+      },
+      "queueCounts": {
+        "active": 0,
+        "available": 3,
+        "transitioning": 0
+      },
+      "routingState": {
+        "available": true,
+        "generatedAt": "2026-09-28T21:10:12.805167839Z",
+        "routes": []
+      },
+      "transitioningQueue": []
+    }
+  },
+  "routes": {
+    "generatedAt": "2026-09-28T21:10:13.562610846Z",
+    "routes": []
+  },
+  "runtimePods": []
+}

@@ -1,0 +1,1972 @@
+{
+  "controllers": {
+    "cluster-state-manager": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "annotations": {
+          "deployment.kubernetes.io/revision": "23",
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/component\":\"cluster-state-manager\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"},\"name\":\"cluster-state-manager\",\"namespace\":\"or-sim-exp\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app.kubernetes.io/component\":\"cluster-state-manager\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"2026-07-13T03:57:19Z\",\"or-sim.io/rebuilt-images-at\":\"2026-07-13T03:57:19Z\"},\"labels\":{\"app.kubernetes.io/component\":\"cluster-state-manager\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"spec\":{\"containers\":[{\"command\":[\"/cluster-state-manager\"],\"env\":[{\"name\":\"NAMESPACE\",\"valueFrom\":{\"fieldRef\":{\"fieldPath\":\"metadata.namespace\"}}},{\"name\":\"ROUTER_URL\",\"value\":\"http://runtime-router:8080\"}],\"image\":\"localhost:10690/migrant-control-plane:go\",\"imagePullPolicy\":\"Always\",\"name\":\"controller\",\"ports\":[{\"containerPort\":8080}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":8080}}}],\"nodeSelector\":{\"kubernetes.io/hostname\":\"or-sim-control-plane\"},\"serviceAccountName\":\"migrant-go-control-plane\"}}}}\n"
+        },
+        "creationTimestamp": "2026-07-09T20:36:17Z",
+        "generation": 23,
+        "labels": {
+          "app.kubernetes.io/component": "cluster-state-manager",
+          "app.kubernetes.io/name": "migrant-go-control-plane"
+        },
+        "name": "cluster-state-manager",
+        "namespace": "or-sim-exp",
+        "resourceVersion": "60540727",
+        "uid": "455fbd8c-04a4-4520-8b95-688528a38e34"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app.kubernetes.io/component": "cluster-state-manager",
+            "app.kubernetes.io/name": "migrant-go-control-plane"
+          }
+        },
+        "strategy": {
+          "rollingUpdate": {
+            "maxSurge": "25%",
+            "maxUnavailable": "25%"
+          },
+          "type": "RollingUpdate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "kubectl.kubernetes.io/restartedAt": "2026-07-15T15:02:28+09:00",
+              "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+            },
+            "creationTimestamp": null,
+            "labels": {
+              "app.kubernetes.io/component": "cluster-state-manager",
+              "app.kubernetes.io/name": "migrant-go-control-plane"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "/cluster-state-manager"
+                ],
+                "env": [
+                  {
+                    "name": "NAMESPACE",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      }
+                    }
+                  },
+                  {
+                    "name": "ROUTER_URL",
+                    "value": "http://runtime-router:8080"
+                  }
+                ],
+                "image": "localhost:10690/migrant-control-plane:batch-state-concurrency-20260928",
+                "imagePullPolicy": "Always",
+                "name": "controller",
+                "ports": [
+                  {
+                    "containerPort": 8080,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": 8080,
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File"
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "nodeSelector": {
+              "kubernetes.io/hostname": "or-sim-control-plane"
+            },
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "serviceAccount": "migrant-go-control-plane",
+            "serviceAccountName": "migrant-go-control-plane",
+            "terminationGracePeriodSeconds": 30
+          }
+        }
+      },
+      "status": {
+        "availableReplicas": 1,
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-07-10T04:10:53Z",
+            "lastUpdateTime": "2026-07-10T04:10:53Z",
+            "message": "Deployment has minimum availability.",
+            "reason": "MinimumReplicasAvailable",
+            "status": "True",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-07-09T20:36:17Z",
+            "lastUpdateTime": "2026-09-28T08:34:49Z",
+            "message": "ReplicaSet \"cluster-state-manager-5769b5954f\" has successfully progressed.",
+            "reason": "NewReplicaSetAvailable",
+            "status": "True",
+            "type": "Progressing"
+          }
+        ],
+        "observedGeneration": 23,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "updatedReplicas": 1
+      }
+    },
+    "planner-controller": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "annotations": {
+          "deployment.kubernetes.io/revision": "25",
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/component\":\"planner-controller\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"},\"name\":\"planner-controller\",\"namespace\":\"or-sim-exp\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app.kubernetes.io/component\":\"planner-controller\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"2026-07-13T03:57:19Z\",\"or-sim.io/rebuilt-images-at\":\"2026-07-13T03:57:19Z\"},\"labels\":{\"app.kubernetes.io/component\":\"planner-controller\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"spec\":{\"containers\":[{\"command\":[\"/planner-controller\"],\"env\":[{\"name\":\"NAMESPACE\",\"valueFrom\":{\"fieldRef\":{\"fieldPath\":\"metadata.namespace\"}}},{\"name\":\"PLANNER_ENGINE_URL\",\"value\":\"http://planner-engine:8080\"}],\"image\":\"localhost:10690/migrant-control-plane:go\",\"imagePullPolicy\":\"Always\",\"name\":\"controller\",\"ports\":[{\"containerPort\":8080}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":8080}}}],\"nodeSelector\":{\"kubernetes.io/hostname\":\"or-sim-control-plane\"},\"serviceAccountName\":\"migrant-go-control-plane\"}}}}\n"
+        },
+        "creationTimestamp": "2026-07-09T20:36:17Z",
+        "generation": 25,
+        "labels": {
+          "app.kubernetes.io/component": "planner-controller",
+          "app.kubernetes.io/name": "migrant-go-control-plane"
+        },
+        "name": "planner-controller",
+        "namespace": "or-sim-exp",
+        "resourceVersion": "60730866",
+        "uid": "3e2319c9-b18c-490e-98d9-eb4587cfe9a1"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app.kubernetes.io/component": "planner-controller",
+            "app.kubernetes.io/name": "migrant-go-control-plane"
+          }
+        },
+        "strategy": {
+          "rollingUpdate": {
+            "maxSurge": "25%",
+            "maxUnavailable": "25%"
+          },
+          "type": "RollingUpdate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "kubectl.kubernetes.io/restartedAt": "2026-09-26T17:57:18+09:00",
+              "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+            },
+            "creationTimestamp": null,
+            "labels": {
+              "app.kubernetes.io/component": "planner-controller",
+              "app.kubernetes.io/name": "migrant-go-control-plane"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "/planner-controller"
+                ],
+                "env": [
+                  {
+                    "name": "NAMESPACE",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      }
+                    }
+                  },
+                  {
+                    "name": "PLANNER_ENGINE_URL",
+                    "value": "http://planner-engine:8080"
+                  }
+                ],
+                "image": "localhost:10690/migrant-control-plane:e1-20260929",
+                "imagePullPolicy": "Always",
+                "name": "controller",
+                "ports": [
+                  {
+                    "containerPort": 8080,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": 8080,
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File"
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "nodeSelector": {
+              "kubernetes.io/hostname": "or-sim-control-plane"
+            },
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "serviceAccount": "migrant-go-control-plane",
+            "serviceAccountName": "migrant-go-control-plane",
+            "terminationGracePeriodSeconds": 30
+          }
+        }
+      },
+      "status": {
+        "availableReplicas": 1,
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-07-10T04:00:51Z",
+            "lastUpdateTime": "2026-07-10T04:00:51Z",
+            "message": "Deployment has minimum availability.",
+            "reason": "MinimumReplicasAvailable",
+            "status": "True",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-07-09T20:36:17Z",
+            "lastUpdateTime": "2026-09-28T19:50:00Z",
+            "message": "ReplicaSet \"planner-controller-6c976697c4\" has successfully progressed.",
+            "reason": "NewReplicaSetAvailable",
+            "status": "True",
+            "type": "Progressing"
+          }
+        ],
+        "observedGeneration": 25,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "updatedReplicas": 1
+      }
+    },
+    "runtime-router": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "annotations": {
+          "deployment.kubernetes.io/revision": "15",
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/name\":\"migrant-runtime-router\"},\"name\":\"runtime-router\",\"namespace\":\"or-sim-exp\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app.kubernetes.io/name\":\"migrant-runtime-router\"}},\"strategy\":{\"type\":\"Recreate\"},\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"2026-07-13T03:57:19Z\",\"or-sim.io/rebuilt-images-at\":\"2026-07-13T03:57:19Z\"},\"labels\":{\"app.kubernetes.io/name\":\"migrant-runtime-router\"}},\"spec\":{\"containers\":[{\"args\":[\"--addr=:10680\"],\"image\":\"localhost:10690/migrant-runtime-router:go\",\"imagePullPolicy\":\"Always\",\"name\":\"router\",\"ports\":[{\"containerPort\":10680,\"name\":\"http\"}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":\"http\"}}}],\"dnsPolicy\":\"ClusterFirstWithHostNet\",\"hostNetwork\":true,\"nodeSelector\":{\"kubernetes.io/hostname\":\"or-sim-control-plane\"},\"serviceAccountName\":\"migrant-go-control-plane\"}}}}\n"
+        },
+        "creationTimestamp": "2026-07-09T20:36:17Z",
+        "generation": 15,
+        "labels": {
+          "app.kubernetes.io/name": "migrant-runtime-router"
+        },
+        "name": "runtime-router",
+        "namespace": "or-sim-exp",
+        "resourceVersion": "60730609",
+        "uid": "546f6ab6-bfd7-402f-9226-4bba30130b29"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app.kubernetes.io/name": "migrant-runtime-router"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "kubectl.kubernetes.io/restartedAt": "2026-09-26T23:00:13+09:00",
+              "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+            },
+            "creationTimestamp": null,
+            "labels": {
+              "app.kubernetes.io/name": "migrant-runtime-router"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "args": [
+                  "--addr=:10680"
+                ],
+                "env": [
+                  {
+                    "name": "NAMESPACE",
+                    "value": "or-sim-exp"
+                  }
+                ],
+                "image": "localhost:10690/migrant-runtime-router:e1-20260929",
+                "imagePullPolicy": "Always",
+                "name": "router",
+                "ports": [
+                  {
+                    "containerPort": 10680,
+                    "name": "http",
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": "http",
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File"
+              }
+            ],
+            "dnsPolicy": "ClusterFirstWithHostNet",
+            "hostNetwork": true,
+            "nodeSelector": {
+              "kubernetes.io/hostname": "or-sim-control-plane"
+            },
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "serviceAccount": "migrant-go-control-plane",
+            "serviceAccountName": "migrant-go-control-plane",
+            "terminationGracePeriodSeconds": 30
+          }
+        }
+      },
+      "status": {
+        "availableReplicas": 1,
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-09-28T19:49:21Z",
+            "lastUpdateTime": "2026-09-28T19:49:21Z",
+            "message": "Deployment has minimum availability.",
+            "reason": "MinimumReplicasAvailable",
+            "status": "True",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-07-09T20:36:17Z",
+            "lastUpdateTime": "2026-09-28T19:49:21Z",
+            "message": "ReplicaSet \"runtime-router-75fb99cbd\" has successfully progressed.",
+            "reason": "NewReplicaSetAvailable",
+            "status": "True",
+            "type": "Progressing"
+          }
+        ],
+        "observedGeneration": 15,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "updatedReplicas": 1
+      }
+    },
+    "transition-executor": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "annotations": {
+          "deployment.kubernetes.io/revision": "59",
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/component\":\"transition-executor\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"},\"name\":\"transition-executor\",\"namespace\":\"or-sim-exp\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app.kubernetes.io/component\":\"transition-executor\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"2026-07-13T03:57:19Z\",\"or-sim.io/rebuilt-images-at\":\"2026-07-13T03:57:19Z\"},\"labels\":{\"app.kubernetes.io/component\":\"transition-executor\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"spec\":{\"containers\":[{\"command\":[\"/transition-executor\"],\"env\":[{\"name\":\"NAMESPACE\",\"valueFrom\":{\"fieldRef\":{\"fieldPath\":\"metadata.namespace\"}}},{\"name\":\"ROUTER_URL\",\"value\":\"http://runtime-router:8080\"},{\"name\":\"MODEL_RUNTIME_IMAGE\",\"value\":\"localhost:10690/migrant-model-runtime:go\"}],\"image\":\"localhost:10690/migrant-control-plane:go\",\"imagePullPolicy\":\"Always\",\"name\":\"controller\",\"ports\":[{\"containerPort\":8080}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":8080}}}],\"nodeSelector\":{\"kubernetes.io/hostname\":\"or-sim-control-plane\"},\"serviceAccountName\":\"migrant-go-control-plane\"}}}}\n"
+        },
+        "creationTimestamp": "2026-07-09T20:36:17Z",
+        "generation": 59,
+        "labels": {
+          "app.kubernetes.io/component": "transition-executor",
+          "app.kubernetes.io/name": "migrant-go-control-plane"
+        },
+        "name": "transition-executor",
+        "namespace": "or-sim-exp",
+        "resourceVersion": "60736264",
+        "uid": "e230b3ff-0269-43ca-b4f7-8325455d7a75"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app.kubernetes.io/component": "transition-executor",
+            "app.kubernetes.io/name": "migrant-go-control-plane"
+          }
+        },
+        "strategy": {
+          "rollingUpdate": {
+            "maxSurge": "25%",
+            "maxUnavailable": "25%"
+          },
+          "type": "RollingUpdate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "kubectl.kubernetes.io/restartedAt": "2026-09-28T18:13:51+09:00",
+              "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+            },
+            "creationTimestamp": null,
+            "labels": {
+              "app.kubernetes.io/component": "transition-executor",
+              "app.kubernetes.io/name": "migrant-go-control-plane"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "/transition-executor"
+                ],
+                "env": [
+                  {
+                    "name": "NAMESPACE",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      }
+                    }
+                  },
+                  {
+                    "name": "ROUTER_URL",
+                    "value": "http://runtime-router:8080"
+                  },
+                  {
+                    "name": "MODEL_RUNTIME_IMAGE",
+                    "value": "localhost:10690/migrant-model-runtime:go"
+                  },
+                  {
+                    "name": "VISION_MODEL_RUNTIME_IMAGE",
+                    "value": "localhost:10690/migrant-model-runtime:torchvision-cpuset-20260929"
+                  },
+                  {
+                    "name": "VISION_RUNTIME_MODE",
+                    "value": "torchvision"
+                  },
+                  {
+                    "name": "LLM_MODEL_RUNTIME_IMAGE",
+                    "value": "localhost:10690/migrant-model-runtime:llm-transformers-profile2-20260714"
+                  },
+                  {
+                    "name": "LLM_RUNTIME_MODE",
+                    "value": "transformers"
+                  },
+                  {
+                    "name": "MODEL_RUNTIME_HF_HOME",
+                    "value": "/opt/hf-cache"
+                  },
+                  {
+                    "name": "MODEL_RUNTIME_HF_HUB_CACHE",
+                    "value": "/opt/hf-cache/hub"
+                  },
+                  {
+                    "name": "MODEL_RUNTIME_HF_CACHE_HOST_PATH",
+                    "value": "/var/lib/or-sim/hf-cache"
+                  },
+                  {
+                    "name": "HF_TOKEN_SECRET_NAME",
+                    "value": "hf-token"
+                  },
+                  {
+                    "name": "RUNTIME_INIT_IMAGE",
+                    "value": "busybox:1.36"
+                  },
+                  {
+                    "name": "RUNTIME_READY_TIMEOUT_SECONDS",
+                    "value": "600"
+                  },
+                  {
+                    "name": "GPT2_MODEL_RUNTIME_IMAGE",
+                    "value": "localhost:10690/migrant-model-runtime:gpt2-medium-cpuset-20260929"
+                  },
+                  {
+                    "name": "GPT2_MODEL_ID",
+                    "value": "/opt/models/gpt2-medium"
+                  },
+                  {
+                    "name": "LLAMA_MODEL_RUNTIME_IMAGE",
+                    "value": "localhost:10690/migrant-model-runtime:llama32-3b-cpuset-20260929"
+                  },
+                  {
+                    "name": "LLAMA_MODEL_ID",
+                    "value": "/opt/models/llama32-3b"
+                  },
+                  {
+                    "name": "RUNTIME_TERMINATION_GRACE_SECONDS",
+                    "value": "2"
+                  }
+                ],
+                "image": "localhost:10690/migrant-control-plane:e1-20260929",
+                "imagePullPolicy": "Always",
+                "name": "controller",
+                "ports": [
+                  {
+                    "containerPort": 8080,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": 8080,
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File"
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "nodeSelector": {
+              "kubernetes.io/hostname": "or-sim-control-plane"
+            },
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "serviceAccount": "migrant-go-control-plane",
+            "serviceAccountName": "migrant-go-control-plane",
+            "terminationGracePeriodSeconds": 30
+          }
+        }
+      },
+      "status": {
+        "availableReplicas": 1,
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-07-10T04:00:53Z",
+            "lastUpdateTime": "2026-07-10T04:00:53Z",
+            "message": "Deployment has minimum availability.",
+            "reason": "MinimumReplicasAvailable",
+            "status": "True",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-07-09T20:36:17Z",
+            "lastUpdateTime": "2026-09-28T20:09:42Z",
+            "message": "ReplicaSet \"transition-executor-8479c987c\" has successfully progressed.",
+            "reason": "NewReplicaSetAvailable",
+            "status": "True",
+            "type": "Progressing"
+          }
+        ],
+        "observedGeneration": 59,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "updatedReplicas": 1
+      }
+    }
+  },
+  "errors": [],
+  "observedA100Ids": [
+    "ampere-gpu0",
+    "ampere-gpu1",
+    "rtx1-worker-gpu0"
+  ],
+  "ok": true,
+  "pods": {
+    "apiVersion": "v1",
+    "items": [
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "cni.projectcalico.org/containerID": "18a68650c529108b74b0c294c7aacb55beca6065ae9205fdced8ea03a8fd368a",
+            "cni.projectcalico.org/podIP": "10.42.0.142/32",
+            "cni.projectcalico.org/podIPs": "10.42.0.142/32",
+            "kubectl.kubernetes.io/restartedAt": "2026-07-15T15:02:28+09:00",
+            "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+          },
+          "creationTimestamp": "2026-09-28T08:34:48Z",
+          "generateName": "cluster-state-manager-5769b5954f-",
+          "labels": {
+            "app.kubernetes.io/component": "cluster-state-manager",
+            "app.kubernetes.io/name": "migrant-go-control-plane",
+            "pod-template-hash": "5769b5954f"
+          },
+          "name": "cluster-state-manager-5769b5954f-rbdq7",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "cluster-state-manager-5769b5954f",
+              "uid": "1e8ed064-c0d2-4b53-83de-30c754e3c3bb"
+            }
+          ],
+          "resourceVersion": "60540691",
+          "uid": "01130a7c-14e8-44de-9891-b727464ff045"
+        },
+        "spec": {
+          "containers": [
+            {
+              "command": [
+                "/cluster-state-manager"
+              ],
+              "env": [
+                {
+                  "name": "NAMESPACE",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.namespace"
+                    }
+                  }
+                },
+                {
+                  "name": "ROUTER_URL",
+                  "value": "http://runtime-router:8080"
+                }
+              ],
+              "image": "localhost:10690/migrant-control-plane:batch-state-concurrency-20260928",
+              "imagePullPolicy": "Always",
+              "name": "controller",
+              "ports": [
+                {
+                  "containerPort": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8080,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-96dk6",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "or-sim-control-plane",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "or-sim-control-plane"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "migrant-go-control-plane",
+          "serviceAccountName": "migrant-go-control-plane",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-96dk6",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T08:34:49Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T08:34:48Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T08:34:49Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T08:34:49Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T08:34:48Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://92402b55862dda9ae8729cb97a1cc9d9e0ed56dee0b921a5bb0221b9122d6017",
+              "image": "localhost:10690/migrant-control-plane:batch-state-concurrency-20260928",
+              "imageID": "localhost:10690/migrant-control-plane@sha256:2917fa29ec74954bfb583e2f70c1f094c328a20b80fee5ad6cc543054d78ae93",
+              "lastState": {},
+              "name": "controller",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-28T08:34:49Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-96dk6",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.179.144",
+          "hostIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "10.42.0.142",
+          "podIPs": [
+            {
+              "ip": "10.42.0.142"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-28T08:34:48Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "cni.projectcalico.org/containerID": "48c6fbe1607acc79d964c55f96ec9b8ae2ba4739c637e4e8015e45ba05dc3778",
+            "cni.projectcalico.org/podIP": "10.42.0.154/32",
+            "cni.projectcalico.org/podIPs": "10.42.0.154/32",
+            "kubectl.kubernetes.io/restartedAt": "2026-09-26T17:57:18+09:00",
+            "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+          },
+          "creationTimestamp": "2026-09-28T19:49:59Z",
+          "generateName": "planner-controller-6c976697c4-",
+          "labels": {
+            "app.kubernetes.io/component": "planner-controller",
+            "app.kubernetes.io/name": "migrant-go-control-plane",
+            "pod-template-hash": "6c976697c4"
+          },
+          "name": "planner-controller-6c976697c4-688z8",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "planner-controller-6c976697c4",
+              "uid": "e6584072-621a-4194-b2ff-a196ad2ed819"
+            }
+          ],
+          "resourceVersion": "60730846",
+          "uid": "cf474c22-7a24-4385-ba0f-ded9ef50420f"
+        },
+        "spec": {
+          "containers": [
+            {
+              "command": [
+                "/planner-controller"
+              ],
+              "env": [
+                {
+                  "name": "NAMESPACE",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.namespace"
+                    }
+                  }
+                },
+                {
+                  "name": "PLANNER_ENGINE_URL",
+                  "value": "http://planner-engine:8080"
+                }
+              ],
+              "image": "localhost:10690/migrant-control-plane:e1-20260929",
+              "imagePullPolicy": "Always",
+              "name": "controller",
+              "ports": [
+                {
+                  "containerPort": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8080,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-72sx6",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "or-sim-control-plane",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "or-sim-control-plane"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "migrant-go-control-plane",
+          "serviceAccountName": "migrant-go-control-plane",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-72sx6",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:50:00Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:49:59Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:50:00Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:50:00Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:49:59Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://9fafe07a6343bc5d81cb342f2246aabe3ee5218bc366b1e98a415c39855ade76",
+              "image": "localhost:10690/migrant-control-plane:e1-20260929",
+              "imageID": "localhost:10690/migrant-control-plane@sha256:9ea25805df1341e37cabaf601b6f04caf8322a73aa9c1e65402bc0790938af4c",
+              "lastState": {},
+              "name": "controller",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-28T19:49:59Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-72sx6",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.179.144",
+          "hostIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "10.42.0.154",
+          "podIPs": [
+            {
+              "ip": "10.42.0.154"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-28T19:49:59Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "cni.projectcalico.org/containerID": "c6907f1aaedba5978fa1d71dcbef479648258fb6e24ead3c1409ad38fe2fdd95",
+            "cni.projectcalico.org/podIP": "10.42.0.155/32",
+            "cni.projectcalico.org/podIPs": "10.42.0.155/32",
+            "kubectl.kubernetes.io/restartedAt": "2026-09-27T00:38:44+09:00",
+            "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+          },
+          "creationTimestamp": "2026-09-28T19:50:29Z",
+          "generateName": "planner-engine-9fdcdc76c-",
+          "labels": {
+            "app.kubernetes.io/name": "migrant-planner-engine",
+            "pod-template-hash": "9fdcdc76c"
+          },
+          "name": "planner-engine-9fdcdc76c-qp75n",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "planner-engine-9fdcdc76c",
+              "uid": "113561de-7eae-4044-9730-3f1df23c46bf"
+            }
+          ],
+          "resourceVersion": "60731047",
+          "uid": "b1591e73-a5e6-44a5-b69a-2f3766ec2efc"
+        },
+        "spec": {
+          "containers": [
+            {
+              "image": "localhost:10690/migrant-planner-engine:e1-20260929",
+              "imagePullPolicy": "Always",
+              "name": "planner-engine",
+              "ports": [
+                {
+                  "containerPort": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8080,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 1,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-strzj",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "or-sim-control-plane",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "or-sim-control-plane"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-strzj",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:50:33Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:50:29Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:50:33Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:50:33Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:50:29Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://eb429532a8bc716332360bc27c85fe080a35a96f15856862d43613c7b4c1fe41",
+              "image": "localhost:10690/migrant-planner-engine:e1-20260929",
+              "imageID": "localhost:10690/migrant-planner-engine@sha256:c3547e16cf79a7dde1ea64192264daf3d6d568d79359e5490c7babdc57d98b16",
+              "lastState": {},
+              "name": "planner-engine",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-28T19:50:32Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-strzj",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.179.144",
+          "hostIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "10.42.0.155",
+          "podIPs": [
+            {
+              "ip": "10.42.0.155"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-28T19:50:29Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "kubectl.kubernetes.io/restartedAt": "2026-09-26T23:00:13+09:00",
+            "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+          },
+          "creationTimestamp": "2026-09-28T19:49:20Z",
+          "generateName": "runtime-router-75fb99cbd-",
+          "labels": {
+            "app.kubernetes.io/name": "migrant-runtime-router",
+            "pod-template-hash": "75fb99cbd"
+          },
+          "name": "runtime-router-75fb99cbd-4xh9j",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "runtime-router-75fb99cbd",
+              "uid": "63b0d45c-e70f-4ce3-8503-a6ecce0b2cbf"
+            }
+          ],
+          "resourceVersion": "60730605",
+          "uid": "cac7510b-6ba0-46a3-9501-d99fce48fdec"
+        },
+        "spec": {
+          "containers": [
+            {
+              "args": [
+                "--addr=:10680"
+              ],
+              "env": [
+                {
+                  "name": "NAMESPACE",
+                  "value": "or-sim-exp"
+                }
+              ],
+              "image": "localhost:10690/migrant-runtime-router:e1-20260929",
+              "imagePullPolicy": "Always",
+              "name": "router",
+              "ports": [
+                {
+                  "containerPort": 10680,
+                  "hostPort": 10680,
+                  "name": "http",
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": "http",
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-9sbmc",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirstWithHostNet",
+          "enableServiceLinks": true,
+          "hostNetwork": true,
+          "nodeName": "or-sim-control-plane",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "or-sim-control-plane"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "migrant-go-control-plane",
+          "serviceAccountName": "migrant-go-control-plane",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-9sbmc",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:49:21Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:49:20Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:49:21Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:49:21Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T19:49:20Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://293d82b2396776ac3e78b3fc282036652d31642c63e662f4034bbe6f50a618e5",
+              "image": "localhost:10690/migrant-runtime-router:e1-20260929",
+              "imageID": "localhost:10690/migrant-runtime-router@sha256:dc2f2d634f3c970754afdc7ce37b776ddab61e4ca06f4288090ee0dd2eb2a250",
+              "lastState": {},
+              "name": "router",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-28T19:49:21Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-9sbmc",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.179.144",
+          "hostIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "115.145.179.144",
+          "podIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-28T19:49:20Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "cni.projectcalico.org/containerID": "41d0821e15d3bbd2f3035b875283016cf6ea06d6b08321cce3ed6606a25973a1",
+            "cni.projectcalico.org/podIP": "10.42.0.157/32",
+            "cni.projectcalico.org/podIPs": "10.42.0.157/32",
+            "kubectl.kubernetes.io/restartedAt": "2026-09-28T18:13:51+09:00",
+            "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+          },
+          "creationTimestamp": "2026-09-28T20:09:40Z",
+          "generateName": "transition-executor-8479c987c-",
+          "labels": {
+            "app.kubernetes.io/component": "transition-executor",
+            "app.kubernetes.io/name": "migrant-go-control-plane",
+            "pod-template-hash": "8479c987c"
+          },
+          "name": "transition-executor-8479c987c-mtjpw",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "transition-executor-8479c987c",
+              "uid": "4414393f-a380-4852-8ee7-0f349fbd8134"
+            }
+          ],
+          "resourceVersion": "60736254",
+          "uid": "76786436-a25f-422a-ac71-df3d270f9b93"
+        },
+        "spec": {
+          "containers": [
+            {
+              "command": [
+                "/transition-executor"
+              ],
+              "env": [
+                {
+                  "name": "NAMESPACE",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.namespace"
+                    }
+                  }
+                },
+                {
+                  "name": "ROUTER_URL",
+                  "value": "http://runtime-router:8080"
+                },
+                {
+                  "name": "MODEL_RUNTIME_IMAGE",
+                  "value": "localhost:10690/migrant-model-runtime:go"
+                },
+                {
+                  "name": "VISION_MODEL_RUNTIME_IMAGE",
+                  "value": "localhost:10690/migrant-model-runtime:torchvision-cpuset-20260929"
+                },
+                {
+                  "name": "VISION_RUNTIME_MODE",
+                  "value": "torchvision"
+                },
+                {
+                  "name": "LLM_MODEL_RUNTIME_IMAGE",
+                  "value": "localhost:10690/migrant-model-runtime:llm-transformers-profile2-20260714"
+                },
+                {
+                  "name": "LLM_RUNTIME_MODE",
+                  "value": "transformers"
+                },
+                {
+                  "name": "MODEL_RUNTIME_HF_HOME",
+                  "value": "/opt/hf-cache"
+                },
+                {
+                  "name": "MODEL_RUNTIME_HF_HUB_CACHE",
+                  "value": "/opt/hf-cache/hub"
+                },
+                {
+                  "name": "MODEL_RUNTIME_HF_CACHE_HOST_PATH",
+                  "value": "/var/lib/or-sim/hf-cache"
+                },
+                {
+                  "name": "HF_TOKEN_SECRET_NAME",
+                  "value": "hf-token"
+                },
+                {
+                  "name": "RUNTIME_INIT_IMAGE",
+                  "value": "busybox:1.36"
+                },
+                {
+                  "name": "RUNTIME_READY_TIMEOUT_SECONDS",
+                  "value": "600"
+                },
+                {
+                  "name": "GPT2_MODEL_RUNTIME_IMAGE",
+                  "value": "localhost:10690/migrant-model-runtime:gpt2-medium-cpuset-20260929"
+                },
+                {
+                  "name": "GPT2_MODEL_ID",
+                  "value": "/opt/models/gpt2-medium"
+                },
+                {
+                  "name": "LLAMA_MODEL_RUNTIME_IMAGE",
+                  "value": "localhost:10690/migrant-model-runtime:llama32-3b-cpuset-20260929"
+                },
+                {
+                  "name": "LLAMA_MODEL_ID",
+                  "value": "/opt/models/llama32-3b"
+                },
+                {
+                  "name": "RUNTIME_TERMINATION_GRACE_SECONDS",
+                  "value": "2"
+                }
+              ],
+              "image": "localhost:10690/migrant-control-plane:e1-20260929",
+              "imagePullPolicy": "Always",
+              "name": "controller",
+              "ports": [
+                {
+                  "containerPort": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8080,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-86gdl",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "or-sim-control-plane",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "or-sim-control-plane"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "migrant-go-control-plane",
+          "serviceAccountName": "migrant-go-control-plane",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-86gdl",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T20:09:42Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T20:09:40Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T20:09:42Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T20:09:42Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T20:09:40Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://e29646ea5a94880eddd46c00210f16577fc8569357a737ef3b22283cf87b6877",
+              "image": "localhost:10690/migrant-control-plane:e1-20260929",
+              "imageID": "localhost:10690/migrant-control-plane@sha256:9ea25805df1341e37cabaf601b6f04caf8322a73aa9c1e65402bc0790938af4c",
+              "lastState": {},
+              "name": "controller",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-28T20:09:41Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-86gdl",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.179.144",
+          "hostIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "10.42.0.157",
+          "podIPs": [
+            {
+              "ip": "10.42.0.157"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-28T20:09:40Z"
+        }
+      }
+    ],
+    "kind": "List",
+    "metadata": {
+      "resourceVersion": ""
+    }
+  },
+  "registry": {
+    "apiVersion": "mig.or-sim.io/v1alpha1",
+    "kind": "PhysicalGpuRegistry",
+    "metadata": {
+      "creationTimestamp": "2026-07-09T20:36:19Z",
+      "generation": 2,
+      "labels": {
+        "app.kubernetes.io/name": "migrant-go"
+      },
+      "name": "default",
+      "namespace": "or-sim-exp",
+      "resourceVersion": "60739635",
+      "uid": "7b7f6249-da54-4ff3-ab32-55ac9f6c3e58"
+    },
+    "spec": {
+      "policy": {
+        "source": "cluster-state-manager"
+      }
+    },
+    "status": {
+      "activeQueue": [],
+      "availableQueue": [
+        "ampere-gpu0",
+        "ampere-gpu1",
+        "rtx1-worker-gpu0"
+      ],
+      "bindings": {
+        "ampere-gpu0": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 0,
+          "gpuIndex": 0,
+          "gpuUUID": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+          "gpuUuid": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "ampere",
+          "nodeName": "ampere",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "ampere-gpu0",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        },
+        "ampere-gpu1": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 1,
+          "gpuIndex": 1,
+          "gpuUUID": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+          "gpuUuid": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "ampere",
+          "nodeName": "ampere",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "ampere-gpu1",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        },
+        "rtx1-worker-gpu0": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 0,
+          "gpuIndex": 0,
+          "gpuUUID": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+          "gpuUuid": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "rtx1-worker",
+          "nodeName": "rtx1-worker",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "rtx1-worker-gpu0",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        }
+      },
+      "currentAllocation": {
+        "canonicalizedAt": "2026-09-28T20:20:30.903261954Z",
+        "format": "migrant.current-allocation/v1",
+        "freePhysicalGpuPool": [
+          "ampere-gpu0",
+          "ampere-gpu1",
+          "rtx1-worker-gpu0"
+        ],
+        "gpus": {},
+        "logicalGpuCount": 0,
+        "logicalGpus": [],
+        "metadata": {
+          "canonical_observed_physical_map": {},
+          "logical_id_map": {},
+          "physical_id_map": {}
+        },
+        "source": "cluster-state-manager"
+      },
+      "health": {
+        "observedAt": "2026-09-28T20:20:30.9032758Z",
+        "queueCounts": {
+          "active": 0,
+          "available": 3,
+          "transitioning": 0
+        },
+        "reasons": [],
+        "repairRequired": false,
+        "requiredActions": [],
+        "stable": true
+      },
+      "logicalBindingLedger": {
+        "available": true,
+        "bindings": {},
+        "lastPlanName": "plan-live-v2-20260928t201926055372z-r91-warmup",
+        "updatedAt": "2026-09-28T20:20:30.395207787Z",
+        "version": "migrant.logical-binding-ledger/v1"
+      },
+      "observedAt": "2026-09-28T20:20:30.915266556Z",
+      "phase": "Observed",
+      "profileCalibrationOverlay": {
+        "available": true,
+        "generatedAt": "2026-09-28T20:20:30.408234765Z",
+        "observations": []
+      },
+      "queueCounts": {
+        "active": 0,
+        "available": 3,
+        "transitioning": 0
+      },
+      "routingState": {
+        "available": true,
+        "generatedAt": "2026-09-28T20:20:30.403883072Z",
+        "routes": []
+      },
+      "transitioningQueue": []
+    }
+  },
+  "routes": {
+    "generatedAt": "2026-09-28T20:20:31.055343784Z",
+    "routes": []
+  },
+  "sourceCheck": {
+    "expected": null,
+    "matches": true,
+    "observed": {
+      "gpus": [
+        {
+          "mig_devices": [],
+          "physical_gpu_id": "ampere-gpu0",
+          "runtime_bindings": []
+        },
+        {
+          "mig_devices": [],
+          "physical_gpu_id": "ampere-gpu1",
+          "runtime_bindings": []
+        },
+        {
+          "mig_devices": [],
+          "physical_gpu_id": "rtx1-worker-gpu0",
+          "runtime_bindings": []
+        }
+      ],
+      "routes": []
+    }
+  }
+}

@@ -1,0 +1,453 @@
+{
+  "errors": [],
+  "ok": true,
+  "rounds": [
+    {
+      "actionCount": 34,
+      "actualRouteCount": 11,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 30.230298,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 1,
+      "sameGpuDistinctSlotPlaceOverlapCount": 16,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 11
+    },
+    {
+      "actionCount": 4,
+      "actualRouteCount": 11,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 1.913736,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 2,
+      "sameGpuDistinctSlotPlaceOverlapCount": 0,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 11
+    },
+    {
+      "actionCount": 9,
+      "actualRouteCount": 11,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 16.551243,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 3,
+      "sameGpuDistinctSlotPlaceOverlapCount": 0,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 11
+    },
+    {
+      "actionCount": 26,
+      "actualRouteCount": 8,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 24.899726,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 4,
+      "sameGpuDistinctSlotPlaceOverlapCount": 0,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 8
+    },
+    {
+      "actionCount": 44,
+      "actualRouteCount": 5,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 46.747653,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 5,
+      "sameGpuDistinctSlotPlaceOverlapCount": 10,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 5
+    },
+    {
+      "actionCount": 4,
+      "actualRouteCount": 5,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 1.717263,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 6,
+      "sameGpuDistinctSlotPlaceOverlapCount": 0,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 5
+    },
+    {
+      "actionCount": 8,
+      "actualRouteCount": 5,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 2.145974,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 7,
+      "sameGpuDistinctSlotPlaceOverlapCount": 0,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 5
+    },
+    {
+      "actionCount": 4,
+      "actualRouteCount": 5,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 1.583508,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 8,
+      "sameGpuDistinctSlotPlaceOverlapCount": 0,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 5
+    },
+    {
+      "actionCount": 10,
+      "actualRouteCount": 6,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 26.839959,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 9,
+      "sameGpuDistinctSlotPlaceOverlapCount": 0,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 6
+    },
+    {
+      "actionCount": 14,
+      "actualRouteCount": 5,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 6.349318,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 10,
+      "sameGpuDistinctSlotPlaceOverlapCount": 0,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 5
+    },
+    {
+      "actionCount": 6,
+      "actualRouteCount": 6,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 23.917533,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 11,
+      "sameGpuDistinctSlotPlaceOverlapCount": 0,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 6
+    },
+    {
+      "actionCount": 36,
+      "actualRouteCount": 7,
+      "allActionsCompleted": true,
+      "executorFinalValidationOk": true,
+      "makespanSeconds": 40.14524,
+      "mismatches": [],
+      "nonCompletedActions": [],
+      "round": 12,
+      "sameGpuDistinctSlotPlaceOverlapCount": 6,
+      "targetMatchesActual": true,
+      "targetRuntimeCount": 7
+    }
+  ],
+  "runId": "20260928T201926.055372Z",
+  "sameGpuDistinctSlotPlaceOverlaps": [
+    {
+      "actionA": "a0008_place_instance_CREATE-gpu0",
+      "actionB": "a0004_place_instance_CREATE-gpu0",
+      "gpu": "ampere-gpu0",
+      "round": 1,
+      "seconds": 2.719327,
+      "slotA": "[4, 7, '3g']",
+      "slotB": "[0, 2, '2g']"
+    },
+    {
+      "actionA": "a0008_place_instance_CREATE-gpu0",
+      "actionB": "a0006_place_instance_CREATE-gpu0",
+      "gpu": "ampere-gpu0",
+      "round": 1,
+      "seconds": 2.7192549999999995,
+      "slotA": "[4, 7, '3g']",
+      "slotB": "[2, 4, '2g']"
+    },
+    {
+      "actionA": "a0004_place_instance_CREATE-gpu0",
+      "actionB": "a0006_place_instance_CREATE-gpu0",
+      "gpu": "ampere-gpu0",
+      "round": 1,
+      "seconds": 4.264504,
+      "slotA": "[0, 2, '2g']",
+      "slotB": "[2, 4, '2g']"
+    },
+    {
+      "actionA": "a0018_place_instance_CREATE-gpu1",
+      "actionB": "a0014_place_instance_CREATE-gpu1",
+      "gpu": "ampere-gpu1",
+      "round": 1,
+      "seconds": 6.001147999999999,
+      "slotA": "[4, 7, '3g']",
+      "slotB": "[0, 2, '2g']"
+    },
+    {
+      "actionA": "a0018_place_instance_CREATE-gpu1",
+      "actionB": "a0016_place_instance_CREATE-gpu1",
+      "gpu": "ampere-gpu1",
+      "round": 1,
+      "seconds": 6.001128,
+      "slotA": "[4, 7, '3g']",
+      "slotB": "[2, 4, '2g']"
+    },
+    {
+      "actionA": "a0014_place_instance_CREATE-gpu1",
+      "actionB": "a0016_place_instance_CREATE-gpu1",
+      "gpu": "ampere-gpu1",
+      "round": 1,
+      "seconds": 7.980835000000001,
+      "slotA": "[0, 2, '2g']",
+      "slotB": "[2, 4, '2g']"
+    },
+    {
+      "actionA": "a0024_place_instance_CREATE-gpu2",
+      "actionB": "a0032_place_instance_CREATE-gpu2",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 1,
+      "seconds": 1.5455559999999995,
+      "slotA": "[0, 1, '1g']",
+      "slotB": "[4, 7, '3g']"
+    },
+    {
+      "actionA": "a0024_place_instance_CREATE-gpu2",
+      "actionB": "a0028_place_instance_CREATE-gpu2",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 1,
+      "seconds": 2.2634229999999995,
+      "slotA": "[0, 1, '1g']",
+      "slotB": "[2, 3, '1g']"
+    },
+    {
+      "actionA": "a0024_place_instance_CREATE-gpu2",
+      "actionB": "a0026_place_instance_CREATE-gpu2",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 1,
+      "seconds": 3.1511419999999983,
+      "slotA": "[0, 1, '1g']",
+      "slotB": "[1, 2, '1g']"
+    },
+    {
+      "actionA": "a0024_place_instance_CREATE-gpu2",
+      "actionB": "a0030_place_instance_CREATE-gpu2",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 1,
+      "seconds": 3.151050999999999,
+      "slotA": "[0, 1, '1g']",
+      "slotB": "[3, 4, '1g']"
+    },
+    {
+      "actionA": "a0032_place_instance_CREATE-gpu2",
+      "actionB": "a0028_place_instance_CREATE-gpu2",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 1,
+      "seconds": 1.5454279999999994,
+      "slotA": "[4, 7, '3g']",
+      "slotB": "[2, 3, '1g']"
+    },
+    {
+      "actionA": "a0032_place_instance_CREATE-gpu2",
+      "actionB": "a0026_place_instance_CREATE-gpu2",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 1,
+      "seconds": 1.5453959999999984,
+      "slotA": "[4, 7, '3g']",
+      "slotB": "[1, 2, '1g']"
+    },
+    {
+      "actionA": "a0032_place_instance_CREATE-gpu2",
+      "actionB": "a0030_place_instance_CREATE-gpu2",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 1,
+      "seconds": 1.545304999999999,
+      "slotA": "[4, 7, '3g']",
+      "slotB": "[3, 4, '1g']"
+    },
+    {
+      "actionA": "a0028_place_instance_CREATE-gpu2",
+      "actionB": "a0026_place_instance_CREATE-gpu2",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 1,
+      "seconds": 2.2633909999999986,
+      "slotA": "[2, 3, '1g']",
+      "slotB": "[1, 2, '1g']"
+    },
+    {
+      "actionA": "a0028_place_instance_CREATE-gpu2",
+      "actionB": "a0030_place_instance_CREATE-gpu2",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 1,
+      "seconds": 2.263299999999999,
+      "slotA": "[2, 3, '1g']",
+      "slotB": "[3, 4, '1g']"
+    },
+    {
+      "actionA": "a0026_place_instance_CREATE-gpu2",
+      "actionB": "a0030_place_instance_CREATE-gpu2",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 1,
+      "seconds": 3.424111999999999,
+      "slotA": "[1, 2, '1g']",
+      "slotB": "[3, 4, '1g']"
+    },
+    {
+      "actionA": "a0010_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0024_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "ampere-gpu1",
+      "round": 5,
+      "seconds": 11.066035,
+      "slotA": "[0, 2, '2g']",
+      "slotB": "[6, 7, '1g']"
+    },
+    {
+      "actionA": "a0010_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0014_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "ampere-gpu1",
+      "round": 5,
+      "seconds": 3.5808419999999996,
+      "slotA": "[0, 2, '2g']",
+      "slotB": "[4, 5, '1g']"
+    },
+    {
+      "actionA": "a0010_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0019_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "ampere-gpu1",
+      "round": 5,
+      "seconds": 8.091202,
+      "slotA": "[0, 2, '2g']",
+      "slotB": "[5, 6, '1g']"
+    },
+    {
+      "actionA": "a0010_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0012_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "ampere-gpu1",
+      "round": 5,
+      "seconds": 5.76728,
+      "slotA": "[0, 2, '2g']",
+      "slotB": "[2, 4, '2g']"
+    },
+    {
+      "actionA": "a0024_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0014_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "ampere-gpu1",
+      "round": 5,
+      "seconds": 3.5808419999999996,
+      "slotA": "[6, 7, '1g']",
+      "slotB": "[4, 5, '1g']"
+    },
+    {
+      "actionA": "a0024_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0019_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "ampere-gpu1",
+      "round": 5,
+      "seconds": 8.091202,
+      "slotA": "[6, 7, '1g']",
+      "slotB": "[5, 6, '1g']"
+    },
+    {
+      "actionA": "a0024_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0012_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "ampere-gpu1",
+      "round": 5,
+      "seconds": 5.76728,
+      "slotA": "[6, 7, '1g']",
+      "slotB": "[2, 4, '2g']"
+    },
+    {
+      "actionA": "a0014_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0019_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "ampere-gpu1",
+      "round": 5,
+      "seconds": 3.580818999999999,
+      "slotA": "[4, 5, '1g']",
+      "slotB": "[5, 6, '1g']"
+    },
+    {
+      "actionA": "a0014_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0012_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "ampere-gpu1",
+      "round": 5,
+      "seconds": 3.580799999999999,
+      "slotA": "[4, 5, '1g']",
+      "slotB": "[2, 4, '2g']"
+    },
+    {
+      "actionA": "a0019_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0012_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "ampere-gpu1",
+      "round": 5,
+      "seconds": 5.76728,
+      "slotA": "[5, 6, '1g']",
+      "slotB": "[2, 4, '2g']"
+    },
+    {
+      "actionA": "a0008_place_instance_PARTIAL-RECONF-gpu1",
+      "actionB": "a0015_place_instance_PARTIAL-RECONF-gpu1",
+      "gpu": "ampere-gpu0",
+      "round": 12,
+      "seconds": 4.160966,
+      "slotA": "[0, 1, '1g']",
+      "slotB": "[2, 4, '2g']"
+    },
+    {
+      "actionA": "a0008_place_instance_PARTIAL-RECONF-gpu1",
+      "actionB": "a0010_place_instance_PARTIAL-RECONF-gpu1",
+      "gpu": "ampere-gpu0",
+      "round": 12,
+      "seconds": 4.160947,
+      "slotA": "[0, 1, '1g']",
+      "slotB": "[1, 2, '1g']"
+    },
+    {
+      "actionA": "a0015_place_instance_PARTIAL-RECONF-gpu1",
+      "actionB": "a0010_place_instance_PARTIAL-RECONF-gpu1",
+      "gpu": "ampere-gpu0",
+      "round": 12,
+      "seconds": 7.527666999999999,
+      "slotA": "[2, 4, '2g']",
+      "slotB": "[1, 2, '1g']"
+    },
+    {
+      "actionA": "a0021_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0025_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 12,
+      "seconds": 1.306984,
+      "slotA": "[0, 2, '2g']",
+      "slotB": "[4, 7, '3g']"
+    },
+    {
+      "actionA": "a0021_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0023_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 12,
+      "seconds": 1.0583039999999997,
+      "slotA": "[0, 2, '2g']",
+      "slotB": "[2, 4, '2g']"
+    },
+    {
+      "actionA": "a0025_place_instance_BRIDGE-RECONF-gpu0",
+      "actionB": "a0023_place_instance_BRIDGE-RECONF-gpu0",
+      "gpu": "rtx1-worker-gpu0",
+      "round": 12,
+      "seconds": 1.0583039999999997,
+      "slotA": "[4, 7, '3g']",
+      "slotB": "[2, 4, '2g']"
+    }
+  ]
+}

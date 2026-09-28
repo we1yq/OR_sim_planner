@@ -1,0 +1,42 @@
+{
+  "actual_sends": 431015,
+  "attempts": 431015,
+  "by_workload": {
+    "gpt2_p512_o512": {
+      "pending": 0,
+      "scheduled": 52
+    },
+    "gpt2_p64_o64": {
+      "pending": 0,
+      "scheduled": 72
+    },
+    "llama_p1024_o128": {
+      "pending": 0,
+      "scheduled": 123
+    },
+    "llama_p2048_o64": {
+      "pending": 0,
+      "scheduled": 66
+    },
+    "resnet50_image": {
+      "pending": 0,
+      "scheduled": 87840
+    },
+    "vgg16_image": {
+      "pending": 0,
+      "scheduled": 272917
+    },
+    "vit_base_image": {
+      "pending": 0,
+      "scheduled": 69945
+    }
+  },
+  "cancelled": 0,
+  "failures": 0,
+  "measurement_invalid": true,
+  "pending": 0,
+  "rejected": 23567,
+  "scheduled": 431015,
+  "successes": 431015,
+  "timeouts": 0
+}
