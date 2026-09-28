@@ -1,0 +1,12 @@
+03:44:00 ampere/gpu0 gpt2_p64_o64 3g ready cpuAffinity=2,58 loadSec=1.3329908680170774
+03:44:22 ampere/gpu0 gpt2_p64_o64 4g ready cpuAffinity=2,58 loadSec=1.3774394700012635
+03:44:34 done ampere/gpu0
+03:44:43 ampere/gpu0 gpt2_p64_o64 3g ready cpuAffinity=2,58 loadSec=1.3429885040095542
+03:45:04 ampere/gpu0 gpt2_p64_o64 4g ready cpuAffinity=2,58 loadSec=1.3860080119920895
+03:45:16 done ampere/gpu0
+03:45:29 ampere/gpu1 gpt2_p64_o64 3g ready cpuAffinity=18,74 loadSec=1.3733486070123035
+03:45:48 ampere/gpu1 gpt2_p64_o64 4g ready cpuAffinity=18,74 loadSec=1.3623425779805984
+03:46:00 done ampere/gpu1
+03:46:11 ampere/gpu1 gpt2_p64_o64 3g ready cpuAffinity=18,74 loadSec=1.3264050059951842
+03:46:29 ampere/gpu1 gpt2_p64_o64 4g ready cpuAffinity=18,74 loadSec=1.3421254410059191
+03:46:41 done ampere/gpu1

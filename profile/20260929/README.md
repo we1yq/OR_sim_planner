@@ -74,6 +74,38 @@ Llama p2048/o64 is monotone on every GPU. Minimum over GPUs: 3g 0.655 → 4g 0.6
 - ampere GPU0: 0.670 → 0.707
 - ampere GPU1: 0.672 → 0.710
 
+## Additional measurements (same protocol)
+
+### `llama_p2048_o48/` — Llama-3.2-3B, prompt 2048, output 48, 2g only
+
+This request shape is not in the catalog. Only `runtimes.json` entries for 2g were run. `executor_deployments.json` also holds specs for the other profiles, but they were not used.
+
+| GPU | throughput (req/s) | mean latency (ms) | TTFT median / P95 (ms) | TPOT median / P95 (ms) |
+|---|---:|---:|---:|---:|
+| rtx1 GPU0 | 0.538 | 1859.2 | 310.3 / 310.3 | 32.27 / 32.29 |
+| ampere GPU0 | 0.538 | 1858.7 | 310.5 / 310.7 | 32.24 / 32.30 |
+| ampere GPU1 | 0.537 | 1860.6 | 310.6 / 310.8 | 32.28 / 32.36 |
+| **min** | **0.537** | | | |
+
+- Each GPU has 10 samples, 0 errors and CV ≤ 0.1%.
+- TPOT meets the llama SLO (≤ 35 ms), but TTFT does not (≤ 250 ms).
+- An aborted 1g attempt never loaded: the runtime reported `loaded=false`, the same as p2048/o64 on 1g. It is not recorded here.
+
+### `gpt2_p64_o64_3g4g_repeat/` — two more independent rounds of gpt2_p64_o64 on 3g and 4g
+
+Each round starts a fresh pod. `run_repeat.py` wraps `run_catalog_profile.py`. Each cell is 3g → 4g mean throughput (req/s).
+
+| GPU | main run (above) | repeat round 1 | repeat round 2 |
+|---|---|---|---|
+| rtx1 GPU0 | 1.535 → 1.474 (−4.0%) | 1.521 → 1.521 (0.0%) | 1.528 → 1.507 (−1.4%) |
+| ampere GPU0 | 1.642 → 1.601 (−2.5%) | 1.627 → 1.614 (−0.8%) | 1.624 → 1.633 (+0.5%) |
+| ampere GPU1 | 1.637 → 1.623 (−0.8%) | 1.647 → 1.585 (−3.8%) | 1.658 → 1.602 (−3.3%) |
+| min over GPUs | 1.535 → 1.474 (−4.0%) | 1.521 → 1.521 (0.0%) | 1.528 → 1.507 (−1.4%) |
+
+- Within a round, CV is below 1%. Between rounds on the same GPU, results differ by about ±3%.
+- For gpt2_p64_o64, 3g → 4g ranges from −4.0% to +0.5%. 4g is roughly equal to or slightly below 3g, not below by a fixed margin.
+- `catalog_min_measured.csv` still holds the main run's values. The other 1–4% decreases listed above are single runs and probably carry the same ±3% run-to-run spread.
+
 ## Not covered
 
 These are isolated measurements. In the live deployment several runtimes share a host. MIG isolates SMs and memory, but not host CPU or PCIe. Co-located throughput can therefore be lower, especially for LLM decode.

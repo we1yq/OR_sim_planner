@@ -1,0 +1,6 @@
+03:44:06 rtx1-worker/gpu0 gpt2_p64_o64 3g ready cpuAffinity=2,34 loadSec=1.626850390999607
+03:44:27 rtx1-worker/gpu0 gpt2_p64_o64 4g ready cpuAffinity=2,34 loadSec=1.6511937110008148
+03:44:38 done rtx1-worker/gpu0
+03:44:49 rtx1-worker/gpu0 gpt2_p64_o64 3g ready cpuAffinity=2,34 loadSec=1.614601686000242
+03:45:10 rtx1-worker/gpu0 gpt2_p64_o64 4g ready cpuAffinity=2,34 loadSec=1.646594695001113
+03:45:21 done rtx1-worker/gpu0

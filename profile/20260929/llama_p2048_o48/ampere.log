@@ -1,0 +1,4 @@
+03:42:01 ampere/gpu0 llama_p2048_o48 2g ready cpuAffinity=2,58 loadSec=6.4787378610053565
+03:42:31 done ampere/gpu0
+03:42:52 ampere/gpu1 llama_p2048_o48 2g ready cpuAffinity=18,74 loadSec=6.4845273260143586
+03:43:21 done ampere/gpu1

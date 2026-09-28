@@ -1,0 +1,2 @@
+03:42:01 rtx1-worker/gpu0 llama_p2048_o48 2g ready cpuAffinity=2,34 loadSec=6.899999608998769
+03:42:29 done rtx1-worker/gpu0
