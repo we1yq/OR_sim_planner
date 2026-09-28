@@ -8,6 +8,7 @@ Kubernetes and the network.
 from __future__ import annotations
 
 import csv
+import gc
 import hashlib
 import io
 import json
@@ -330,12 +331,17 @@ class BoundedAsyncSender:
         *,
         max_pending_per_workload: int = PENDING_PER_WORKLOAD,
         max_pending_total: int = PENDING_TOTAL,
-        max_workers: int = 128,
+        max_workers: int | None = None,
         stop_event: threading.Event | None = None,
         clock: Callable[[], float] = time.monotonic,
         wall_clock: Callable[[], float] = time.time,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        # One worker per admissible pending request: the pending bounds are the
+        # only admission limit, so one workload's backlog cannot delay other
+        # workloads' open-loop sends by exhausting a smaller thread pool.
+        if max_workers is None:
+            max_workers = max_pending_total
         if max_pending_per_workload <= 0 or max_pending_total <= 0 or max_workers <= 0:
             raise ValueError("pending limits and max_workers must be positive")
         self.transport = transport
@@ -624,9 +630,123 @@ def _response_value(response: Mapping[str, Any], *keys: str) -> Any:
     return None
 
 
+class ContinuousRateSender:
+    """E1 open-loop generator whose rates switch at run-time events.
+
+    Each workload sends at fixed inter-arrival 1/d.  After ``set_rates`` at
+    monotonic time t, workload w sends at ``t + phi_w(d) + n/d`` (n = 0, 1, ...),
+    with phi from the traffic seed as in ``request_offsets``; d = 0 stops w.
+    Every request is tagged at send time with the live round and window
+    ("transition" or "steady") that were current when it was scheduled, so
+    requests still in flight after a switch keep their original window.
+    Sending goes through ``BoundedAsyncSender`` (pending bounds, no retries).
+
+    Request records accumulate for the whole run; a full CPython collection
+    over them stalls every thread (up to ~1 s late in a 12-round run), which
+    shows up as gaps in the offered load.  The dispatcher therefore calls
+    ``gc.freeze()`` every ``gc_freeze_s`` so collections only scan objects
+    created since the last freeze (the records hold no reference cycles).
+    """
+
+    def __init__(self, sender: "BoundedAsyncSender", *, seed: int = SEED, tick_s: float = 0.002,
+                 gc_freeze_s: float = 1.0) -> None:
+        self.sender = sender
+        self.seed = int(seed)
+        self.tick_s = float(tick_s)
+        self.gc_freeze_s = float(gc_freeze_s)
+        self._lock = threading.Lock()
+        self._schedule: dict[str, dict[str, Any]] = {}
+        self._label: dict[str, Any] = {}
+        self._events: list[dict[str, Any]] = []
+        self._thread: threading.Thread | None = None
+        self._stopped = threading.Event()
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._dispatch, name="e1-continuous-traffic", daemon=True)
+        self._thread.start()
+
+    def set_rates(self, rates: Mapping[str, Any], *, live_round: int, window: str) -> dict[str, Any]:
+        """Switch every workload to ``rates`` now; return the switch event."""
+
+        normalized = _rates(rates)
+        now = self.sender._clock()
+        event = {
+            "live_round": int(live_round),
+            "window": str(window),
+            "rates": dict(normalized),
+            "switched_at_offset": now - self.sender._start,
+            "switched_at_utc": self.sender._wall_clock(),
+        }
+        with self._lock:
+            self._label = {"live_round": int(live_round), "window": str(window)}
+            for workload in WORKLOAD_KEYS:
+                rate = normalized[workload]
+                self._schedule[workload] = {
+                    "rate": rate,
+                    "base": now + (phase_offset(rate, workload, self.seed) if rate > 0 else 0.0),
+                    "n": 0,
+                    "label": dict(self._label),
+                }
+            self._events.append(event)
+        return event
+
+    def events(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [dict(event) for event in self._events]
+
+    def stop(self) -> None:
+        """Stop scheduling new requests; in-flight requests keep running."""
+
+        self._stopped.set()
+        if self._thread is not None:
+            self._thread.join(timeout=10.0)
+
+    def _dispatch(self) -> None:
+        last_freeze = self.sender._clock()
+        while not self._stopped.is_set() and not self.sender.stop_event.is_set():
+            now = self.sender._clock()
+            if self.gc_freeze_s > 0 and now - last_freeze >= self.gc_freeze_s:
+                gc.freeze()
+                last_freeze = now
+            due: list[dict[str, Any]] = []
+            with self._lock:
+                for workload, entry in self._schedule.items():
+                    rate = float(entry["rate"])
+                    if rate <= 0:
+                        continue
+                    while True:
+                        at = float(entry["base"]) + int(entry["n"]) / rate
+                        if at > now:
+                            break
+                        label = entry["label"]
+                        n = int(entry["n"])
+                        sequence_id = f"r{label['live_round']}:{label['window']}:{workload}:{n}"
+                        payload = build_request_payload(workload, sequence_id)
+                        due.append({
+                            "phase": label["window"],
+                            "live_round": label["live_round"],
+                            "seed": self.seed,
+                            "workload": workload,
+                            "family": "vision" if workload in VISION_WORKLOADS else "llm",
+                            "model": payload["model"],
+                            "sequence_id": sequence_id,
+                            "attempt_id": f"e1:{sequence_id}",
+                            "n": n,
+                            "rate": rate,
+                            "scheduled_offset": at - self.sender._start,
+                            "payload_hash": payload_hash(payload),
+                            "payload_json": json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True),
+                        })
+                        entry["n"] = n + 1
+            for row in sorted(due, key=lambda r: float(r["scheduled_offset"])):
+                self.sender.submit(row)
+            time.sleep(self.tick_s)
+
+
 __all__ = [
     "AsyncSender",
     "BoundedAsyncSender",
+    "ContinuousRateSender",
     "LLM_WORKLOADS",
     "PENDING_PER_WORKLOAD",
     "PENDING_TOTAL",

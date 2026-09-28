@@ -224,12 +224,19 @@ def verify_sha256sums(root: Path, sums_path: Path | None = None) -> dict[str, st
     return verified
 
 
-def load_frozen_inputs(root: Path = ROOT) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, str]]:
-    """Verify and load the frozen demand and catalog without rewriting either."""
+def load_frozen_inputs(root: Path = ROOT, catalog_file: str = "catalog.csv") -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, str]]:
+    """Verify and load the frozen demand and a catalog without rewriting either.
+
+    ``catalog_file`` (relative to ``root``) selects the ledger catalog; a
+    non-default file is hashed into the returned hashes.  The frozen files in
+    SHA256SUMS are verified either way.
+    """
 
     hashes = verify_sha256sums(root)
     demand_path = root / "selected_demand.csv"
-    catalog_path = root / "catalog.csv"
+    catalog_path = root / catalog_file
+    if catalog_file != "catalog.csv":
+        hashes = {**dict(hashes), catalog_file: hashlib.sha256(catalog_path.read_bytes()).hexdigest()}
     with demand_path.open(encoding="utf-8", newline="") as stream:
         demand = list(csv.DictReader(stream))
     with catalog_path.open(encoding="utf-8", newline="") as stream:
@@ -384,8 +391,13 @@ def audit_preflight(
     controllers: Mapping[str, Any],
     *,
     require_empty: bool = True,
+    allow_inflight: bool = False,
 ) -> list[str]:
-    """Audit only observations; this function never mutates cluster state."""
+    """Audit only observations; this function never mutates cluster state.
+
+    ``allow_inflight`` skips only the drained-routes check, for E1 where
+    traffic deliberately continues across rounds.
+    """
 
     errors = registry_health_errors(registry)
     a100s = observed_a100_ids(registry)
@@ -395,7 +407,7 @@ def audit_preflight(
         errors.append("R1 registry allocation is not empty")
     if require_empty and not routes_are_empty(routes):
         errors.append("R1 router routes are not empty")
-    if not require_empty:
+    if not require_empty and not allow_inflight:
         route_rows = _items(routes.get("routes", [])) if isinstance(routes, Mapping) else _items(routes)
         busy = [
             str(_first(_mapping(route), "runtimeId", "runtime_id", default="unknown"))
@@ -880,15 +892,60 @@ class RunContext:
     target_steady_seconds: float
     profile_seconds: float
     stop_event: threading.Event = field(default_factory=threading.Event)
+    # This is intentionally a single cohesive mode: it measures control-plane
+    # convergence only, not serving capacity or traffic continuity.
+    makespan_mode: bool = False
+    post_target_dwell_seconds: float = 5.0
+    # E1: one continuous open-loop generator for the whole run; commitment
+    # traffic during each transition, new demand for dwell_seconds after it.
+    e1_mode: bool = False
+    dwell_seconds: float = 30.0
+    e1_poll_seconds: float = 0.25
+    catalog_path: str = "catalog.csv"
 
 
 def make_run_context(args: argparse.Namespace, output_root: Path) -> RunContext:
+    resume_dir = getattr(args, "resume_run_dir", None)
+    if resume_dir is not None:
+        output_dir = Path(resume_dir).resolve()
+        if not output_dir.is_dir():
+            raise ValueError(f"--resume-run-dir does not exist: {output_dir}")
+        environment_path = output_dir / "environment.json"
+        if not environment_path.is_file():
+            raise ValueError(f"--resume-run-dir has no environment.json: {output_dir}")
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        run_id = str(environment.get("run_id") or "")
+        if not run_id:
+            raise ValueError(f"--resume-run-dir environment.json has no run_id: {output_dir}")
+        return RunContext(
+            run_id, output_dir, args.namespace, args.router_url,
+            args.source_control_seconds, args.target_steady_seconds, args.profile_seconds,
+            makespan_mode=bool(args.makespan_mode),
+            post_target_dwell_seconds=float(args.post_target_dwell_seconds),
+            e1_mode=bool(getattr(args, "e1", False)),
+            dwell_seconds=float(getattr(args, "dwell_seconds", 30.0)),
+            catalog_path=str(getattr(args, "catalog", "catalog.csv")),
+        )
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     output_dir = output_root / run_id
     output_dir.mkdir(parents=True, exist_ok=False)
     for directory in ("plans", "snapshots"):
         (output_dir / directory).mkdir()
-    return RunContext(run_id, output_dir, args.namespace, args.router_url, args.source_control_seconds, args.target_steady_seconds, args.profile_seconds)
+    return RunContext(
+        run_id, output_dir, args.namespace, args.router_url,
+        args.source_control_seconds, args.target_steady_seconds, args.profile_seconds,
+        makespan_mode=bool(args.makespan_mode),
+        post_target_dwell_seconds=float(args.post_target_dwell_seconds),
+        e1_mode=bool(getattr(args, "e1", False)),
+        dwell_seconds=float(getattr(args, "dwell_seconds", 30.0)),
+        catalog_path=str(getattr(args, "catalog", "catalog.csv")),
+    )
+
+
+def _experiment_mode(ctx: RunContext) -> str:
+    if ctx.e1_mode:
+        return "e1_continuous_traffic"
+    return "transition_makespan_no_traffic_no_profile" if ctx.makespan_mode else "full_traffic_and_profile"
 
 
 def _write_initial_outputs(ctx: RunContext, args: argparse.Namespace, hashes: Mapping[str, str]) -> None:
@@ -897,11 +954,20 @@ def _write_initial_outputs(ctx: RunContext, args: argparse.Namespace, hashes: Ma
         "router_url": ctx.router_url, "traffic_seed": TRAFFIC_SEED,
         "source_control_seconds": ctx.source_control_seconds, "target_steady_seconds": ctx.target_steady_seconds,
         "profile_seconds": ctx.profile_seconds, "input_sha256": dict(hashes),
+        "experiment_mode": _experiment_mode(ctx),
+        "makespan_mode": ctx.makespan_mode,
+        "post_target_dwell_seconds": ctx.post_target_dwell_seconds if ctx.makespan_mode else None,
+        "e1_mode": ctx.e1_mode,
+        "e1_dwell_seconds": ctx.dwell_seconds if ctx.e1_mode else None,
+        "e1_completion_poll_seconds": ctx.e1_poll_seconds if ctx.e1_mode else None,
+        "catalog_file": ctx.catalog_path,
         "stage3_variant": getattr(args, "stage3_variant", "slicewise"),
         "solver": {"threads": 8, "seed": 1, "mip_gap": 0, "accepted_status": "OPTIMAL"},
     })
     _json_output(ctx.output_dir / "profile_protocol.json", {
-        "mode": "in_place_existing_replicas", "sample_window_seconds": ctx.profile_seconds,
+        "mode": "skipped_for_transition_makespan" if (ctx.makespan_mode or ctx.e1_mode) else "in_place_existing_replicas",
+        "sample_window_seconds": None if (ctx.makespan_mode or ctx.e1_mode) else ctx.profile_seconds,
+        "status": "skipped_no_profile" if (ctx.makespan_mode or ctx.e1_mode) else "configured",
         "warmup_requests": {"vision": 10, "llm": 1}, "family": "auto", "traffic_seed": TRAFFIC_SEED,
         "timing_boundary": "runtimeInferenceSeconds with runtime CUDA synchronization",
         "source": "k8s-extension-go/tools/run_k8s_profile_matrix.py defaults",
@@ -1665,7 +1731,12 @@ def _finalize_run_outputs(ctx: RunContext, result: Mapping[str, Any]) -> None:
         "rounds": summary_rows,
     })
     status = "完成" if result.get("ok") else "未完成"
-    limitation = "无" if result.get("ok") else str(result.get("failure") or "运行提前停止")
+    limitations: list[str] = []
+    if ctx.makespan_mode:
+        limitations.append("transition-makespan模式：未发送服务流量、未执行容量profile；结果只用于动作/收敛时间，不是吞吐或零亏空证明")
+    if not result.get("ok"):
+        limitations.append(str(result.get("failure") or "运行提前停止"))
+    limitation = "；".join(limitations) if limitations else "无"
     (ctx.output_dir / "results.md").write_text(
         "# 三卡连续实验结果\n\n"
         f"- 运行 ID：`{ctx.run_id}`\n"
@@ -1691,11 +1762,18 @@ def _validate_and_record_outputs(ctx: RunContext, result: dict[str, Any]) -> dic
     except BaseException as exc:
         finalization_errors.append(f"finalization failed before validation: {type(exc).__name__}: {exc}")
     try:
-        artifact_errors = collectors.validate_required_outputs(
-            ctx.output_dir,
-            expected_rounds=ROUND_COUNT,
-            allow_partial=not bool(result.get("ok")) or bool(result.get("range_run")),
-        )
+        if ctx.e1_mode:
+            artifact_errors = _validate_makespan_outputs(ctx.output_dir, expected_rounds=int(result.get("expected_rounds", ROUND_COUNT)))
+            for name in ("requests.jsonl", "e1_rate_events.jsonl", "e1_windows.csv"):
+                if not (ctx.output_dir / name).exists():
+                    artifact_errors.append(f"missing {name}")
+        elif ctx.makespan_mode:
+            artifact_errors = _validate_makespan_outputs(ctx.output_dir, expected_rounds=int(result.get("expected_rounds", ROUND_COUNT)))
+        else:
+            artifact_errors = collectors.validate_required_outputs(
+                ctx.output_dir, expected_rounds=ROUND_COUNT,
+                allow_partial=not bool(result.get("ok")) or bool(result.get("range_run")),
+            )
     except BaseException as exc:
         artifact_errors = [f"validator raised {type(exc).__name__}: {exc}"]
     errors = [*finalization_errors, *list(artifact_errors)]
@@ -1703,7 +1781,8 @@ def _validate_and_record_outputs(ctx: RunContext, result: dict[str, Any]) -> dic
         "run_id": ctx.run_id,
         "at": utc_now(),
         "expected_rounds": ROUND_COUNT,
-        "allow_partial": not bool(result.get("ok")) or bool(result.get("range_run")),
+        "allow_partial": not bool(result.get("ok")) or bool(result.get("range_run")) or ctx.makespan_mode or ctx.e1_mode,
+        "experiment_mode": _experiment_mode(ctx),
         "ok": not errors,
         "errors": errors,
     }
@@ -1725,6 +1804,38 @@ def _validate_and_record_outputs(ctx: RunContext, result: dict[str, Any]) -> dic
     return result
 
 
+def _validate_makespan_outputs(root: Path, *, expected_rounds: int) -> list[str]:
+    """Strictly validate convergence artifacts without requiring traffic/profile files."""
+    errors: list[str] = []
+    try:
+        rows = list(csv.DictReader((root / "round_summary.csv").open(encoding="utf-8", newline="")))
+    except (OSError, ValueError) as exc:
+        return [f"round_summary.csv unreadable: {exc}"]
+    if len(rows) != expected_rounds:
+        errors.append(f"round_summary.csv expected {expected_rounds} rows, got {len(rows)}")
+    for round_number in range(1, expected_rounds + 1):
+        row = next((x for x in rows if str(x.get("live_round")) == str(round_number)), None)
+        if row is None:
+            errors.append(f"round_summary.csv missing round {round_number}"); continue
+        if str(row.get("reached_target")).lower() != "true" or str(row.get("finalValidationOk")).lower() != "true" or str(row.get("failure_count")) not in {"0", "0.0"}:
+            errors.append(f"round {round_number} summary is not successful")
+        for path in (root / "plans" / f"r{round_number:02d}_terminal_plan.json", root / "snapshots" / f"r{round_number:02d}_after_transition.json"):
+            if not path.exists(): errors.append(f"missing {path.relative_to(root)}")
+        if not (root / "plans" / f"r{round_number:02d}_terminal_plan.json").exists(): continue
+        try:
+            plan = json.loads((root / "plans" / f"r{round_number:02d}_terminal_plan.json").read_text(encoding="utf-8"))
+            if _mapping(_mapping(plan).get("status")).get("phase") != "Executed": errors.append(f"round {round_number} terminal plan not Executed")
+            statuses = _items(_mapping(_mapping(plan).get("status")).get("actionStatuses"))
+            if not statuses or any(_mapping(item).get("status") != "completed" for item in statuses): errors.append(f"round {round_number} has incomplete actions")
+            final = _mapping(_mapping(_mapping(_mapping(plan).get("status")).get("transitionExecution")).get("metrics")).get("finalValidation")
+            if not _mapping(final).get("ok"): errors.append(f"round {round_number} lacks successful executor finalValidation")
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            errors.append(f"round {round_number} terminal plan unreadable: {exc}")
+    for name in ("environment.json", "profile_protocol.json", "actions.jsonl", "strict_runtime_audit.json"):
+        if not (root / name).exists(): errors.append(f"missing {name}")
+    return errors
+
+
 def _controller_map(value: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     return {str(_mapping(item.get("metadata")).get("name", index)): dict(item) for index, item in enumerate(_items(value.get("items"))) if isinstance(item, Mapping)}
 
@@ -1735,12 +1846,13 @@ def preflight(
     *,
     controllers: Sequence[str],
     require_empty: bool = True,
+    allow_inflight: bool = False,
 ) -> dict[str, Any]:
     registry = kube.get_json("physicalgpuregistries", "default")
     routes = router.get_json("/routes")
     deployments = _controller_map(kube.get_json("deployments"))
     selected = {name: deployments[name] for name in controllers if name in deployments}
-    errors = audit_preflight(registry, routes, selected, require_empty=require_empty)
+    errors = audit_preflight(registry, routes, selected, require_empty=require_empty, allow_inflight=allow_inflight)
     missing = [name for name in controllers if name not in deployments]
     errors.extend("controller missing: " + name for name in missing)
     return {"ok": not errors, "errors": errors, "registry": registry, "routes": routes, "controllers": selected, "observedA100Ids": sorted(observed_a100_ids(registry))}
@@ -2074,13 +2186,17 @@ def execute_experiment(
                 raise RuntimeError("preflight failed before " + phase + ": " + "; ".join(current_preflight["errors"]))
             if not source_check["matches"]:
                 raise RuntimeError(f"{phase} source layout/runtime/route/batch drifted after the previous round")
-            paired = traffic.build_paired_request_plans(
-                target_rates if live_round == 1 else {key: min(source_rates[key], target_rates[key]) for key in WORKLOAD_KEYS},
-                ctx.source_control_seconds,
-                seed=TRAFFIC_SEED,
-                sequence_prefix=f"r{live_round}:",
-            )
-            if live_round > 1:
+            paired: dict[str, Sequence[Mapping[str, Any]]] = {}
+            source_rows: list[dict[str, Any]] = []
+            source_accounting: Mapping[str, Any] = {"scheduled": 0}
+            if not ctx.makespan_mode:
+                paired = traffic.build_paired_request_plans(
+                    target_rates if live_round == 1 else {key: min(source_rates[key], target_rates[key]) for key in WORKLOAD_KEYS},
+                    ctx.source_control_seconds,
+                    seed=TRAFFIC_SEED,
+                    sequence_prefix=f"r{live_round}:",
+                )
+            if live_round > 1 and not ctx.makespan_mode:
                 # Source control precedes planning so the planner observes the
                 # same settled source that the paired measurement describes.
                 source_rows, source_accounting = _run_sender(paired["source_control"], ctx.router_url, ctx.stop_event)
@@ -2129,7 +2245,7 @@ def execute_experiment(
                     ctx.stop_event,
                     window_seconds=ctx.source_control_seconds,
                 )
-                if live_round > 1 else (None, None)
+                if live_round > 1 and not ctx.makespan_mode else (None, None)
             )
             wait_error: BaseException | None = None
             traffic_stop_error: BaseException | None = None
@@ -2179,14 +2295,28 @@ def execute_experiment(
             _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_after_transition.json", {"plan": terminal, "registry": final_registry, "routes": final_routes, "finalValidation": final_validation})
             if not final_validation["ok"]:
                 raise RuntimeError("independent final validation failed: " + "; ".join(final_validation["errors"]))
-            target_plan = traffic.build_request_plan(target_rates, ctx.target_steady_seconds, phase="target_steady", seed=TRAFFIC_SEED, sequence_prefix=f"r{live_round}:target:")
-            _record_planned_requests(ctx, live_round, trace_round, "target_steady", target_plan)
-            target_rows, target_accounting = _run_sender(target_plan, ctx.router_url, ctx.stop_event)
-            router.wait_drained(timeout=900.0)
-            _record_requests(ctx, live_round, trace_round, "target_steady", target_rows, target_accounting)
-            profile_report = _profile_target(router.routes(), ctx.profile_seconds)
+            if ctx.makespan_mode:
+                dwell_started_at = utc_now()
+                if ctx.post_target_dwell_seconds:
+                    time.sleep(ctx.post_target_dwell_seconds)
+                profile_report = {
+                    "status": "skipped_no_profile",
+                    "reason": "transition makespan mode disables traffic and in-place profiling",
+                    "samples": [],
+                    "replicas": [],
+                    "postTargetDwellSeconds": ctx.post_target_dwell_seconds,
+                    "dwellStartedAt": dwell_started_at,
+                    "dwellFinishedAt": utc_now(),
+                }
+            else:
+                target_plan = traffic.build_request_plan(target_rates, ctx.target_steady_seconds, phase="target_steady", seed=TRAFFIC_SEED, sequence_prefix=f"r{live_round}:target:")
+                _record_planned_requests(ctx, live_round, trace_round, "target_steady", target_plan)
+                target_rows, target_accounting = _run_sender(target_plan, ctx.router_url, ctx.stop_event)
+                router.wait_drained(timeout=900.0)
+                _record_requests(ctx, live_round, trace_round, "target_steady", target_rows, target_accounting)
+                profile_report = _profile_target(router.routes(), ctx.profile_seconds)
             _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_profile.json", profile_report)
-            if profile_report.get("status") != "ok":
+            if not ctx.makespan_mode and profile_report.get("status") != "ok":
                 raise RuntimeError("target profile failed: " + "; ".join(str(item) for item in profile_report.get("errors", [])))
             after_pods = kube.get_json("pods")
             after_registry = kube.get_json("physicalgpuregistries", "default")
@@ -2238,6 +2368,25 @@ def execute_experiment(
             )
             _json_output(ctx.output_dir / "failure.json", {"run_id": ctx.run_id, "at": utc_now(), "phase": phase, "error": failure, "safe_stop": "new traffic stopped; partial outputs preserved"})
             break
+    cleanup_summary: dict[str, Any] | None = None
+    if failure is None and end_round == ROUND_COUNT:
+        try:
+            cleanup_summary = execute_r13_cleanup(ctx, args, kube, router, demand)
+            if cleanup_summary.get("ok") is not True:
+                failure = "R13 cleanup did not leave the cluster empty: " + "; ".join(
+                    str(item) for item in _items(cleanup_summary.get("errors"))
+                )
+        except BaseException as exc:
+            failure = f"R13 cleanup: {exc}"
+            cleanup_summary = {
+                "runId": ctx.run_id,
+                "round": 13,
+                "purpose": "explicit-zero-demand-cleanup",
+                "includedInMeasuredTwelveRoundAggregate": False,
+                "ok": False,
+                "errors": [str(exc)],
+            }
+            _json_output(ctx.output_dir / "r13_cleanup_summary.json", cleanup_summary)
     expected_rounds = end_round - start_round + 1
     result = {
         "run_id": ctx.run_id,
@@ -2246,8 +2395,430 @@ def execute_experiment(
         "ok": failure is None and completed_rounds == expected_rounds,
         "failure": failure,
         "range_run": start_round != 1 or end_round != ROUND_COUNT,
+        "r13_cleanup": cleanup_summary,
     }
     return _validate_and_record_outputs(ctx, result)
+
+
+E1_WINDOW_FIELDS = [
+    "run_id", "live_round", "trace_round", "stage3_variant",
+    "transition_switch_offset", "transition_switch_utc",
+    "executor_started_at", "executor_finished_at",
+    "steady_switch_offset", "steady_switch_utc", "completion_detect_lag_seconds",
+    "dwell_seconds", "dwell_end_offset", "commitment_json", "target_json",
+]
+
+
+def _utc_seconds(value: Any) -> float | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def _e1_warmup_step(
+    ctx: RunContext,
+    args: argparse.Namespace,
+    kube: Kubectl,
+    router: Router,
+    *,
+    label: str,
+    number: int,
+    source_rates: Mapping[str, float],
+    target_rates: Mapping[str, float],
+    require_empty: bool,
+) -> dict[str, Any]:
+    """Run one untrafficked transition used only to warm the system."""
+
+    before = preflight(kube, router, controllers=tuple(args.controller_names), require_empty=require_empty)
+    if not before["ok"]:
+        raise RuntimeError(f"warm-up {label} preflight failed: " + "; ".join(before["errors"]))
+    snapshot_name = f"{snapshot_name_for_run(ctx.run_id, number)}-warmup"
+    snapshot = build_arrival_snapshot(
+        snapshot_name, number, dict(source_rates), dict(target_rates),
+        namespace=ctx.namespace, placement_nodes=args.placement_nodes,
+        stage3_variant=args.stage3_variant,
+    )
+    snapshot["spec"]["triggerReason"] = f"e1-warmup-{label}"
+    _json_output(ctx.output_dir / "warmup" / f"{label}_arrival_snapshot.json", snapshot)
+    kube.apply(snapshot)
+    plan_name = "plan-" + snapshot_name
+    plan = wait_for_plan(kube, plan_name, timeout=args.watchdog_seconds, poll_seconds=ctx.e1_poll_seconds)
+    registry = kube.get_json("physicalgpuregistries", "default")
+    audit = audit_plan(plan, registry, source_gpu_count=active_gpu_count(registry),
+                       require_nonzero_target=False, expected_stage3_variant=args.stage3_variant)
+    _json_output(ctx.output_dir / "warmup" / f"{label}_plan.json", plan)
+    if not audit["ok"]:
+        raise RuntimeError(f"warm-up {label} plan audit failed: " + "; ".join(audit["errors"]))
+    kube.approve(plan_name)
+    terminal = wait_for_plan(kube, plan_name, timeout=args.watchdog_seconds,
+                             poll_seconds=ctx.e1_poll_seconds, accept_planned=False)
+    _json_output(ctx.output_dir / "warmup" / f"{label}_terminal_plan.json", terminal)
+    if str(_mapping(terminal.get("status")).get("phase")) not in TERMINAL_PHASES:
+        raise RuntimeError(f"warm-up {label} plan did not succeed: {_mapping(terminal.get('status')).get('message')}")
+    validation, _, _ = wait_independent_final_validation(kube, router, terminal, timeout=60.0, poll_seconds=ctx.e1_poll_seconds)
+    if not validation.get("ok"):
+        raise RuntimeError(f"warm-up {label} final validation failed: " + "; ".join(str(e) for e in _items(validation.get("errors"))))
+    return {"label": label, "plan": plan_name, "makespanSeconds": _planner_makespan_seconds(terminal),
+            "actionCount": len(_items(_mapping(terminal.get("status")).get("actionStatuses")))}
+
+
+def e1_warmup(ctx: RunContext, args: argparse.Namespace, kube: Kubectl, router: Router,
+              demand: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Warm every path R1 uses (images, model page cache, planner, executor,
+    MIG/CDI, containers) with empty -> R1 target -> empty, without traffic.
+
+    Excluded from all measured outputs; saved under warmup/.
+    """
+
+    (ctx.output_dir / "warmup").mkdir(exist_ok=True)
+    zero = {key: 0.0 for key in WORKLOAD_KEYS}
+    r1 = demand_rates(demand[0])
+    started = utc_now()
+    steps = [
+        _e1_warmup_step(ctx, args, kube, router, label="up", number=90, source_rates=zero,
+                        target_rates=r1, require_empty=True),
+        _e1_warmup_step(ctx, args, kube, router, label="down", number=91, source_rates=r1,
+                        target_rates=zero, require_empty=False),
+    ]
+    summary = {"runId": ctx.run_id, "purpose": "e1-warmup-excluded-from-measurement",
+               "startedAt": started, "finishedAt": utc_now(), "steps": steps}
+    _json_output(ctx.output_dir / "warmup" / "warmup_summary.json", summary)
+    return summary
+
+
+def execute_e1_experiment(
+    ctx: RunContext,
+    args: argparse.Namespace,
+    kube: Kubectl,
+    router: Router,
+    demand: Sequence[Mapping[str, Any]],
+    catalog: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """E1: R1 plus 11 transitions under continuous open-loop traffic.
+
+    One generator runs for the whole run.  At each approval its rates switch
+    to the commitment min(D_old, D_new); when the executor reports the plan
+    terminal they switch to D_new for ``ctx.dwell_seconds`` before the next
+    round is planned from the observed source.  No drain, source control or
+    profiling happens between rounds.  Requests keep the round/window they
+    were scheduled in.  After R12 the generator stops, in-flight requests
+    finish, and the zero-demand R13 cleanup empties the cluster.
+    """
+
+    zero = {key: 0.0 for key in WORKLOAD_KEYS}
+    if getattr(args, "e1_warmup", True):
+        e1_warmup(ctx, args, kube, router, demand)
+    sender = traffic.BoundedAsyncSender(traffic.urllib_transport(ctx.router_url, timeout_s=900.0))
+    generator = traffic.ContinuousRateSender(sender, seed=TRAFFIC_SEED)
+    generator.start()
+    previous_rates = dict(zero)
+    completed_rounds = 0
+    failure: str | None = None
+    expected_source_signature: dict[str, Any] | None = None
+    controller_names = tuple(args.controller_names)
+    windows: list[dict[str, Any]] = []
+    trace_rounds: dict[int, int] = {}
+    try:
+        for live_round, raw_target in enumerate(demand, 1):
+            trace_round = _int(raw_target.get("round"))
+            trace_rounds[live_round] = trace_round
+            target_rates = demand_rates(raw_target)
+            source_rates = dict(previous_rates)
+            phase = f"R{live_round}"
+            plan_name: str | None = None
+            terminal: dict[str, Any] | None = None
+            try:
+                current_preflight = preflight(
+                    kube, router, controllers=controller_names,
+                    require_empty=(live_round == 1), allow_inflight=(live_round > 1),
+                )
+                current_preflight["pods"] = kube.get_json("pods")
+                observed_source_signature = source_state_signature(
+                    _mapping(current_preflight.get("registry")), _mapping(current_preflight.get("routes")),
+                )
+                source_check = {
+                    "expected": expected_source_signature,
+                    "observed": observed_source_signature,
+                    "matches": expected_source_signature is None or expected_source_signature == observed_source_signature,
+                }
+                current_preflight["sourceCheck"] = source_check
+                _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_before_preflight.json", current_preflight)
+                if not current_preflight["ok"]:
+                    raise RuntimeError("preflight failed before " + phase + ": " + "; ".join(current_preflight["errors"]))
+                if not source_check["matches"]:
+                    raise RuntimeError(f"{phase} source layout/runtime/route/batch drifted after the previous round")
+                snapshot_name = snapshot_name_for_run(ctx.run_id, live_round)
+                snapshot = build_arrival_snapshot(
+                    snapshot_name, live_round, source_rates, target_rates,
+                    namespace=ctx.namespace, placement_nodes=args.placement_nodes,
+                    stage3_variant=args.stage3_variant,
+                )
+                _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_arrival_snapshot.json", snapshot)
+                kube.apply(snapshot)
+                plan_name = "plan-" + snapshot_name
+                plan = wait_for_plan(kube, plan_name, timeout=args.watchdog_seconds, poll_seconds=ctx.e1_poll_seconds)
+                _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_plan_observed.json", plan)
+                registry = kube.get_json("physicalgpuregistries", "default")
+                audit = audit_plan(
+                    plan, registry, source_gpu_count=active_gpu_count(registry),
+                    require_nonzero_target=(live_round == 1 and sum(float(v) for v in target_rates.values()) > 0.0),
+                    expected_stage3_variant=args.stage3_variant,
+                )
+                _save_plan_and_audit(ctx, live_round, plan, audit)
+                _record_plan_artifacts(ctx, live_round, trace_round, plan, registry)
+                if not audit["ok"]:
+                    raise RuntimeError("plan audit failed: " + "; ".join(audit["errors"]))
+                commitment = {key: min(source_rates[key], target_rates[key]) for key in WORKLOAD_KEYS}
+                switch_in = generator.set_rates(commitment, live_round=live_round, window="transition")
+                kube.approve(plan_name)
+                terminal = wait_for_plan(
+                    kube, plan_name, timeout=args.watchdog_seconds,
+                    poll_seconds=ctx.e1_poll_seconds, accept_planned=False,
+                )
+                status = _mapping(terminal.get("status"))
+                if str(status.get("phase")) not in TERMINAL_PHASES:
+                    raise RuntimeError(f"{phase} plan ended in phase {status.get('phase')}: {status.get('message')}")
+                switch_out = generator.set_rates(target_rates, live_round=live_round, window="steady")
+                _json_output(ctx.output_dir / "plans" / f"r{live_round:02d}_terminal_plan.json", terminal)
+                _record_plan_artifacts(ctx, live_round, trace_round, terminal, registry)
+                final_validation, final_registry, final_routes = wait_independent_final_validation(
+                    kube, router, terminal, timeout=60.0, poll_seconds=ctx.e1_poll_seconds,
+                )
+                _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_after_transition.json", {
+                    "plan": terminal, "registry": final_registry, "routes": final_routes, "finalValidation": final_validation,
+                })
+                if not final_validation["ok"]:
+                    raise RuntimeError("independent final validation failed: " + "; ".join(final_validation["errors"]))
+                remaining = ctx.dwell_seconds - (sender._clock() - sender._start - float(switch_out["switched_at_offset"]))
+                if remaining > 0:
+                    time.sleep(remaining)
+                timestamps = _mapping(_mapping(status.get("transitionExecution")).get("timestamps"))
+                finished_at = _utc_seconds(timestamps.get("executorFinishedAt"))
+                windows.append({
+                    "run_id": ctx.run_id, "live_round": live_round, "trace_round": trace_round,
+                    "stage3_variant": args.stage3_variant,
+                    "transition_switch_offset": switch_in["switched_at_offset"],
+                    "transition_switch_utc": datetime.fromtimestamp(switch_in["switched_at_utc"], timezone.utc).isoformat(),
+                    "executor_started_at": timestamps.get("executorStartedAt"),
+                    "executor_finished_at": timestamps.get("executorFinishedAt"),
+                    "steady_switch_offset": switch_out["switched_at_offset"],
+                    "steady_switch_utc": datetime.fromtimestamp(switch_out["switched_at_utc"], timezone.utc).isoformat(),
+                    "completion_detect_lag_seconds": (switch_out["switched_at_utc"] - finished_at) if finished_at else None,
+                    "dwell_seconds": ctx.dwell_seconds,
+                    "dwell_end_offset": sender._clock() - sender._start,
+                    "commitment_json": json.dumps(commitment, sort_keys=True),
+                    "target_json": json.dumps(target_rates, sort_keys=True),
+                })
+                _csv_output(ctx.output_dir / "e1_windows.csv", windows, E1_WINDOW_FIELDS)
+                after_registry = kube.get_json("physicalgpuregistries", "default")
+                after_routes = router.get_json("/routes")
+                after_pods = kube.get_json("pods")
+                _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_after.json", {
+                    "registry": after_registry, "routes": after_routes, "pods": after_pods,
+                })
+                _merge_observed_pod_images(ctx, after_pods)
+                profile_report = {
+                    "status": "skipped_no_profile",
+                    "reason": "E1 measures serving under continuous traffic; no in-place profiling",
+                    "samples": [], "replicas": [],
+                }
+                _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_profile.json", profile_report)
+                _record_round_artifacts(
+                    ctx, live_round, trace_round, terminal, registry,
+                    _items(_mapping(current_preflight.get("routes")).get("routes")),
+                    _items(final_routes.get("routes")),
+                    profile_report, source_rates, target_rates, catalog,
+                )
+                completed_rounds += 1
+                previous_rates = target_rates
+                expected_source_signature = source_state_signature(after_registry, after_routes)
+            except BaseException as exc:
+                failure = f"{phase}: {exc}"
+                generator.set_rates(zero, live_round=live_round, window="stopped_on_failure")
+                ctx.stop_event.set()
+                _capture_round_failure(
+                    ctx, kube, router, live_round=live_round, trace_round=trace_round, phase=phase,
+                    error=exc, plan_name=plan_name, terminal=terminal, profile_report=None,
+                )
+                _write_partial_round_summary(ctx, live_round=live_round, trace_round=trace_round, phase=phase, error=exc, terminal=terminal)
+                _json_output(ctx.output_dir / "failure.json", {"run_id": ctx.run_id, "at": utc_now(), "phase": phase, "error": failure, "safe_stop": "new traffic stopped; partial outputs preserved"})
+                break
+    finally:
+        generator.set_rates(zero, live_round=ROUND_COUNT + 1, window="stopped")
+        generator.stop()
+        rows = sender.drain(timeout_s=900.0)
+        accounting = sender.accounting()
+        sender.shutdown()
+        _jsonl_output(ctx.output_dir / "e1_rate_events.jsonl", generator.events())
+        by_group: dict[tuple[int, str], list[dict[str, Any]]] = {}
+        for row in rows:
+            by_group.setdefault((_int(row.get("live_round")), str(row.get("phase"))), []).append(row)
+        for (live_round, window), group in sorted(by_group.items()):
+            _record_planned_requests(ctx, live_round, trace_rounds.get(live_round, 0), window, group)
+            _record_requests(ctx, live_round, trace_rounds.get(live_round, 0), window, group, accounting)
+        _json_output(ctx.output_dir / "e1_traffic_accounting.json", accounting)
+    cleanup_summary: dict[str, Any] | None = None
+    if failure is None:
+        try:
+            router.wait_drained(timeout=900.0)
+            cleanup_summary = execute_r13_cleanup(ctx, args, kube, router, demand)
+            if cleanup_summary.get("ok") is not True:
+                failure = "R13 cleanup did not leave the cluster empty: " + "; ".join(str(item) for item in _items(cleanup_summary.get("errors")))
+        except BaseException as exc:
+            failure = f"R13 cleanup: {exc}"
+            cleanup_summary = {"runId": ctx.run_id, "round": 13, "purpose": "explicit-zero-demand-cleanup",
+                               "includedInMeasuredTwelveRoundAggregate": False, "ok": False, "errors": [str(exc)]}
+            _json_output(ctx.output_dir / "r13_cleanup_summary.json", cleanup_summary)
+    if completed_rounds == ROUND_COUNT:
+        # Post-run strict audit (target vs routes, action completion, executor
+        # validation, same-GPU distinct-slot parallelism); writes
+        # strict_runtime_audit.json, which output validation requires.
+        audit = subprocess.run(
+            [sys.executable, str(ROOT / "audit_makespan_run.py"), str(ctx.output_dir)],
+            text=True, capture_output=True, check=False,
+        )
+        if audit.returncode != 0 and failure is None:
+            failure = "strict runtime audit failed: " + (audit.stderr or audit.stdout).strip()[-400:]
+    result = {
+        "run_id": ctx.run_id,
+        "completed_rounds": completed_rounds,
+        "expected_rounds": ROUND_COUNT,
+        "ok": failure is None and completed_rounds == ROUND_COUNT,
+        "failure": failure,
+        "range_run": False,
+        "r13_cleanup": cleanup_summary,
+        "experiment_mode": "e1_continuous_traffic",
+        "stage3_variant": args.stage3_variant,
+    }
+    return _validate_and_record_outputs(ctx, result)
+
+
+def execute_r13_cleanup(
+    ctx: RunContext,
+    args: argparse.Namespace,
+    kube: Kubectl,
+    router: Router,
+    demand: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Execute the mandatory zero-demand cleanup after the measured R1-R12 run."""
+
+    live_round = ROUND_COUNT + 1
+    source_rates = demand_rates(demand[-1])
+    target_rates = {key: 0.0 for key in WORKLOAD_KEYS}
+    before = preflight(
+        kube,
+        router,
+        controllers=tuple(args.controller_names),
+        require_empty=False,
+    )
+    before["pods"] = kube.get_json("pods")
+    _json_output(ctx.output_dir / "snapshots" / "r13_cleanup_before.json", before)
+    if not before["ok"]:
+        raise RuntimeError("R13 preflight failed: " + "; ".join(before["errors"]))
+
+    snapshot_name = snapshot_name_for_run(ctx.run_id, live_round)
+    snapshot = build_arrival_snapshot(
+        snapshot_name,
+        live_round,
+        source_rates,
+        target_rates,
+        namespace=ctx.namespace,
+        placement_nodes=args.placement_nodes,
+    )
+    snapshot["spec"]["triggerReason"] = "explicit-r13-cleanup"
+    snapshot["spec"]["notes"] = [
+        "R13 is a mandatory zero-demand cleanup after measured R1-R12",
+        "R13 makespan is reported separately and excluded from the 12-round aggregate",
+    ]
+    _json_output(ctx.output_dir / "snapshots" / "r13_cleanup_arrival_snapshot.json", snapshot)
+    kube.apply(snapshot)
+    plan_name = "plan-" + snapshot_name
+    plan = wait_for_plan(kube, plan_name, timeout=args.watchdog_seconds, poll_seconds=args.poll_seconds)
+    registry = kube.get_json("physicalgpuregistries", "default")
+    audit = audit_plan(
+        plan,
+        registry,
+        source_gpu_count=active_gpu_count(registry),
+        require_nonzero_target=False,
+    )
+    _json_output(ctx.output_dir / "plans" / "r13_cleanup_plan.json", plan)
+    _json_output(ctx.output_dir / "plans" / "r13_cleanup_audit.json", audit)
+    if not audit["ok"]:
+        raise RuntimeError("R13 plan audit failed: " + "; ".join(audit["errors"]))
+
+    kube.approve(plan_name)
+    terminal = wait_for_plan(
+        kube,
+        plan_name,
+        timeout=args.watchdog_seconds,
+        poll_seconds=args.poll_seconds,
+        accept_planned=False,
+    )
+    _json_output(ctx.output_dir / "plans" / "r13_cleanup_terminal_plan.json", terminal)
+    if str(_mapping(terminal.get("status")).get("phase")) not in TERMINAL_PHASES:
+        raise RuntimeError("R13 cleanup plan did not succeed")
+
+    validation, final_registry, final_routes = wait_independent_final_validation(
+        kube,
+        router,
+        terminal,
+        timeout=60.0,
+        poll_seconds=args.poll_seconds,
+    )
+    all_pods = kube.get_json("pods")
+    runtime_pods = [
+        pod for pod in _items(all_pods.get("items"))
+        if _mapping(_mapping(pod).get("metadata")).get("labels", {}).get("app.kubernetes.io/name")
+        == "migrant-model-runtime"
+    ]
+    queue_counts = _mapping(_mapping(final_registry.get("status")).get("queueCounts"))
+    routes = _items(_mapping(final_routes).get("routes"))
+    errors = list(_items(validation.get("errors")))
+    if _int(queue_counts.get("active"), -1) != 0:
+        errors.append(f"registry active={queue_counts.get('active')}, want 0")
+    if _int(queue_counts.get("transitioning"), -1) != 0:
+        errors.append(f"registry transitioning={queue_counts.get('transitioning')}, want 0")
+    if _int(queue_counts.get("available"), -1) != MAX_PHYSICAL_GPUS:
+        errors.append(f"registry available={queue_counts.get('available')}, want {MAX_PHYSICAL_GPUS}")
+    if routes:
+        errors.append(f"router still has {len(routes)} routes")
+    if runtime_pods:
+        errors.append(f"cluster still has {len(runtime_pods)} runtime pods")
+
+    action_statuses = _items(_mapping(terminal.get("status")).get("actionStatuses"))
+    action_counts: dict[str, int] = {}
+    for item in action_statuses:
+        action_type = str(_mapping(item).get("type", "unknown"))
+        action_counts[action_type] = action_counts.get(action_type, 0) + 1
+    summary = {
+        "runId": ctx.run_id,
+        "round": live_round,
+        "purpose": "explicit-zero-demand-cleanup",
+        "includedInMeasuredTwelveRoundAggregate": False,
+        "ok": validation.get("ok") is True and not errors,
+        "errors": errors,
+        "planName": plan_name,
+        "planPhase": _mapping(terminal.get("status")).get("phase"),
+        "makespanSeconds": _planner_makespan_seconds(terminal),
+        "actionCount": len(action_statuses),
+        "actionCounts": action_counts,
+        "allActionsCompleted": all(str(_mapping(item).get("status")) == "completed" for item in action_statuses),
+        "finalValidation": validation,
+        "queueCounts": dict(queue_counts),
+        "routeCount": len(routes),
+        "runtimePodCount": len(runtime_pods),
+    }
+    _json_output(ctx.output_dir / "snapshots" / "r13_cleanup_after.json", {
+        "registry": final_registry,
+        "routes": final_routes,
+        "runtimePods": runtime_pods,
+        "finalValidation": validation,
+    })
+    _json_output(ctx.output_dir / "r13_cleanup_summary.json", summary)
+    return summary
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2262,9 +2833,31 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--namespace", default=DEFAULT_NAMESPACE)
     parser.add_argument("--router-url", default=DEFAULT_ROUTER_URL)
     parser.add_argument("--output-root", type=Path, default=ROOT / "cluster_results")
+    parser.add_argument(
+        "--resume-run-dir", type=Path,
+        help="continue a previously initialized run directory; requires --execute and --start-round > 1",
+    )
     parser.add_argument("--source-control-seconds", type=float, default=60.0)
     parser.add_argument("--target-steady-seconds", type=float, default=30.0)
     parser.add_argument("--profile-seconds", type=float, default=60.0)
+    parser.add_argument(
+        "--makespan-mode", action="store_true",
+        help="run only transition convergence: no source/transition/target traffic and no profile; retain validation and collectors",
+    )
+    parser.add_argument(
+        "--post-target-dwell-seconds", type=float, default=5.0,
+        help="idle dwell after strict target validation in --makespan-mode (default: 5)",
+    )
+    parser.add_argument(
+        "--e1", action="store_true",
+        help="E1: continuous open-loop traffic; commitment during each transition, new demand for --dwell-seconds after completion; no drain/source-control/profile",
+    )
+    parser.add_argument("--dwell-seconds", type=float, default=30.0, help="E1 new-demand dwell after each transition (default: 30)")
+    parser.add_argument(
+        "--no-e1-warmup", dest="e1_warmup", action="store_false",
+        help="skip the untrafficked empty->R1->empty warm-up before E1's R1 (default: run it)",
+    )
+    parser.add_argument("--catalog", default="catalog.csv", help="ledger catalog file in the experiment directory (default: frozen catalog.csv)")
     parser.add_argument("--watchdog-seconds", type=float, default=1800.0)
     parser.add_argument("--poll-seconds", type=float, default=2.0)
     parser.add_argument("--start-round", type=int, default=1, help="first live round to execute; default runs from R1")
@@ -2290,18 +2883,40 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.execute and args.stage3_variant == "sw-c" and not args.allow_unsafe_sw_c:
         print("SW-C execution requires --allow-unsafe-sw-c", file=sys.stderr)
         return 2
-    if min(args.source_control_seconds, args.target_steady_seconds, args.profile_seconds) <= 0:
+    if args.e1 and args.makespan_mode:
+        print("--e1 and --makespan-mode are exclusive", file=sys.stderr)
+        return 2
+    if args.e1 and args.dwell_seconds <= 0:
+        print("--dwell-seconds must be positive", file=sys.stderr)
+        return 2
+    if not args.makespan_mode and min(args.source_control_seconds, args.target_steady_seconds, args.profile_seconds) <= 0:
         print("duration overrides must be positive", file=sys.stderr)
+        return 2
+    if args.post_target_dwell_seconds < 0:
+        print("--post-target-dwell-seconds must be non-negative", file=sys.stderr)
         return 2
     if args.start_round < 1 or args.end_round > ROUND_COUNT or args.start_round > args.end_round:
         print(f"round range must satisfy 1 <= start <= end <= {ROUND_COUNT}", file=sys.stderr)
         return 2
+    if args.resume_run_dir is not None and (not args.execute or args.start_round <= 1):
+        print("--resume-run-dir requires --execute and --start-round > 1", file=sys.stderr)
+        return 2
     ctx: RunContext | None = None
     try:
         validate_workload_contract()
-        demand, catalog, hashes = load_frozen_inputs()
+        demand, catalog, hashes = load_frozen_inputs(catalog_file=args.catalog)
         ctx = make_run_context(args, args.output_root)
-        _write_initial_outputs(ctx, args, hashes)
+        if args.resume_run_dir is None:
+            _write_initial_outputs(ctx, args, hashes)
+        else:
+            _json_output(ctx.output_dir / "resume.json", {
+                "run_id": ctx.run_id,
+                "resumed_at": utc_now(),
+                "start_round": args.start_round,
+                "end_round": args.end_round,
+                "makespan_mode": ctx.makespan_mode,
+                "post_target_dwell_seconds": ctx.post_target_dwell_seconds,
+            })
         kube = Kubectl(args.namespace)
         if not args.router_url:
             raise ValueError("--router-url (or OR_SIM_ROUTER_URL) is required for preflight")
@@ -2331,7 +2946,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.execute:
             print(json.dumps({"run_id": ctx.run_id, "preflight": readiness["ok"], "execute": False, "output": str(ctx.output_dir)}, sort_keys=True))
             return 0 if readiness["ok"] else 1
-        result = execute_experiment(ctx, args, kube, router, demand, catalog)
+        runner_fn = execute_e1_experiment if ctx.e1_mode else execute_experiment
+        result = runner_fn(ctx, args, kube, router, demand, catalog)
         print(json.dumps({**result, "output": str(ctx.output_dir)}, sort_keys=True))
         return 0 if result["ok"] else 1
     except (OSError, ValueError, RuntimeError, TimeoutError, json.JSONDecodeError) as exc:

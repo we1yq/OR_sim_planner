@@ -236,5 +236,34 @@ class SenderTests(unittest.TestCase):
         self.assertEqual(summary["cancelled"], 1)
 
 
+class ContinuousRateSenderTest(unittest.TestCase):
+    def test_rate_switch_tags_windows_and_keeps_fixed_spacing(self) -> None:
+        sent = []
+        sender = traffic.BoundedAsyncSender(lambda request: sent.append(request) or {"status": "success"})
+        gen = traffic.ContinuousRateSender(sender, seed=71, tick_s=0.001)
+        zero = {key: 0.0 for key in traffic.WORKLOAD_KEYS}
+        gen.start()
+        gen.set_rates({**zero, "gpt2_p64_o64": 50.0}, live_round=2, window="transition")
+        time.sleep(0.25)
+        switch = gen.set_rates({**zero, "gpt2_p64_o64": 100.0}, live_round=2, window="steady")
+        time.sleep(0.25)
+        gen.set_rates(zero, live_round=2, window="steady")
+        time.sleep(0.05)
+        gen.stop()
+        rows = sender.drain(timeout_s=5.0)
+        sender.shutdown()
+        by_window = {w: sorted(float(r["scheduled_offset"]) for r in rows if r["phase"] == w) for w in ("transition", "steady")}
+        self.assertTrue(all(r["workload"] == "gpt2_p64_o64" and r["live_round"] == 2 for r in rows))
+        self.assertGreaterEqual(len(by_window["transition"]), 10)
+        self.assertGreaterEqual(len(by_window["steady"]), 20)
+        gaps = [b - a for a, b in zip(by_window["steady"], by_window["steady"][1:])]
+        for gap in gaps:
+            self.assertAlmostEqual(gap, 0.01, places=6)
+        self.assertTrue(all(offset < switch["switched_at_offset"] for offset in by_window["transition"]))
+        self.assertTrue(all(offset >= switch["switched_at_offset"] for offset in by_window["steady"]))
+        self.assertEqual(len({r["sequence_id"] for r in rows}), len(rows))
+        self.assertEqual(len(gen.events()), 3)
+
+
 if __name__ == "__main__":
     unittest.main()

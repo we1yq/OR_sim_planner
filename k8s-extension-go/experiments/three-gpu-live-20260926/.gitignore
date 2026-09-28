@@ -1,0 +1,4 @@
+# Raw per-request logs (hundreds of MB); the E1 runs keep requests.csv.gz
+# (compact_requests.py), which the analysis scripts read instead.
+cluster_results/*/requests.jsonl
+cluster_results/*/planned_requests.csv

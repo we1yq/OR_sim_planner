@@ -62,6 +62,34 @@ class RunnerAuditTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             parser.parse_args(["--preflight-only", "--execute"])
 
+    def test_makespan_mode_has_a_single_explicit_switch_and_five_second_dwell(self) -> None:
+        args = runner.build_parser().parse_args(["--execute", "--makespan-mode"])
+        self.assertTrue(args.makespan_mode)
+        self.assertEqual(args.post_target_dwell_seconds, 5.0)
+        self.assertEqual(args.source_control_seconds, 60.0)
+
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = runner.RunContext(
+                "run", Path(directory), "or-sim-exp", "http://router", 60, 30, 60,
+                makespan_mode=True, post_target_dwell_seconds=5,
+            )
+            runner._write_initial_outputs(ctx, SimpleNamespace(), {})
+            environment = json.loads((ctx.output_dir / "environment.json").read_text())
+            protocol = json.loads((ctx.output_dir / "profile_protocol.json").read_text())
+        self.assertEqual(environment["experiment_mode"], "transition_makespan_no_traffic_no_profile")
+        self.assertEqual(environment["post_target_dwell_seconds"], 5)
+        self.assertEqual(protocol["status"], "skipped_no_profile")
+
+    def test_resume_requires_an_explicit_later_round_and_reuses_run_id(self) -> None:
+        parser = runner.build_parser()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "environment.json").write_text(json.dumps({"run_id": "prior-run"}), encoding="utf-8")
+            args = parser.parse_args(["--execute", "--makespan-mode", "--start-round", "2", "--resume-run-dir", str(root)])
+            ctx = runner.make_run_context(args, root / "unused")
+        self.assertEqual(ctx.run_id, "prior-run")
+        self.assertEqual(ctx.output_dir, root.resolve())
+
     def test_preflight_requires_three_a100s_empty_routes_and_healthy_controllers(self) -> None:
         controllers = {name: {"status": {"replicas": 1, "availableReplicas": 1}} for name in ("planner", "executor")}
         report = runner.audit_preflight(registry_fixture(), {"routes": []}, controllers)
@@ -441,6 +469,69 @@ class KubectlBoundaryTests(unittest.TestCase):
         generated = runner.snapshot_name_for_run("20260926T092447.387936Z", 1)
         self.assertRegex(generated, r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
 
+    def test_r13_cleanup_is_zero_demand_and_kept_out_of_twelve_round_aggregate(self) -> None:
+        registry = {
+            "status": {
+                "queueCounts": {"active": 0, "available": 3, "transitioning": 0},
+                "bindings": {},
+            }
+        }
+        planned = {"metadata": {"name": "plan-r13"}, "status": {"phase": "Planned"}}
+        terminal = {
+            "metadata": {"name": "plan-r13"},
+            "status": {
+                "phase": "Executed",
+                "actionStatuses": [{"id": "a", "type": "return_gpu", "status": "completed"}],
+                "transitionExecution": {"durations": {"makespanSec": 1.25}},
+            },
+        }
+
+        class FakeKube:
+            def __init__(self) -> None:
+                self.applied: dict[str, object] | None = None
+                self.approved = ""
+
+            def apply(self, value: dict[str, object]) -> None:
+                self.applied = value
+
+            def approve(self, name: str) -> None:
+                self.approved = name
+
+            def get_json(self, resource: str, name: str | None = None) -> dict[str, object]:
+                if resource == "pods":
+                    return {"items": []}
+                return registry
+
+        demand = [{"round": number, **{key: 1.0 for key in runner.WORKLOAD_KEYS}} for number in range(1, 13)]
+        args = SimpleNamespace(
+            controller_names=["planner-controller"], placement_nodes=["ampere"],
+            watchdog_seconds=10.0, poll_seconds=0.0,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = runner.RunContext("run", Path(directory), "or-sim-exp", "http://router", 60, 30, 60)
+            (ctx.output_dir / "snapshots").mkdir()
+            (ctx.output_dir / "plans").mkdir()
+            kube = FakeKube()
+            with (
+                patch.object(runner, "preflight", return_value={"ok": True, "errors": [], "routes": {"routes": []}}),
+                patch.object(runner, "wait_for_plan", side_effect=[planned, terminal]),
+                patch.object(runner, "audit_plan", return_value={"ok": True, "errors": []}),
+                patch.object(
+                    runner,
+                    "wait_independent_final_validation",
+                    return_value=({"ok": True, "errors": []}, registry, {"routes": []}),
+                ),
+            ):
+                summary = runner.execute_r13_cleanup(ctx, args, kube, SimpleNamespace(), demand)
+            saved = json.loads((ctx.output_dir / "r13_cleanup_summary.json").read_text())
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["round"], 13)
+        self.assertFalse(summary["includedInMeasuredTwelveRoundAggregate"])
+        self.assertEqual(kube.applied["spec"]["targetDemand"], {key: 0.0 for key in runner.WORKLOAD_KEYS})  # type: ignore[index]
+        self.assertEqual(kube.approved, "plan-live-v2-run-r13")
+        self.assertEqual(saved["queueCounts"]["available"], 3)
+
     def test_sw_c_execution_requires_explicit_unsafe_acknowledgement(self) -> None:
         self.assertEqual(runner.main(["--execute", "--stage3-variant", "sw-c"]), 2)
 
@@ -601,6 +692,80 @@ class KubectlBoundaryTests(unittest.TestCase):
                 validation = json.loads((root / "output_validation.json").read_text())
                 self.assertTrue(validation["ok"])
                 self.assertTrue(result["artifact_validation_ok"])
+
+
+class E1ModeTests(unittest.TestCase):
+    def test_e1_switches_rates_per_round_tags_requests_and_runs_r13(self) -> None:
+        rates = {key: 0.0 for key in runner.WORKLOAD_KEYS}
+        demand = []
+        for number in range(1, 13):
+            row = {"round": number + 3, **rates}
+            row["gpt2_p64_o64"] = 40.0 if number % 2 else 20.0
+            demand.append(row)
+        sent: list[dict[str, object]] = []
+
+        def fake_transport(_url: str, timeout_s: float = 900.0):
+            return lambda request: sent.append(dict(request)) or {"status": "success"}
+
+        terminal = {"status": {"phase": "Executed", "actionStatuses": [], "transitionExecution": {"timestamps": {
+            "executorStartedAt": "2026-09-29T00:00:00Z", "executorFinishedAt": "2026-09-29T00:00:01Z"}}}}
+
+        def fake_wait_for_plan(_kube, name, *, timeout, poll_seconds, accept_planned=True):
+            self.assertLessEqual(poll_seconds, 0.25)
+            return {"metadata": {"name": name}, "status": {"phase": "Planned"}} if accept_planned else terminal
+
+        class FakeKube:
+            def apply(self, value): pass
+            def approve(self, name): pass
+            def get_json(self, resource, name=None):
+                return {"items": []} if resource == "pods" else registry_fixture()
+
+        class FakeRouter:
+            def get_json(self, path): return {"routes": []}
+            def wait_drained(self, timeout): return None
+
+        args = SimpleNamespace(controller_names=["planner-controller"], placement_nodes=[], watchdog_seconds=10.0,
+                               poll_seconds=2.0, stage3_variant="sw-c", e1_warmup=True)
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = runner.RunContext("run", Path(directory), "or-sim-exp", "http://router", 60, 30, 60,
+                                    e1_mode=True, dwell_seconds=0.05)
+            for sub in ("snapshots", "plans"):
+                (ctx.output_dir / sub).mkdir()
+            runner._write_initial_outputs(ctx, args, {})
+            preflight_calls = []
+            with (
+                patch.object(runner.traffic, "urllib_transport", fake_transport),
+                patch.object(runner, "preflight", side_effect=lambda *a, **k: preflight_calls.append(k) or {"ok": True, "errors": [], "routes": {"routes": []}, "registry": registry_fixture()}),
+                patch.object(runner, "wait_for_plan", side_effect=fake_wait_for_plan),
+                patch.object(runner, "audit_plan", return_value={"ok": True, "errors": []}),
+                patch.object(runner, "wait_independent_final_validation", return_value=({"ok": True, "errors": []}, registry_fixture(), {"routes": []})),
+                patch.object(runner, "_record_round_artifacts"),
+                patch.object(runner, "_record_plan_artifacts"),
+                patch.object(runner, "execute_r13_cleanup", return_value={"ok": True}) as r13,
+                patch.object(runner, "e1_warmup", return_value={"steps": []}) as warm,
+                patch.object(runner.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")) as audit,
+                patch.object(runner, "_validate_and_record_outputs", side_effect=lambda _ctx, result: result),
+            ):
+                result = runner.execute_e1_experiment(ctx, args, FakeKube(), FakeRouter(), demand, [])
+            events = [json.loads(line) for line in (ctx.output_dir / "e1_rate_events.jsonl").read_text().splitlines()]
+            windows = (ctx.output_dir / "e1_windows.csv").read_text().splitlines()
+            requests = [json.loads(line) for line in (ctx.output_dir / "requests.jsonl").read_text().splitlines()]
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["completed_rounds"], 12)
+        r13.assert_called_once()
+        warm.assert_called_once()
+        self.assertIn("audit_makespan_run.py", str(audit.call_args))
+        self.assertEqual(len(windows), 13)  # header + 12 rounds
+        self.assertEqual([e["window"] for e in events[:4]], ["transition", "steady", "transition", "steady"])
+        self.assertEqual(events[-1]["window"], "stopped")
+        self.assertEqual(events[2]["rates"]["gpt2_p64_o64"], 20.0)  # R2 commitment = min(40, 20)
+        self.assertTrue(preflight_calls[0]["require_empty"] and not preflight_calls[0]["allow_inflight"])
+        self.assertTrue(all(call["allow_inflight"] for call in preflight_calls[1:]))
+        tagged = {(r["live_round"], r["phase"]) for r in requests}
+        self.assertIn((2, "steady"), tagged)
+        self.assertTrue(all(r["workload"] == "gpt2_p64_o64" for r in requests))
+        self.assertEqual(len(sent), len(requests))
 
 
 if __name__ == "__main__":
