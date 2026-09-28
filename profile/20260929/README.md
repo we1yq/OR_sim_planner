@@ -91,6 +91,21 @@ This request shape is not in the catalog. Only `runtimes.json` entries for 2g we
 - TPOT meets the llama SLO (≤ 35 ms), but TTFT does not (≤ 250 ms).
 - An aborted 1g attempt never loaded: the runtime reported `loaded=false`, the same as p2048/o64 on 1g. It is not recorded here.
 
+### `llama_p2048_o64_2g/` — Llama-3.2-3B, prompt 2048, output 64, 2g
+
+This is the catalog shape, but on a profile the catalog leaves out because it fails the SLO.
+
+| GPU | throughput (req/s) | mean latency (ms) | TTFT median / P95 (ms) | TPOT median / P95 (ms) |
+|---|---:|---:|---:|---:|
+| rtx1 GPU0 | 0.417 | 2395.4 | 310.2 / 310.3 | 32.58 / 32.59 |
+| ampere GPU0 | 0.417 | 2395.5 | 310.5 / 311.0 | 32.57 / 32.59 |
+| ampere GPU1 | 0.417 | 2396.8 | 310.8 / 310.8 | 32.59 / 32.63 |
+| **min** | **0.417** | | | |
+
+- Each GPU has 10 samples, 0 errors and CV 0.0%.
+- TTFT is about 310 ms, which exceeds the 250 ms SLO. That is why 2g is not a catalog option. July measured TTFT 316 ms and 0.416 req/s here.
+- Minimum over GPUs by profile: 2g 0.417 → 3g 0.655 → 4g 0.660 → 7g 0.705.
+
 ### `gpt2_p64_o64_3g4g_repeat/` — two more independent rounds of gpt2_p64_o64 on 3g and 4g
 
 Each round starts a fresh pod. `run_repeat.py` wraps `run_catalog_profile.py`. Each cell is 3g → 4g mean throughput (req/s).
