@@ -1,0 +1,79 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-control-plane-release-20260928
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/part-of: migrant-go
+    or-sim.io/release: batch-state-concurrency-20260928
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          command: [/busybox/sh, -c]
+          args:
+            - >-
+              set -eu;
+              mkdir -p /workspace/context;
+              tar -xzf /input/context.tar.gz -C /workspace/context;
+              /kaniko/executor
+              --context=/workspace/context
+              --dockerfile=/workspace/context/Dockerfile.control-plane
+              --destination=localhost:10690/migrant-control-plane:batch-state-concurrency-20260928
+              --insecure --skip-tls-verify
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-release-context-20260928
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-router-release-20260928
+  namespace: or-sim
+  labels:
+    app.kubernetes.io/part-of: migrant-go
+    or-sim.io/release: batch-state-concurrency-20260928
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          command: [/busybox/sh, -c]
+          args:
+            - >-
+              set -eu;
+              mkdir -p /workspace/context;
+              tar -xzf /input/context.tar.gz -C /workspace/context;
+              /kaniko/executor
+              --context=/workspace/context
+              --dockerfile=/workspace/context/Dockerfile.runtime-router
+              --destination=localhost:10690/migrant-runtime-router:batch-state-concurrency-20260928
+              --insecure --skip-tls-verify
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-release-context-20260928

@@ -16,18 +16,20 @@ import (
 )
 
 type runtimeBinding struct {
-	Model           string
-	RuntimeModel    string
-	RequestClass    string
-	PromptLen       int
-	OutputTokens    int
-	BatchSize       int
-	Pod             string
-	Phase           string
-	SlotResource    string
-	DeviceResource  string
-	ExpectedMIGUUID string
-	Route           map[string]any
+	Model               string
+	RuntimeModel        string
+	RequestClass        string
+	PromptLen           int
+	OutputTokens        int
+	BatchSize           int
+	ConfiguredBatchSize int
+	BatchObservedFrom   string
+	Pod                 string
+	Phase               string
+	SlotResource        string
+	DeviceResource      string
+	ExpectedMIGUUID     string
+	Route               map[string]any
 }
 
 type nodeObservation struct {
@@ -232,11 +234,11 @@ func reconcile(client *kube.Client, router string) error {
 				"logicalMigSlots":     migDevicesAsMaps(devices),
 				"runtimeBindings":     runtimeBindingsAsMaps(runtimes),
 				"cleanliness":         cleanliness,
-					"state":               state,
-					"availabilityReason":  reason,
-					"requiredAction":      requiredAction,
-					"repairPaused":        repairPaused,
-					"activeLogicalGpuId":  nilIfEmpty(activeLogicalID),
+				"state":               state,
+				"availabilityReason":  reason,
+				"requiredAction":      requiredAction,
+				"repairPaused":        repairPaused,
+				"activeLogicalGpuId":  nilIfEmpty(activeLogicalID),
 				"pendingLogicalGpuId": nilIfEmpty(pendingLogicalID),
 				"logicalBinding":      logicalBinding,
 			}
@@ -255,8 +257,8 @@ func reconcile(client *kube.Client, router string) error {
 			},
 		},
 		"spec": map[string]any{"policy": map[string]any{
-			"source":                                   "cluster-state-manager",
-			"emptyMigConfig":                           nil,
+			"source":         "cluster-state-manager",
+			"emptyMigConfig": nil,
 			"requireMigConfigStateSuccessBeforeAvailable": nil,
 		}},
 	}
@@ -609,22 +611,55 @@ func observeRuntimeBindings(client *kube.Client, routes map[string][]map[string]
 		outputTokens := intNumber(labels["migrant.io/output-tokens"])
 		slotResource := asString(asMap(meta["annotations"])["migrant.io/slot-resource"])
 		expectedMIGUUID := asString(asMap(meta["annotations"])["migrant.io/expected-mig-uuid"])
+		configuredBatch := runtimeBatchSize(spec)
+		observedBatch, observedFrom := observedRuntimeBatchSize(routes[model], slotResource, expectedMIGUUID, configuredBatch)
 		out[gpuID] = append(out[gpuID], runtimeBinding{
-			Model:           model,
-			RuntimeModel:    runtimeModel,
-			RequestClass:    requestClass,
-			PromptLen:       promptLen,
-			OutputTokens:    outputTokens,
-			BatchSize:       runtimeBatchSize(spec),
-			Pod:             asString(meta["name"]),
-			Phase:           asString(status["phase"]),
-			SlotResource:    slotResource,
-			DeviceResource:  asString(asMap(meta["annotations"])["migrant.io/device-resource"]),
-			ExpectedMIGUUID: expectedMIGUUID,
-			Route:           routeSummaryForBinding(routes[model], slotResource, expectedMIGUUID),
+			Model:        model,
+			RuntimeModel: runtimeModel,
+			RequestClass: requestClass,
+			PromptLen:    promptLen,
+			OutputTokens: outputTokens,
+			// The pod environment is only the creation-time configuration.  A
+			// /control/batch update changes the running process, not the pod spec,
+			// so the registry must prefer the router's runtime observation here.
+			BatchSize:           observedBatch,
+			ConfiguredBatchSize: configuredBatch,
+			BatchObservedFrom:   observedFrom,
+			Pod:                 asString(meta["name"]),
+			Phase:               asString(status["phase"]),
+			SlotResource:        slotResource,
+			DeviceResource:      asString(asMap(meta["annotations"])["migrant.io/device-resource"]),
+			ExpectedMIGUUID:     expectedMIGUUID,
+			Route:               routeSummaryForBinding(routes[model], slotResource, expectedMIGUUID),
 		})
 	}
 	return out, nil
+}
+
+func observedRuntimeBatchSize(routes []map[string]any, slotResource, expectedMIGUUID string, configured int) (int, string) {
+	route := matchingRouteForBinding(routes, slotResource, expectedMIGUUID)
+	if batch := intNumber(route["runtime.batchSize"]); batch > 0 {
+		return batch, "runtime-metrics"
+	}
+	return configured, "pod-spec-fallback"
+}
+
+// Batch observation must not use matchingRoute's convenient first-route
+// fallback: a model may have several replicas, and borrowing another
+// replica's batch would be worse than a clearly-labelled fallback.
+func matchingRouteForBinding(routes []map[string]any, slotResource, expectedMIGUUID string) map[string]any {
+	for _, route := range routes {
+		if expectedMIGUUID != "" && (asString(route["expectedMigUuid"]) == expectedMIGUUID || asString(route["runtime.migUuid"]) == expectedMIGUUID) {
+			return route
+		}
+		if slotResource != "" && (asString(route["slotResource"]) == slotResource || asString(route["runtime.slotResource"]) == slotResource) {
+			return route
+		}
+	}
+	if len(routes) == 1 {
+		return routes[0]
+	}
+	return nil
 }
 
 func routeSummaryForBinding(routes []map[string]any, slotResource, expectedMIGUUID string) map[string]any {
@@ -823,7 +858,8 @@ func runtimeBindingsAsMaps(bindings []runtimeBinding) []map[string]any {
 		out = append(out, map[string]any{
 			"model": binding.Model, "runtimeModel": binding.RuntimeModel, "requestClass": binding.RequestClass,
 			"promptLen": binding.PromptLen, "outputTokens": binding.OutputTokens,
-			"batchSize": binding.BatchSize, "pod": binding.Pod, "phase": binding.Phase,
+			"batchSize": binding.BatchSize, "configuredBatchSize": binding.ConfiguredBatchSize,
+			"batchObservationSource": binding.BatchObservedFrom, "pod": binding.Pod, "phase": binding.Phase,
 			"slotResource": binding.SlotResource, "deviceResource": binding.DeviceResource, "expectedMigUuid": binding.ExpectedMIGUUID,
 		})
 		if len(binding.Route) > 0 {

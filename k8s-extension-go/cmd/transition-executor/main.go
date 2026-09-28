@@ -21,6 +21,17 @@ import (
 	"or-sim/k8s-extension-go/internal/system"
 )
 
+// HTTP clients for node-agent, router and runtime calls.  Timeouts are upper
+// bounds for a single call; the callers keep their own overall deadlines.
+var (
+	// MIG geometry calls retry busy nvidia-smi operations (30 s each), so they
+	// get a generous bound.
+	nodeAgentMIGClient  = &http.Client{Timeout: 5 * time.Minute}
+	nodeAgentFastClient = &http.Client{Timeout: 2 * time.Minute}
+	routerClient        = &http.Client{Timeout: 30 * time.Second}
+	runtimeClient       = &http.Client{Timeout: 2 * time.Minute}
+)
+
 func main() {
 	ns := env("NAMESPACE", "or-sim")
 	router := env("ROUTER_URL", "http://runtime-router:8080")
@@ -134,7 +145,7 @@ func reconcile(client *kube.Client, router string) error {
 			}
 		}
 		trace.Mark("finalValidationStartedAt")
-		finalVerification, err := validateFinalTargetAllocation(client, spec)
+		finalVerification, err := validateFinalTargetAllocation(client, router, spec)
 		trace.Mark("finalValidationFinishedAt")
 		trace.SetMetric("finalValidation", finalVerification)
 		if err != nil {
@@ -320,7 +331,7 @@ func closeRouterMonitor(trace *executionTrace, router, planName string) {
 
 func postRouterMonitor(router string, payload map[string]any) (map[string]any, error) {
 	raw, _ := json.Marshal(payload)
-	resp, err := http.Post(strings.TrimRight(router, "/")+"/control/monitor", "application/json", bytes.NewReader(raw))
+	resp, err := routerClient.Post(strings.TrimRight(router, "/")+"/control/monitor", "application/json", bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +372,13 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 	known := map[string]bool{}
 	completed := map[string]bool{}
 	blockedOrFailed := map[string]string{}
-	runningPhysical := map[string]bool{}
+	// The planner DAG already expresses ordering between dependent actions.  The
+	// scheduler additionally protects resources whose underlying Kubernetes/MIG
+	// operations are not safe to overlap.  Keep that protection at the narrowest
+	// useful scope: a geometry/lifecycle change owns its whole physical GPU, while
+	// instance and route work owns only its slot.  In particular, two independent
+	// slots on the same GPU must not be needlessly serialized.
+	runningClaims := map[string][]actionResourceClaim{}
 	acquiredPhysical := map[string]string{}
 	done := make(chan actionRunResult, len(actions))
 	running := 0
@@ -380,6 +397,22 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 	launchReady := func() bool {
 		progress := false
 		ready := readyActionIDs(pending)
+		// A GPU-exclusive action whose dependencies are done but that is held
+		// back by running actions reserves its GPU: no new action starts there
+		// until it runs, so it cannot be starved by a stream of slot actions.
+		reservedGPU := map[string]string{}
+		for _, id := range ready {
+			node := pending[id]
+			if !dependenciesCompleted(node, completed) {
+				continue
+			}
+			claims := actionResourceClaims(node)
+			if len(claims) == 1 && claims[0].kind == resourceGPUExclusive && resourceClaimsConflict(claims, runningClaims) {
+				if _, ok := reservedGPU[claims[0].physicalID]; !ok {
+					reservedGPU[claims[0].physicalID] = id
+				}
+			}
+		}
 		for _, id := range ready {
 			node := pending[id]
 			blockReason := blockedDependencyReason(node, known, completed, blockedOrFailed)
@@ -394,7 +427,11 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 				continue
 			}
 			physicalID := physicalIDFromAction(node.Action)
-			if physicalID != "" && serializesPhysicalGPU(node.Type) && runningPhysical[physicalID] {
+			claims := actionResourceClaims(node)
+			if resourceClaimsConflict(claims, runningClaims) {
+				continue
+			}
+			if claimsReservedGPU(claims, reservedGPU, id) {
 				continue
 			}
 			if node.Type == "allocate_gpu" && physicalID != "" {
@@ -408,9 +445,7 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 				}
 			}
 			delete(pending, id)
-			if physicalID != "" && serializesPhysicalGPU(node.Type) {
-				runningPhysical[physicalID] = true
-			}
+			runningClaims[node.ID] = claims
 			running++
 			progress = true
 			go func(node actionNode) {
@@ -460,9 +495,7 @@ func executeActionDAG(client *kube.Client, router string, nodes map[string]strin
 
 		result := <-done
 		running--
-		if physicalID := physicalIDFromAction(result.node.Action); physicalID != "" && serializesPhysicalGPU(result.node.Type) {
-			delete(runningPhysical, physicalID)
-		}
+		delete(runningClaims, result.node.ID)
 		statuses = append(statuses, result.status)
 		if result.err != nil {
 			blockedOrFailed[result.node.ID] = result.err.Error()
@@ -529,13 +562,120 @@ func validatePhysicalAcquireLifecycle(actions []actionNode) error {
 	return nil
 }
 
+// actionResourceClaim identifies a resource that must not overlap another
+// action.  An exclusive GPU claim conflicts with every claim for that GPU;
+// slot claims conflict only when the logical MIG slot is the same.
+type actionResourceClaim struct {
+	physicalID string
+	kind       string
+	key        string
+}
+
+const (
+	resourceGPUExclusive = "gpu-exclusive"
+	resourceSlot         = "slot"
+	resourceTraffic      = "traffic"
+	resourceRuntime      = "runtime"
+	// resourceMIGDevices covers MIG device registration (CDI refresh, UUID
+	// resolution, allocatable wait).  It excludes MIG geometry changes and
+	// other registrations on the GPU, but not slot-scoped instance actions.
+	resourceMIGDevices = "mig-devices"
+	// resourceBinding covers logical-binding ledger updates that do not touch
+	// the device (allocate/bind).  It excludes geometry changes and other
+	// binding updates on the GPU, but not slot-scoped instance actions.
+	resourceBinding = "binding"
+)
+
+func actionResourceClaims(node actionNode) []actionResourceClaim {
+	physicalID := physicalIDFromAction(node.Action)
+	if physicalID == "" {
+		return nil
+	}
+	if serializesPhysicalGPU(node.Type) {
+		return []actionResourceClaim{{physicalID: physicalID, kind: resourceGPUExclusive}}
+	}
+	switch node.Type {
+	case "register_mig_devices", "refresh_slot_resources":
+		return []actionResourceClaim{{physicalID: physicalID, kind: resourceMIGDevices}}
+	case "allocate_gpu", "bind_target_gpu":
+		return []actionResourceClaim{{physicalID: physicalID, kind: resourceBinding}}
+	}
+
+	slot, ok := actionSlot(node.Action)
+	if !ok {
+		// Instance-oriented actions without an explicit slot cannot safely be
+		// scoped more narrowly than the GPU.
+		switch node.Type {
+		case "place_instance", "activate_instance_route", "deactivate_instance_route", "wait_instance_drain", "delete_instance", "patch_batch_config", "apply_batch", "verify_batch":
+			return []actionResourceClaim{{physicalID: physicalID, kind: resourceGPUExclusive}}
+		default:
+			return nil
+		}
+	}
+	slotKey := fmt.Sprintf("%d:%d:%s", slot.Start, slot.End, slot.Profile)
+	// All operations touching one slot share the slot claim.  The specialised
+	// traffic/runtime claims make the ownership model explicit and preserve a
+	// stable place to add endpoint-specific locks later; the common slot claim
+	// prevents an incomplete DAG from overlapping incompatible operations on one
+	// instance.
+	switch node.Type {
+	case "place_instance", "delete_instance":
+		return []actionResourceClaim{{physicalID: physicalID, kind: resourceSlot, key: slotKey}}
+	case "activate_instance_route", "deactivate_instance_route", "wait_instance_drain":
+		return []actionResourceClaim{
+			{physicalID: physicalID, kind: resourceSlot, key: slotKey},
+			{physicalID: physicalID, kind: resourceTraffic, key: slotKey},
+		}
+	case "patch_batch_config", "apply_batch", "verify_batch":
+		runtimeKey := modelFromAction(node.Action) + "|" + slotKey
+		return []actionResourceClaim{
+			{physicalID: physicalID, kind: resourceSlot, key: slotKey},
+			{physicalID: physicalID, kind: resourceRuntime, key: runtimeKey},
+		}
+	default:
+		return nil
+	}
+}
+
+// claimsReservedGPU reports whether claims touch a GPU reserved for a waiting
+// GPU-exclusive action other than id.
+func claimsReservedGPU(claims []actionResourceClaim, reserved map[string]string, id string) bool {
+	for _, claim := range claims {
+		if owner, ok := reserved[claim.physicalID]; ok && owner != id {
+			return true
+		}
+	}
+	return false
+}
+
+func resourceClaimsConflict(candidate []actionResourceClaim, running map[string][]actionResourceClaim) bool {
+	for _, active := range running {
+		for _, next := range candidate {
+			for _, held := range active {
+				if next.physicalID != held.physicalID {
+					continue
+				}
+				if next.kind == resourceGPUExclusive || held.kind == resourceGPUExclusive {
+					return true
+				}
+				if next.kind == held.kind && next.key == held.key {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// serializesPhysicalGPU lists actions that change MIG geometry or the GPU's
+// lifetime and therefore exclude every other action on that GPU.
+// clear_gpu_binding waits for all runtime pods on the GPU to disappear, so it
+// must not overlap slot actions that could start new pods there.
 func serializesPhysicalGPU(actionType string) bool {
 	switch actionType {
-	case "allocate_gpu", "return_gpu",
+	case "return_gpu",
 		"configure_full_template", "apply_slots", "configure_partial_profile", "patch_slots",
-		"clear_full_template", "clear_gpu", "clear_template", "clear_gpu_binding",
-		"bind_target_gpu", "register_mig_devices",
-		"place_instance", "activate_instance_route", "deactivate_instance_route", "wait_instance_drain", "delete_instance":
+		"clear_full_template", "clear_gpu", "clear_template", "clear_gpu_binding":
 		return true
 	default:
 		return false
@@ -815,17 +955,27 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 		trace.Mark("drainWaitFinishedAt")
 		return err
 	case "delete_instance":
+		// Withdraw the route before deleting the runtime so the router never
+		// points at a replica whose pod is going away.  Stage 3 has already
+		// drained it (deactivate_instance_route + wait_instance_drain).
+		model := modelFromAction(action)
+		routedIDs := routeRuntimeIDsForAction(router, action)
+		if err := deleteRouteEndpoints(router, model, routedIDs); err != nil {
+			return err
+		}
 		runtimeIDs, err := deleteRuntimeDeploymentForAction(client, action)
 		if err != nil {
 			return err
 		}
 		if len(runtimeIDs) == 0 {
-			runtimeIDs = routeRuntimeIDsForAction(router, action)
+			runtimeIDs = routedIDs
 		}
 		if err := waitForRuntimeIDsGone(client, runtimeIDs, 120*time.Second); err != nil {
 			return err
 		}
-		return deleteRouteEndpoints(router, modelFromAction(action), runtimeIDs)
+		// Deployments found without a matching route (e.g. route already gone)
+		// may still have a stale route entry under their runtime id.
+		return deleteRouteEndpoints(router, model, missingIDs(runtimeIDs, routedIDs))
 	case "clear_full_template", "clear_gpu", "clear_template":
 		trace.Mark("clearStartedAt")
 		err := clearGPUs(nodes, map[string]bool{nodeNameFromPhysicalGPU(physicalID) + "|" + physicalID: true})
@@ -833,9 +983,12 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 		return err
 	case "clear_gpu_binding":
 		trace.Mark("gpuBindingClearStartedAt")
-		err := updateLogicalBinding(client, planName, action, "clearing")
+		// Do not publish a clearing ledger state until the precondition is
+		// true.  A timeout here used to strand pendingLogicalGpuId and block
+		// the registry even though the GPU still had runtime pods.
+		err := clearGPUBinding(client, router, physicalID, action)
 		if err == nil {
-			err = clearGPUBinding(client, router, physicalID, action)
+			err = updateLogicalBinding(client, planName, action, "clearing")
 		}
 		trace.Mark("gpuBindingClearFinishedAt")
 		return err
@@ -961,7 +1114,13 @@ func executeAction(client *kube.Client, router string, nodes map[string]string, 
 		trace.Mark("batchVerifyStartedAt")
 		err = verifyBatch(router, action, target, 30*time.Second)
 		trace.Mark("batchVerifyFinishedAt")
-		return err
+		if err != nil {
+			return err
+		}
+		// Keep the router's batching policy aligned with the now-verified
+		// runtime value.  Updating it only after verification avoids routing a
+		// larger batch to a runtime that has not accepted the change yet.
+		return syncRouteBatchSize(router, action, target.BatchSize)
 	case "return_gpu":
 		trace.Mark("gpuReturnStartedAt")
 		err := verifyGPUReturned(client, nodes, physicalID, 60*time.Second)
@@ -1026,11 +1185,18 @@ func physicalIDFromAction(action map[string]any) string {
 	return firstNonEmpty(asString(action["physical_gpu_id"]), asString(action["physicalGpuId"]), asString(action["gpu"]))
 }
 
+// logicalBindingLedgerMu serializes read-modify-write of the single ledger
+// ConfigMap.  Binding actions on different GPUs run concurrently; without it a
+// concurrent update could be lost.
+var logicalBindingLedgerMu sync.Mutex
+
 func updateLogicalBinding(client *kube.Client, planName string, action map[string]any, phase string) error {
 	physicalID := physicalIDFromAction(action)
 	if physicalID == "" {
 		return fmt.Errorf("%s binding action requires physical_gpu_id", phase)
 	}
+	logicalBindingLedgerMu.Lock()
+	defer logicalBindingLedgerMu.Unlock()
 	ledger := loadLogicalBindingLedger(client)
 	bindings := asMap(ledger["bindings"])
 	entry := asMap(bindings[physicalID])
@@ -1101,6 +1267,8 @@ func persistFinalLogicalBindings(client *kube.Client, planName string, spec map[
 		return nil
 	}
 	now := time.Now().Format(time.RFC3339Nano)
+	logicalBindingLedgerMu.Lock()
+	defer logicalBindingLedgerMu.Unlock()
 	ledger := loadLogicalBindingLedger(client)
 	bindings := map[string]any{}
 	for logicalID, physicalID := range physicalByLogical {
@@ -1136,12 +1304,12 @@ func finalPhysicalIDMap(spec map[string]any) map[string]string {
 	return stringMap(asMap(planningTrace["canonicalization"]), "canonicalPhysicalIds")
 }
 
-func validateFinalTargetAllocation(client *kube.Client, spec map[string]any) (map[string]any, error) {
+func validateFinalTargetAllocation(client *kube.Client, router string, spec map[string]any) (map[string]any, error) {
 	deadline := time.Now().Add(90 * time.Second)
 	var last map[string]any
 	var lastErr error
 	for {
-		out, err := validateFinalTargetAllocationOnce(client, spec)
+		out, err := validateFinalTargetAllocationOnce(client, router, spec)
 		if err == nil || asBool(out["skipped"]) {
 			return out, err
 		}
@@ -1158,7 +1326,7 @@ func validateFinalTargetAllocation(client *kube.Client, spec map[string]any) (ma
 	return last, lastErr
 }
 
-func validateFinalTargetAllocationOnce(client *kube.Client, spec map[string]any) (map[string]any, error) {
+func validateFinalTargetAllocationOnce(client *kube.Client, router string, spec map[string]any) (map[string]any, error) {
 	targetPlan := asMap(asMap(spec["validationTargets"])["targetAllocationPlan"])
 	targetState := asMap(targetPlan["targetState"])
 	if len(targetState) == 0 {
@@ -1209,7 +1377,7 @@ func validateFinalTargetAllocationOnce(client *kube.Client, spec map[string]any)
 			if model == "" || slotResource == "" {
 				continue
 			}
-			actualRuntimes[runtimeBindingKey(physicalID, slotResource, model)] = true
+			actualRuntimes[runtimeBindingKeyWithBatch(physicalID, slotResource, model, intNumber(rt["batchSize"]))] = true
 		}
 		if !expectedPhysical[physicalID] && (len(asSlice(gpu["migDevices"])) > 0 || len(asSlice(gpu["runtimeBindings"])) > 0) {
 			actualMIG["unexpected-gpu|"+physicalID] = true
@@ -1218,8 +1386,9 @@ func validateFinalTargetAllocationOnce(client *kube.Client, spec map[string]any)
 
 	missingMIG, extraMIG := diffStringSets(expectedMIG, actualMIG)
 	missingRuntime, extraRuntime := diffStringSets(expectedRuntimes, actualRuntimes)
+	liveBatchFailures := validateLiveRuntimeBatches(router, targetPlan)
 	out := map[string]any{
-		"ok":                     len(missingMIG) == 0 && len(extraMIG) == 0 && len(missingRuntime) == 0 && len(extraRuntime) == 0,
+		"ok":                     len(missingMIG) == 0 && len(extraMIG) == 0 && len(missingRuntime) == 0 && len(extraRuntime) == 0 && len(liveBatchFailures) == 0,
 		"expectedMigSlotCount":   len(expectedMIG),
 		"actualMigSlotCount":     len(actualMIG),
 		"expectedRuntimeCount":   len(expectedRuntimes),
@@ -1228,9 +1397,10 @@ func validateFinalTargetAllocationOnce(client *kube.Client, spec map[string]any)
 		"extraMigSlots":          extraMIG,
 		"missingRuntimeBindings": missingRuntime,
 		"extraRuntimeBindings":   extraRuntime,
+		"liveBatchFailures":      liveBatchFailures,
 	}
 	if !asBool(out["ok"]) {
-		return out, fmt.Errorf("final target validation failed: missingMig=%d extraMig=%d missingRuntime=%d extraRuntime=%d", len(missingMIG), len(extraMIG), len(missingRuntime), len(extraRuntime))
+		return out, fmt.Errorf("final target validation failed: missingMig=%d extraMig=%d missingRuntime=%d extraRuntime=%d liveBatch=%d", len(missingMIG), len(extraMIG), len(missingRuntime), len(extraRuntime), len(liveBatchFailures))
 	}
 	return out, nil
 }
@@ -1279,7 +1449,7 @@ func expectedRuntimeBindingsFromTargetPlan(targetPlan map[string]any) map[string
 		if model == "" || physicalID == "" || slotResource == "" {
 			continue
 		}
-		out[runtimeBindingKey(physicalID, slotResource, model)] = true
+		out[runtimeBindingKeyWithBatch(physicalID, slotResource, model, intNumber(rt["batchSize"]))] = true
 	}
 	return out
 }
@@ -1290,6 +1460,72 @@ func migSlotKey(physicalID string, start, end int, profile string) string {
 
 func runtimeBindingKey(physicalID, slotResource, model string) string {
 	return physicalID + "|" + slotResource + "|" + model
+}
+
+func runtimeBindingKeyWithBatch(physicalID, slotResource, model string, batch int) string {
+	return runtimeBindingKey(physicalID, slotResource, model) + "|batch=" + strconv.Itoa(batch)
+}
+
+// validateLiveRuntimeBatches verifies the running process directly.  Registry
+// observations are useful for planning, but can lag a just-completed batch
+// update and must not by themselves certify the final target state.
+func validateLiveRuntimeBatches(router string, targetPlan map[string]any) []map[string]any {
+	if strings.TrimSpace(router) == "" {
+		return []map[string]any{{"error": "router endpoint is empty"}}
+	}
+	routesPayload, err := getJSON(strings.TrimRight(router, "/") + "/routes")
+	if err != nil {
+		return []map[string]any{{"error": "could not read router routes: " + err.Error()}}
+	}
+	routes := asSlice(routesPayload["routes"])
+	failures := []map[string]any{}
+	for _, raw := range asSlice(targetPlan["desiredRuntimes"]) {
+		expected := asMap(raw)
+		expectedBatch := intNumber(expected["batchSize"])
+		if expectedBatch <= 0 {
+			failures = append(failures, map[string]any{"runtimeId": asString(expected["runtimeId"]), "error": "target batchSize is missing"})
+			continue
+		}
+		route := matchingRuntimeRoute(routes, expected)
+		if len(route) == 0 {
+			failures = append(failures, map[string]any{"runtimeId": asString(expected["runtimeId"]), "expectedBatchSize": expectedBatch, "error": "matching route is missing"})
+			continue
+		}
+		endpoint := strings.TrimRight(asString(route["endpoint"]), "/")
+		if endpoint == "" {
+			failures = append(failures, map[string]any{"runtimeId": asString(expected["runtimeId"]), "expectedBatchSize": expectedBatch, "error": "route endpoint is empty"})
+			continue
+		}
+		metrics, err := getJSON(endpoint + "/metrics")
+		if err != nil {
+			failures = append(failures, map[string]any{"runtimeId": asString(expected["runtimeId"]), "expectedBatchSize": expectedBatch, "endpoint": endpoint, "error": "could not read runtime metrics: " + err.Error()})
+			continue
+		}
+		observed := intNumber(metrics["batchSize"])
+		if observed != expectedBatch {
+			failures = append(failures, map[string]any{"runtimeId": asString(expected["runtimeId"]), "expectedBatchSize": expectedBatch, "observedBatchSize": observed, "endpoint": endpoint})
+		}
+	}
+	return failures
+}
+
+func matchingRuntimeRoute(routes []any, expected map[string]any) map[string]any {
+	expectedID := asString(expected["runtimeId"])
+	for _, raw := range routes {
+		route := asMap(raw)
+		if expectedID != "" && asString(route["runtimeId"]) == expectedID {
+			return route
+		}
+	}
+	for _, raw := range routes {
+		route := asMap(raw)
+		if asString(route["model"]) == asString(expected["model"]) &&
+			asString(route["gpu"]) == asString(expected["gpu"]) &&
+			asString(route["slotResource"]) == asString(expected["slotResource"]) {
+			return route
+		}
+	}
+	return nil
 }
 
 func placementProfileSize(profile string, fallback int) int {
@@ -1396,22 +1632,34 @@ func markRouteDrainingForAction(router string, action map[string]any) error {
 		}
 		return err
 	}
-	route["acceptingNew"] = false
-	route["draining"] = true
-	route["active"] = true
-	return postRouteEndpoint(router, route)
+	return patchRouteEndpoint(router, asString(route["model"]), asString(route["runtimeId"]), map[string]any{
+		"acceptingNew": false,
+		"draining":     true,
+		"active":       true,
+	})
 }
 
 func waitInstanceDrain(router string, action map[string]any, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
+	record, err := routeEndpointForAction(router, action)
+	if err != nil {
+		if errors.Is(err, errRouteNotFound) {
+			return nil
+		}
+		return err
+	}
+	runtimeID := asString(record["runtimeId"])
 	for time.Now().Before(deadline) {
-		route, err := routeEndpointForAction(router, action)
+		// Poll only this replica's row so each check queries one runtime's
+		// metrics instead of every runtime behind the router.
+		rows, err := routeSnapshots(router, runtimeID)
 		if err != nil {
-			if errors.Is(err, errRouteNotFound) {
-				return nil
-			}
 			return err
 		}
+		if len(rows) == 0 {
+			return nil
+		}
+		route := rows[0]
 		inflight := intNumber(route["endpointInflight"])
 		if _, ok := route["endpointInflight"]; !ok {
 			inflight = intNumber(route["inflight"])
@@ -1439,7 +1687,7 @@ func routeEndpointForAction(router string, action map[string]any) (map[string]an
 	if _, ok := actionSlot(action); !ok {
 		return nil, fmt.Errorf("%s requires slot", asString(action["type"]))
 	}
-	routes, err := routeSnapshots(router)
+	routes, err := routeRecords(router)
 	if err != nil {
 		return nil, err
 	}
@@ -1459,6 +1707,61 @@ func routeEndpointForAction(router string, action map[string]any) (map[string]an
 }
 
 var errRouteNotFound = errors.New("route not found")
+
+// routeRecords returns the router's stored route records without querying
+// runtime metrics; it carries the identity fields matching needs.
+func routeRecords(router string) ([]map[string]any, error) {
+	payload, err := getJSON(strings.TrimRight(router, "/") + "/control/routes")
+	if err != nil {
+		return nil, err
+	}
+	out := []map[string]any{}
+	for _, raw := range asSlice(payload["routes"]) {
+		out = append(out, asMap(raw))
+	}
+	return out, nil
+}
+
+// patchRouteEndpoint changes only the given fields of one replica's route,
+// atomically in the router, so the rest of the stored route is preserved.
+func patchRouteEndpoint(router, model, runtimeID string, fields map[string]any) error {
+	if model == "" || runtimeID == "" {
+		return fmt.Errorf("route patch requires model and runtimeId (model=%q runtimeId=%q)", model, runtimeID)
+	}
+	body := map[string]any{"model": model, "runtimeId": runtimeID}
+	for key, value := range fields {
+		body[key] = value
+	}
+	raw, _ := json.Marshal(body)
+	req, err := http.NewRequest(http.MethodPatch, strings.TrimRight(router, "/")+"/control/routes", bytes.NewReader(raw))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("content-type", "application/json")
+	resp, err := routerClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("route patch for %s/%s returned %d", model, runtimeID, resp.StatusCode)
+	}
+	return nil
+}
+
+func missingIDs(ids, exclude []string) []string {
+	skip := map[string]bool{}
+	for _, id := range exclude {
+		skip[id] = true
+	}
+	out := []string{}
+	for _, id := range ids {
+		if id != "" && !skip[id] {
+			out = append(out, id)
+		}
+	}
+	return out
+}
 
 func routeRuntimeIDsForAction(router string, action map[string]any) []string {
 	route, err := routeEndpointForAction(router, action)
@@ -1611,7 +1914,7 @@ func applyBatch(router string, action map[string]any, target system.ModelRuntime
 		return err
 	}
 	raw, _ := json.Marshal(map[string]any{"batchSize": target.BatchSize})
-	resp, err := http.Post(endpoint+"/control/batch", "application/json", bytes.NewReader(raw))
+	resp, err := runtimeClient.Post(endpoint+"/control/batch", "application/json", bytes.NewReader(raw))
 	if err != nil {
 		return err
 	}
@@ -1638,6 +1941,17 @@ func verifyBatch(router string, action map[string]any, target system.ModelRuntim
 	return fmt.Errorf("timed out verifying batchSize=%d for %s", target.BatchSize, target.Model)
 }
 
+func syncRouteBatchSize(router string, action map[string]any, batch int) error {
+	if batch <= 0 {
+		return fmt.Errorf("cannot sync non-positive batchSize %d", batch)
+	}
+	route, err := routeEndpointForAction(router, action)
+	if err != nil {
+		return err
+	}
+	return patchRouteEndpoint(router, asString(route["model"]), asString(route["runtimeId"]), map[string]any{"batchSize": batch})
+}
+
 func routeEndpointForBatchAction(router string, action map[string]any) (string, error) {
 	route, err := routeEndpointForAction(router, action)
 	if err != nil {
@@ -1650,8 +1964,14 @@ func routeEndpointForBatchAction(router string, action map[string]any) (string, 
 	return endpoint, nil
 }
 
-func routeSnapshots(router string) ([]map[string]any, error) {
-	payload, err := getJSON(strings.TrimRight(router, "/") + "/routes")
+// routeSnapshots returns /routes rows (with runtime metrics).  A non-empty
+// runtimeID limits the rows and the metric queries to that replica.
+func routeSnapshots(router, runtimeID string) ([]map[string]any, error) {
+	endpoint := strings.TrimRight(router, "/") + "/routes"
+	if runtimeID != "" {
+		endpoint += "?runtimeId=" + url.QueryEscape(runtimeID)
+	}
+	payload, err := getJSON(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -1804,7 +2124,7 @@ func applySlots(nodes map[string]string, physicalID, createSpec string) (map[str
 		return nil, err
 	}
 	raw, _ := json.Marshal(map[string]any{"create": createSpec})
-	resp, err := http.Post(fmt.Sprintf("http://%s:10684/apply-slots?gpuIndex=%d", ip, gpuIndex), "application/json", bytes.NewReader(raw))
+	resp, err := nodeAgentMIGClient.Post(fmt.Sprintf("http://%s:10684/apply-slots?gpuIndex=%d", ip, gpuIndex), "application/json", bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}
@@ -1822,7 +2142,7 @@ func patchSlots(nodes map[string]string, physicalID, deleteSpec, createSpec, pre
 		return nil, err
 	}
 	raw, _ := json.Marshal(map[string]any{"delete": deleteSpec, "create": createSpec, "preserve": preserveSpec})
-	resp, err := http.Post(fmt.Sprintf("http://%s:10684/patch-slots?gpuIndex=%d", ip, gpuIndex), "application/json", bytes.NewReader(raw))
+	resp, err := nodeAgentMIGClient.Post(fmt.Sprintf("http://%s:10684/patch-slots?gpuIndex=%d", ip, gpuIndex), "application/json", bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}
@@ -1839,7 +2159,7 @@ func refreshCDI(nodes map[string]string, physicalID string) (map[string]any, err
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.Post(fmt.Sprintf("http://%s:10684/refresh-cdi?gpuIndex=%d", ip, gpuIndex), "application/json", nil)
+	resp, err := nodeAgentFastClient.Post(fmt.Sprintf("http://%s:10684/refresh-cdi?gpuIndex=%d", ip, gpuIndex), "application/json", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -2162,11 +2482,24 @@ func gpuIndexFromID(gpuID string) (int, error) {
 }
 
 func syncRuntimes(client *kube.Client, runtimes []system.ModelRuntimeSpec) error {
+	nodeCPU := map[string]nodeCPUConfig{}
 	for _, rt := range runtimes {
 		if rt.DeviceResource == "" || rt.ExpectedMIGUUID == "" {
 			return fmt.Errorf("runtime %s missing resolved per-MIG UUID device binding for slot %s", rt.Model, rt.SlotResource)
 		}
-		body := deployment(client.Namespace(), rt)
+		cfg, ok := nodeCPU[rt.Node]
+		if !ok {
+			var err error
+			if cfg, err = runtimeNodeCPUConfig(client, rt.Node); err != nil {
+				return err
+			}
+			nodeCPU[rt.Node] = cfg
+		}
+		placement, err := runtimeCPUPlacementFor(cfg, rt)
+		if err != nil {
+			return err
+		}
+		body := deployment(client.Namespace(), rt, placement)
 		if err := client.Upsert(kube.Deployment(client.Namespace(), runtimeDeploymentName(rt)), body, nil); err != nil {
 			return err
 		}
@@ -2253,7 +2586,7 @@ func ensureSlotResources(client *kube.Client, nodes map[string]string, runtimes 
 		}
 		raw, _ := json.Marshal(map[string]any{"create": strings.Join(create, ",")})
 		url := fmt.Sprintf("http://%s:10684/apply-slots?gpuIndex=%d", ip, gpuIndex)
-		resp, err := http.Post(url, "application/json", bytes.NewReader(raw))
+		resp, err := nodeAgentMIGClient.Post(url, "application/json", bytes.NewReader(raw))
 		if err != nil {
 			return err
 		}
@@ -2262,7 +2595,7 @@ func ensureSlotResources(client *kube.Client, nodes map[string]string, runtimes 
 			return fmt.Errorf("apply slots on %s gpu%d returned %d", node, gpuIndex, resp.StatusCode)
 		}
 		refreshURL := fmt.Sprintf("http://%s:10684/refresh-cdi?gpuIndex=%d", ip, gpuIndex)
-		refreshResp, err := http.Post(refreshURL, "application/json", nil)
+		refreshResp, err := nodeAgentFastClient.Post(refreshURL, "application/json", nil)
 		if err != nil {
 			return err
 		}
@@ -2443,6 +2776,10 @@ func waitForRuntimeCDIDevices(nodes map[string]string, runtimes []system.ModelRu
 	if len(runtimes) == 0 {
 		return nil
 	}
+	// Refresh CDI only for GPUs with an expected device missing from the
+	// node's CDI spec.  register_mig_devices normally refreshed it already,
+	// and a CDI refresh takes the node-wide lock, so refreshing
+	// unconditionally serializes every place_instance on the host.
 	refreshed := map[string]bool{}
 	for _, rt := range runtimes {
 		if rt.ExpectedMIGUUID == "" {
@@ -2450,6 +2787,9 @@ func waitForRuntimeCDIDevices(nodes map[string]string, runtimes []system.ModelRu
 		}
 		key := rt.Node + "|" + rt.GPU
 		if refreshed[key] {
+			continue
+		}
+		if ready, err := runtimeCDIDeviceReady(nodes, rt); err == nil && ready {
 			continue
 		}
 		if _, err := refreshCDI(nodes, rt.GPU); err != nil {
@@ -2869,7 +3209,7 @@ func postRouteEndpoint(router string, route map[string]any) error {
 }
 
 func postRouteRaw(router string, raw []byte, label string) error {
-	resp, err := http.Post(strings.TrimRight(router, "/")+"/control/routes", "application/json", bytes.NewReader(raw))
+	resp, err := routerClient.Post(strings.TrimRight(router, "/")+"/control/routes", "application/json", bytes.NewReader(raw))
 	if err != nil {
 		return err
 	}
@@ -2903,7 +3243,7 @@ func deleteRouteEndpoint(router, model, runtimeID string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := routerClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -2914,7 +3254,63 @@ func deleteRouteEndpoint(router, model, runtimeID string) error {
 	return nil
 }
 
-func deployment(ns string, rt system.ModelRuntimeSpec) map[string]any {
+const (
+	// runtimeCPUExcludeAnnotation lists host CPUs (e.g. "1,33") runtimes on
+	// that node must not run on; the runtime drops them from its affinity.
+	runtimeCPUExcludeAnnotation = "mig.or-sim.io/runtime-cpu-exclude"
+	// runtimeCPUPoolAnnotation lists dedicated per-runtime CPU sets separated
+	// by ";" (e.g. "2,58;4,60", one physical core each).  A runtime on GPU g
+	// with slot start s gets entry g*8+s; slots never overlap on a node, so
+	// runtimes never share a core.  Spreading one runtime over many cores
+	// makes GPU-launch-bound latency bimodal.
+	runtimeCPUPoolAnnotation = "mig.or-sim.io/runtime-cpu-pool"
+	migSlotsPerGPU           = 8
+)
+
+type nodeCPUConfig struct {
+	Exclude string
+	Pool    []string
+}
+
+type runtimeCPUPlacement struct {
+	Exclude string
+	Set     string
+}
+
+func runtimeNodeCPUConfig(client *kube.Client, nodeName string) (nodeCPUConfig, error) {
+	var node map[string]any
+	if _, err := client.Get(kube.Node(nodeName), &node); err != nil {
+		return nodeCPUConfig{}, err
+	}
+	annotations := asMap(asMap(node["metadata"])["annotations"])
+	cfg := nodeCPUConfig{Exclude: strings.TrimSpace(asString(annotations[runtimeCPUExcludeAnnotation]))}
+	for _, entry := range strings.Split(asString(annotations[runtimeCPUPoolAnnotation]), ";") {
+		if entry = strings.TrimSpace(entry); entry != "" {
+			cfg.Pool = append(cfg.Pool, entry)
+		}
+	}
+	return cfg, nil
+}
+
+func runtimeCPUPlacementFor(cfg nodeCPUConfig, rt system.ModelRuntimeSpec) (runtimeCPUPlacement, error) {
+	placement := runtimeCPUPlacement{Exclude: cfg.Exclude}
+	if len(cfg.Pool) == 0 {
+		return placement, nil
+	}
+	slot, err := parseSlotRequest(rt)
+	if err != nil {
+		return placement, err
+	}
+	idx := slot.GPUIndex*migSlotsPerGPU + slot.Start
+	if idx < 0 || idx >= len(cfg.Pool) {
+		return placement, fmt.Errorf("%s on %s has %d entries, runtime %s needs entry %d (gpu%d slot %d)",
+			runtimeCPUPoolAnnotation, rt.Node, len(cfg.Pool), rt.Model, idx, slot.GPUIndex, slot.Start)
+	}
+	placement.Set = cfg.Pool[idx]
+	return placement, nil
+}
+
+func deployment(ns string, rt system.ModelRuntimeSpec, cpu runtimeCPUPlacement) map[string]any {
 	name := runtimeDeploymentName(rt)
 	rid := runtimeID(rt)
 	modelName := runtimeModel(rt)
@@ -2938,6 +3334,12 @@ func deployment(ns string, rt system.ModelRuntimeSpec) map[string]any {
 		{"name": "OR_SIM_SLOT_RESOURCE", "value": rt.SlotResource},
 		{"name": "OR_SIM_DEVICE_RESOURCE", "value": rt.DeviceResource},
 		{"name": "OR_SIM_EXPECTED_MIG_UUID", "value": rt.ExpectedMIGUUID},
+	}
+	if cpu.Set != "" {
+		envVars = append(envVars, map[string]any{"name": "OR_SIM_CPU_SET", "value": cpu.Set})
+	}
+	if cpu.Exclude != "" {
+		envVars = append(envVars, map[string]any{"name": "OR_SIM_CPU_EXCLUDE", "value": cpu.Exclude})
 	}
 	if isLLMRuntime(rt) {
 		if modelID := llmModelID(rt); modelID != "" {

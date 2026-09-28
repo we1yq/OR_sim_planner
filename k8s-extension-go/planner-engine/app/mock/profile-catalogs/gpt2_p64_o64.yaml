@@ -1,6 +1,6 @@
 metadata:
-  source: profile/current/gpt2m_streaming_bench.csv
-  generatedBy: eval/8gpu/build_8gpu_planner_fixture.py
+  source: profile/20260929 (per-GPU median latency, min over 3 GPUs)
+  generatedBy: profile/20260929/build_catalog_median_min.py
   workload: gpt2_p64_o64
   modelMatch: gpt2
   runtimeModel: gpt2
@@ -24,7 +24,7 @@ options:
   family: llm
   batch: 1
   profile: 1g
-  mu: 1.304951
+  mu: 1.456
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -32,7 +32,7 @@ options:
   ttftMsP95: 16.26
   tpotMs: 13.153228
   tpotMsP95: 13.153228
-  serviceTimeMs: 766.312549
+  serviceTimeMs: 686.813187
   timeMsP95: 852.645325
   peakMemMb: 741.972656
   fitSlo: true
@@ -42,7 +42,7 @@ options:
   family: llm
   batch: 1
   profile: 2g
-  mu: 1.535936
+  mu: 1.527
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -50,7 +50,7 @@ options:
   ttftMsP95: 14.260192
   tpotMs: 10.092476
   tpotMsP95: 10.092476
-  serviceTimeMs: 651.068799
+  serviceTimeMs: 654.878847
   timeMsP95: 656.378052
   peakMemMb: 741.972656
   fitSlo: true
@@ -60,7 +60,7 @@ options:
   family: llm
   batch: 1
   profile: 3g
-  mu: 1.409742
+  mu: 1.535
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -68,7 +68,7 @@ options:
   ttftMsP95: 13.287456
   tpotMs: 13.309037
   tpotMsP95: 13.309037
-  serviceTimeMs: 709.349902
+  serviceTimeMs: 651.465798
   timeMsP95: 864.285828
   peakMemMb: 741.972656
   fitSlo: true
@@ -78,7 +78,7 @@ options:
   family: llm
   batch: 1
   profile: 4g
-  mu: 1.474348
+  mu: 1.479
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -86,7 +86,7 @@ options:
   ttftMsP95: 13.335296
   tpotMs: 10.913537
   tpotMsP95: 10.913537
-  serviceTimeMs: 678.266101
+  serviceTimeMs: 676.132522
   timeMsP95: 708.470093
   peakMemMb: 741.972656
   fitSlo: true
@@ -96,7 +96,7 @@ options:
   family: llm
   batch: 1
   profile: 7g
-  mu: 1.499434
+  mu: 1.495
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -104,7 +104,7 @@ options:
   ttftMsP95: 14.0544
   tpotMs: 10.467361
   tpotMsP95: 10.467361
-  serviceTimeMs: 666.918213
+  serviceTimeMs: 668.896321
   timeMsP95: 679.974487
   peakMemMb: 741.972656
   fitSlo: true

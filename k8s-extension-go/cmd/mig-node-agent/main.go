@@ -21,6 +21,8 @@ import (
 
 	"google.golang.org/grpc"
 	deviceplugin "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+
+	"or-sim/k8s-extension-go/internal/kube"
 )
 
 type result struct {
@@ -105,7 +107,19 @@ var profileToPlacementSize = map[string]int{
 	"7g": 8,
 }
 
-var migMutationMu sync.Mutex
+// Lock hierarchy (always host before GPU, so no cycle):
+//   - hostLockMu + flock(lockPath): CDI refresh, which rewrites the node-wide
+//     CDI spec, and one-shot CLI commands.
+//   - per-GPU mutex + flock(lockPath.gpuN): MIG geometry changes (clear,
+//     apply-slots, patch-slots) on that GPU only, so different GPUs of one
+//     host can change MIG geometry concurrently.
+//
+// A CDI refresh may overlap a geometry change on another GPU: every GPU
+// refreshes CDI after its own change completes and refreshes are serialized,
+// so the last refresh reflects every completed change.
+var hostLockMu sync.Mutex
+
+var gpuLockMus sync.Map // gpu index -> *sync.Mutex
 
 var gpuIndexRe = regexp.MustCompile(`^[0-9]+$`)
 var giLineRe = regexp.MustCompile(`^\|\s+([0-9]+)\s+(MIG [0-9]+g\.[0-9]+gb)\s+([0-9]+)\s+([0-9]+)\s+([0-9]+):([0-9]+)\s+\|`)
@@ -164,6 +178,11 @@ func main() {
 		fail(jsonOut, result{Command: command, GPUIndex: gpuIndex, Success: false, Message: err.Error()}, 1)
 	}
 	defer unlock()
+	unlockGPU, err := acquireGPULock(lockPath, gpuIndex)
+	if err != nil {
+		fail(jsonOut, result{Command: command, GPUIndex: gpuIndex, Success: false, Message: err.Error()}, 1)
+	}
+	defer unlockGPU()
 
 	switch command {
 	case "list":
@@ -274,7 +293,7 @@ func runHTTPAPI(addr, lockPath string) error {
 			return
 		}
 		gpuIndex := queryDefault(r, "gpuIndex", "0")
-		res := withLock(lockPath, "clear", gpuIndex, func() result {
+		res := withGPULock(lockPath, "clear", gpuIndex, func() result {
 			clearErr := clearMIG(gpuIndex)
 			out, listErr := run("nvidia-smi", "-L")
 			success := clearErr == nil && listErr == nil && !gpuBlockHasMIG(out, gpuIndex)
@@ -305,7 +324,7 @@ func runHTTPAPI(addr, lockPath string) error {
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			createSpec = body.Create
 		}
-		res := withLock(lockPath, "apply-slots", gpuIndex, func() result {
+		res := withGPULock(lockPath, "apply-slots", gpuIndex, func() result {
 			return applySlots(gpuIndex, createSpec)
 		})
 		res = attachDevicePluginRefresh(res)
@@ -331,7 +350,7 @@ func runHTTPAPI(addr, lockPath string) error {
 			createSpec = body.Create
 			preserveSpec = body.Preserve
 		}
-		res := withLock(lockPath, "patch-slots", gpuIndex, func() result {
+		res := withGPULock(lockPath, "patch-slots", gpuIndex, func() result {
 			return patchSlots(gpuIndex, deleteSpec, createSpec, preserveSpec)
 		})
 		res = attachDevicePluginRefresh(res)
@@ -386,8 +405,22 @@ func runHTTPAPI(addr, lockPath string) error {
 	return http.ListenAndServe(addr, mux)
 }
 
+// withLock runs fn under the host lock (node-wide CDI refresh).
 func withLock(lockPath, command, gpuIndex string, fn func() result) result {
 	unlock, err := acquireLock(lockPath)
+	if err != nil {
+		return result{Command: command, GPUIndex: gpuIndex, Success: false, Message: err.Error()}
+	}
+	defer unlock()
+	return fn()
+}
+
+// withGPULock runs fn under the lock of one GPU (MIG geometry changes).
+func withGPULock(lockPath, command, gpuIndex string, fn func() result) result {
+	if !gpuIndexRe.MatchString(gpuIndex) {
+		return result{Command: command, GPUIndex: gpuIndex, Success: false, Message: "gpuIndex must be a non-negative integer"}
+	}
+	unlock, err := acquireGPULock(lockPath, gpuIndex)
 	if err != nil {
 		return result{Command: command, GPUIndex: gpuIndex, Success: false, Message: err.Error()}
 	}
@@ -1238,22 +1271,35 @@ func atoiStrict(value string) int {
 	return out
 }
 
+// acquireLock takes the host lock.
 func acquireLock(path string) (func(), error) {
-	migMutationMu.Lock()
+	return acquireFileLock(path, &hostLockMu)
+}
+
+// acquireGPULock takes the lock of one GPU index.
+func acquireGPULock(path, gpuIndex string) (func(), error) {
+	mu, _ := gpuLockMus.LoadOrStore(gpuIndex, &sync.Mutex{})
+	return acquireFileLock(path+".gpu"+gpuIndex, mu.(*sync.Mutex))
+}
+
+// acquireFileLock holds mu (in-process exclusion) and an exclusive flock on
+// path (exclusion from other agent processes sharing the lock directory).
+func acquireFileLock(path string, mu *sync.Mutex) (func(), error) {
+	mu.Lock()
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
-		migMutationMu.Unlock()
+		mu.Unlock()
 		return nil, err
 	}
 	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
 		_ = file.Close()
-		migMutationMu.Unlock()
+		mu.Unlock()
 		return nil, err
 	}
 	return func() {
 		_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
 		_ = file.Close()
-		migMutationMu.Unlock()
+		mu.Unlock()
 	}, nil
 }
 
@@ -1331,6 +1377,7 @@ func runSlotDevicePlugin(nodeName, pluginDir string, scanInterval time.Duration)
 		return err
 	}
 	var mu sync.Mutex
+	pruner := newStaleResourcePruner(nodeName)
 	scan := func(reason string) ([]slotDevice, error) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -1356,7 +1403,14 @@ func runSlotDevicePlugin(nodeName, pluginDir string, scanInterval time.Duration)
 			if _, ok := seen[resourceName]; ok {
 				continue
 			}
-			server.markUnavailable()
+			// Withdrawing the registration socket makes kubelet drop the
+			// endpoint, but kubelet never deletes the key from node status: after
+			// its stop grace period it pins capacity to 0 forever.  The pruner
+			// removes such keys once that grace period has passed.
+			server.stop()
+			delete(manager, resourceName)
+			pruner.noteWithdrawn(resourceName, time.Now())
+			fmt.Fprintf(os.Stderr, "or-sim slot device plugin withdrew %s reason=%s\n", resourceName, reason)
 		}
 		return slots, nil
 	}
@@ -1370,8 +1424,142 @@ func runSlotDevicePlugin(nodeName, pluginDir string, scanInterval time.Duration)
 		if _, err := scan("interval"); err != nil {
 			fmt.Fprintf(os.Stderr, "or-sim slot device discovery failed: %v\n", err)
 		}
+		if pruner.due(time.Now()) {
+			mu.Lock()
+			registered := make(map[string]bool, len(manager))
+			for resourceName := range manager {
+				registered[resourceName] = true
+			}
+			withdrawnAt := pruner.withdrawnSnapshot()
+			mu.Unlock()
+			pruner.prune(registered, withdrawnAt, time.Now())
+		}
 		<-ticker.C
 	}
+}
+
+const (
+	stalePruneInterval = 30 * time.Second
+	// kubelet keeps a stopped device-plugin endpoint for 5 minutes before
+	// pinning its capacity to 0; removing the key earlier only makes kubelet
+	// write it back.
+	stalePruneWithdrawGrace = 6 * time.Minute
+)
+
+// staleResourcePruner deletes or-sim.io/* extended resources that no live
+// plugin server backs from this node's status.
+type staleResourcePruner struct {
+	client      *kube.Client
+	nodeName    string
+	withdrawnAt map[string]time.Time
+	lastRun     time.Time
+}
+
+func newStaleResourcePruner(nodeName string) *staleResourcePruner {
+	p := &staleResourcePruner{nodeName: nodeName, withdrawnAt: map[string]time.Time{}}
+	client, err := kube.NewInCluster("")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "or-sim stale resource pruning disabled: %v\n", err)
+		return p
+	}
+	p.client = client
+	return p
+}
+
+// noteWithdrawn and withdrawnSnapshot must be called with the plugin mutex held.
+func (p *staleResourcePruner) noteWithdrawn(resourceName string, now time.Time) {
+	p.withdrawnAt[resourceName] = now
+}
+
+func (p *staleResourcePruner) withdrawnSnapshot() map[string]time.Time {
+	out := make(map[string]time.Time, len(p.withdrawnAt))
+	for k, v := range p.withdrawnAt {
+		out[k] = v
+	}
+	return out
+}
+
+func (p *staleResourcePruner) due(now time.Time) bool {
+	return p.client != nil && now.Sub(p.lastRun) >= stalePruneInterval
+}
+
+func (p *staleResourcePruner) prune(registered map[string]bool, withdrawnAt map[string]time.Time, now time.Time) {
+	p.lastRun = now
+	var node map[string]any
+	if _, err := p.client.Get(kube.Node(p.nodeName), &node); err != nil {
+		fmt.Fprintf(os.Stderr, "or-sim stale resource pruning: get node failed: %v\n", err)
+		return
+	}
+	status, _ := node["status"].(map[string]any)
+	capacity, _ := status["capacity"].(map[string]any)
+	allocatable, _ := status["allocatable"].(map[string]any)
+	stale := staleOrSimResourceKeys(capacity, allocatable, registered, withdrawnAt, now)
+	if len(stale) == 0 {
+		return
+	}
+	ops := staleResourcePatchOps(stale, capacity, allocatable)
+	if _, err := p.client.PatchJSON(kube.NodeStatus(p.nodeName), ops, nil); err != nil {
+		// A failed test op means kubelet changed a value after we read it;
+		// the next round re-reads and retries.
+		fmt.Fprintf(os.Stderr, "or-sim stale resource pruning: patch failed: %v\n", err)
+		return
+	}
+	for _, key := range stale {
+		delete(withdrawnAt, key)
+	}
+	fmt.Fprintf(os.Stderr, "or-sim stale resource pruning removed %d keys: %s\n", len(stale), strings.Join(stale, ","))
+}
+
+// staleOrSimResourceKeys returns or-sim.io/* keys with no allocatable devices
+// that no live plugin server backs.  Keys withdrawn within the kubelet grace
+// period are kept so kubelet does not write them back.
+func staleOrSimResourceKeys(capacity, allocatable map[string]any, registered map[string]bool, withdrawnAt map[string]time.Time, now time.Time) []string {
+	keys := map[string]bool{}
+	for key := range capacity {
+		keys[key] = true
+	}
+	for key := range allocatable {
+		keys[key] = true
+	}
+	out := []string{}
+	for key := range keys {
+		if !strings.HasPrefix(key, orSimResourceDomain+"/") || registered[key] {
+			continue
+		}
+		if value := fmt.Sprint(allocatable[key]); allocatable[key] != nil && value != "0" {
+			continue
+		}
+		if at, ok := withdrawnAt[key]; ok && now.Sub(at) < stalePruneWithdrawGrace {
+			continue
+		}
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// staleResourcePatchOps builds a JSON patch that removes each key from
+// capacity and allocatable, guarded by test ops on the values just read.
+func staleResourcePatchOps(keys []string, capacity, allocatable map[string]any) []map[string]any {
+	ops := []map[string]any{}
+	for _, key := range keys {
+		pointer := strings.ReplaceAll(strings.ReplaceAll(key, "~", "~0"), "/", "~1")
+		for _, field := range []struct {
+			name   string
+			values map[string]any
+		}{{"capacity", capacity}, {"allocatable", allocatable}} {
+			value, ok := field.values[key]
+			if !ok {
+				continue
+			}
+			path := "/status/" + field.name + "/" + pointer
+			ops = append(ops,
+				map[string]any{"op": "test", "path": path, "value": value},
+				map[string]any{"op": "remove", "path": path},
+			)
+		}
+	}
+	return ops
 }
 
 func serveDevicePluginRefresh(pluginDir string, scan func(reason string) ([]slotDevice, error)) {
@@ -1706,17 +1894,12 @@ func discoverSlotDevices(nodeName string) ([]slotDevice, error) {
 	if err != nil {
 		return nil, err
 	}
-	slots, err := possibleSlotDevicesFromSMI(nodeName, smi)
-	if err != nil {
-		return nil, err
-	}
-	byPlacement := map[string]int{}
-	for i, slot := range slots {
-		byPlacement[slotPlacementKey(slot.PhysicalGPUID, slot.SlotStart, slot.SlotEnd, slot.Profile)] = i
-	}
-	gpuUUIDs := parseGPUUUIDs(smi)
+	// nvidia-smi -L exposes every adapter in the host.  Mixed nodes can have
+	// one MIG-capable A100 plus ordinary RTX adapters; querying `mig -lgi` on
+	// the latter returns exit 6.  Restrict discovery to the actual MIG-capable
+	// adapters parsed from this observation.
 	uuidDevices := map[string]slotDevice{}
-	for gpuIndex := range gpuUUIDs {
+	for _, gpuIndex := range migCapableGPUIndexes(smi) {
 		instances, _, err := listGPUInstances(gpuIndex)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "or-sim slot device discovery skipped GPU %s: %v\n", gpuIndex, err)
@@ -1727,7 +1910,6 @@ func discoverSlotDevices(nodeName string) ([]slotDevice, error) {
 				continue
 			}
 			physicalID := fmt.Sprintf("%s-gpu%s", nodeName, gpuIndex)
-			key := slotPlacementKey(physicalID, slot.SlotStart, slot.SlotEnd, slot.Profile)
 			device := slotDevice{
 				ResourceName:  migUUIDResourceName(slot.MIGDeviceUUID),
 				SocketName:    socketNameForResource(migUUIDResourceName(slot.MIGDeviceUUID)),
@@ -1739,16 +1921,25 @@ func discoverSlotDevices(nodeName string) ([]slotDevice, error) {
 				MIGUUID:       slot.MIGDeviceUUID,
 			}
 			uuidDevices[device.ResourceName] = device
-			if i, ok := byPlacement[key]; ok {
-				slots[i].MIGUUID = slot.MIGDeviceUUID
-			}
 		}
 	}
+	slots := make([]slotDevice, 0, len(uuidDevices))
 	for _, device := range uuidDevices {
 		slots = append(slots, device)
 	}
 	sort.Slice(slots, func(i, j int) bool { return slots[i].ResourceName < slots[j].ResourceName })
 	return slots, nil
+}
+
+func migCapableGPUIndexes(smi string) []string {
+	indexes := []string{}
+	for index, name := range parseGPUNames(smi) {
+		if isMIGCapableA100Name(name) {
+			indexes = append(indexes, index)
+		}
+	}
+	sort.Slice(indexes, func(i, j int) bool { return atoi(indexes[i]) < atoi(indexes[j]) })
+	return indexes
 }
 
 func possibleSlotDevicesFromSMI(nodeName, smi string) ([]slotDevice, error) {

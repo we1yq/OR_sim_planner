@@ -67,6 +67,10 @@ func (c *Client) PatchMerge(apiPath string, body any, out any) (int, error) {
 	return c.doWithContentType(http.MethodPatch, apiPath, body, out, "application/merge-patch+json")
 }
 
+func (c *Client) PatchJSON(apiPath string, ops any, out any) (int, error) {
+	return c.doWithContentType(http.MethodPatch, apiPath, ops, out, "application/json-patch+json")
+}
+
 func (c *Client) Delete(apiPath string) (int, error) {
 	return c.do(http.MethodDelete, apiPath, nil, nil)
 }
@@ -199,3 +203,5 @@ func Service(ns, name string) string {
 func Nodes() string { return "/api/v1/nodes" }
 
 func Node(name string) string { return "/api/v1/nodes/" + name }
+
+func NodeStatus(name string) string { return Node(name) + "/status" }

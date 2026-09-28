@@ -74,9 +74,25 @@ class BatchCapacityEffectsTest(unittest.TestCase):
         ]
         action_keys = [action["actionKey"] for action in actions]
         removed = _remove_capacity_dependency_edges(actions)
-        self.assertEqual(removed, 1)
+        self.assertEqual(removed, {"capacityGate": 1, "temporaryCapacityCleanup": 0})
         self.assertEqual([action["actionKey"] for action in actions], action_keys)
         self.assertEqual(actions[2]["dependsOnActionKeys"], ["resource"])
+
+    def test_sw_c_removes_temporary_capacity_cleanup_ordering(self):
+        actions = [
+            {"actionKey": "final-activate", "type": "activate_instance_route"},
+            {"actionKey": "slot-resource", "type": "place_instance"},
+            {
+                "actionKey": "temp-cleanup",
+                "type": "deactivate_instance_route",
+                "cleanupTemporaryCapacity": True,
+                "dependsOnActionKeys": ["final-activate", "slot-resource"],
+                "temporaryCapacityCleanupDependsOn": ["final-activate"],
+            },
+        ]
+        removed = _remove_capacity_dependency_edges(actions)
+        self.assertEqual(removed, {"capacityGate": 0, "temporaryCapacityCleanup": 1})
+        self.assertEqual(actions[2]["dependsOnActionKeys"], ["slot-resource"])
 
     def test_sw_c_keeps_target_and_action_multiset(self):
         def state(gpu_id, physical_id):

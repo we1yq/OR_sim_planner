@@ -10,6 +10,59 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+
+def parse_cpu_list(spec: str) -> set[int]:
+    cpus: set[int] = set()
+    for part in spec.replace(" ", "").split(","):
+        if not part:
+            continue
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            cpus.update(range(int(lo), int(hi) + 1))
+        else:
+            cpus.add(int(part))
+    return cpus
+
+
+def format_cpu_list(cpus: list[int]) -> str:
+    ranges: list[str] = []
+    start = prev = None
+    for cpu in sorted(cpus) + [None]:
+        if prev is not None and cpu == prev + 1:
+            prev = cpu
+            continue
+        if start is not None:
+            ranges.append(str(start) if start == prev else f"{start}-{prev}")
+        start = prev = cpu
+    return ",".join(ranges)
+
+def apply_cpu_exclude() -> str:
+    """Apply OR_SIM_CPU_SET / OR_SIM_CPU_EXCLUDE to this process's CPU affinity.
+
+    Runs before torch is imported so every thread torch, CUDA and the
+    per-request HTTP handlers create inherits the result.  OR_SIM_CPU_SET
+    (e.g. "4,60", one physical core) confines the runtime to a dedicated core;
+    spreading runtime threads over many cores makes GPU-launch-bound latency
+    bimodal.  OR_SIM_CPU_EXCLUDE (e.g. "1,33") drops host cores that
+    measurably slow the GPU launch path.
+    """
+    for name in ("OR_SIM_CPU_SET", "OR_SIM_CPU_EXCLUDE"):
+        spec = os.environ.get(name, "").strip()
+        if not spec:
+            continue
+        try:
+            allowed = os.sched_getaffinity(0)
+            cpus = parse_cpu_list(spec)
+            keep = allowed & cpus if name == "OR_SIM_CPU_SET" else allowed - cpus
+            if keep and keep != allowed:
+                os.sched_setaffinity(0, keep)
+        except (OSError, ValueError) as exc:
+            print(f"ignoring {name}={spec!r}: {exc}", file=sys.stderr, flush=True)
+    return format_cpu_list(sorted(os.sched_getaffinity(0)))
+
+
+CPU_AFFINITY = apply_cpu_exclude()
+
 try:
     import torch
     import torchvision.models as models
@@ -127,6 +180,29 @@ class RuntimeState:
             if self.device == "cuda":
                 torch.cuda.synchronize()
 
+    def control_batch(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = payload or {}
+        next_batch = int_value(payload.get("batchSize") or payload.get("batch"), 0)
+        if next_batch <= 0:
+            raise ValueError("batchSize must be positive")
+        if self.model is None:
+            raise RuntimeError(self.load_error or "model is not loaded")
+        # Build the tensor before publishing the new default so the metrics update
+        # only after this runtime can actually serve the requested batch.
+        self.input_for_batch(next_batch)
+        with self.lock:
+            previous = self.batch_size
+            self.batch_size = next_batch
+        return {
+            "model": self.model_name,
+            "runtimeId": self.runtime_id,
+            "runtimeMode": self.runtime_mode,
+            "previousBatchSize": previous,
+            "batchSize": next_batch,
+            "applied": True,
+            "requiresRestart": False,
+        }
+
     def infer(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         if self.model is None:
             raise RuntimeError(self.load_error or "model is not loaded")
@@ -194,10 +270,22 @@ class RuntimeState:
                 "runtimeThroughput": throughput,
                 "lastRuntimeLatencyMs": self.last_runtime_latency_ms,
                 "migUuid": os.environ.get("OR_SIM_MIG_UUID", ""),
+                "profile": os.environ.get("OR_SIM_PROFILE", ""),
                 "slotResource": os.environ.get("OR_SIM_SLOT_RESOURCE", ""),
                 "deviceResource": os.environ.get("OR_SIM_DEVICE_RESOURCE", ""),
+                "expectedMigUuid": os.environ.get("OR_SIM_EXPECTED_MIG_UUID", ""),
+                "physicalGpuId": os.environ.get("OR_SIM_PHYSICAL_GPU_ID", ""),
+                "orSimMIGUUID": os.environ.get("OR_SIM_MIG_UUID", ""),
+                "orSimSlot": os.environ.get("OR_SIM_SLOT", ""),
+                "orSimSlotResource": os.environ.get("OR_SIM_SLOT_RESOURCE", ""),
+                "orSimDeviceResource": os.environ.get("OR_SIM_DEVICE_RESOURCE", ""),
+                "orSimExpectedMIGUUID": os.environ.get("OR_SIM_EXPECTED_MIG_UUID", ""),
+                "orSimPhysicalGpuID": os.environ.get("OR_SIM_PHYSICAL_GPU_ID", ""),
                 "loadTimings": dict(self.load_timings),
                 "loadError": self.load_error,
+                "cpuSet": os.environ.get("OR_SIM_CPU_SET", ""),
+                "cpuExclude": os.environ.get("OR_SIM_CPU_EXCLUDE", ""),
+                "cpuAffinity": CPU_AFFINITY,
                 "loaded": self.model is not None,
             }
 
@@ -241,7 +329,22 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(500, {"error": str(exc), "model": STATE.model_name})
             return
         if self.path == "/control/batch":
-            self._json(409, {"error": "batch changes require runtime restart in torchvision mode"})
+            try:
+                length = int(self.headers.get("content-length", "0"))
+                payload: dict[str, Any] = {}
+                if length > 0:
+                    payload = json.loads(self.rfile.read(length).decode() or "{}")
+                self._json(200, STATE.control_batch(payload))
+            except ValueError as exc:
+                self._json(400, {"error": str(exc), "model": STATE.model_name})
+            except Exception as exc:
+                self._json(500, {"error": str(exc), "model": STATE.model_name})
+            return
+        self._json(404, {"error": "not found"})
+
+    def do_PUT(self) -> None:
+        if self.path == "/control/batch":
+            self.do_POST()
             return
         self._json(404, {"error": "not found"})
 

@@ -85,9 +85,10 @@ def run(
     _add_physical_reuse_dependency_edges(actions)
     actions = bind_physical_lifetimes(actions, plan_items, current_state)
     actions = action_builder._preserve_independent_slot_deletes(actions)
-    removed_capacity_edges = 0
+    removed_by_kind = {"capacityGate": 0, "temporaryCapacityCleanup": 0}
     if variant == "sw-c":
-        removed_capacity_edges = _remove_capacity_dependency_edges(actions)
+        removed_by_kind = _remove_capacity_dependency_edges(actions)
+    removed_capacity_edges = sum(removed_by_kind.values())
     planned_state = action_builder._planned_state_for_actions(current_state, target_state, actions)
     executed_state = simulate_transition_actions(
         source_state=current_state,
@@ -139,6 +140,7 @@ def run(
             "stage3Variant": variant,
             "capacityDependenciesEnforced": variant != "sw-c",
             "removedCapacityDependencyCount": int(removed_capacity_edges),
+            "removedCapacityDependencyCountByKind": dict(removed_by_kind),
         },
         "effect_model": {
             "capacity": "producesCapacity/consumesCapacity annotate route activation and serving removal",
@@ -183,6 +185,7 @@ def run(
         "stage3_variant": variant,
         "capacity_dependencies_enforced": variant != "sw-c",
         "removed_capacity_dependency_count": int(removed_capacity_edges),
+        "removed_capacity_dependency_count_by_kind": dict(removed_by_kind),
     }
 
 
@@ -195,22 +198,35 @@ def _capacity_dependency_keys(action: dict[str, Any]) -> set[str]:
     }
 
 
-def _remove_capacity_dependency_edges(actions: list[dict[str, Any]]) -> int:
-    """Apply the paper's SW-C negative control without changing its actions."""
+def _remove_capacity_dependency_edges(actions: list[dict[str, Any]]) -> dict[str, int]:
+    """Apply the paper's SW-C negative control without changing its actions.
 
-    removed = 0
+    Drops every capacity-motivated ordering: capacity-gate producer edges and
+    the edges that keep temporary capacity until its replacement is ready.
+    Resource, drain and physical-GPU ordering is rebuilt from action resources
+    by build_phased_action_plan and stays enforced.
+    """
+
+    removed = {"capacityGate": 0, "temporaryCapacityCleanup": 0}
     for action in actions:
-        capacity_keys = _capacity_dependency_keys(action)
-        if not capacity_keys:
+        gate_keys = _capacity_dependency_keys(action)
+        cleanup_keys = {str(key) for key in list(action.get("temporaryCapacityCleanupDependsOn") or [])}
+        if not gate_keys and not cleanup_keys:
             continue
         old = [str(key) for key in list(action.get("dependsOnActionKeys") or [])]
-        new = [key for key in old if key not in capacity_keys]
-        removed += len(old) - len(new)
+        new = []
+        for key in old:
+            if key in gate_keys:
+                removed["capacityGate"] += 1
+            elif key in cleanup_keys:
+                removed["temporaryCapacityCleanup"] += 1
+            else:
+                new.append(key)
         if new:
             action["dependsOnActionKeys"] = new
         else:
             action.pop("dependsOnActionKeys", None)
-    return int(removed)
+    return removed
 
 
 def _build_effect_aware_actions(
@@ -1338,9 +1354,15 @@ def _add_temporary_cleanup_dependency_edges(actions: list[dict[str, Any]]) -> No
             continue
         for cleanup in cleanup_actions:
             cleanup_key = cleanup.get("actionKey")
+            added = {key for key in deps_to_add if cleanup_key is None or key != str(cleanup_key)}
             deps = set(str(key) for key in list(cleanup.get("dependsOnActionKeys") or []))
-            deps.update(key for key in deps_to_add if cleanup_key is None or key != str(cleanup_key))
+            deps.update(added)
             cleanup["dependsOnActionKeys"] = sorted(deps)
+            # Recorded so the SW-C negative control can drop this capacity-
+            # motivated ordering too: it keeps temporary capacity until the
+            # capacity it stands in for is ready.
+            previous = set(str(key) for key in list(cleanup.get("temporaryCapacityCleanupDependsOn") or []))
+            cleanup["temporaryCapacityCleanupDependsOn"] = sorted(previous | added)
 
 
 def _capacity_dependency_context(actions: list[dict[str, Any]]) -> dict[str, Any]:

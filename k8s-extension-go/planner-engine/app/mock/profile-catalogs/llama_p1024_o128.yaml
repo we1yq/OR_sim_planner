@@ -1,6 +1,6 @@
 metadata:
-  source: profile/current/llama32_3b_streaming_bench.csv
-  generatedBy: eval/8gpu/build_8gpu_planner_fixture.py
+  source: profile/20260929 (per-GPU median latency, min over 3 GPUs)
+  generatedBy: profile/20260929/build_catalog_median_min.py
   workload: llama_p1024_o128
   modelMatch: llama
   runtimeModel: llama
@@ -24,7 +24,7 @@ options:
   family: llm
   batch: 1
   profile: 2g
-  mu: 0.261391
+  mu: 0.263
   fit: true
   fitMem: true
   sourceCsv: llama32_3b_streaming_bench.csv
@@ -32,7 +32,7 @@ options:
   ttftMsP95: 151.969955
   tpotMs: 29.42342
   tpotMsP95: 29.42342
-  serviceTimeMs: 3825.69165
+  serviceTimeMs: 3802.281369
   timeMsP95: 3915.290039
   peakMemMb: 6513.105957
   fitSlo: true
@@ -42,7 +42,7 @@ options:
   family: llm
   batch: 1
   profile: 3g
-  mu: 0.353109
+  mu: 0.358
   fit: true
   fitMem: true
   sourceCsv: llama32_3b_streaming_bench.csv
@@ -50,7 +50,7 @@ options:
   ttftMsP95: 97.621918
   tpotMs: 21.644117
   tpotMsP95: 21.644117
-  serviceTimeMs: 2831.982764
+  serviceTimeMs: 2793.296089
   timeMsP95: 2864.952148
   peakMemMb: 6513.105957
   fitSlo: true
@@ -60,7 +60,7 @@ options:
   family: llm
   batch: 1
   profile: 4g
-  mu: 0.367115
+  mu: 0.349
   fit: true
   fitMem: true
   sourceCsv: llama32_3b_streaming_bench.csv
@@ -68,7 +68,7 @@ options:
   ttftMsP95: 81.774467
   tpotMs: 22.490434
   tpotMsP95: 22.490434
-  serviceTimeMs: 2723.939258
+  serviceTimeMs: 2865.329513
   timeMsP95: 2960.550049
   peakMemMb: 6513.105957
   fitSlo: true
@@ -78,7 +78,7 @@ options:
   family: llm
   batch: 1
   profile: 7g
-  mu: 0.36708
+  mu: 0.366
   fit: true
   fitMem: true
   sourceCsv: llama32_3b_streaming_bench.csv
@@ -86,7 +86,7 @@ options:
   ttftMsP95: 57.2752
   tpotMs: 23.464347
   tpotMsP95: 23.464347
-  serviceTimeMs: 2724.200146
+  serviceTimeMs: 2732.240437
   timeMsP95: 3056.004395
   peakMemMb: 6513.105957
   fitSlo: true

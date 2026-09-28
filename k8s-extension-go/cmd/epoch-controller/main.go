@@ -410,6 +410,8 @@ func repairActions(required []any) []map[string]any {
 		if physicalID == "" {
 			continue
 		}
+		deleteID := "repair-delete-runtimes-" + sanitize(physicalID)
+		clearBindingID := "repair-clear-binding-" + sanitize(physicalID)
 		clearID := "repair-clear-template-" + sanitize(physicalID)
 		returnID := "repair-return-gpu-" + sanitize(physicalID)
 		common := map[string]any{
@@ -420,11 +422,41 @@ func repairActions(required []any) []map[string]any {
 			"gpuIndex":        req["gpuIndex"],
 			"reason":          firstNonEmpty(asString(req["reason"]), "clear_template_before_available"),
 		}
+		// A registry repair can be triggered after a failed cleanup plan.  In
+		// that case desired Deployment objects may still own pods even when the
+		// registry observation is otherwise empty.  Delete them through the
+		// ordinary executor action, wait for their pods, then transition the
+		// ledger and clear the hardware.  This is intentionally not a status
+		// patch or an out-of-band registry edit.
 		nodes = append(nodes, map[string]any{
-			"id":    clearID,
-			"type":  "clear_template",
+			"id":    deleteID,
+			"type":  "delete_instance",
 			"phase": index,
 			"index": index,
+			"action": mergeMap(common, map[string]any{
+				"type":           "delete_instance",
+				"abstractAction": "Delete Remaining GPU Runtimes",
+			}),
+		})
+		index++
+		nodes = append(nodes, map[string]any{
+			"id":        clearBindingID,
+			"type":      "clear_gpu_binding",
+			"phase":     index,
+			"index":     index,
+			"dependsOn": []string{deleteID},
+			"action": mergeMap(common, map[string]any{
+				"type":           "clear_gpu_binding",
+				"abstractAction": "Clear GPU Binding Before Available",
+			}),
+		})
+		index++
+		nodes = append(nodes, map[string]any{
+			"id":        clearID,
+			"type":      "clear_template",
+			"phase":     index,
+			"index":     index,
+			"dependsOn": []string{clearBindingID},
 			"action": mergeMap(common, map[string]any{
 				"type":           "clear_template",
 				"abstractAction": "Clear Template Before Available",

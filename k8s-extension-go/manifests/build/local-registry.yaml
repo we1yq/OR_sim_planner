@@ -16,6 +16,8 @@ spec:
     spec:
       hostNetwork: true
       dnsPolicy: Default
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
       tolerations:
         - operator: Exists
       containers:
@@ -24,7 +26,7 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: REGISTRY_HTTP_ADDR
-              value: 127.0.0.1:10690
+              value: 0.0.0.0:10690
           ports:
             - name: registry
               containerPort: 10690
@@ -38,4 +40,6 @@ spec:
               mountPath: /var/lib/registry
       volumes:
         - name: registry-storage
-          emptyDir: {}
+          hostPath:
+            path: /var/lib/or-sim/registry
+            type: DirectoryOrCreate

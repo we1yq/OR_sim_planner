@@ -85,6 +85,7 @@ spec:
         app.kubernetes.io/name: migrant-slot-device-plugin
         app.kubernetes.io/component: slot-device-plugin
     spec:
+      serviceAccountName: migrant-slot-device-plugin
       hostPID: true
       nodeSelector:
         nvidia.com/mig.capable: "true"
@@ -134,3 +135,36 @@ spec:
           hostPath:
             path: /var/run/cdi
             type: DirectoryOrCreate
+---
+# The slot device plugin prunes withdrawn or-sim.io/* extended resources from
+# its own node's status; kubelet otherwise keeps them at 0 forever.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: migrant-slot-device-plugin
+  namespace: or-sim
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: migrant-slot-device-plugin
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["nodes/status"]
+    verbs: ["patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: migrant-slot-device-plugin
+subjects:
+  - kind: ServiceAccount
+    name: migrant-slot-device-plugin
+    namespace: or-sim
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: migrant-slot-device-plugin

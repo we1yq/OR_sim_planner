@@ -15,10 +15,22 @@ def test_traffic_uses_min_during_transition_and_target_during_steady() -> None:
     )
 
     assert driver.phase() == "transition"
-    assert driver.effective_rates() == {"llama": 0.2, "gpt2": 0.3, "resnet50": 0.0}
+    assert driver.effective_rates() == {
+        "llama": 0.2,
+        "gpt2": 0.3,
+        "resnet50": 0.0,
+        "vgg16": 0.0,
+        "vit_base": 0.0,
+    }
     driver.enter_steady()
     assert driver.phase() == "steady"
-    assert driver.effective_rates() == {"llama": 0.5, "gpt2": 0.3, "resnet50": 100.0}
+    assert driver.effective_rates() == {
+        "llama": 0.5,
+        "gpt2": 0.3,
+        "resnet50": 100.0,
+        "vgg16": 0.0,
+        "vit_base": 0.0,
+    }
 
 
 def test_transition_metrics_follow_executor_schema() -> None:

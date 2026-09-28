@@ -10,16 +10,95 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+
+def parse_cpu_list(spec: str) -> set[int]:
+    cpus: set[int] = set()
+    for part in spec.replace(" ", "").split(","):
+        if not part:
+            continue
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            cpus.update(range(int(lo), int(hi) + 1))
+        else:
+            cpus.add(int(part))
+    return cpus
+
+
+def format_cpu_list(cpus: list[int]) -> str:
+    ranges: list[str] = []
+    start = prev = None
+    for cpu in sorted(cpus) + [None]:
+        if prev is not None and cpu == prev + 1:
+            prev = cpu
+            continue
+        if start is not None:
+            ranges.append(str(start) if start == prev else f"{start}-{prev}")
+        start = prev = cpu
+    return ",".join(ranges)
+
+def apply_cpu_exclude() -> str:
+    """Apply OR_SIM_CPU_SET / OR_SIM_CPU_EXCLUDE to this process's CPU affinity.
+
+    Runs before torch is imported so every thread torch, CUDA and the
+    per-request HTTP handlers create inherits the result.  OR_SIM_CPU_SET
+    (e.g. "4,60", one physical core) confines the runtime to a dedicated core;
+    spreading runtime threads over many cores makes GPU-launch-bound latency
+    bimodal.  OR_SIM_CPU_EXCLUDE (e.g. "1,33") drops host cores that
+    measurably slow the GPU launch path.
+    """
+    for name in ("OR_SIM_CPU_SET", "OR_SIM_CPU_EXCLUDE"):
+        spec = os.environ.get(name, "").strip()
+        if not spec:
+            continue
+        try:
+            allowed = os.sched_getaffinity(0)
+            cpus = parse_cpu_list(spec)
+            keep = allowed & cpus if name == "OR_SIM_CPU_SET" else allowed - cpus
+            if keep and keep != allowed:
+                os.sched_setaffinity(0, keep)
+        except (OSError, ValueError) as exc:
+            print(f"ignoring {name}={spec!r}: {exc}", file=sys.stderr, flush=True)
+    return format_cpu_list(sorted(os.sched_getaffinity(0)))
+
+
+CPU_AFFINITY = apply_cpu_exclude()
+
 try:
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList
 except Exception as exc:  # pragma: no cover - surfaced through /healthz
     torch = None
     AutoModelForCausalLM = None
     AutoTokenizer = None
+    StoppingCriteria = object
+    StoppingCriteriaList = None
     IMPORT_ERROR = str(exc)
 else:
     IMPORT_ERROR = ""
+
+
+class FirstTokenMark(StoppingCriteria):
+    """Marks when generate() has produced its first token; never stops.
+
+    generate() calls stopping criteria once per generated token, right after
+    the token is selected, so the first call is the time to first token.  On
+    CUDA the mark is an event on the stream (no extra synchronisation); on CPU
+    it is a perf_counter reading.
+    """
+
+    def __init__(self, cuda: bool) -> None:
+        self.cuda = cuda
+        self.event = None
+        self.at = None
+
+    def __call__(self, input_ids, scores, **kwargs):
+        if self.event is None and self.at is None:
+            if self.cuda:
+                self.event = torch.cuda.Event(enable_timing=True)
+                self.event.record()
+            else:
+                self.at = time.perf_counter()
+        return torch.zeros(input_ids.shape[0], dtype=torch.bool, device=input_ids.device)
 
 
 MODEL_ALIASES = {
@@ -129,24 +208,57 @@ class RuntimeState:
         if self.device == "cuda":
             torch.cuda.empty_cache()
 
+    def control_batch(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = payload or {}
+        next_batch = int_value(payload.get("batchSize") or payload.get("batch"), 0)
+        if next_batch <= 0:
+            raise ValueError("batchSize must be positive")
+        if self.model is None or self.tokenizer is None:
+            raise RuntimeError(self.load_error or "model is not loaded")
+        # Batch is the only mutable serving capacity knob here. Prompt/output
+        # length define the request class and must stay fixed for this runtime.
+        prompt_input_ids = self.make_prompt(self.prompt_len, next_batch)
+        if self.device == "cuda":
+            torch.cuda.synchronize()
+        with self.lock:
+            previous = self.batch_size
+            self.batch_size = next_batch
+            self.prompt_input_ids = prompt_input_ids
+        return {
+            "model": self.model_name,
+            "modelId": self.model_id,
+            "runtimeId": self.runtime_id,
+            "runtimeMode": "transformers",
+            "promptLen": self.prompt_len,
+            "outputTokens": self.output_tokens,
+            "previousBatchSize": previous,
+            "batchSize": next_batch,
+            "applied": True,
+            "requiresRestart": False,
+        }
+
     def infer(self, payload: dict[str, Any]) -> dict[str, Any]:
         if self.model is None or self.prompt_input_ids is None:
             raise RuntimeError(self.load_error or "model is not loaded")
+        with self.lock:
+            default_batch = self.batch_size
+            default_input_ids = self.prompt_input_ids
         prompt_len = int_value(payload.get("prompt_len"), self.prompt_len)
         output_tokens = int_value(payload.get("output_tokens") or payload.get("max_tokens"), self.output_tokens)
-        batch_size = int_value(payload.get("batch"), self.batch_size)
-        input_ids = self.prompt_input_ids
-        if prompt_len != self.prompt_len or batch_size != self.batch_size:
+        batch_size = int_value(payload.get("batch"), default_batch)
+        input_ids = default_input_ids
+        if prompt_len != self.prompt_len or batch_size != default_batch:
             input_ids = self.make_prompt(prompt_len, batch_size)
 
         if self.device == "cuda":
             torch.cuda.reset_peak_memory_stats()
+        # One generate() per request: TTFT is marked inside it (first token
+        # selected), TPOT = (total - TTFT) / (output_tokens - 1).
         started = time.perf_counter()
-        prefill_ms = self.prefill(input_ids)
-        total_ms = self.generate_once(max_new_tokens=output_tokens, input_ids=input_ids)
+        total_ms, prefill_ms = self.generate_once(max_new_tokens=output_tokens, input_ids=input_ids, mark_first_token=True)
         wall_ms = (time.perf_counter() - started) * 1000.0
         decode_ms = max(0.0, total_ms - prefill_ms)
-        tpot_ms = decode_ms / max(1, output_tokens)
+        tpot_ms = decode_ms / max(1, output_tokens - 1)
         decode_tps = 1000.0 / tpot_ms if tpot_ms > 0 else 0.0
         peak_alloc_mb = 0.0
         peak_reserved_mb = 0.0
@@ -172,44 +284,42 @@ class RuntimeState:
             "peakReservedMb": peak_reserved_mb,
         }
 
-    def prefill(self, input_ids) -> float:
-        if self.device == "cuda":
-            start = torch.cuda.Event(enable_timing=True)
-            end = torch.cuda.Event(enable_timing=True)
-            with torch.inference_mode():
-                start.record()
-                _ = self.model(input_ids=input_ids, use_cache=True)
-                end.record()
-                torch.cuda.synchronize()
-            return float(start.elapsed_time(end))
-        with torch.inference_mode():
-            started = time.perf_counter()
-            _ = self.model(input_ids=input_ids, use_cache=True)
-            return (time.perf_counter() - started) * 1000.0
-
-    def generate_once(self, max_new_tokens: int, input_ids=None) -> float:
+    def generate_once(self, max_new_tokens: int, input_ids=None, mark_first_token: bool = False):
+        """Run one generate(); return total ms, or (total ms, first-token ms)
+        when ``mark_first_token``."""
         if input_ids is None:
             input_ids = self.prompt_input_ids
         assert input_ids is not None
-        if self.device == "cuda":
-            start = torch.cuda.Event(enable_timing=True)
-            end = torch.cuda.Event(enable_timing=True)
-            with torch.inference_mode():
+        cuda = self.device == "cuda"
+        mark = FirstTokenMark(cuda) if mark_first_token else None
+        kwargs = {
+            "input_ids": input_ids,
+            "max_new_tokens": max_new_tokens,
+            "do_sample": False,
+            "pad_token_id": self.tokenizer.eos_token_id if self.tokenizer is not None else None,
+            "use_cache": True,
+        }
+        if mark is not None:
+            kwargs["stopping_criteria"] = StoppingCriteriaList([mark])
+        with torch.inference_mode():
+            if cuda:
+                start = torch.cuda.Event(enable_timing=True)
+                end = torch.cuda.Event(enable_timing=True)
                 start.record()
-                _ = self.model.generate(
-                    input_ids=input_ids,
-                    max_new_tokens=max_new_tokens,
-                    do_sample=False,
-                    pad_token_id=self.tokenizer.eos_token_id if self.tokenizer is not None else None,
-                    use_cache=True,
-                )
+                _ = self.model.generate(**kwargs)
                 end.record()
                 torch.cuda.synchronize()
-            return float(start.elapsed_time(end))
-        with torch.inference_mode():
-            started = time.perf_counter()
-            _ = self.model.generate(input_ids=input_ids, max_new_tokens=max_new_tokens, do_sample=False, use_cache=True)
-            return (time.perf_counter() - started) * 1000.0
+                total_ms = float(start.elapsed_time(end))
+                first_ms = float(start.elapsed_time(mark.event)) if mark is not None and mark.event is not None else total_ms
+            else:
+                started = time.perf_counter()
+                _ = self.model.generate(**kwargs)
+                finished = time.perf_counter()
+                total_ms = (finished - started) * 1000.0
+                first_ms = ((mark.at - started) * 1000.0) if mark is not None and mark.at is not None else total_ms
+        if mark_first_token:
+            return total_ms, first_ms
+        return total_ms
 
     def record(self, ttft_ms: float, decode_ms: float, service_ms: float, failed: bool) -> None:
         with self.lock:
@@ -220,7 +330,7 @@ class RuntimeState:
             self.total_decode_ms += decode_ms
             self.total_service_ms += service_ms
             self.last_ttft_ms = ttft_ms
-            self.last_tpot_ms = decode_ms / max(1, self.output_tokens)
+            self.last_tpot_ms = decode_ms / max(1, self.output_tokens - 1)
             self.last_service_ms = service_ms
 
     def snapshot(self) -> dict[str, Any]:
@@ -228,7 +338,7 @@ class RuntimeState:
             avg_ttft = self.total_ttft_ms / self.requests if self.requests else 0.0
             avg_decode = self.total_decode_ms / self.requests if self.requests else 0.0
             avg_service = self.total_service_ms / self.requests if self.requests else 0.0
-            avg_tpot = avg_decode / max(1, self.output_tokens)
+            avg_tpot = avg_decode / max(1, self.output_tokens - 1)
             throughput = (1000.0 * self.batch_size / avg_service) if avg_service > 0 else 0.0
             return {
                 "model": self.model_name,
@@ -253,9 +363,21 @@ class RuntimeState:
                 "lastRuntimeLatencyMs": self.last_service_ms,
                 "loadTimings": dict(self.load_timings),
                 "migUuid": os.environ.get("OR_SIM_MIG_UUID", ""),
+                "profile": os.environ.get("OR_SIM_PROFILE", ""),
                 "slotResource": os.environ.get("OR_SIM_SLOT_RESOURCE", ""),
                 "deviceResource": os.environ.get("OR_SIM_DEVICE_RESOURCE", ""),
+                "expectedMigUuid": os.environ.get("OR_SIM_EXPECTED_MIG_UUID", ""),
+                "physicalGpuId": os.environ.get("OR_SIM_PHYSICAL_GPU_ID", ""),
+                "orSimMIGUUID": os.environ.get("OR_SIM_MIG_UUID", ""),
+                "orSimSlot": os.environ.get("OR_SIM_SLOT", ""),
+                "orSimSlotResource": os.environ.get("OR_SIM_SLOT_RESOURCE", ""),
+                "orSimDeviceResource": os.environ.get("OR_SIM_DEVICE_RESOURCE", ""),
+                "orSimExpectedMIGUUID": os.environ.get("OR_SIM_EXPECTED_MIG_UUID", ""),
+                "orSimPhysicalGpuID": os.environ.get("OR_SIM_PHYSICAL_GPU_ID", ""),
                 "loadError": self.load_error,
+                "cpuSet": os.environ.get("OR_SIM_CPU_SET", ""),
+                "cpuExclude": os.environ.get("OR_SIM_CPU_EXCLUDE", ""),
+                "cpuAffinity": CPU_AFFINITY,
                 "loaded": self.model is not None,
             }
 
@@ -284,6 +406,22 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 STATE.record(0.0, 0.0, 0.0, failed=True)
                 self._json(500, {"error": str(exc), "model": STATE.model_name})
+            return
+        if self.path == "/control/batch":
+            try:
+                length = int(self.headers.get("content-length", "0"))
+                payload = json.loads(self.rfile.read(length).decode()) if length > 0 else {}
+                self._json(200, STATE.control_batch(payload))
+            except ValueError as exc:
+                self._json(400, {"error": str(exc), "model": STATE.model_name})
+            except Exception as exc:
+                self._json(500, {"error": str(exc), "model": STATE.model_name})
+            return
+        self._json(404, {"error": "not found"})
+
+    def do_PUT(self) -> None:
+        if self.path == "/control/batch":
+            self.do_POST()
             return
         self._json(404, {"error": "not found"})
 

@@ -306,9 +306,9 @@ def run_warmup(args: argparse.Namespace, run_id: str, out_dir: Path) -> None:
 
 def runtime_warmup_images() -> dict[str, str]:
     return {
-        "vision": "localhost:10690/migrant-model-runtime:torchvision-profile-20260714a",
-        "gpt2": "localhost:10690/migrant-model-runtime:gpt2-medium-baked-20260714d",
-        "llama": "localhost:10690/migrant-model-runtime:llama32-3b-baked-20260714a",
+        "vision": "localhost:10690/migrant-model-runtime:torchvision-cpuset-20260929",
+        "gpt2": "localhost:10690/migrant-model-runtime:gpt2-medium-cpuset-20260929",
+        "llama": "localhost:10690/migrant-model-runtime:llama32-3b-cpuset-20260929",
     }
 
 

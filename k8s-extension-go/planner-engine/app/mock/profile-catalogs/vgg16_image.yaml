@@ -1,6 +1,6 @@
 metadata:
-  source: profile/current/cnn_bench.csv
-  generatedBy: eval/8gpu/build_8gpu_planner_fixture.py
+  source: profile/20260929 (per-GPU median latency, min over 3 GPUs)
+  generatedBy: profile/20260929/build_catalog_median_min.py
   workload: vgg16_image
   modelMatch: vgg16
   runtimeModel: vgg16
@@ -22,7 +22,7 @@ options:
   family: cv
   batch: 1
   profile: 1g
-  mu: 86.354173
+  mu: 86.813
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -30,7 +30,7 @@ options:
   latencyMsP95: 12.091968
   e2eMs: 12.091968
   e2eMsP95: 12.091968
-  serviceTimeMs: 11.580216
+  serviceTimeMs: 11.519012
   timeMsP95: 12.091968
   peakMemMb: 0.0
   fitSlo: true
@@ -40,7 +40,7 @@ options:
   family: cv
   batch: 4
   profile: 1g
-  mu: 177.929018
+  mu: 178.555
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -48,7 +48,7 @@ options:
   latencyMsP95: 22.531168
   e2eMs: 22.531168
   e2eMsP95: 22.531168
-  serviceTimeMs: 22.480875
+  serviceTimeMs: 22.402061
   timeMsP95: 22.531168
   peakMemMb: 0.0
   fitSlo: true
@@ -58,7 +58,7 @@ options:
   family: cv
   batch: 16
   profile: 1g
-  mu: 235.797327
+  mu: 235.963
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -66,7 +66,7 @@ options:
   latencyMsP95: 68.029572
   e2eMs: 68.029572
   e2eMsP95: 68.029572
-  serviceTimeMs: 67.854883
+  serviceTimeMs: 67.807241
   timeMsP95: 68.029572
   peakMemMb: 0.0
   fitSlo: true
@@ -112,7 +112,7 @@ options:
   family: cv
   batch: 1
   profile: 2g
-  mu: 99.504534
+  mu: 101.706
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -120,7 +120,7 @@ options:
   latencyMsP95: 10.917888
   e2eMs: 10.917888
   e2eMsP95: 10.917888
-  serviceTimeMs: 10.049793
+  serviceTimeMs: 9.832262
   timeMsP95: 10.917888
   peakMemMb: 0.0
   fitSlo: true
@@ -130,7 +130,7 @@ options:
   family: cv
   batch: 4
   profile: 2g
-  mu: 343.592531
+  mu: 344.972
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -138,7 +138,7 @@ options:
   latencyMsP95: 11.716512
   e2eMs: 11.716512
   e2eMsP95: 11.716512
-  serviceTimeMs: 11.641697
+  serviceTimeMs: 11.595144
   timeMsP95: 11.716512
   peakMemMb: 0.0
   fitSlo: true
@@ -148,7 +148,7 @@ options:
   family: cv
   batch: 16
   profile: 2g
-  mu: 467.425476
+  mu: 468.144
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -156,7 +156,7 @@ options:
   latencyMsP95: 34.312481
   e2eMs: 34.312481
   e2eMsP95: 34.312481
-  serviceTimeMs: 34.230056
+  serviceTimeMs: 34.177518
   timeMsP95: 34.312481
   peakMemMb: 0.0
   fitSlo: true
@@ -166,7 +166,7 @@ options:
   family: cv
   batch: 32
   profile: 2g
-  mu: 489.593241
+  mu: 489.336
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -174,7 +174,7 @@ options:
   latencyMsP95: 65.525246
   e2eMs: 65.525246
   e2eMsP95: 65.525246
-  serviceTimeMs: 65.360379
+  serviceTimeMs: 65.394739
   timeMsP95: 65.525246
   peakMemMb: 0.0
   fitSlo: true
@@ -202,7 +202,7 @@ options:
   family: cv
   batch: 1
   profile: 3g
-  mu: 109.829543
+  mu: 113.25
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -210,7 +210,7 @@ options:
   latencyMsP95: 9.703552
   e2eMs: 9.703552
   e2eMsP95: 9.703552
-  serviceTimeMs: 9.105018
+  serviceTimeMs: 8.830022
   timeMsP95: 9.703552
   peakMemMb: 0.0
   fitSlo: true
@@ -220,7 +220,7 @@ options:
   family: cv
   batch: 4
   profile: 3g
-  mu: 412.616096
+  mu: 413.742
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -228,7 +228,7 @@ options:
   latencyMsP95: 9.82688
   e2eMs: 9.82688
   e2eMsP95: 9.82688
-  serviceTimeMs: 9.694241
+  serviceTimeMs: 9.667861
   timeMsP95: 9.82688
   peakMemMb: 0.0
   fitSlo: true
@@ -238,7 +238,7 @@ options:
   family: cv
   batch: 16
   profile: 3g
-  mu: 751.284048
+  mu: 752.134
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -246,7 +246,7 @@ options:
   latencyMsP95: 21.281601
   e2eMs: 21.281601
   e2eMsP95: 21.281601
-  serviceTimeMs: 21.296872
+  serviceTimeMs: 21.272805
   timeMsP95: 21.281601
   peakMemMb: 0.0
   fitSlo: true
@@ -256,7 +256,7 @@ options:
   family: cv
   batch: 32
   profile: 3g
-  mu: 816.035304
+  mu: 815.677
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -264,7 +264,7 @@ options:
   latencyMsP95: 39.26685
   e2eMs: 39.26685
   e2eMsP95: 39.26685
-  serviceTimeMs: 39.21399
+  serviceTimeMs: 39.231215
   timeMsP95: 39.26685
   peakMemMb: 0.0
   fitSlo: true
@@ -274,7 +274,7 @@ options:
   family: cv
   batch: 64
   profile: 3g
-  mu: 827.163815
+  mu: 825.865
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -282,7 +282,7 @@ options:
   latencyMsP95: 77.690659
   e2eMs: 77.690659
   e2eMsP95: 77.690659
-  serviceTimeMs: 77.372824
+  serviceTimeMs: 77.494506
   timeMsP95: 77.690659
   peakMemMb: 0.0
   fitSlo: true
@@ -292,7 +292,7 @@ options:
   family: cv
   batch: 1
   profile: 4g
-  mu: 111.510207
+  mu: 114.344
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -300,7 +300,7 @@ options:
   latencyMsP95: 9.335168
   e2eMs: 9.335168
   e2eMsP95: 9.335168
-  serviceTimeMs: 8.967789
+  serviceTimeMs: 8.74554
   timeMsP95: 9.335168
   peakMemMb: 0.0
   fitSlo: true
@@ -310,7 +310,7 @@ options:
   family: cv
   batch: 4
   profile: 4g
-  mu: 429.289054
+  mu: 432.316
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -318,7 +318,7 @@ options:
   latencyMsP95: 10.087232
   e2eMs: 10.087232
   e2eMsP95: 10.087232
-  serviceTimeMs: 9.317731
+  serviceTimeMs: 9.252491
   timeMsP95: 10.087232
   peakMemMb: 0.0
   fitSlo: true
@@ -328,7 +328,7 @@ options:
   family: cv
   batch: 16
   profile: 4g
-  mu: 899.338549
+  mu: 901.159
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -336,7 +336,7 @@ options:
   latencyMsP95: 17.880896
   e2eMs: 17.880896
   e2eMsP95: 17.880896
-  serviceTimeMs: 17.790853
+  serviceTimeMs: 17.754913
   timeMsP95: 17.880896
   peakMemMb: 0.0
   fitSlo: true
@@ -346,7 +346,7 @@ options:
   family: cv
   batch: 32
   profile: 4g
-  mu: 958.473722
+  mu: 958.112
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -354,7 +354,7 @@ options:
   latencyMsP95: 33.519073
   e2eMs: 33.519073
   e2eMsP95: 33.519073
-  serviceTimeMs: 33.386413
+  serviceTimeMs: 33.399018
   timeMsP95: 33.519073
   peakMemMb: 0.0
   fitSlo: true
@@ -364,7 +364,7 @@ options:
   family: cv
   batch: 64
   profile: 4g
-  mu: 982.223274
+  mu: 973.993
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -372,7 +372,7 @@ options:
   latencyMsP95: 65.317665
   e2eMs: 65.317665
   e2eMsP95: 65.317665
-  serviceTimeMs: 65.158301
+  serviceTimeMs: 65.708891
   timeMsP95: 65.317665
   peakMemMb: 0.0
   fitSlo: true
@@ -382,7 +382,7 @@ options:
   family: cv
   batch: 1
   profile: 7g
-  mu: 114.795145
+  mu: 116.219
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -390,7 +390,7 @@ options:
   latencyMsP95: 9.255008
   e2eMs: 9.255008
   e2eMsP95: 9.255008
-  serviceTimeMs: 8.71117
+  serviceTimeMs: 8.604445
   timeMsP95: 9.255008
   peakMemMb: 0.0
   fitSlo: true
@@ -400,7 +400,7 @@ options:
   family: cv
   batch: 4
   profile: 7g
-  mu: 440.079638
+  mu: 453.18
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -408,7 +408,7 @@ options:
   latencyMsP95: 9.7224
   e2eMs: 9.7224
   e2eMsP95: 9.7224
-  serviceTimeMs: 9.089264
+  serviceTimeMs: 8.826515
   timeMsP95: 9.7224
   peakMemMb: 0.0
   fitSlo: true
@@ -418,7 +418,7 @@ options:
   family: cv
   batch: 16
   profile: 7g
-  mu: 1463.259889
+  mu: 1490.666
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -426,7 +426,7 @@ options:
   latencyMsP95: 10.9976
   e2eMs: 10.9976
   e2eMsP95: 10.9976
-  serviceTimeMs: 10.93449
+  serviceTimeMs: 10.733457
   timeMsP95: 10.9976
   peakMemMb: 0.0
   fitSlo: true
@@ -436,7 +436,7 @@ options:
   family: cv
   batch: 32
   profile: 7g
-  mu: 1604.031682
+  mu: 1591.005
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -444,7 +444,7 @@ options:
   latencyMsP95: 20.82032
   e2eMs: 20.82032
   e2eMsP95: 20.82032
-  serviceTimeMs: 19.949731
+  serviceTimeMs: 20.113073
   timeMsP95: 20.82032
   peakMemMb: 0.0
   fitSlo: true
@@ -454,7 +454,7 @@ options:
   family: cv
   batch: 64
   profile: 7g
-  mu: 1630.618231
+  mu: 1591.12
   fit: true
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -462,7 +462,7 @@ options:
   latencyMsP95: 39.808414
   e2eMs: 39.808414
   e2eMsP95: 39.808414
-  serviceTimeMs: 39.248917
+  serviceTimeMs: 40.223239
   timeMsP95: 39.808414
   peakMemMb: 0.0
   fitSlo: true

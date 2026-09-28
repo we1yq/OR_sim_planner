@@ -58,11 +58,20 @@ type batchRequest struct {
 	Done       chan batchResponse
 }
 
+// endpointBatcher forms vision batches for one replica.  Batches are formed
+// when the replica can take one (pull), not when requests arrive: while
+// inFlight batches run, arrivals queue, and each finished batch immediately
+// takes up to BatchSize queued requests.  Under load batches fill to
+// BatchSize, so replica throughput approaches the profiled
+// BatchSize / batch latency.  An idle replica still waits up to
+// visionBatchWait for a partial batch.
 type endpointBatcher struct {
 	mu        sync.Mutex
 	queue     []*batchRequest
 	timer     *time.Timer
 	runtimeID string
+	endpoint  routeEndpoint
+	inFlight  int
 }
 
 type latencySample struct {
@@ -116,6 +125,55 @@ type routerState struct {
 	http            *http.Client
 	kube            *kube.Client
 	store           string
+	// routesVersion increases on every route mutation (under mu); snapshots
+	// passed to persistRoutes carry the version they were taken at, and
+	// persistMu/persistedVersion keep an older snapshot from overwriting a
+	// newer one in the route ConfigMap.
+	routesVersion    uint64
+	persistMu        sync.Mutex
+	persistedVersion uint64
+	// endpointSlots limits how many requests (a vision batch or one LLM
+	// request) run on one replica at a time.  Profiled mu is measured with
+	// one batch in flight; letting many concurrent batches share a replica's
+	// dedicated CPU core collapses its throughput.  Waiting requests queue
+	// FIFO in the router and still count as in flight for drain.
+	endpointSlotsMu        sync.Mutex
+	endpointSlots          map[string]chan struct{}
+	maxEndpointConcurrency int
+}
+
+// acquireEndpoint blocks until the replica has a free execution slot and
+// returns the release function.  maxEndpointConcurrency <= 0 disables it.
+func (s *routerState) acquireEndpoint(runtimeID string) func() {
+	if s.maxEndpointConcurrency <= 0 || runtimeID == "" {
+		return func() {}
+	}
+	s.endpointSlotsMu.Lock()
+	if s.endpointSlots == nil {
+		s.endpointSlots = map[string]chan struct{}{}
+	}
+	slots, ok := s.endpointSlots[runtimeID]
+	if !ok {
+		slots = make(chan struct{}, s.maxEndpointConcurrency)
+		s.endpointSlots[runtimeID] = slots
+	}
+	s.endpointSlotsMu.Unlock()
+	slots <- struct{}{}
+	return func() { <-slots }
+}
+
+// routePatch is a partial update for one existing replica route.  Nil fields
+// are left unchanged, so a drain or batch-size change cannot drop the
+// request-shape fields of the stored route.
+type routePatch struct {
+	Model        string   `json:"model"`
+	RuntimeID    string   `json:"runtimeId"`
+	Active       *bool    `json:"active,omitempty"`
+	AcceptingNew *bool    `json:"acceptingNew,omitempty"`
+	Draining     *bool    `json:"draining,omitempty"`
+	BatchSize    *int     `json:"batchSize,omitempty"`
+	Weight       *float64 `json:"weight,omitempty"`
+	Capacity     *float64 `json:"capacity,omitempty"`
 }
 
 func main() {
@@ -155,9 +213,14 @@ func main() {
 		http:            &http.Client{Timeout: 30 * time.Second},
 		kube:            kubeClient,
 		store:           store,
+		// Default 1 matches the profiling protocol (one batch in flight).
+		maxEndpointConcurrency: nonNegativeIntEnv("ENDPOINT_MAX_CONCURRENCY", 1),
 	}
 	if len(routes) > 0 {
-		if err := state.persistRoutes(routes); err != nil {
+		state.mu.Lock()
+		snapshot, version := state.commitRoutesLocked()
+		state.mu.Unlock()
+		if err := state.persistRoutes(snapshot, version); err != nil {
 			log.Printf("runtime-router startup route persist failed: %v", err)
 		}
 	}
@@ -233,6 +296,8 @@ func (s *routerState) proxyInfer(w http.ResponseWriter, r *http.Request, model s
 		s.recordMonitorSampleN(model, elapsed, failed, logicalCount)
 	}()
 
+	release := s.acquireEndpoint(selected.RuntimeID)
+	defer release()
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, endpoint+"/infer", bytes.NewReader(body))
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
@@ -300,42 +365,89 @@ func (s *routerState) batcherFor(runtimeID string) *endpointBatcher {
 func (b *endpointBatcher) enqueue(s *routerState, endpoint routeEndpoint, req *batchRequest) {
 	b.mu.Lock()
 	b.queue = append(b.queue, req)
-	maxBatch := endpoint.BatchSize
-	if maxBatch <= 0 {
-		maxBatch = 1
-	}
-	if len(b.queue) >= maxBatch {
-		batch := b.queue
-		b.queue = nil
-		if b.timer != nil {
-			b.timer.Stop()
-			b.timer = nil
-		}
+	b.endpoint = endpoint
+	if b.canStartLocked(s) && len(b.queue) >= batchLimit(endpoint) {
+		batch := b.takeBatchLocked()
 		b.mu.Unlock()
-		go s.dispatchBatch(endpoint, batch)
+		b.run(s, batch)
 		return
 	}
-	if len(b.queue) == 1 {
+	if b.inFlight == 0 && b.timer == nil {
 		wait := s.visionBatchWait
 		if wait <= 0 {
 			wait = time.Nanosecond
 		}
 		b.timer = time.AfterFunc(wait, func() {
-			b.flush(s, endpoint)
+			b.flush(s)
 		})
 	}
 	b.mu.Unlock()
 }
 
-func (b *endpointBatcher) flush(s *routerState, endpoint routeEndpoint) {
-	b.mu.Lock()
-	batch := b.queue
-	b.queue = nil
-	b.timer = nil
-	b.mu.Unlock()
-	if len(batch) > 0 {
-		s.dispatchBatch(endpoint, batch)
+func batchLimit(endpoint routeEndpoint) int {
+	if endpoint.BatchSize <= 0 {
+		return 1
 	}
+	return endpoint.BatchSize
+}
+
+// canStartLocked reports whether another batch may run on this replica.
+func (b *endpointBatcher) canStartLocked(s *routerState) bool {
+	return s.maxEndpointConcurrency <= 0 || b.inFlight < s.maxEndpointConcurrency
+}
+
+// takeBatchLocked removes up to BatchSize queued requests and marks a batch
+// in flight.
+func (b *endpointBatcher) takeBatchLocked() []*batchRequest {
+	n := batchLimit(b.endpoint)
+	if n > len(b.queue) {
+		n = len(b.queue)
+	}
+	batch := append([]*batchRequest(nil), b.queue[:n]...)
+	b.queue = append([]*batchRequest(nil), b.queue[n:]...)
+	if b.timer != nil {
+		b.timer.Stop()
+		b.timer = nil
+	}
+	b.inFlight++
+	return batch
+}
+
+// run dispatches batch and, when it finishes, starts the next batch from the
+// queue without waiting.
+func (b *endpointBatcher) run(s *routerState, batch []*batchRequest) {
+	go func() {
+		s.dispatchBatch(b.endpointSnapshot(), batch)
+		b.mu.Lock()
+		b.inFlight--
+		var next []*batchRequest
+		if len(b.queue) > 0 && b.canStartLocked(s) {
+			next = b.takeBatchLocked()
+		}
+		b.mu.Unlock()
+		if next != nil {
+			b.run(s, next)
+		}
+	}()
+}
+
+func (b *endpointBatcher) endpointSnapshot() routeEndpoint {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.endpoint
+}
+
+// flush starts a partial batch after visionBatchWait if the replica is idle.
+func (b *endpointBatcher) flush(s *routerState) {
+	b.mu.Lock()
+	b.timer = nil
+	if len(b.queue) == 0 || !b.canStartLocked(s) {
+		b.mu.Unlock()
+		return
+	}
+	batch := b.takeBatchLocked()
+	b.mu.Unlock()
+	b.run(s, batch)
 }
 
 func (b *endpointBatcher) takeQueued() []*batchRequest {
@@ -380,11 +492,14 @@ func (s *routerState) dispatchBatch(endpoint routeEndpoint, batch []*batchReques
 	if len(batch) == 0 {
 		return
 	}
-	serviceStarted := time.Now()
 	endpointMetrics := s.metricsForEndpoint(endpoint.RuntimeID)
+	queued := time.Now()
 	for range batch {
-		endpointMetrics.begin(serviceStarted)
+		endpointMetrics.begin(queued)
 	}
+	release := s.acquireEndpoint(endpoint.RuntimeID)
+	defer release()
+	serviceStarted := time.Now()
 	payload := map[string]any{}
 	if err := json.Unmarshal(batch[0].Body, &payload); err != nil {
 		s.finishBatch(endpointMetrics, batch, serviceStarted, http.StatusBadRequest, map[string]any{"error": err.Error(), "model": batch[0].Model}, true)
@@ -490,7 +605,7 @@ func (s *routerState) handleRouteSnapshot(w http.ResponseWriter, r *http.Request
 	}
 	now := time.Now()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"routes":      s.routeSnapshot(now),
+		"routes":      s.routeSnapshot(now, strings.TrimSpace(r.URL.Query().Get("runtimeId"))),
 		"generatedAt": now.Format(time.RFC3339Nano),
 	})
 }
@@ -518,16 +633,44 @@ func (s *routerState) handleRoutes(w http.ResponseWriter, r *http.Request) {
 		input = normalizeEndpoint(input)
 		s.mu.Lock()
 		s.routes[input.Model] = upsertEndpoints(s.routes[input.Model], input)
-		routes := s.copyRoutesLocked()
+		routes, version := s.commitRoutesLocked()
 		s.mu.Unlock()
 		if input.Draining || !input.AcceptingNew {
 			s.drainBatcher(input)
 		}
-		if err := s.persistRoutes(routes); err != nil {
+		if err := s.persistRoutes(routes, version); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusOK, input)
+	case http.MethodPatch:
+		var patch routePatch
+		if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		if patch.Model == "" || patch.RuntimeID == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "model and runtimeId are required"})
+			return
+		}
+		s.mu.Lock()
+		updated, ok := applyRoutePatch(s.routes[patch.Model], patch)
+		if !ok {
+			s.mu.Unlock()
+			writeJSON(w, http.StatusNotFound, map[string]any{"error": "route not found", "model": patch.Model, "runtimeId": patch.RuntimeID})
+			return
+		}
+		s.routes[patch.Model] = upsertEndpoints(s.routes[patch.Model], updated)
+		routes, version := s.commitRoutesLocked()
+		s.mu.Unlock()
+		if updated.Draining || !updated.AcceptingNew {
+			s.drainBatcher(updated)
+		}
+		if err := s.persistRoutes(routes, version); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, updated)
 	case http.MethodDelete:
 		model := strings.TrimSpace(r.URL.Query().Get("model"))
 		if model == "" {
@@ -551,18 +694,18 @@ func (s *routerState) handleRoutes(w http.ResponseWriter, r *http.Request) {
 				delete(s.routes, model)
 			}
 		}
-		routes := s.copyRoutesLocked()
+		routes, version := s.commitRoutesLocked()
 		s.mu.Unlock()
 		for _, endpoint := range removed {
 			s.drainBatcher(endpoint)
 		}
-		if err := s.persistRoutes(routes); err != nil {
+		if err := s.persistRoutes(routes, version); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"model": model, "runtimeId": runtimeID, "deleted": true})
 	default:
-		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "GET, PUT, POST, or DELETE required"})
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "GET, PUT, POST, PATCH, or DELETE required"})
 	}
 }
 
@@ -630,7 +773,9 @@ func (s *routerState) handleMonitorControl(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (s *routerState) routeSnapshot(now time.Time) []map[string]any {
+// routeSnapshot returns one row per route.  A non-empty runtimeID limits the
+// rows (and the per-runtime /metrics calls) to that replica.
+func (s *routerState) routeSnapshot(now time.Time, runtimeID string) []map[string]any {
 	metricsByModel := s.snapshotMetrics(now)
 	metricsByEndpoint := s.snapshotEndpointMetrics(now)
 	s.mu.RLock()
@@ -651,6 +796,9 @@ func (s *routerState) routeSnapshot(now time.Time) []map[string]any {
 		endpoints := append([]routeEndpoint(nil), routes[model]...)
 		sort.Slice(endpoints, func(i, j int) bool { return endpoints[i].RuntimeID < endpoints[j].RuntimeID })
 		for _, endpoint := range endpoints {
+			if runtimeID != "" && endpoint.RuntimeID != runtimeID {
+				continue
+			}
 			endpointMetrics := metricsByEndpoint[endpoint.RuntimeID]
 			row := metricsRow(model, endpointMetrics, s.window)
 			row["modelArrivalRate"] = round(float64(len(metricsByModel[model].Arrivals))/s.window.Seconds(), 4)
@@ -695,8 +843,22 @@ func (s *routerState) copyRoutesLocked() map[string][]routeEndpoint {
 	return out
 }
 
-func (s *routerState) persistRoutes(routes map[string][]routeEndpoint) error {
+// commitRoutesLocked records a route mutation and returns the snapshot to
+// persist with its version.  Callers must hold s.mu for writing.
+func (s *routerState) commitRoutesLocked() (map[string][]routeEndpoint, uint64) {
+	s.routesVersion++
+	return s.copyRoutesLocked(), s.routesVersion
+}
+
+func (s *routerState) persistRoutes(routes map[string][]routeEndpoint, version uint64) error {
+	s.persistMu.Lock()
+	defer s.persistMu.Unlock()
+	if version <= s.persistedVersion {
+		// A newer snapshot, which already includes this mutation, was written.
+		return nil
+	}
 	if s.kube == nil {
+		s.persistedVersion = version
 		return nil
 	}
 	raw, err := json.Marshal(routes)
@@ -720,7 +882,11 @@ func (s *routerState) persistRoutes(routes map[string][]routeEndpoint) error {
 			"updatedAt":   time.Now().Format(time.RFC3339Nano),
 		},
 	}
-	return s.kube.Upsert(configMapPath(s.kube.Namespace(), s.store), body, nil)
+	if err := s.kube.Upsert(configMapPath(s.kube.Namespace(), s.store), body, nil); err != nil {
+		return err
+	}
+	s.persistedVersion = version
+	return nil
 }
 
 func (s *routerState) handleDemand(w http.ResponseWriter, _ *http.Request) {
@@ -855,12 +1021,13 @@ func (s *routerState) gcStaleRoutes(timeout time.Duration, failureThreshold int)
 		removed += before - len(s.routes[item.model])
 		delete(s.routeGCFailures, item.runtimeID)
 	}
-	updated := s.copyRoutesLocked()
-	s.mu.Unlock()
 	if removed == 0 {
+		s.mu.Unlock()
 		return 0, nil
 	}
-	return removed, s.persistRoutes(updated)
+	updated, version := s.commitRoutesLocked()
+	s.mu.Unlock()
+	return removed, s.persistRoutes(updated, version)
 }
 
 func (s *routerState) routeHealthFailed(runtimeID string, healthy bool, threshold int) bool {
@@ -1219,6 +1386,18 @@ func durationEnv(key string, fallback time.Duration) time.Duration {
 	return parsed
 }
 
+func nonNegativeIntEnv(key string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		return fallback
+	}
+	return value
+}
+
 func positiveIntEnv(key string, fallback int) int {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
@@ -1379,6 +1558,36 @@ func upsertEndpoints(existing []routeEndpoint, updates ...routeEndpoint) []route
 	return out
 }
 
+// applyRoutePatch returns the stored route for patch.RuntimeID with the
+// non-nil patch fields applied.
+func applyRoutePatch(existing []routeEndpoint, patch routePatch) (routeEndpoint, bool) {
+	for _, endpoint := range existing {
+		if endpoint.RuntimeID != patch.RuntimeID {
+			continue
+		}
+		if patch.Active != nil {
+			endpoint.Active = *patch.Active
+		}
+		if patch.AcceptingNew != nil {
+			endpoint.AcceptingNew = *patch.AcceptingNew
+		}
+		if patch.Draining != nil {
+			endpoint.Draining = *patch.Draining
+		}
+		if patch.BatchSize != nil {
+			endpoint.BatchSize = *patch.BatchSize
+		}
+		if patch.Weight != nil {
+			endpoint.Weight = *patch.Weight
+		}
+		if patch.Capacity != nil {
+			endpoint.Capacity = *patch.Capacity
+		}
+		return endpoint, true
+	}
+	return routeEndpoint{}, false
+}
+
 func deleteEndpoint(existing []routeEndpoint, runtimeID string) []routeEndpoint {
 	out := []routeEndpoint{}
 	for _, endpoint := range existing {
@@ -1400,10 +1609,13 @@ func effectiveWeight(endpoint routeEndpoint) float64 {
 }
 
 func trueBatchSize(endpoint routeEndpoint, runtimeMetrics map[string]any) int {
-	if endpoint.BatchSize > 0 {
-		return endpoint.BatchSize
+	// batchSize is the route's requested/configured value. Runtime batch
+	// updates are applied in-process, so metrics are authoritative whenever
+	// they are available.
+	if batch := intNumber(runtimeMetrics["runtime.batchSize"]); batch > 0 {
+		return batch
 	}
-	return intNumber(runtimeMetrics["runtime.batchSize"])
+	return endpoint.BatchSize
 }
 
 func isVisionModel(model string) bool {
