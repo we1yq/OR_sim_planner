@@ -14,15 +14,10 @@ This folder contains the short trace for the Section 4.4 real three-GPU executab
 Run the real executor with:
 
 ```bash
-python3 eval/3gpu_test/real_3gpu_k8s_experiment.py \
-  --namespace or-sim-exp \
-  --router-url http://127.0.0.1:18081 \
-  --planner ours \
-  --steady-seconds 0 \
-  --no-traffic \
+python eval/3gpu_test/real_3gpu_k8s_experiment.py \
   --run-id real3gpu-section44-<date> \
   --stages-json "$(cat eval/4.4/three_gpu_executable_trace/stages.json)"
 ```
 
 The replay has 5 planning rounds. Round 0 provisions from an empty cluster,
-rounds 1--3 exercise structural changes, and round 4 shuts the system down.
+rounds 1--4 exercise structural changes, and round 5 shuts the system down.
