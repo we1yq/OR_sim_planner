@@ -1,0 +1,3 @@
+23:11:19 rtx1-worker/gpu0 vgg16_image 3g ready cpuAffinity=2,34 loadSec=1.737653328003944
+23:11:30 rtx1-worker/gpu0 vgg16_image 4g ready cpuAffinity=2,34 loadSec=1.7187135370040778
+23:11:35 done rtx1-worker/gpu0

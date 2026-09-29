@@ -2,7 +2,10 @@
 """Build the catalog from profile/newest (all 84 options, worker-thread runtime).
 
 mu per option = min over the three GPUs of (1000 * batch / median runtime
-latency on that GPU), 3 decimals.
+latency on that GPU), 3 decimals.  Samples come from this directory and from
+unmeasured_options/ (options marked fit=false, measured so the yaml carries a
+measured mu for them too; their fit flags are unchanged because every one
+exceeds its SLO).  vgg16_b1_3g4g_repeat/ is a repeat check, not an input.
 
 Writes:
   - planner-engine/app/mock/profile-catalogs/<workload>.yaml for all 7
@@ -31,10 +34,11 @@ WORKLOADS = ["resnet50_image", "vgg16_image", "vit_base_image", "gpt2_p64_o64",
 
 def measured_mu() -> dict[tuple[str, str, int], float]:
     lat: dict[tuple[str, str, str, int], list[float]] = defaultdict(list)
-    for gpu in GPUS:
-        for row in csv.DictReader((HERE / gpu / "raw-samples.csv").open()):
-            if row["phase"] == "sample":
-                lat[(gpu, row["workload"], row["profile"], int(row["batch"]))].append(float(row["runtimeLatencyMs"]))
+    for base in (HERE, HERE / "unmeasured_options"):
+        for gpu in GPUS:
+            for row in csv.DictReader((base / gpu / "raw-samples.csv").open()):
+                if row["phase"] == "sample":
+                    lat[(gpu, row["workload"], row["profile"], int(row["batch"]))].append(float(row["runtimeLatencyMs"]))
     per_option: dict[tuple[str, str, int], dict[str, float]] = defaultdict(dict)
     for (gpu, workload, profile, batch), values in lat.items():
         per_option[(workload, profile, batch)][gpu] = 1000.0 * batch / statistics.median(values)

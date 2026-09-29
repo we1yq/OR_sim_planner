@@ -1,0 +1,6 @@
+23:17:00 ampere/gpu0 vgg16_image 3g ready cpuAffinity=2,58 loadSec=1.6038469990016893
+23:17:12 ampere/gpu0 vgg16_image 4g ready cpuAffinity=2,58 loadSec=1.5682319829938933
+23:17:17 done ampere/gpu0
+23:17:31 ampere/gpu1 vgg16_image 3g ready cpuAffinity=18,74 loadSec=1.8312609049608
+23:17:43 ampere/gpu1 vgg16_image 4g ready cpuAffinity=18,74 loadSec=1.5788427729858086
+23:17:49 done ampere/gpu1

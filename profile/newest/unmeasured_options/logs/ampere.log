@@ -1,0 +1,16 @@
+23:06:18 ampere/gpu0 resnet50_image 1g ready cpuAffinity=2,58 loadSec=0.7671025799936615
+23:06:41 ampere/gpu0 vgg16_image 1g ready cpuAffinity=2,58 loadSec=1.9496645499602892
+23:07:17 ampere/gpu0 vit_base_image 1g ready cpuAffinity=2,58 loadSec=1.4479550539981574
+23:09:08 ampere/gpu0 llama_p2048_o64 2g ready cpuAffinity=2,58 loadSec=6.456178185995668
+23:09:47 ampere/gpu0 vgg16_image 2g ready cpuAffinity=2,58 loadSec=1.5735659770434722
+23:10:07 ampere/gpu0 vit_base_image 2g ready cpuAffinity=2,58 loadSec=1.4174617690150626
+23:10:54 ampere/gpu0 vit_base_image 3g ready cpuAffinity=2,58 loadSec=1.4328273810097016
+23:11:19 done ampere/gpu0
+23:11:35 ampere/gpu1 resnet50_image 1g ready cpuAffinity=18,74 loadSec=0.7585803599795327
+23:11:58 ampere/gpu1 vgg16_image 1g ready cpuAffinity=18,74 loadSec=1.5430453260196373
+23:12:34 ampere/gpu1 vit_base_image 1g ready cpuAffinity=18,74 loadSec=1.45115772401914
+23:14:33 ampere/gpu1 llama_p2048_o64 2g ready cpuAffinity=18,74 loadSec=6.562985457945615
+23:15:12 ampere/gpu1 vgg16_image 2g ready cpuAffinity=18,74 loadSec=1.5482488520210609
+23:15:32 ampere/gpu1 vit_base_image 2g ready cpuAffinity=18,74 loadSec=1.4320772690116428
+23:16:19 ampere/gpu1 vit_base_image 3g ready cpuAffinity=18,74 loadSec=1.4201675219810568
+23:16:44 done ampere/gpu1

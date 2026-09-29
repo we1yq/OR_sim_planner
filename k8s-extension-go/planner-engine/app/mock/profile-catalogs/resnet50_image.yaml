@@ -95,7 +95,7 @@ options:
   family: cv
   batch: 64
   profile: 1g
-  mu: 385.930635
+  mu: 386.955
   fit: false
   fitMem: true
   sourceCsv: cnn_bench.csv
@@ -103,7 +103,7 @@ options:
   latencyMsP95: 165.960388
   e2eMs: 165.960388
   e2eMsP95: 165.960388
-  serviceTimeMs: 165.832909
+  serviceTimeMs: 165.393909
   timeMsP95: 165.960388
   peakMemMb: 0.0
   fitSlo: false

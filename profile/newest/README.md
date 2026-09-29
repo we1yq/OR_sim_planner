@@ -50,3 +50,34 @@ Because the catalog takes the minimum over the three GPUs, a few ampere-noise me
 - LLM: gpt2_p64 (2g→3g, 3g→4g), gpt2_p512 3g→4g.
 
 The drops are 0.3–3.8%. The values are kept as measured.
+
+## Options marked unfit (`unmeasured_options/`)
+
+These are the nine options that `fit: false` excludes from the catalog. They were measured with the same protocol so that the yaml carries a measured `mu` for them too. Each exceeds its SLO, so they stay excluded (worst GPU p95 against the SLO):
+
+| option | p95 | SLO |
+|---|---|---|
+| resnet50 1g b64 | 165.4 ms | 100 ms |
+| vgg16 1g b32 | 128.6 ms | 100 ms |
+| vgg16 1g b64 | 256.1 ms | 100 ms |
+| vgg16 2g b64 | 127.6 ms | 100 ms |
+| vit_base 1g b32 | 500.4 ms | 300 ms |
+| vit_base 1g b64 | 982.6 ms | 300 ms |
+| vit_base 2g b64 | 499.4 ms | 300 ms |
+| vit_base 3g b64 | 329.5 ms | 300 ms |
+| llama_p2048_o64 2g | TTFT 291 ms (TPOT 33.5 ms) | TTFT 250 ms / TPOT 35 ms |
+
+There were no out-of-memory errors.
+
+## vgg16 b1 3g/4g repeat (`vgg16_b1_3g4g_repeat/`)
+
+This is a second measurement of vgg16 b1 on 3g and 4g. It is a check only and does not feed the catalog.
+
+| throughput (rps) | rtx1 | ampere0 | ampere1 | min over GPUs |
+|---|---|---|---|---|
+| 3g, first run | 389.7 | 339.5 | 321.5 | 321.5 |
+| 3g, repeat | 389.2 | 319.5 | 350.2 | 319.5 |
+| 4g, first run | 461.5 | 320.0 | 317.2 | 317.2 |
+| 4g, repeat | 459.7 | 313.8 | 323.5 | 313.8 |
+
+rtx1 is stable and gets faster from 3g to 4g. On both ampere GPUs, 4g is no faster than 3g in either run. The ampere host caps this launch-bound option at about 3.1 ms per call, while rtx1 reaches 2.17 ms on 4g.
