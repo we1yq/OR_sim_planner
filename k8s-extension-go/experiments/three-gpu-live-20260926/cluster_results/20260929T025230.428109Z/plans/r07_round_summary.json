@@ -1,0 +1,43 @@
+{
+  "action_counts": {
+    "by_category": {
+      "instance_update": 6,
+      "routing": 2
+    },
+    "by_status": {
+      "completed": 8
+    },
+    "by_type": {
+      "activate_instance_route": 2,
+      "apply_batch": 2,
+      "patch_batch_config": 2,
+      "verify_batch": 2
+    },
+    "total": 8
+  },
+  "capacity_uncertain_events": 0,
+  "finalValidation": {
+    "actualMigSlotCount": 6,
+    "actualRuntimeCount": 6,
+    "expectedMigSlotCount": 6,
+    "expectedRuntimeCount": 6,
+    "extraMigSlots": [],
+    "extraRuntimeBindings": [],
+    "liveBatchFailures": [],
+    "missingMigSlots": [],
+    "missingRuntimeBindings": [],
+    "ok": true
+  },
+  "finalValidationOk": true,
+  "gpu_capacity": 3,
+  "headroom": 2.0,
+  "live_round": 7,
+  "makespan_reason": null,
+  "makespan_seconds": 3.639197,
+  "peak_active_gpu_count": 1.0,
+  "phase": "R7",
+  "planner_makespan_seconds": 0.04926440119743347,
+  "reached_target": true,
+  "run_id": "20260929T025230.428109Z",
+  "trace_round": 10
+}

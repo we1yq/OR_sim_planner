@@ -1,0 +1,14 @@
+{
+  "actionCount": 39,
+  "conservativePeakGpuCount": 3,
+  "errors": [],
+  "ok": true,
+  "physicalIds": [
+    "ampere-gpu0",
+    "ampere-gpu1",
+    "rtx1-worker-gpu0"
+  ],
+  "plannerStatus": "OPTIMAL",
+  "stage3Variant": "sw-c",
+  "targetGpuCount": 2
+}
