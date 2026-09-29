@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import queue
 import os
 import sys
 import threading
@@ -111,6 +112,40 @@ MODEL_ALIASES = {
 }
 
 
+class CudaWorker:
+    """Runs every CUDA call of the runtime on one long-lived thread.
+
+    ThreadingHTTPServer handles each request on a new thread, and the first
+    CUDA call on a new thread sets up PyTorch's per-thread CUDA/cuBLAS/cuDNN
+    state.  Doing inference there added ~6 ms of idle GPU time per call
+    between the timing events (vgg16 b1 on 2g: 10.4 ms vs 4.2 ms on a fixed
+    thread), inflating small-batch latencies (see torchvision_runtime.py).
+    Requests hand their work to this thread and wait; it also runs one
+    generate() at a time.
+    """
+
+    def __init__(self) -> None:
+        self.jobs: "queue.Queue" = queue.Queue()
+        threading.Thread(target=self._loop, name="cuda-worker", daemon=True).start()
+
+    def _loop(self) -> None:
+        while True:
+            fn, done, box = self.jobs.get()
+            try:
+                box["result"] = fn()
+            except BaseException as exc:  # handed back to the request thread
+                box["error"] = exc
+            done.set()
+
+    def run(self, fn):
+        done, box = threading.Event(), {}
+        self.jobs.put((fn, done, box))
+        done.wait()
+        if "error" in box:
+            raise box["error"]
+        return box["result"]
+
+
 class RuntimeState:
     def __init__(self) -> None:
         self.model_name = env("MODEL_NAME", "gpt2-medium")
@@ -123,8 +158,8 @@ class RuntimeState:
         self.warmup_iters = env_int("LLM_WARMUP_ITERS", 1)
         self.started_at = time.time()
         self.lock = threading.Lock()
-        # One generate() on the GPU at a time (see torchvision_runtime.py).
-        self.infer_lock = threading.Lock()
+        # All CUDA work runs on this one thread, one generate() at a time.
+        self.worker = CudaWorker()
         self.requests = 0
         self.errors = 0
         self.total_ttft_ms = 0.0
@@ -139,7 +174,7 @@ class RuntimeState:
         self.tokenizer = None
         self.model = None
         self.prompt_input_ids = None
-        self.load_model()
+        self.worker.run(self.load_model)
 
     def load_model(self) -> None:
         total_started = time.perf_counter()
@@ -219,9 +254,12 @@ class RuntimeState:
             raise RuntimeError(self.load_error or "model is not loaded")
         # Batch is the only mutable serving capacity knob here. Prompt/output
         # length define the request class and must stay fixed for this runtime.
-        prompt_input_ids = self.make_prompt(self.prompt_len, next_batch)
-        if self.device == "cuda":
-            torch.cuda.synchronize()
+        def build():
+            ids = self.make_prompt(self.prompt_len, next_batch)
+            if self.device == "cuda":
+                torch.cuda.synchronize()
+            return ids
+        prompt_input_ids = self.worker.run(build)
         with self.lock:
             previous = self.batch_size
             self.batch_size = next_batch
@@ -248,28 +286,29 @@ class RuntimeState:
         prompt_len = int_value(payload.get("prompt_len"), self.prompt_len)
         output_tokens = int_value(payload.get("output_tokens") or payload.get("max_tokens"), self.output_tokens)
         batch_size = int_value(payload.get("batch"), default_batch)
-        input_ids = default_input_ids
-        if prompt_len != self.prompt_len or batch_size != default_batch:
-            input_ids = self.make_prompt(prompt_len, batch_size)
-
-        if self.device == "cuda":
-            torch.cuda.reset_peak_memory_stats()
-        # One generate() per request: TTFT is marked inside it (first token
-        # selected), TPOT = (total - TTFT) / (output_tokens - 1).
         queued_at = time.perf_counter()
-        with self.infer_lock:
+
+        def run():
+            input_ids = default_input_ids
+            if prompt_len != self.prompt_len or batch_size != default_batch:
+                input_ids = self.make_prompt(prompt_len, batch_size)
+            if self.device == "cuda":
+                torch.cuda.reset_peak_memory_stats()
+            # One generate() per request: TTFT is marked inside it (first token
+            # selected), TPOT = (total - TTFT) / (output_tokens - 1).
             started = time.perf_counter()
-            total_ms, prefill_ms = self.generate_once(max_new_tokens=output_tokens, input_ids=input_ids, mark_first_token=True)
-            wall_ms = (time.perf_counter() - started) * 1000.0
-        infer_queue_ms = (started - queued_at) * 1000.0
+            total, prefill = self.generate_once(max_new_tokens=output_tokens, input_ids=input_ids, mark_first_token=True)
+            wall = (time.perf_counter() - started) * 1000.0
+            alloc = reserved = 0.0
+            if self.device == "cuda":
+                alloc = torch.cuda.max_memory_allocated() / (1024 * 1024)
+                reserved = torch.cuda.max_memory_reserved() / (1024 * 1024)
+            return total, prefill, wall, (started - queued_at) * 1000.0, alloc, reserved
+
+        total_ms, prefill_ms, wall_ms, infer_queue_ms, peak_alloc_mb, peak_reserved_mb = self.worker.run(run)
         decode_ms = max(0.0, total_ms - prefill_ms)
         tpot_ms = decode_ms / max(1, output_tokens - 1)
         decode_tps = 1000.0 / tpot_ms if tpot_ms > 0 else 0.0
-        peak_alloc_mb = 0.0
-        peak_reserved_mb = 0.0
-        if self.device == "cuda":
-            peak_alloc_mb = torch.cuda.max_memory_allocated() / (1024 * 1024)
-            peak_reserved_mb = torch.cuda.max_memory_reserved() / (1024 * 1024)
         self.record(prefill_ms, decode_ms, total_ms, failed=False)
         return {
             "model": self.model_name,

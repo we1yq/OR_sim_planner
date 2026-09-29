@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import queue
 import os
 import sys
 import threading
@@ -88,6 +89,39 @@ MODEL_SPECS = {
 }
 
 
+class CudaWorker:
+    """Runs every CUDA call of the runtime on one long-lived thread.
+
+    ThreadingHTTPServer handles each request on a new thread, and the first
+    CUDA call on a new thread sets up PyTorch's per-thread CUDA/cuBLAS/cuDNN
+    state.  Doing inference there added ~6 ms of idle GPU time per call
+    between the timing events (vgg16 b1 on 2g: 10.4 ms vs 4.2 ms on a fixed
+    thread), inflating small-batch latencies.  Requests therefore hand their
+    work to this thread and wait; it also executes one batch at a time.
+    """
+
+    def __init__(self) -> None:
+        self.jobs: "queue.Queue" = queue.Queue()
+        threading.Thread(target=self._loop, name="cuda-worker", daemon=True).start()
+
+    def _loop(self) -> None:
+        while True:
+            fn, done, box = self.jobs.get()
+            try:
+                box["result"] = fn()
+            except BaseException as exc:  # handed back to the request thread
+                box["error"] = exc
+            done.set()
+
+    def run(self, fn):
+        done, box = threading.Event(), {}
+        self.jobs.put((fn, done, box))
+        done.wait()
+        if "error" in box:
+            raise box["error"]
+        return box["result"]
+
+
 class RuntimeState:
     def __init__(self) -> None:
         self.model_name = env("MODEL_NAME", "resnet50")
@@ -99,11 +133,11 @@ class RuntimeState:
         self.warmup_iters = env_int("TORCHVISION_WARMUP_ITERS", 5)
         self.started_at = time.time()
         self.lock = threading.Lock()
-        # One batch on the GPU at a time: the router keeps up to two batches in
+        # All CUDA work (load, warm-up, inputs, inference) runs on this one
+        # thread, one batch at a time: the router keeps up to two batches in
         # flight per replica so the next one waits here instead of the GPU
-        # idling through the router round trip; concurrent execution would
-        # share the GPU and the pinned CPU core and slow every batch.
-        self.infer_lock = threading.Lock()
+        # idling through the router round trip.
+        self.worker = CudaWorker()
         self.requests = 0
         self.errors = 0
         self.total_runtime_latency_ms = 0.0
@@ -114,7 +148,7 @@ class RuntimeState:
         self.model = None
         self.input_tensors: dict[int, Any] = {}
         self.load_timings: dict[str, float] = {}
-        self.load_model()
+        self.worker.run(self.load_model)
 
     def load_model(self) -> None:
         if IMPORT_ERROR:
@@ -194,7 +228,7 @@ class RuntimeState:
             raise RuntimeError(self.load_error or "model is not loaded")
         # Build the tensor before publishing the new default so the metrics update
         # only after this runtime can actually serve the requested batch.
-        self.input_for_batch(next_batch)
+        self.worker.run(lambda: self.input_for_batch(next_batch))
         with self.lock:
             previous = self.batch_size
             self.batch_size = next_batch
@@ -213,15 +247,11 @@ class RuntimeState:
             raise RuntimeError(self.load_error or "model is not loaded")
         payload = payload or {}
         request_batch = int_value(payload.get("batch"), self.batch_size)
-        input_tensor = self.input_for_batch(request_batch)
         queued_at = time.perf_counter()
-        self.infer_lock.acquire()
-        try:
-            return self._infer_locked(request_batch, input_tensor, (time.perf_counter() - queued_at) * 1000.0)
-        finally:
-            self.infer_lock.release()
+        return self.worker.run(lambda: self._infer_on_worker(request_batch, (time.perf_counter() - queued_at) * 1000.0))
 
-    def _infer_locked(self, request_batch: int, input_tensor, infer_queue_ms: float) -> dict[str, Any]:
+    def _infer_on_worker(self, request_batch: int, infer_queue_ms: float) -> dict[str, Any]:
+        input_tensor = self.input_for_batch(request_batch)
         wall_start = time.perf_counter()
         if self.device == "cuda":
             start = torch.cuda.Event(enable_timing=True)

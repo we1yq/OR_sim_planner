@@ -1,0 +1,32 @@
+10:59:17 ampere/gpu0 resnet50_image 1g ready cpuAffinity=2,58 loadSec=0.7586557769973297
+10:59:41 ampere/gpu0 vgg16_image 1g ready cpuAffinity=2,58 loadSec=1.5740439310029615
+11:00:08 ampere/gpu0 vit_base_image 1g ready cpuAffinity=2,58 loadSec=1.4471754920086823
+11:00:49 ampere/gpu0 resnet50_image 2g ready cpuAffinity=2,58 loadSec=0.7754606940143276
+11:01:13 ampere/gpu0 vgg16_image 2g ready cpuAffinity=2,58 loadSec=1.5456682469812222
+11:01:34 ampere/gpu0 vit_base_image 2g ready cpuAffinity=2,58 loadSec=1.4034501400019508
+11:02:21 ampere/gpu0 resnet50_image 3g ready cpuAffinity=2,58 loadSec=0.7693954429996666
+11:02:41 ampere/gpu0 vgg16_image 3g ready cpuAffinity=2,58 loadSec=1.5706957270158455
+11:03:04 ampere/gpu0 vit_base_image 3g ready cpuAffinity=2,58 loadSec=1.434735464019468
+11:03:35 ampere/gpu0 resnet50_image 4g ready cpuAffinity=2,58 loadSec=0.7967126939911395
+11:03:55 ampere/gpu0 vgg16_image 4g ready cpuAffinity=2,58 loadSec=1.5722722930076998
+11:04:17 ampere/gpu0 vit_base_image 4g ready cpuAffinity=2,58 loadSec=1.429935653024586
+11:05:05 ampere/gpu0 resnet50_image 7g ready cpuAffinity=2,58 loadSec=0.8675032069731969
+11:05:23 ampere/gpu0 vgg16_image 7g ready cpuAffinity=2,58 loadSec=1.6488000199897215
+11:05:42 ampere/gpu0 vit_base_image 7g ready cpuAffinity=2,58 loadSec=1.8309273199993186
+11:06:07 done ampere/gpu0
+11:06:16 ampere/gpu1 resnet50_image 1g ready cpuAffinity=18,74 loadSec=1.0047634149959777
+11:06:39 ampere/gpu1 vgg16_image 1g ready cpuAffinity=18,74 loadSec=1.8582557550107595
+11:06:59 ampere/gpu1 vit_base_image 1g ready cpuAffinity=18,74 loadSec=1.8692415590048768
+11:07:40 ampere/gpu1 resnet50_image 2g ready cpuAffinity=18,74 loadSec=0.7604782949783839
+11:08:04 ampere/gpu1 vgg16_image 2g ready cpuAffinity=18,74 loadSec=1.8268372579768766
+11:08:25 ampere/gpu1 vit_base_image 2g ready cpuAffinity=18,74 loadSec=1.4143492470029742
+11:09:11 ampere/gpu1 resnet50_image 3g ready cpuAffinity=18,74 loadSec=0.7730338830151595
+11:09:42 ampere/gpu1 vgg16_image 3g ready cpuAffinity=18,74 loadSec=1.551375132985413
+11:10:05 ampere/gpu1 vit_base_image 3g ready cpuAffinity=18,74 loadSec=1.4178651130059734
+11:10:34 ampere/gpu1 resnet50_image 4g ready cpuAffinity=18,74 loadSec=0.7758117679913994
+11:11:04 ampere/gpu1 vgg16_image 4g ready cpuAffinity=18,74 loadSec=1.5645607759943232
+11:11:26 ampere/gpu1 vit_base_image 4g ready cpuAffinity=18,74 loadSec=1.6933793009957299
+11:12:15 ampere/gpu1 resnet50_image 7g ready cpuAffinity=18,74 loadSec=0.8840751459938474
+11:12:33 ampere/gpu1 vgg16_image 7g ready cpuAffinity=18,74 loadSec=1.6347957600082736
+11:12:52 ampere/gpu1 vit_base_image 7g ready cpuAffinity=18,74 loadSec=1.8333926570194308
+11:13:18 done ampere/gpu1

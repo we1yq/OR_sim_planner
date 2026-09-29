@@ -22,13 +22,14 @@ spec.loader.exec_module(runner)
 traffic = runner.traffic
 
 ROUTER = "http://115.145.179.144:10680"
+CATALOG = sys.argv[1] if len(sys.argv) > 1 else "catalog_20260929_median_min.csv"
 TRAFFIC_SECONDS = 25.0
 
 
 def main() -> int:
     kube = runner.Kubectl("or-sim-exp")
     router = runner.Router(ROUTER)
-    demand, _, _ = runner.load_frozen_inputs(catalog_file="catalog_20260929_median_min.csv")
+    demand, _, _ = runner.load_frozen_inputs(catalog_file=CATALOG)
     zero = {k: 0.0 for k in runner.WORKLOAD_KEYS}
     r1 = runner.demand_rates(demand[0])
     out = Path("/tmp") / f"e1_smoke_{int(time.time())}"
@@ -79,7 +80,7 @@ def main() -> int:
     for w, v in sorted(llm.items()):
         print(f"  {w:18s} " + " / ".join(f"{statistics.median(c):.1f}" for c in zip(*v)))
     import csv as _csv
-    mu = {(r["workload"], r["profile"], int(r["batch"])): float(r["mu"]) for r in _csv.DictReader(open(HERE / "catalog_20260929_median_min.csv"))}
+    mu = {(r["workload"], r["profile"], int(r["batch"])): float(r["mu"]) for r in _csv.DictReader(open(HERE / CATALOG))}
     per = {}
     for row in rows:
         if row.get("status") == "success" and row.get("family") == "vision":

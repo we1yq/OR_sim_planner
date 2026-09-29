@@ -1,0 +1,16 @@
+10:59:11 rtx1-worker/gpu0 resnet50_image 1g ready cpuAffinity=2,34 loadSec=0.8419828149999375
+10:59:33 rtx1-worker/gpu0 vgg16_image 1g ready cpuAffinity=2,34 loadSec=1.72749614300119
+10:59:51 rtx1-worker/gpu0 vit_base_image 1g ready cpuAffinity=2,34 loadSec=1.5640690500003984
+11:00:22 rtx1-worker/gpu0 resnet50_image 2g ready cpuAffinity=2,34 loadSec=0.8460235460006515
+11:00:44 rtx1-worker/gpu0 vgg16_image 2g ready cpuAffinity=2,34 loadSec=1.7139783029997488
+11:01:03 rtx1-worker/gpu0 vit_base_image 2g ready cpuAffinity=2,34 loadSec=1.5596072190019186
+11:01:46 rtx1-worker/gpu0 resnet50_image 3g ready cpuAffinity=2,34 loadSec=0.8574559720000252
+11:02:04 rtx1-worker/gpu0 vgg16_image 3g ready cpuAffinity=2,34 loadSec=1.7219499659986468
+11:02:26 rtx1-worker/gpu0 vit_base_image 3g ready cpuAffinity=2,34 loadSec=1.5444521230019745
+11:02:54 rtx1-worker/gpu0 resnet50_image 4g ready cpuAffinity=2,34 loadSec=0.8767006170019158
+11:03:12 rtx1-worker/gpu0 vgg16_image 4g ready cpuAffinity=2,34 loadSec=1.7452267620028579
+11:03:33 rtx1-worker/gpu0 vit_base_image 4g ready cpuAffinity=2,34 loadSec=1.5399471869968693
+11:04:21 rtx1-worker/gpu0 resnet50_image 7g ready cpuAffinity=2,34 loadSec=0.929893970998819
+11:04:36 rtx1-worker/gpu0 vgg16_image 7g ready cpuAffinity=2,34 loadSec=1.7756495409994386
+11:04:54 rtx1-worker/gpu0 vit_base_image 7g ready cpuAffinity=2,34 loadSec=1.5849939370018546
+11:05:17 done rtx1-worker/gpu0
