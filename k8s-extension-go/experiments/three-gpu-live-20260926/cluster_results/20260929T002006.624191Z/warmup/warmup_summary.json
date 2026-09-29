@@ -1,0 +1,20 @@
+{
+  "finishedAt": "2026-09-29T00:21:06.970Z",
+  "purpose": "e1-warmup-excluded-from-measurement",
+  "runId": "20260929T002006.624191Z",
+  "startedAt": "2026-09-29T00:20:08.495Z",
+  "steps": [
+    {
+      "actionCount": 34,
+      "label": "up",
+      "makespanSeconds": 0.08881376683712006,
+      "plan": "plan-live-v2-20260929t002006624191z-r90-warmup"
+    },
+    {
+      "actionCount": 42,
+      "label": "down",
+      "makespanSeconds": 0.05229395627975464,
+      "plan": "plan-live-v2-20260929t002006624191z-r91-warmup"
+    }
+  ]
+}

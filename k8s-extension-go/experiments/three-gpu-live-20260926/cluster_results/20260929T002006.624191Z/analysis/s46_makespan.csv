@@ -1,0 +1,13 @@
+live_round,actions,measured_makespan_s,critical_path_estimate_s,critical_path_actions,measured_over_estimate,dag_width_observed,critical_path
+1,34,22.92,22.748,6,1.008,11,allocate_gpu[-] > configure_full_template[-] > bind_target_gpu[-] > register_mig_devices[-] > place_instance[llama_p1024_o128] > activate_instance_route[llama_p1024_o128]
+2,4,2.066,2.328,4,0.887,1,patch_batch_config[vgg16_image] > apply_batch[vgg16_image] > verify_batch[vgg16_image] > activate_instance_route[vgg16_image]
+3,9,13.201,11.646,5,1.134,2,deactivate_instance_route[llama_p1024_o128] > wait_instance_drain[llama_p1024_o128] > delete_instance[llama_p1024_o128] > place_instance[vgg16_image] > activate_instance_route[vgg16_image]
+4,26,22.946,18.91,5,1.213,6,deactivate_instance_route[llama_p1024_o128] > wait_instance_drain[llama_p1024_o128] > delete_instance[llama_p1024_o128] > place_instance[llama_p2048_o64] > activate_instance_route[llama_p2048_o64]
+5,44,29.247,22.813,12,1.282,7,allocate_gpu[-] > configure_full_template[-] > bind_target_gpu[-] > register_mig_devices[-] > place_instance[vit_base_image] > activate_instance_route[vit_base_image] > deactivate_instance_route[vit_base_image] > wait_instance_drain[vit_base_image] > delete_instance[vit_base_image] > clear_gpu_binding[-] > clear_template[-] > return_gpu[-]
+6,4,1.783,2.938,4,0.607,1,patch_batch_config[vit_base_image] > apply_batch[vit_base_image] > verify_batch[vit_base_image] > activate_instance_route[vit_base_image]
+7,8,2.936,2.938,4,0.999,2,patch_batch_config[vit_base_image] > apply_batch[vit_base_image] > verify_batch[vit_base_image] > activate_instance_route[vit_base_image]
+8,4,1.776,2.328,4,0.763,1,patch_batch_config[vgg16_image] > apply_batch[vgg16_image] > verify_batch[vgg16_image] > activate_instance_route[vgg16_image]
+9,10,22.87,22.468,6,1.018,2,allocate_gpu[-] > configure_full_template[-] > bind_target_gpu[-] > register_mig_devices[-] > place_instance[llama_p2048_o64] > activate_instance_route[llama_p2048_o64]
+10,14,6.949,5.761,6,1.206,3,deactivate_instance_route[llama_p2048_o64] > wait_instance_drain[llama_p2048_o64] > delete_instance[llama_p2048_o64] > clear_gpu_binding[-] > clear_template[-] > return_gpu[-]
+11,6,20.908,22.468,6,0.931,1,allocate_gpu[-] > configure_full_template[-] > bind_target_gpu[-] > register_mig_devices[-] > place_instance[llama_p2048_o64] > activate_instance_route[llama_p2048_o64]
+12,36,23.846,23.315,4,1.023,6,configure_partial_profile[-] > register_mig_devices[-] > place_instance[llama_p1024_o128] > activate_instance_route[llama_p1024_o128]

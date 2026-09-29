@@ -1,0 +1,8 @@
+workload,metric,min_ratio,at_round
+resnet50_image,min per-second completed / commitment in transition windows,0.0,5
+vgg16_image,min per-second completed / commitment in transition windows,0.1485,3
+vit_base_image,min per-second completed / commitment in transition windows,0.783,2
+gpt2_p64_o64,min completed / offered per transition window,0.375,5
+gpt2_p512_o512,min completed / offered per transition window,0.5,5
+llama_p1024_o128,min completed / offered per transition window,1.0,2
+llama_p2048_o64,min completed / offered per transition window,0.2,4
