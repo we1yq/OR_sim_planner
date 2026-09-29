@@ -51,6 +51,11 @@ spec:
                     - sw-c
                 forceReplan:
                   type: boolean
+                capacityHeadroom:
+                  type: number
+                  minimum: 0
+                conservative3gMu:
+                  type: boolean
                 phaseGate:
                   type: string
                 epoch:

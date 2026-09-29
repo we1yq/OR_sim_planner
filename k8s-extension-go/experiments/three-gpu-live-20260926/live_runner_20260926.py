@@ -728,9 +728,11 @@ def build_arrival_snapshot(
     namespace: str = DEFAULT_NAMESPACE,
     placement_nodes: Sequence[str] = (),
     stage3_variant: str = "slicewise",
+    capacity_headroom: float | None = None,
+    conservative_3g_mu: bool = False,
 ) -> dict[str, Any]:
     validate_workload_contract()
-    return {
+    snapshot = {
         "apiVersion": "mig.or-sim.io/v1alpha1",
         "kind": "ArrivalSnapshot",
         "metadata": {"name": name, "namespace": namespace, "labels": {"experiment.or-sim.io/name": "three-gpu-live-20260926-v2"}},
@@ -764,6 +766,20 @@ def build_arrival_snapshot(
                 f"Stage 3 variant: {stage3_variant}",
             ],
         },
+    }
+    # Planner-side knobs: provision for (1 + h) x demand (best-effort under the
+    # GPU budget) and use min(mu_3g, mu_4g) for 3g options in Stage 1.
+    if capacity_headroom is not None:
+        snapshot["spec"]["capacityHeadroom"] = float(capacity_headroom)
+    if conservative_3g_mu:
+        snapshot["spec"]["conservative3gMu"] = True
+    return snapshot
+
+
+def planning_knobs(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "capacity_headroom": getattr(args, "capacity_headroom", None),
+        "conservative_3g_mu": bool(getattr(args, "conservative_3g_mu", False)),
     }
 
 
@@ -962,6 +978,8 @@ def _write_initial_outputs(ctx: RunContext, args: argparse.Namespace, hashes: Ma
         "e1_completion_poll_seconds": ctx.e1_poll_seconds if ctx.e1_mode else None,
         "catalog_file": ctx.catalog_path,
         "stage3_variant": getattr(args, "stage3_variant", "slicewise"),
+        "capacity_headroom": getattr(args, "capacity_headroom", None),
+        "conservative_3g_mu": bool(getattr(args, "conservative_3g_mu", False)),
         "solver": {"threads": 8, "seed": 1, "mip_gap": 0, "accepted_status": "OPTIMAL"},
     })
     _json_output(ctx.output_dir / "profile_protocol.json", {
@@ -2212,6 +2230,7 @@ def execute_experiment(
                 namespace=ctx.namespace,
                 placement_nodes=args.placement_nodes,
                 stage3_variant=args.stage3_variant,
+                **planning_knobs(args),
             )
             _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_arrival_snapshot.json", snapshot)
             kube.apply(snapshot)
@@ -2439,7 +2458,7 @@ def _e1_warmup_step(
     snapshot = build_arrival_snapshot(
         snapshot_name, number, dict(source_rates), dict(target_rates),
         namespace=ctx.namespace, placement_nodes=args.placement_nodes,
-        stage3_variant=args.stage3_variant,
+        stage3_variant=args.stage3_variant, **planning_knobs(args),
     )
     snapshot["spec"]["triggerReason"] = f"e1-warmup-{label}"
     _json_output(ctx.output_dir / "warmup" / f"{label}_arrival_snapshot.json", snapshot)
@@ -2554,7 +2573,7 @@ def execute_e1_experiment(
                 snapshot = build_arrival_snapshot(
                     snapshot_name, live_round, source_rates, target_rates,
                     namespace=ctx.namespace, placement_nodes=args.placement_nodes,
-                    stage3_variant=args.stage3_variant,
+                    stage3_variant=args.stage3_variant, **planning_knobs(args),
                 )
                 _json_output(ctx.output_dir / "snapshots" / f"r{live_round:02d}_arrival_snapshot.json", snapshot)
                 kube.apply(snapshot)
@@ -2857,6 +2876,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-e1-warmup", dest="e1_warmup", action="store_false",
         help="skip the untrafficked empty->R1->empty warm-up before E1's R1 (default: run it)",
     )
+    parser.add_argument("--capacity-headroom", type=float, default=None,
+                        help="planner provisions for (1 + h) x demand, lowered per round to fit the GPU budget (default: off)")
+    parser.add_argument("--conservative-3g-mu", action="store_true",
+                        help="planner Stage 1 uses min(mu_3g, mu_4g) for 3g options (default: off)")
     parser.add_argument("--catalog", default="catalog.csv", help="ledger catalog file in the experiment directory (default: frozen catalog.csv)")
     parser.add_argument("--watchdog-seconds", type=float, default=1800.0)
     parser.add_argument("--poll-seconds", type=float, default=2.0)

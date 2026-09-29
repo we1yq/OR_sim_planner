@@ -55,7 +55,9 @@ def plan_scenario_as_migplan_status(
     verbose: bool = False,
 ) -> dict[str, Any]:
     workload_names = [workload.name for workload in scenario.workloads]
-    target_arrival = [float(workload.target_arrival) for workload in scenario.workloads]
+    # capacityHeadroom h: Stage 1 and Stage 2 provision for (1 + h) x target
+    # demand; Stage 3 transition safety keeps the raw demand.
+    headroom = capacity_headroom(scenario)
     source_arrival = dict(scenario.source_arrival)
 
     source_state = source_state_override or cluster_state_from_mock_yaml(load_yaml(scenario.source_state_ref))
@@ -66,7 +68,7 @@ def plan_scenario_as_migplan_status(
     current_feasibility = evaluate_current_state_feasibility(
         scenario=scenario,
         source_state=source_state,
-        safety_factor=float(scenario.transition.get("currentStateSafetyFactor", 1.0)),
+        safety_factor=max(float(scenario.transition.get("currentStateSafetyFactor", 1.0)), 1.0 + headroom),
     )
     if (
         current_feasibility["feasible"]
@@ -93,21 +95,57 @@ def plan_scenario_as_migplan_status(
         source_state=source_state,
         feasible_option_df=feasible_option_df,
     )
-    milp_res = _call_planner(
-        solve_milp_gurobi_batch_unified,
-        capture_stdout=not verbose,
-        feasible_option_df=feasible_option_df,
-        arrival_rate=target_arrival,
-        n_workloads=len(workload_names),
-        warm_start_res=milp_warm_start_res,
-        current_workload_profile_counts=current_workload_profile_counts(source_state),
-        time_limit_s=milp_time_limit_s,
-        verbose=verbose,
+    stage1_option_df = (
+        conservative_3g_option_dataframe(feasible_option_df)
+        if bool(scenario.transition.get("conservative3gMu", False))
+        else feasible_option_df
     )
+    raw_target_arrival = [float(workload.target_arrival) for workload in scenario.workloads]
+
+    def solve_stage1(h: float) -> dict[str, Any]:
+        return _call_planner(
+            solve_milp_gurobi_batch_unified,
+            capture_stdout=not verbose,
+            feasible_option_df=stage1_option_df,
+            arrival_rate=[(1.0 + h) * value for value in raw_target_arrival],
+            n_workloads=len(workload_names),
+            warm_start_res=milp_warm_start_res,
+            current_workload_profile_counts=current_workload_profile_counts(source_state),
+            time_limit_s=milp_time_limit_s,
+            verbose=verbose,
+        )
+
+    budget = observed_physical_gpu_budget(source_state)
+    if not _is_observed_cluster_state(source_state) and scenario.transition.get("gpuBudget") is not None:
+        budget = int(scenario.transition["gpuBudget"])
+    budget_applies = _is_observed_cluster_state(source_state) or scenario.transition.get("gpuBudget") is not None
+
+    def fits(res: dict[str, Any]) -> bool:
+        return bool(res.get("feasible")) and (not budget_applies or int(res.get("gpu_count", 0)) <= budget)
+
+    milp_res = solve_stage1(headroom)
+    effective_headroom = headroom
+    if headroom > 0 and not fits(milp_res):
+        # Best-effort headroom: the largest h' in [0, h] whose plan fits the GPU
+        # budget (bisection to 0.25 percentage points).
+        best_h, best_res = 0.0, solve_stage1(0.0)
+        lo, hi = 0.0, headroom
+        if fits(best_res):
+            while hi - lo > 0.0025:
+                mid = (lo + hi) / 2.0
+                res = solve_stage1(mid)
+                if fits(res):
+                    lo, best_h, best_res = mid, mid, res
+                else:
+                    hi = mid
+        milp_res, effective_headroom = best_res, best_h
+    target_arrival = [(1.0 + effective_headroom) * value for value in raw_target_arrival]
+    milp_res["capacityHeadroomRequested"] = headroom
+    milp_res["capacityHeadroomEffective"] = effective_headroom
+    milp_res["conservative3gMu"] = stage1_option_df is not feasible_option_df
     if not milp_res.get("feasible"):
         return _status_from_infeasible_milp(scenario, milp_res)
-    budget = observed_physical_gpu_budget(source_state)
-    if _is_observed_cluster_state(source_state) and int(milp_res.get("gpu_count", 0)) > budget:
+    if budget_applies and int(milp_res.get("gpu_count", 0)) > budget:
         budget_res = dict(milp_res)
         budget_res["feasible"] = False
         budget_res["status"] = "physical_gpu_budget_exceeded"
@@ -160,6 +198,32 @@ def plan_scenario_as_migplan_status(
         runtime_profile_correction=runtime_profile_correction,
         milp_warm_start=milp_warm_start_res,
     )
+
+
+def conservative_3g_option_dataframe(feasible_option_df):
+    """Stage 1 view where a 3g option's mu is min(mu_3g, mu_4g) of the same
+    workload and batch: Stage 2 may realise a 3g instance on a 4g slot (no
+    3g+3g layout), so Stage 1 capacity must lower-bound either realisation
+    for Stage 2's physical capacity check to be feasible whatever it picks."""
+    df = feasible_option_df.copy()
+    four = {
+        (row.workload, int(row.batch)): float(row.mu)
+        for row in df.itertuples()
+        if str(row.profile) == "4g"
+    }
+    for idx, row in df.iterrows():
+        if str(row["profile"]) == "3g":
+            mu4 = four.get((row["workload"], int(row["batch"])))
+            if mu4 is not None and mu4 < float(row["mu"]):
+                df.at[idx, "mu"] = mu4
+    return df
+
+
+def capacity_headroom(scenario: PlanningScenario) -> float:
+    value = float(scenario.transition.get("capacityHeadroom", 0.0) or 0.0)
+    if value < 0:
+        raise ValueError(f"capacityHeadroom must be >= 0, got {value}")
+    return value
 
 
 def plan_scenario_chain_as_migplan_statuses(
@@ -510,6 +574,9 @@ def _migplan_status_from_results(
             "milp": {
                 "status": milp_res.get("status"),
                 "gpuCount": milp_res.get("gpu_count"),
+                "capacityHeadroomRequested": milp_res.get("capacityHeadroomRequested", 0.0),
+                "capacityHeadroomEffective": milp_res.get("capacityHeadroomEffective", 0.0),
+                "conservative3gMu": bool(milp_res.get("conservative3gMu", False)),
                 "chosenTemplates": list(milp_res.get("chosen_templates", [])),
                 "KTotal": dict(milp_res.get("K_total", {})),
                 "alloc": _to_yamlable(milp_res.get("alloc", [])),

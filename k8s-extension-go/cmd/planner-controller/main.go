@@ -327,7 +327,7 @@ func callPlannerEngine(plannerURL string, input system.PlanningInput, current sy
 
 func planningInputFromSnapshot(spec map[string]any) system.PlanningInput {
 	slo := asMap(spec["slo"])
-	return system.PlanningInput{
+	input := system.PlanningInput{
 		Source:        asString(spec["source"]),
 		Mode:          asString(spec["mode"]),
 		Planner:       firstNonEmpty(asString(spec["planner"]), asString(spec["planningMethod"]), asString(spec["targetPlanner"]), "ours"),
@@ -359,7 +359,12 @@ func planningInputFromSnapshot(spec map[string]any) system.PlanningInput {
 		CalibrationOverlayRef:  asString(spec["calibrationOverlayRef"]),
 		CurrentAllocationRef:   asString(spec["currentAllocationRef"]),
 		PlacementNodes:         stringList(asSlice(asMap(spec["placement"])["nodes"])),
+		Conservative3gMu:       asBool(spec["conservative3gMu"]),
 	}
+	if headroom, ok := optionalFloat(spec["capacityHeadroom"]); ok {
+		input.CapacityHeadroom = &headroom
+	}
+	return input
 }
 
 func loadCurrentAllocation(client *kube.Client) (system.CurrentAllocation, error) {

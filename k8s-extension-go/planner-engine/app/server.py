@@ -194,6 +194,12 @@ def apply_planning_input(scenario: PlanningScenario, planning_input: dict[str, A
         transition["transitionDemandPolicy"] = str(planning_input["transitionDemandPolicy"])
     if planning_input.get("stage3Variant"):
         transition["stage3Variant"] = str(planning_input["stage3Variant"])
+    if planning_input.get("capacityHeadroom") is not None:
+        transition["capacityHeadroom"] = float(planning_input["capacityHeadroom"])
+    if planning_input.get("conservative3gMu") is not None:
+        transition["conservative3gMu"] = bool(planning_input["conservative3gMu"])
+    if planning_input.get("gpuBudget") is not None:
+        transition["gpuBudget"] = int(planning_input["gpuBudget"])
     transition["arrivalSnapshot"] = {
         "epoch": planning_input.get("epoch"),
         "source": planning_input.get("source", "runtime-router"),

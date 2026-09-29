@@ -17,6 +17,8 @@ type PlanningInput struct {
 	TransitionDemandPolicy string             `json:"transitionDemandPolicy,omitempty"`
 	Stage3Variant          string             `json:"stage3Variant,omitempty"`
 	ForceReplan            bool               `json:"forceReplan,omitempty"`
+	CapacityHeadroom       *float64           `json:"capacityHeadroom,omitempty"`
+	Conservative3gMu       bool               `json:"conservative3gMu,omitempty"`
 	ProfileCatalogRef      string             `json:"profileCatalogRef"`
 	ScenarioPath           string             `json:"scenarioPath,omitempty"`
 	CalibrationOverlayRef  string             `json:"calibrationOverlayRef"`

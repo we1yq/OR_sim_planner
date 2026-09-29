@@ -770,3 +770,15 @@ class E1ModeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlanningKnobTests(unittest.TestCase):
+    def test_snapshot_carries_headroom_and_conservative_flag_only_when_set(self):
+        rates = {k: 0.0 for k in runner.WORKLOAD_KEYS}
+        plain = runner.build_arrival_snapshot("s", 1, rates, rates)
+        self.assertNotIn("capacityHeadroom", plain["spec"])
+        self.assertNotIn("conservative3gMu", plain["spec"])
+        knobs = runner.planning_knobs(SimpleNamespace(capacity_headroom=0.1, conservative_3g_mu=True))
+        spec = runner.build_arrival_snapshot("s", 1, rates, rates, **knobs)["spec"]
+        self.assertEqual(spec["capacityHeadroom"], 0.1)
+        self.assertTrue(spec["conservative3gMu"])
