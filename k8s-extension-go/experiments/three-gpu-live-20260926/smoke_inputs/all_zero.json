@@ -1,9 +1,0 @@
-{
-  "gpt2_p512_o512": 0.0,
-  "gpt2_p64_o64": 0.0,
-  "llama_p1024_o128": 0.0,
-  "llama_p2048_o64": 0.0,
-  "resnet50_image": 0.0,
-  "vgg16_image": 0.0,
-  "vit_base_image": 0.0
-}

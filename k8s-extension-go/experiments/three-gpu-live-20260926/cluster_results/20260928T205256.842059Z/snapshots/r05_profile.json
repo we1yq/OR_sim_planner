@@ -1,6 +1,0 @@
-{
-  "reason": "E1 measures serving under continuous traffic; no in-place profiling",
-  "replicas": [],
-  "samples": [],
-  "status": "skipped_no_profile"
-}

@@ -32,7 +32,7 @@ Same as `profile/20260929` (see its README). Only the images differ:
 - all 7 `k8s-extension-go/planner-engine/app/mock/profile-catalogs/<workload>.yaml`. It updates `mu` and `serviceTimeMs` of the measured options in place.
 - `k8s-extension-go/experiments/three-gpu-live-20260926/catalog_newest.csv`, with the 84 rows of `catalog.csv`.
 
-`catalog_20260929_worker.csv` is kept as the catalog of the E1 runs `20260929T023306` and `20260929T025230`. It has the same vision rows as this catalog, but its LLM rows come from `profile/20260929`. The LLM rows here are 0–5% lower than there: gpt2 −1.6% to −5.0%, llama −3.1% to +0.3%.
+The LLM rows here are 0–5% lower than the `profile/20260929` values (gpt2 −1.6% to −5.0%, llama −3.1% to +0.3%). The intermediate catalogs `catalog_20260929_median_min.csv` and `catalog_20260929_worker.csv`, and the E1 runs that used them, were removed. See `k8s-extension-go/experiments/three-gpu-live-20260926/E1_EXPERIMENT_LOG.md`.
 
 Change against `catalog_20260929_median_min.csv`:
 - Small batches rise a lot. For example, resnet50 1g b1 goes from 42.1 to 187.2, resnet50 3g b4 from 182.0 to 815.8, and vgg16 2g b1 from 101.7 to 239.0.

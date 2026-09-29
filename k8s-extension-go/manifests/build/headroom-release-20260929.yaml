@@ -1,0 +1,95 @@
+# Headroom release (2026-09-29), built from commit cf6efae: planner-engine
+# with capacityHeadroom / conservative3gMu, and the control-plane image whose
+# planner-controller forwards those ArrivalSnapshot fields.  Only
+# planner-controller is switched to the new control-plane image.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-headroom-control-plane-20260929
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.control-plane \
+                --destination=localhost:10690/migrant-control-plane:headroom-20260929 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-headroom-cp-context-20260929
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-headroom-planner-engine-20260929
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.planner-engine \
+                --destination=localhost:10690/migrant-planner-engine:headroom-20260929 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-headroom-pe-context-20260929
+
+
+

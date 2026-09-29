@@ -22,7 +22,7 @@ spec.loader.exec_module(runner)
 traffic = runner.traffic
 
 ROUTER = "http://115.145.179.144:10680"
-CATALOG = sys.argv[1] if len(sys.argv) > 1 else "catalog_20260929_median_min.csv"
+CATALOG = sys.argv[1] if len(sys.argv) > 1 else "catalog_newest.csv"
 TRAFFIC_SECONDS = 25.0
 
 
