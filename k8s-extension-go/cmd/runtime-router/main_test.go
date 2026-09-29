@@ -170,7 +170,7 @@ func TestReplicaRunsOneBatchAtATime(t *testing.T) {
 	for _, limit := range []int{1, 0} {
 		srv, peak := concurrencyProbe(t)
 		state := newTestRouter()
-		state.maxEndpointConcurrency = limit
+		state.visionPipelineDepth = limit
 		endpoint := routeEndpoint{Model: "resnet50_image", RuntimeID: "rt-r", Endpoint: srv.URL, BatchSize: 4}
 		var wg sync.WaitGroup
 		for i := 0; i < 8; i++ {
@@ -236,7 +236,7 @@ func TestBatchesFillUnderLoadAndRunOneAtATime(t *testing.T) {
 	}))
 	defer srv.Close()
 	state := newTestRouter()
-	state.maxEndpointConcurrency = 1
+	state.visionPipelineDepth = 1
 	state.visionBatchWait = 5 * time.Millisecond
 	endpoint := routeEndpoint{Model: "resnet50_image", RuntimeID: "rt-r", Endpoint: srv.URL, BatchSize: 16}
 	reqs := make([]*batchRequest, 64)
@@ -281,7 +281,7 @@ func TestIdleReplicaSendsPartialBatchAfterWait(t *testing.T) {
 	}))
 	defer srv.Close()
 	state := newTestRouter()
-	state.maxEndpointConcurrency = 1
+	state.visionPipelineDepth = 2
 	state.visionBatchWait = 5 * time.Millisecond
 	endpoint := routeEndpoint{Model: "vgg16_image", RuntimeID: "rt-v", Endpoint: srv.URL, BatchSize: 16}
 	req := &batchRequest{Model: "vgg16_image", Body: []byte(`{"batch":1}`), ArrivedAt: time.Now(), ModelStats: state.metricsFor("vgg16_image"), Done: make(chan batchResponse, 1)}
@@ -295,5 +295,83 @@ func TestIdleReplicaSendsPartialBatchAfterWait(t *testing.T) {
 	defer mu.Unlock()
 	if len(sizes) != 1 || sizes[0] != 1 {
 		t.Fatalf("idle batches = %v, want [1]", sizes)
+	}
+}
+
+// batchProbe records batch sizes and peak concurrency of a runtime whose
+// batches take 20 ms.
+func batchProbe(t *testing.T) (*httptest.Server, func() ([]int, int64)) {
+	var mu sync.Mutex
+	var sizes []int
+	var current, peak int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		now := atomic.AddInt64(&current, 1)
+		for {
+			old := atomic.LoadInt64(&peak)
+			if now <= old || atomic.CompareAndSwapInt64(&peak, old, now) {
+				break
+			}
+		}
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		mu.Lock()
+		sizes = append(sizes, int(body["batch"].(float64)))
+		mu.Unlock()
+		time.Sleep(20 * time.Millisecond)
+		atomic.AddInt64(&current, -1)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	t.Cleanup(srv.Close)
+	return srv, func() ([]int, int64) {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]int(nil), sizes...), atomic.LoadInt64(&peak)
+	}
+}
+
+func enqueueAndWait(t *testing.T, state *routerState, endpoint routeEndpoint, n int) {
+	t.Helper()
+	reqs := make([]*batchRequest, n)
+	for i := range reqs {
+		reqs[i] = &batchRequest{Model: endpoint.Model, Body: []byte(`{"batch":1}`), ArrivedAt: time.Now(), ModelStats: state.metricsFor(endpoint.Model), Done: make(chan batchResponse, 1)}
+		state.batcherFor(endpoint.RuntimeID).enqueue(state, endpoint, reqs[i])
+	}
+	for _, req := range reqs {
+		select {
+		case <-req.Done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("request not served")
+		}
+	}
+}
+
+func TestPipelineKeepsTwoFullBatchesInFlight(t *testing.T) {
+	srv, result := batchProbe(t)
+	state := newTestRouter()
+	state.visionPipelineDepth = 2
+	state.visionBatchWait = 5 * time.Millisecond
+	endpoint := routeEndpoint{Model: "resnet50_image", RuntimeID: "rt-r", Endpoint: srv.URL, BatchSize: 16}
+	enqueueAndWait(t, state, endpoint, 96)
+	sizes, peak := result()
+	if peak != 2 {
+		t.Fatalf("peak batches in flight = %d, want 2", peak)
+	}
+	for i, size := range sizes {
+		if size != 16 {
+			t.Fatalf("batch %d size %d, want 16 (sizes %v)", i, size, sizes)
+		}
+	}
+}
+
+func TestPipelineDoesNotSplitSecondBatch(t *testing.T) {
+	srv, result := batchProbe(t)
+	state := newTestRouter()
+	state.visionPipelineDepth = 2
+	state.visionBatchWait = 5 * time.Millisecond
+	endpoint := routeEndpoint{Model: "vgg16_image", RuntimeID: "rt-v", Endpoint: srv.URL, BatchSize: 16}
+	enqueueAndWait(t, state, endpoint, 19)
+	sizes, peak := result()
+	if peak != 1 || len(sizes) != 2 || sizes[0] != 16 || sizes[1] != 3 {
+		t.Fatalf("sizes %v peak %d, want [16 3] one at a time (partial batch only once the replica is idle)", sizes, peak)
 	}
 }

@@ -99,6 +99,11 @@ class RuntimeState:
         self.warmup_iters = env_int("TORCHVISION_WARMUP_ITERS", 5)
         self.started_at = time.time()
         self.lock = threading.Lock()
+        # One batch on the GPU at a time: the router keeps up to two batches in
+        # flight per replica so the next one waits here instead of the GPU
+        # idling through the router round trip; concurrent execution would
+        # share the GPU and the pinned CPU core and slow every batch.
+        self.infer_lock = threading.Lock()
         self.requests = 0
         self.errors = 0
         self.total_runtime_latency_ms = 0.0
@@ -209,6 +214,14 @@ class RuntimeState:
         payload = payload or {}
         request_batch = int_value(payload.get("batch"), self.batch_size)
         input_tensor = self.input_for_batch(request_batch)
+        queued_at = time.perf_counter()
+        self.infer_lock.acquire()
+        try:
+            return self._infer_locked(request_batch, input_tensor, (time.perf_counter() - queued_at) * 1000.0)
+        finally:
+            self.infer_lock.release()
+
+    def _infer_locked(self, request_batch: int, input_tensor, infer_queue_ms: float) -> dict[str, Any]:
         wall_start = time.perf_counter()
         if self.device == "cuda":
             start = torch.cuda.Event(enable_timing=True)
@@ -236,6 +249,7 @@ class RuntimeState:
             "device": self.device,
             "runtimeLatencyMs": runtime_latency_ms,
             "latencyMs": wall_latency_ms,
+            "inferQueueMs": infer_queue_ms,
             "topClass": top_class,
         }
 

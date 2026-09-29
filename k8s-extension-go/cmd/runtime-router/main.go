@@ -60,11 +60,15 @@ type batchRequest struct {
 
 // endpointBatcher forms vision batches for one replica.  Batches are formed
 // when the replica can take one (pull), not when requests arrive: while
-// inFlight batches run, arrivals queue, and each finished batch immediately
-// takes up to BatchSize queued requests.  Under load batches fill to
-// BatchSize, so replica throughput approaches the profiled
-// BatchSize / batch latency.  An idle replica still waits up to
-// visionBatchWait for a partial batch.
+// batches run, arrivals queue.  Up to visionPipelineDepth batches are in
+// flight per replica; the runtime executes them one at a time, so with depth
+// 2 the next batch is already at the runtime while the current one runs and
+// the router<->runtime round trip (~1.5 ms per call) overlaps GPU work
+// instead of idling the GPU.  A batch beyond the first in flight is only
+// sent full, so pipelining does not split batches; an idle replica still
+// waits up to visionBatchWait for a partial batch, and a replica whose last
+// batch finished takes whatever is queued.  Under load every batch is full
+// and replica throughput approaches the profiled BatchSize / batch latency.
 type endpointBatcher struct {
 	mu        sync.Mutex
 	queue     []*batchRequest
@@ -140,12 +144,16 @@ type routerState struct {
 	endpointSlotsMu        sync.Mutex
 	endpointSlots          map[string]chan struct{}
 	maxEndpointConcurrency int
+	// visionPipelineDepth bounds vision batches in flight per replica (see
+	// endpointBatcher); <= 0 disables the bound.
+	visionPipelineDepth int
 }
 
-// acquireEndpoint blocks until the replica has a free execution slot and
-// returns the release function.  maxEndpointConcurrency <= 0 disables it.
-func (s *routerState) acquireEndpoint(runtimeID string) func() {
-	if s.maxEndpointConcurrency <= 0 || runtimeID == "" {
+// acquireEndpoint blocks until the replica has one of its limit execution
+// slots free and returns the release function.  limit <= 0 disables it.  A
+// replica serves one model, so its slot count is fixed by the first call.
+func (s *routerState) acquireEndpoint(runtimeID string, limit int) func() {
+	if limit <= 0 || runtimeID == "" {
 		return func() {}
 	}
 	s.endpointSlotsMu.Lock()
@@ -154,7 +162,7 @@ func (s *routerState) acquireEndpoint(runtimeID string) func() {
 	}
 	slots, ok := s.endpointSlots[runtimeID]
 	if !ok {
-		slots = make(chan struct{}, s.maxEndpointConcurrency)
+		slots = make(chan struct{}, limit)
 		s.endpointSlots[runtimeID] = slots
 	}
 	s.endpointSlotsMu.Unlock()
@@ -215,6 +223,7 @@ func main() {
 		store:           store,
 		// Default 1 matches the profiling protocol (one batch in flight).
 		maxEndpointConcurrency: nonNegativeIntEnv("ENDPOINT_MAX_CONCURRENCY", 1),
+		visionPipelineDepth:    nonNegativeIntEnv("VISION_PIPELINE_DEPTH", 2),
 	}
 	if len(routes) > 0 {
 		state.mu.Lock()
@@ -296,7 +305,7 @@ func (s *routerState) proxyInfer(w http.ResponseWriter, r *http.Request, model s
 		s.recordMonitorSampleN(model, elapsed, failed, logicalCount)
 	}()
 
-	release := s.acquireEndpoint(selected.RuntimeID)
+	release := s.acquireEndpoint(selected.RuntimeID, s.maxEndpointConcurrency)
 	defer release()
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, endpoint+"/infer", bytes.NewReader(body))
 	if err != nil {
@@ -393,7 +402,19 @@ func batchLimit(endpoint routeEndpoint) int {
 
 // canStartLocked reports whether another batch may run on this replica.
 func (b *endpointBatcher) canStartLocked(s *routerState) bool {
-	return s.maxEndpointConcurrency <= 0 || b.inFlight < s.maxEndpointConcurrency
+	return s.visionPipelineDepth <= 0 || b.inFlight < s.visionPipelineDepth
+}
+
+// nextBatchLocked takes the next batch if one should start now: a full batch
+// whenever a slot is free, a partial one only when nothing is in flight.
+func (b *endpointBatcher) nextBatchLocked(s *routerState) []*batchRequest {
+	if len(b.queue) == 0 || !b.canStartLocked(s) {
+		return nil
+	}
+	if len(b.queue) >= batchLimit(b.endpoint) || b.inFlight == 0 {
+		return b.takeBatchLocked()
+	}
+	return nil
 }
 
 // takeBatchLocked removes up to BatchSize queued requests and marks a batch
@@ -420,10 +441,7 @@ func (b *endpointBatcher) run(s *routerState, batch []*batchRequest) {
 		s.dispatchBatch(b.endpointSnapshot(), batch)
 		b.mu.Lock()
 		b.inFlight--
-		var next []*batchRequest
-		if len(b.queue) > 0 && b.canStartLocked(s) {
-			next = b.takeBatchLocked()
-		}
+		next := b.nextBatchLocked(s)
 		b.mu.Unlock()
 		if next != nil {
 			b.run(s, next)
@@ -441,7 +459,7 @@ func (b *endpointBatcher) endpointSnapshot() routeEndpoint {
 func (b *endpointBatcher) flush(s *routerState) {
 	b.mu.Lock()
 	b.timer = nil
-	if len(b.queue) == 0 || !b.canStartLocked(s) {
+	if b.inFlight > 0 || len(b.queue) == 0 || !b.canStartLocked(s) {
 		b.mu.Unlock()
 		return
 	}
@@ -497,7 +515,7 @@ func (s *routerState) dispatchBatch(endpoint routeEndpoint, batch []*batchReques
 	for range batch {
 		endpointMetrics.begin(queued)
 	}
-	release := s.acquireEndpoint(endpoint.RuntimeID)
+	release := s.acquireEndpoint(endpoint.RuntimeID, s.visionPipelineDepth)
 	defer release()
 	serviceStarted := time.Now()
 	payload := map[string]any{}

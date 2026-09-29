@@ -16,7 +16,7 @@ from pathlib import Path
 
 REQUEST_FIELDS = ["sequence_id", "workload", "family", "live_round", "phase", "rate", "scheduled_send",
                   "actual_send", "send_lag_s", "completion", "status", "error", "attempts"]
-RESPONSE_FIELDS = ["runtimeId", "batchSize", "maxBatchSize", "routerDispatchAt", "queueWaitMs", "serviceLatencyMs",
+RESPONSE_FIELDS = ["runtimeId", "batchSize", "maxBatchSize", "routerDispatchAt", "queueWaitMs", "serviceLatencyMs", "inferQueueMs",
                    "latencyMs", "runtimeLatencyMs", "ttftMs", "tpotMs", "outputTokens"]
 
 

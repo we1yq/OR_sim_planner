@@ -123,6 +123,8 @@ class RuntimeState:
         self.warmup_iters = env_int("LLM_WARMUP_ITERS", 1)
         self.started_at = time.time()
         self.lock = threading.Lock()
+        # One generate() on the GPU at a time (see torchvision_runtime.py).
+        self.infer_lock = threading.Lock()
         self.requests = 0
         self.errors = 0
         self.total_ttft_ms = 0.0
@@ -254,9 +256,12 @@ class RuntimeState:
             torch.cuda.reset_peak_memory_stats()
         # One generate() per request: TTFT is marked inside it (first token
         # selected), TPOT = (total - TTFT) / (output_tokens - 1).
-        started = time.perf_counter()
-        total_ms, prefill_ms = self.generate_once(max_new_tokens=output_tokens, input_ids=input_ids, mark_first_token=True)
-        wall_ms = (time.perf_counter() - started) * 1000.0
+        queued_at = time.perf_counter()
+        with self.infer_lock:
+            started = time.perf_counter()
+            total_ms, prefill_ms = self.generate_once(max_new_tokens=output_tokens, input_ids=input_ids, mark_first_token=True)
+            wall_ms = (time.perf_counter() - started) * 1000.0
+        infer_queue_ms = (started - queued_at) * 1000.0
         decode_ms = max(0.0, total_ms - prefill_ms)
         tpot_ms = decode_ms / max(1, output_tokens - 1)
         decode_tps = 1000.0 / tpot_ms if tpot_ms > 0 else 0.0
@@ -280,6 +285,7 @@ class RuntimeState:
             "decodeTps": decode_tps,
             "runtimeLatencyMs": total_ms,
             "latencyMs": wall_ms,
+            "inferQueueMs": infer_queue_ms,
             "peakAllocMb": peak_alloc_mb,
             "peakReservedMb": peak_reserved_mb,
         }

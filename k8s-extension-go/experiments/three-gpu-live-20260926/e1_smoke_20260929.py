@@ -78,6 +78,29 @@ def main() -> int:
     print("llm runtime ttft / tpot / generate ms / wall-generate ms (medians):")
     for w, v in sorted(llm.items()):
         print(f"  {w:18s} " + " / ".join(f"{statistics.median(c):.1f}" for c in zip(*v)))
+    import csv as _csv
+    mu = {(r["workload"], r["profile"], int(r["batch"])): float(r["mu"]) for r in _csv.DictReader(open(HERE / "catalog_20260929_median_min.csv"))}
+    per = {}
+    for row in rows:
+        if row.get("status") == "success" and row.get("family") == "vision":
+            x = json.loads(row["response_json"])
+            per.setdefault(x["runtimeId"], {})[x["routerDispatchAt"]] = (x["batchSize"], x["maxBatchSize"], x["runtimeLatencyMs"], x.get("inferQueueMs", 0.0))
+    print("vision replicas (last 15 s): served rps / catalog mu, GPU busy share, full batches, median runtime queue ms:")
+    for rid, batches in sorted(per.items()):
+        from datetime import datetime as _dt
+        ts = sorted((_dt.fromisoformat(k[:26].rstrip("Z") + "+00:00").timestamp(), v) for k, v in batches.items())
+        end = ts[-1][0]
+        tail = [(t, v) for t, v in ts if t >= end - 15.0]
+        span = tail[-1][0] - tail[0][0]
+        if span <= 0 or len(tail) < 3:
+            continue
+        served = sum(v[0] for _, v in tail[:-1]) / span
+        busy = sum(v[2] for _, v in tail[:-1]) / 1000.0 / span
+        workload, profile = rid.split("-image-")[0] + "_image", rid.rsplit("-", 1)[1]
+        cat = mu.get((workload.replace("-", "_"), profile, tail[0][1][1]))
+        full = sum(1 for _, v in tail if v[0] == v[1]) / len(tail)
+        q = sorted(v[3] for _, v in tail)[len(tail) // 2]
+        print(f"  {rid:40s} b{tail[0][1][1]:<3} {served:7.1f} / {cat or 0:7.1f} ({served / cat if cat else 0:5.1%})  busy {busy:5.1%}  full {full:4.0%}  queue {q:5.2f}")
     router.wait_drained(timeout=300.0)
     down = runner._e1_warmup_step(ctx, args, kube, router, label="down", number=81, source_rates=r1, target_rates=zero, require_empty=False)
     print("up/down:", up, down)
