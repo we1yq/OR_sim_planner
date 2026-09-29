@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Isolated re-profiling of every vision catalog serving option on one A100
-(worker-thread runtime images, see README.md).
+"""Isolated re-profiling of every catalog serving option on one A100
+(worker-thread runtime images, see README.md).  PROFILE_WORKLOADS=w1,w2
+limits a run to those workloads.
 
 Pods come from executor_deployments.json, which transition-executor's own
 deployment() generated with the live or-sim-exp executor env, so image, env,
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import select
 import socket
 import statistics
@@ -199,9 +201,11 @@ def measure(g: GPU, workload: str, profile: str, mig_uuid: str, writer) -> None:
 
 
 def run_gpu(g: GPU) -> None:
+    only = {w for w in os.environ.get("PROFILE_WORKLOADS", "").split(",") if w}
     by_profile: dict[str, list[str]] = {}
     for (w, p) in g.batches:
-        by_profile.setdefault(p, []).append(w)
+        if not only or w in only:
+            by_profile.setdefault(p, []).append(w)
     new = not g.raw_path.exists()
     with g.raw_path.open("a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=RAW_FIELDS)

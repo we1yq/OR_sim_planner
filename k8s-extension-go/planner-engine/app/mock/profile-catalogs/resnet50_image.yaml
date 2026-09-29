@@ -1,7 +1,7 @@
 metadata:
-  source: profile/20260929-worker (worker-thread runtime; per-GPU median latency,
-    min over 3 GPUs)
-  generatedBy: profile/20260929-worker/build_catalog_worker.py
+  source: profile/newest (worker-thread runtime; per-GPU median latency, min over
+    3 GPUs)
+  generatedBy: profile/newest/build_catalog_newest.py
   workload: resnet50_image
   modelMatch: resnet50
   runtimeModel: resnet50

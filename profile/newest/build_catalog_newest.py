@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""Build the worker-runtime catalog.
+"""Build the catalog from profile/newest (all 84 options, worker-thread runtime).
 
-Vision options: mu = min over the three GPUs of (1000 * batch / median
-runtime latency on that GPU) from this directory (worker-thread runtime),
-3 decimals.  LLM options keep their mu from catalog_20260929_median_min.csv
-(profile/20260929; the per-request thread cost is negligible next to their
-seconds-long generate()).
+mu per option = min over the three GPUs of (1000 * batch / median runtime
+latency on that GPU), 3 decimals.
 
 Writes:
-  - planner-engine/app/mock/profile-catalogs/{resnet50,vgg16,vit_base}_image.yaml
-    (in place: mu and serviceTimeMs of measured options)
-  - experiments/three-gpu-live-20260926/catalog_20260929_worker.csv
+  - planner-engine/app/mock/profile-catalogs/<workload>.yaml for all 7
+    workloads (in place: mu and serviceTimeMs of measured options)
+  - experiments/three-gpu-live-20260926/catalog_newest.csv (rows and columns
+    of catalog.csv)
 """
 from __future__ import annotations
 
@@ -27,7 +25,8 @@ K8S = ROOT / "k8s-extension-go"
 CATALOG_DIR = K8S / "planner-engine" / "app" / "mock" / "profile-catalogs"
 LIVE = K8S / "experiments" / "three-gpu-live-20260926"
 GPUS = ["rtx1-worker-gpu0", "ampere-gpu0", "ampere-gpu1"]
-VISION = ["resnet50_image", "vgg16_image", "vit_base_image"]
+WORKLOADS = ["resnet50_image", "vgg16_image", "vit_base_image", "gpt2_p64_o64",
+             "gpt2_p512_o512", "llama_p1024_o128", "llama_p2048_o64"]
 
 
 def measured_mu() -> dict[tuple[str, str, int], float]:
@@ -49,7 +48,7 @@ def measured_mu() -> dict[tuple[str, str, int], float]:
 
 def main() -> None:
     mu = measured_mu()
-    for workload in VISION:
+    for workload in WORKLOADS:
         path = CATALOG_DIR / f"{workload}.yaml"
         doc = yaml.safe_load(path.read_text())
         for option in doc["options"]:
@@ -57,25 +56,23 @@ def main() -> None:
             if key in mu:
                 option["mu"] = mu[key]
                 option["serviceTimeMs"] = round(1000.0 * key[2] / mu[key], 6)
-        doc["metadata"]["source"] = "profile/20260929-worker (worker-thread runtime; per-GPU median latency, min over 3 GPUs)"
-        doc["metadata"]["generatedBy"] = "profile/20260929-worker/build_catalog_worker.py"
+        doc["metadata"]["source"] = "profile/newest (worker-thread runtime; per-GPU median latency, min over 3 GPUs)"
+        doc["metadata"]["generatedBy"] = "profile/newest/build_catalog_newest.py"
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
 
-    rows = list(csv.DictReader((LIVE / "catalog_20260929_median_min.csv").open()))
-    changed = 0
+    rows = list(csv.DictReader((LIVE / "catalog.csv").open()))
+    missing = [r for r in rows if (r["workload"], r["profile"], int(r["batch"])) not in mu]
+    if missing:
+        raise SystemExit(f"catalog.csv options without measurement: {missing[:3]}")
     for r in rows:
-        key = (r["workload"], r["profile"], int(r["batch"]))
-        if r["workload"] in VISION:
-            if key not in mu:
-                raise SystemExit(f"vision option without measurement: {key}")
-            r["mu"] = f"{mu[key]:.3f}"
-            changed += 1
-    out = LIVE / "catalog_20260929_worker.csv"
+        r["mu"] = f"{mu[(r['workload'], r['profile'], int(r['batch']))]:.3f}"
+    changed = len(rows)
+    out = LIVE / "catalog_newest.csv"
     with out.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
-    print(f"updated {len(VISION)} vision yaml catalogs; wrote {out.relative_to(ROOT)} ({len(rows)} rows, {changed} vision mu replaced)")
+    print(f"updated {len(WORKLOADS)} yaml catalogs; wrote {out.relative_to(ROOT)} ({changed} rows)")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 metadata:
-  source: profile/20260929 (per-GPU median latency, min over 3 GPUs)
-  generatedBy: profile/20260929/build_catalog_median_min.py
+  source: profile/newest (worker-thread runtime; per-GPU median latency, min over
+    3 GPUs)
+  generatedBy: profile/newest/build_catalog_newest.py
   workload: gpt2_p512_o512
   modelMatch: gpt2
   runtimeModel: gpt2
@@ -24,7 +25,7 @@ options:
   family: llm
   batch: 1
   profile: 1g
-  mu: 0.18
+  mu: 0.176
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -32,7 +33,7 @@ options:
   ttftMsP95: 40.392414
   tpotMs: 11.63163
   tpotMsP95: 11.63163
-  serviceTimeMs: 5555.555556
+  serviceTimeMs: 5681.818182
   timeMsP95: 5995.787109
   peakMemMb: 910.56543
   fitSlo: true
@@ -42,7 +43,7 @@ options:
   family: llm
   batch: 1
   profile: 2g
-  mu: 0.188
+  mu: 0.183
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -50,7 +51,7 @@ options:
   ttftMsP95: 32.703297
   tpotMs: 11.352475
   tpotMsP95: 11.352475
-  serviceTimeMs: 5319.148936
+  serviceTimeMs: 5464.480874
   timeMsP95: 5833.003418
   peakMemMb: 910.56543
   fitSlo: true
@@ -60,7 +61,7 @@ options:
   family: llm
   batch: 1
   profile: 3g
-  mu: 0.186
+  mu: 0.183
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -68,7 +69,7 @@ options:
   ttftMsP95: 25.680193
   tpotMs: 10.708294
   tpotMsP95: 10.708294
-  serviceTimeMs: 5376.344086
+  serviceTimeMs: 5464.480874
   timeMsP95: 5508.32666
   peakMemMb: 910.56543
   fitSlo: true
@@ -78,7 +79,7 @@ options:
   family: llm
   batch: 1
   profile: 4g
-  mu: 0.184
+  mu: 0.18
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -86,7 +87,7 @@ options:
   ttftMsP95: 27.110497
   tpotMs: 11.162572
   tpotMsP95: 11.162572
-  serviceTimeMs: 5434.782609
+  serviceTimeMs: 5555.555556
   timeMsP95: 5742.347168
   peakMemMb: 910.56543
   fitSlo: true
@@ -96,7 +97,7 @@ options:
   family: llm
   batch: 1
   profile: 7g
-  mu: 0.182
+  mu: 0.179
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -104,7 +105,7 @@ options:
   ttftMsP95: 25.810528
   tpotMs: 10.968679
   tpotMsP95: 10.968679
-  serviceTimeMs: 5494.505495
+  serviceTimeMs: 5586.592179
   timeMsP95: 5641.774414
   peakMemMb: 910.56543
   fitSlo: true

@@ -1,0 +1,18 @@
+22:15:49 rtx1-worker/gpu0 gpt2_p512_o512 1g ready cpuAffinity=2,34 loadSec=1.556491374009056
+22:17:04 rtx1-worker/gpu0 gpt2_p64_o64 1g ready cpuAffinity=2,34 loadSec=1.5687778550054645
+22:17:29 rtx1-worker/gpu0 gpt2_p512_o512 2g ready cpuAffinity=2,34 loadSec=1.657153936001123
+22:18:53 rtx1-worker/gpu0 gpt2_p64_o64 2g ready cpuAffinity=2,34 loadSec=1.5932505410019075
+22:19:19 rtx1-worker/gpu0 llama_p1024_o128 2g ready cpuAffinity=2,34 loadSec=6.9505014549940825
+22:20:26 rtx1-worker/gpu0 gpt2_p512_o512 3g ready cpuAffinity=2,34 loadSec=1.6031339689943707
+22:21:37 rtx1-worker/gpu0 gpt2_p64_o64 3g ready cpuAffinity=2,34 loadSec=1.6273842920054449
+22:22:03 rtx1-worker/gpu0 llama_p1024_o128 3g ready cpuAffinity=2,34 loadSec=7.016649653000059
+22:22:53 rtx1-worker/gpu0 llama_p2048_o64 3g ready cpuAffinity=2,34 loadSec=6.996534049001639
+22:23:22 rtx1-worker/gpu0 gpt2_p512_o512 4g ready cpuAffinity=2,34 loadSec=1.6370427329966333
+22:24:39 rtx1-worker/gpu0 gpt2_p64_o64 4g ready cpuAffinity=2,34 loadSec=1.6427272580040153
+22:25:04 rtx1-worker/gpu0 llama_p1024_o128 4g ready cpuAffinity=2,34 loadSec=6.991000066002016
+22:25:53 rtx1-worker/gpu0 llama_p2048_o64 4g ready cpuAffinity=2,34 loadSec=6.988860746991122
+22:26:33 rtx1-worker/gpu0 gpt2_p512_o512 7g ready cpuAffinity=2,34 loadSec=1.741322764006327
+22:27:49 rtx1-worker/gpu0 gpt2_p64_o64 7g ready cpuAffinity=2,34 loadSec=1.6931926010001916
+22:28:14 rtx1-worker/gpu0 llama_p1024_o128 7g ready cpuAffinity=2,34 loadSec=6.988218860002235
+22:29:03 rtx1-worker/gpu0 llama_p2048_o64 7g ready cpuAffinity=2,34 loadSec=7.05429354700027
+22:29:23 done rtx1-worker/gpu0
