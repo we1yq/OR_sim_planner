@@ -1,9 +1,0 @@
-{
-  "allow_partial": true,
-  "at": "2026-09-29T15:13:03.342Z",
-  "errors": [],
-  "expected_rounds": 12,
-  "experiment_mode": "e1_continuous_traffic",
-  "ok": true,
-  "run_id": "20260929T145358.996350Z"
-}

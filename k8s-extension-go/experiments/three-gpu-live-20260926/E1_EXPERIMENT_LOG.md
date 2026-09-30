@@ -47,12 +47,12 @@ python3 live_runner_20260926.py --execute --e1 --catalog catalog_newest.csv --co
 python3 compact_requests.py <run>; python3 e1_analyze.py <run>; python3 s46_analyze.py <run>
 ```
 
-## 3. 最终结果
+## 3. 2026-09-29 的结果（已被 `E1_FINAL_20260930.md` 取代，run 目录已从仓库删除）
 
 | run | 变体 | 目录 |
 |---|---|---|
-| SliceWise | `--conservative-3g-mu` | `cluster_results/20260929T143422.387493Z` |
-| SW−C | `--conservative-3g-mu --stage3-variant sw-c` | `cluster_results/20260929T145358.996350Z` |
+| SliceWise | `--conservative-3g-mu` | `cluster_results/20260929T143422.387493Z`（已删除） |
+| SW−C | `--conservative-3g-mu --stage3-variant sw-c` | `cluster_results/20260929T145358.996350Z`（已删除） |
 
 **验收检查（两个 run 都通过）**
 - 12 轮全部 reached target，final validation 通过，strict runtime audit PASS，R13 把集群清空。
