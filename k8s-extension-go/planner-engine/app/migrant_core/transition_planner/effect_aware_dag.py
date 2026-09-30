@@ -799,7 +799,7 @@ def _reconfiguration_candidates(
             partial_plan,
             required,
         )
-        feasible = _partial_effect_feasible(source_state, src_gpu, partial_plan, required)
+        feasible = _partial_effect_feasible(source_state, target_state, gpu_id, src_gpu, partial_plan, required)
         candidates.append(_candidate("partial_reconfiguration", 0, feasible, local_actions, local_items))
 
     local_actions = []
@@ -955,21 +955,46 @@ def _append_effect_bridge_reconfiguration_actions(
     )
 
 
-def _partial_effect_feasible(source_state: ClusterState, src_gpu: GPUState, partial_plan: Any, required: dict[str, float]) -> bool:
-    """Partial reconfiguration is a candidate when the source alone still
-    covers the commitment after the deletes, or when every deleted instance's
-    workload has a producer elsewhere: the deletes then get capacity edges to
-    the new producers (see the capacity gates below), as for a workload
-    replacement on a slot (_workload_replacement_possible).  Checking the
-    source alone sent partials whose workload had no spare capacity to a
-    bridge, borrowing a GPU (E1 R5)."""
+def _partial_effect_feasible(
+    source_state: ClusterState,
+    target_state: ClusterState,
+    gpu_id: int,
+    src_gpu: GPUState,
+    partial_plan: Any,
+    required: dict[str, float],
+) -> bool:
+    """Partial reconfiguration is a candidate when, per workload, the source
+    capacity left after this GPU's deletes plus the capacity the target
+    creates covers the commitment.  Checking the source alone sent partials
+    whose workload had no spare capacity to a bridge that borrows a GPU (E1
+    R5), although the capacity gates make each delete wait for enough new
+    producers.
+
+    New slots on other GPUs all count.  A new slot on this GPU counts only
+    if it overlaps none of the deleted slots: one that does can only be
+    created after the delete, so it cannot cover it (the rule
+    _same_physical_capacity_dependency_allowed applies to capacity edges).
+    Same rule as eval."""
     if action_builder._partial_reconfiguration_capacity_safe(source_state, src_gpu, partial_plan, required):
         return True
     delete_slots = set(partial_plan.delete_slots)
+    available = provided_by_workload(source_state)
     for inst in src_gpu.instances:
-        if (inst.start, inst.end, inst.profile) in delete_slots and not _same_workload_producer_exists(source_state, inst.workload, exclude=inst):
-            return False
-    return True
+        if (inst.start, inst.end, inst.profile) in delete_slots and inst.workload is not None:
+            available[inst.workload] = available.get(inst.workload, 0.0) - float(inst.mu)
+    source_gpus = gpu_map_by_id(source_state)
+    for tgt in target_state.real_gpus():
+        src = source_gpus.get(tgt.gpu_id)
+        existing = set() if src is None else {(inst.start, inst.end, inst.profile, inst.workload) for inst in src.instances}
+        for inst in tgt.instances:
+            if inst.workload is None or (inst.start, inst.end, inst.profile, inst.workload) in existing:
+                continue
+            if tgt.gpu_id == gpu_id and any(
+                max(int(inst.start), int(start)) < min(int(inst.end), int(end)) for start, end, _ in delete_slots
+            ):
+                continue
+            available[inst.workload] = available.get(inst.workload, 0.0) + float(inst.mu)
+    return all(available.get(workload, 0.0) + 1e-9 >= float(rate) for workload, rate in required.items())
 
 
 def _append_preserved_slot_serving_updates(
