@@ -549,6 +549,10 @@ def simulate_transition_actions(
                     start, end, profile = slot
                     target_inst = MigInstance(start, end, profile)
                 _remove_overlapping_void_slots(cur_gpu, int(slot[0]), int(slot[1]))
+                # An earlier activation on this GPU may already have installed the
+                # target layout; creating a slot is idempotent.
+                cur_gpu.instances = [inst for inst in cur_gpu.instances
+                                     if (int(inst.start), int(inst.end), str(inst.profile)) != slot]
                 cur_gpu.instances.append(copy.deepcopy(target_inst))
                 runtime = _get_runtime_entry(executed_state, gpu_id, slot)
                 runtime.setdefault("queued", 0)
