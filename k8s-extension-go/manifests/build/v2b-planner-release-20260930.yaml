@@ -1,9 +1,9 @@
-# planner-engine built from commit 71e6f25: catalogs from profile/newest_v2.
+# planner-engine built from commit f70c0da: catalogs from profile/newest_v2.
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: migrant-v2-planner-engine-20260930
+  name: migrant-v2b-planner-engine-20260930
   namespace: or-sim
 spec:
   backoffLimit: 0
@@ -30,7 +30,7 @@ spec:
               /kaniko/executor \
                 --context=/workspace/context \
                 --dockerfile=/workspace/context/Dockerfile.planner-engine \
-                --destination=localhost:10690/migrant-planner-engine:v2-20260930 \
+                --destination=localhost:10690/migrant-planner-engine:v2b-20260930 \
                 --insecure \
                 --insecure-pull \
                 --skip-tls-verify \
@@ -42,7 +42,7 @@ spec:
       volumes:
         - name: context
           configMap:
-            name: migrant-v2-planner-context-20260930
+            name: migrant-v2b-planner-context-20260930
 
 
 
