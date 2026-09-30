@@ -1,7 +1,8 @@
 metadata:
-  source: profile/newest_v2 (two-process runtime, C6 enabled on both hosts, vision
-    with two requests in flight; per-GPU median latency, min over 3 GPUs)
-  generatedBy: profile/newest_v2/build_catalog_newest_v2.py
+  source: profile/newest_v3 (two-process runtime, C6 enabled on both hosts, vision
+    with two requests in flight; per-GPU median wall-clock completion rate, min over
+    3 GPUs)
+  generatedBy: profile/newest_v3/build_catalog_newest_v3.py
   workload: llama_p1024_o128
   modelMatch: llama
   runtimeModel: llama
@@ -25,7 +26,7 @@ options:
   family: llm
   batch: 1
   profile: 2g
-  mu: 0.263
+  mu: 0.262
   fit: true
   fitMem: true
   sourceCsv: llama32_3b_streaming_bench.csv
@@ -33,7 +34,7 @@ options:
   ttftMsP95: 151.969955
   tpotMs: 29.42342
   tpotMsP95: 29.42342
-  serviceTimeMs: 3802.281369
+  serviceTimeMs: 3816.793893
   timeMsP95: 3915.290039
   peakMemMb: 6513.105957
   fitSlo: true
@@ -43,7 +44,7 @@ options:
   family: llm
   batch: 1
   profile: 3g
-  mu: 0.35
+  mu: 0.352
   fit: true
   fitMem: true
   sourceCsv: llama32_3b_streaming_bench.csv
@@ -51,7 +52,7 @@ options:
   ttftMsP95: 97.621918
   tpotMs: 21.644117
   tpotMsP95: 21.644117
-  serviceTimeMs: 2857.142857
+  serviceTimeMs: 2840.909091
   timeMsP95: 2864.952148
   peakMemMb: 6513.105957
   fitSlo: true
@@ -61,7 +62,7 @@ options:
   family: llm
   batch: 1
   profile: 4g
-  mu: 0.346
+  mu: 0.351
   fit: true
   fitMem: true
   sourceCsv: llama32_3b_streaming_bench.csv
@@ -69,7 +70,7 @@ options:
   ttftMsP95: 81.774467
   tpotMs: 22.490434
   tpotMsP95: 22.490434
-  serviceTimeMs: 2890.17341
+  serviceTimeMs: 2849.002849
   timeMsP95: 2960.550049
   peakMemMb: 6513.105957
   fitSlo: true
@@ -79,7 +80,7 @@ options:
   family: llm
   batch: 1
   profile: 7g
-  mu: 0.362
+  mu: 0.363
   fit: true
   fitMem: true
   sourceCsv: llama32_3b_streaming_bench.csv
@@ -87,7 +88,7 @@ options:
   ttftMsP95: 57.2752
   tpotMs: 23.464347
   tpotMsP95: 23.464347
-  serviceTimeMs: 2762.430939
+  serviceTimeMs: 2754.820937
   timeMsP95: 3056.004395
   peakMemMb: 6513.105957
   fitSlo: true

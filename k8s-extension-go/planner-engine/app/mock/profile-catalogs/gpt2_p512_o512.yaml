@@ -1,7 +1,8 @@
 metadata:
-  source: profile/newest_v2 (two-process runtime, C6 enabled on both hosts, vision
-    with two requests in flight; per-GPU median latency, min over 3 GPUs)
-  generatedBy: profile/newest_v2/build_catalog_newest_v2.py
+  source: profile/newest_v3 (two-process runtime, C6 enabled on both hosts, vision
+    with two requests in flight; per-GPU median wall-clock completion rate, min over
+    3 GPUs)
+  generatedBy: profile/newest_v3/build_catalog_newest_v3.py
   workload: gpt2_p512_o512
   modelMatch: gpt2
   runtimeModel: gpt2
@@ -43,7 +44,7 @@ options:
   family: llm
   batch: 1
   profile: 2g
-  mu: 0.182
+  mu: 0.184
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -51,7 +52,7 @@ options:
   ttftMsP95: 32.703297
   tpotMs: 11.352475
   tpotMsP95: 11.352475
-  serviceTimeMs: 5494.505495
+  serviceTimeMs: 5434.782609
   timeMsP95: 5833.003418
   peakMemMb: 910.56543
   fitSlo: true
@@ -61,7 +62,7 @@ options:
   family: llm
   batch: 1
   profile: 3g
-  mu: 0.183
+  mu: 0.181
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -69,7 +70,7 @@ options:
   ttftMsP95: 25.680193
   tpotMs: 10.708294
   tpotMsP95: 10.708294
-  serviceTimeMs: 5464.480874
+  serviceTimeMs: 5524.861878
   timeMsP95: 5508.32666
   peakMemMb: 910.56543
   fitSlo: true
@@ -79,7 +80,7 @@ options:
   family: llm
   batch: 1
   profile: 4g
-  mu: 0.181
+  mu: 0.18
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -87,7 +88,7 @@ options:
   ttftMsP95: 27.110497
   tpotMs: 11.162572
   tpotMsP95: 11.162572
-  serviceTimeMs: 5524.861878
+  serviceTimeMs: 5555.555556
   timeMsP95: 5742.347168
   peakMemMb: 910.56543
   fitSlo: true
@@ -97,7 +98,7 @@ options:
   family: llm
   batch: 1
   profile: 7g
-  mu: 0.18
+  mu: 0.179
   fit: true
   fitMem: true
   sourceCsv: gpt2m_streaming_bench.csv
@@ -105,7 +106,7 @@ options:
   ttftMsP95: 25.810528
   tpotMs: 10.968679
   tpotMsP95: 10.968679
-  serviceTimeMs: 5555.555556
+  serviceTimeMs: 5586.592179
   timeMsP95: 5641.774414
   peakMemMb: 910.56543
   fitSlo: true
