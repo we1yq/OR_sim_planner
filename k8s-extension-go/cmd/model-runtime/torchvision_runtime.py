@@ -381,8 +381,17 @@ def _inference_main(conn) -> None:
         "loaded": state.model is not None,
         "load_error": state.load_error,
     }))
+    # Spin on the pipe instead of blocking in recv(): the core is the
+    # runtime's own, and a core that sleeps between requests drops to a low
+    # P-state (and C6).  On ampere a partly loaded resnet50 1g b1 replica ran
+    # at 1.2-2 GHz and took 6.5 ms per request instead of the profiled 4.8 ms
+    # (profiling keeps the replica saturated, so its core never slows).
+    busy_poll = os.environ.get("OR_SIM_BUSY_POLL", "1") != "0"
     while True:
         try:
+            if busy_poll:
+                while not conn.poll(0):
+                    pass
             req_id, method, args, kwargs = conn.recv()
         except (EOFError, OSError):
             return
