@@ -1,6 +1,6 @@
 metadata:
-  source: profile/newest_v2 (two-process runtime, C6 disabled on both hosts; per-GPU
-    median latency, min over 3 GPUs)
+  source: profile/newest_v2 (two-process runtime, C6 enabled on both hosts, vision
+    with two requests in flight; per-GPU median latency, min over 3 GPUs)
   generatedBy: profile/newest_v2/build_catalog_newest_v2.py
   workload: llama_p2048_o64
   modelMatch: llama

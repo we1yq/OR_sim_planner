@@ -59,7 +59,7 @@ def main() -> None:
             if key in mu:
                 option["mu"] = mu[key]
                 option["serviceTimeMs"] = round(1000.0 * key[2] / mu[key], 6)
-        doc["metadata"]["source"] = "profile/newest_v2 (two-process runtime, C6 disabled on both hosts; per-GPU median latency, min over 3 GPUs)"
+        doc["metadata"]["source"] = "profile/newest_v2 (two-process runtime, C6 enabled on both hosts, vision with two requests in flight; per-GPU median latency, min over 3 GPUs)"
         doc["metadata"]["generatedBy"] = "profile/newest_v2/build_catalog_newest_v2.py"
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
 
