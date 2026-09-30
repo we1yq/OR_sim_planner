@@ -3,6 +3,7 @@ package main
 import (
 	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
@@ -180,5 +181,57 @@ func TestHostLockDoesNotWaitForGPULock(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("CDI refresh (host lock) must not wait for a GPU's MIG change")
+	}
+}
+
+func TestFreshSharedOnlySharesRunsStartedAfterArrival(t *testing.T) {
+	var mu sync.Mutex
+	runs := 0
+	release := make(chan struct{})
+	f := &freshShared[int]{fn: func() (int, string, error) {
+		mu.Lock()
+		runs++
+		n := runs
+		mu.Unlock()
+		<-release
+		return n, "", nil
+	}}
+
+	first := make(chan int)
+	go func() { v, _, _ := f.do(); first <- v }()
+	waitFor(t, func() bool { mu.Lock(); defer mu.Unlock(); return runs == 1 })
+
+	// Three callers arrive while run 1 is in progress: they must share run 2.
+	later := make(chan int, 3)
+	for i := 0; i < 3; i++ {
+		go func() { v, _, _ := f.do(); later <- v }()
+	}
+	time.Sleep(50 * time.Millisecond)
+	release <- struct{}{} // finish run 1
+	if v := <-first; v != 1 {
+		t.Fatalf("first caller got run %d, want 1", v)
+	}
+	waitFor(t, func() bool { mu.Lock(); defer mu.Unlock(); return runs == 2 })
+	release <- struct{}{} // finish run 2
+	for i := 0; i < 3; i++ {
+		if v := <-later; v != 2 {
+			t.Fatalf("late caller got run %d, want 2", v)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if runs != 2 {
+		t.Fatalf("runs = %d, want 2", runs)
+	}
+}
+
+func waitFor(t *testing.T, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatal("condition not reached")
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }

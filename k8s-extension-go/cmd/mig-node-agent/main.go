@@ -949,20 +949,61 @@ func activeComputeProcessesByUUID() (map[string][]string, string, error) {
 	return processes, out, nil
 }
 
-func activeComputeProcessesForMIGUUID(migUUID string) ([]string, string, map[string]string, error) {
-	gpuIndex, giID, ciID, locationRaw, err := migLocationByUUID(migUUID)
+// migProcessSnapshot is one read of the MIG layout (nvidia-smi -L plus
+// nvidia-smi mig -lgi per GPU) and of the process table (plain nvidia-smi).
+type migProcessSnapshot struct {
+	smiL      string
+	instances map[string][]gpuInstance // GPU index -> GPU instances
+	processes string
+}
+
+// migProcessSnapshots shares snapshots among /processes?migUuid= requests that
+// wait at the same time.  Under load one snapshot takes 1.5-2.7 s and
+// concurrent nvidia-smi calls queue in the driver, so the runtimes placed
+// together in one transition used to wait 7-10 s for each other's checks.
+var migProcessSnapshots = &freshShared[migProcessSnapshot]{fn: takeMIGProcessSnapshot}
+
+func takeMIGProcessSnapshot() (migProcessSnapshot, string, error) {
+	snap := migProcessSnapshot{instances: map[string][]gpuInstance{}}
+	smi, err := run("nvidia-smi", "-L")
 	if err != nil {
-		return nil, locationRaw, nil, err
+		return snap, smi, err
+	}
+	snap.smiL = smi
+	for gpuIndex := range parseGPUUUIDs(smi) {
+		instances, rawGI, err := listGPUInstances(gpuIndex)
+		if err != nil {
+			return snap, smi + "\n" + rawGI, err
+		}
+		snap.instances[gpuIndex] = instances
 	}
 	out, err := run("nvidia-smi")
-	if err != nil {
-		if strings.Contains(out, "No running processes found") {
-			return []string{}, out, map[string]string{"gpuIndex": gpuIndex, "gpuInstanceId": giID, "computeInstanceId": ciID}, nil
-		}
-		return nil, out, nil, err
+	if err != nil && !strings.Contains(out, "No running processes found") {
+		return snap, out, err
 	}
+	snap.processes = out
+	return snap, out, nil
+}
+
+func activeComputeProcessesForMIGUUID(migUUID string) ([]string, string, map[string]string, error) {
+	snap, raw, err := migProcessSnapshots.do()
+	if err != nil {
+		return nil, raw, nil, err
+	}
+	gpuIndex, giID, ciID := "", "", ""
+	for index, instances := range snap.instances {
+		for _, slot := range migSlotsFromObservation(snap.smiL, instances, index) {
+			if slot.MIGDeviceUUID == migUUID {
+				gpuIndex, giID, ciID = index, slot.GPUInstanceID, "0"
+			}
+		}
+	}
+	if gpuIndex == "" {
+		return nil, snap.smiL, nil, fmt.Errorf("MIG UUID %s not found in nvidia-smi -L", migUUID)
+	}
+	location := map[string]string{"gpuIndex": gpuIndex, "gpuInstanceId": giID, "computeInstanceId": ciID}
 	processes := []string{}
-	for _, line := range strings.Split(out, "\n") {
+	for _, line := range strings.Split(snap.processes, "\n") {
 		match := migProcessLineRe.FindStringSubmatch(strings.TrimSpace(line))
 		if len(match) != 7 {
 			continue
@@ -975,27 +1016,55 @@ func activeComputeProcessesForMIGUUID(migUUID string) ([]string, string, map[str
 		}
 		processes = append(processes, strings.TrimSpace(match[4]+" "+match[6]))
 	}
-	return processes, out, map[string]string{"gpuIndex": gpuIndex, "gpuInstanceId": giID, "computeInstanceId": ciID}, nil
+	return processes, snap.processes, location, nil
 }
 
-func migLocationByUUID(migUUID string) (string, string, string, string, error) {
-	smi, err := run("nvidia-smi", "-L")
-	if err != nil {
-		return "", "", "", smi, err
+// freshShared runs fn once for all callers waiting at the same time, but a
+// caller only shares a run that starts after it arrived, so its result is
+// never older than its request.
+type freshShared[T any] struct {
+	fn      func() (T, string, error)
+	mu      sync.Mutex
+	running bool
+	next    *freshCall[T]
+}
+
+type freshCall[T any] struct {
+	done chan struct{}
+	val  T
+	raw  string
+	err  error
+}
+
+func (f *freshShared[T]) do() (T, string, error) {
+	f.mu.Lock()
+	if f.next == nil {
+		f.next = &freshCall[T]{done: make(chan struct{})}
 	}
-	gpuUUIDs := parseGPUUUIDs(smi)
-	for gpuIndex := range gpuUUIDs {
-		instances, rawGI, err := listGPUInstances(gpuIndex)
-		if err != nil {
-			return "", "", "", smi + "\n" + rawGI, err
-		}
-		for _, slot := range migSlotsFromObservation(smi, instances, gpuIndex) {
-			if slot.MIGDeviceUUID == migUUID {
-				return gpuIndex, slot.GPUInstanceID, "0", smi, nil
-			}
-		}
+	c := f.next
+	if !f.running {
+		f.running = true
+		go f.loop()
 	}
-	return "", "", "", smi, fmt.Errorf("MIG UUID %s not found in nvidia-smi -L", migUUID)
+	f.mu.Unlock()
+	<-c.done
+	return c.val, c.raw, c.err
+}
+
+func (f *freshShared[T]) loop() {
+	for {
+		f.mu.Lock()
+		c := f.next
+		f.next = nil
+		if c == nil {
+			f.running = false
+			f.mu.Unlock()
+			return
+		}
+		f.mu.Unlock()
+		c.val, c.raw, c.err = f.fn()
+		close(c.done)
+	}
 }
 
 func listGPUInstances(gpuIndex string) ([]gpuInstance, string, error) {
