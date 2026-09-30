@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing as mp
 import queue
 import os
 import sys
@@ -427,7 +428,141 @@ class RuntimeState:
             }
 
 
-STATE: RuntimeState
+FRONTEND_CPU_AFFINITY = ""
+
+
+def _apply_frontend_affinity() -> str:
+    """Move this (HTTP) process to OR_SIM_FRONTEND_CPU_SET, minus
+    OR_SIM_CPU_EXCLUDE.  Linux affinity is per thread and inherited, so this
+    runs after the inference child is spawned and before any other thread
+    starts."""
+    spec = os.environ.get("OR_SIM_FRONTEND_CPU_SET", "").strip()
+    if spec:
+        try:
+            cpus = parse_cpu_list(spec) - parse_cpu_list(os.environ.get("OR_SIM_CPU_EXCLUDE", ""))
+            if cpus:
+                os.sched_setaffinity(0, cpus)
+        except (OSError, ValueError) as exc:
+            print(f"ignoring OR_SIM_FRONTEND_CPU_SET={spec!r}: {exc}", file=sys.stderr, flush=True)
+    return format_cpu_list(sorted(os.sched_getaffinity(0)))
+
+
+def _inference_main(conn) -> None:
+    """Child process: owns CUDA and runs requests one at a time.
+
+    The module was re-imported under spawn, so apply_cpu_exclude() already
+    confined this process to the runtime's core before torch was imported.
+    No HTTP thread lives here, so nothing competes with the kernel-launching
+    thread for the interpreter lock or the core.
+    """
+    state = RuntimeState()
+    conn.send(("ready", {
+        "model_name": state.model_name,
+        "model_id": getattr(state, "model_id", None),
+        "device": state.device,
+        "loaded": state.model is not None,
+        "load_error": state.load_error,
+    }))
+    while True:
+        try:
+            req_id, method, args, kwargs = conn.recv()
+        except (EOFError, OSError):
+            return
+        try:
+            conn.send((req_id, True, getattr(state, method)(*args, **kwargs)))
+        except Exception as exc:  # returned to the HTTP process
+            conn.send((req_id, False, (type(exc).__name__, str(exc))))
+
+
+class InferenceProcess:
+    """HTTP-process proxy for the RuntimeState running in the child.
+
+    With the router keeping two requests in flight, the HTTP handler of the
+    next request used to run in the same process (and on the same core) as
+    the kernel launches of the current one; on a 2.2 GHz host that slowed
+    launch-bound options by 9-34% (resnet50 1g b1: 5.3 -> 5.9-7.1 ms).
+    Requests now go over a pipe to a spawned child; this process only parses
+    HTTP, on its own cores (OR_SIM_FRONTEND_CPU_SET).
+    """
+
+    def __init__(self) -> None:
+        global FRONTEND_CPU_AFFINITY
+        ctx = mp.get_context("spawn")
+        self._conn, child_conn = ctx.Pipe()
+        self._proc = ctx.Process(target=_inference_main, args=(child_conn,), name="inference", daemon=True)
+        self._proc.start()
+        child_conn.close()
+        FRONTEND_CPU_AFFINITY = _apply_frontend_affinity()
+        self._send_lock = threading.Lock()
+        self._waiters: dict[int, tuple[threading.Event, dict[str, Any]]] = {}
+        self._next_id = 0
+        self._dead = ""
+        _, info = self._conn.recv()
+        self.model_name = info["model_name"]
+        self.model_id = info.get("model_id")
+        self.device = info["device"]
+        self.load_error = info.get("load_error", "")
+        self.model = True if info["loaded"] else None
+        threading.Thread(target=self._reader, name="inference-reader", daemon=True).start()
+
+    def _reader(self) -> None:
+        try:
+            while True:
+                req_id, ok, value = self._conn.recv()
+                event, box = self._waiters.pop(req_id)
+                box["ok"], box["value"] = ok, value
+                event.set()
+        except (EOFError, OSError):
+            self._proc.join(1.0)
+            self._dead = f"inference process exited (code {self._proc.exitcode})"
+            self.model = None
+            for event, box in list(self._waiters.values()):
+                box["ok"], box["value"] = False, ("RuntimeError", self._dead)
+                event.set()
+            # Let pending requests get their error, then exit so the container
+            # restarts instead of serving 503 forever.
+            print(self._dead, file=sys.stderr, flush=True)
+            time.sleep(2.0)
+            os._exit(1)
+
+    def _call(self, method: str, *args: Any, **kwargs: Any) -> Any:
+        if self._dead:
+            raise RuntimeError(self._dead)
+        event, box = threading.Event(), {}
+        with self._send_lock:
+            req_id = self._next_id
+            self._next_id += 1
+            self._waiters[req_id] = (event, box)
+            self._conn.send((req_id, method, args, kwargs))
+        event.wait()
+        if box["ok"]:
+            return box["value"]
+        kind, message = box["value"]
+        raise (ValueError if kind == "ValueError" else RuntimeError)(message)
+
+    def infer(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        started = time.perf_counter()
+        out = self._call("infer", payload)
+        # queueing behind the in-flight request plus pipe transfer
+        out["inferQueueMs"] = max(0.0, (time.perf_counter() - started) * 1000.0 - float(out.get("latencyMs") or 0.0))
+        return out
+
+    def control_batch(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        return self._call("control_batch", payload)
+
+    def snapshot(self) -> dict[str, Any]:
+        out = self._call("snapshot") if not self._dead else {"model": self.model_name, "loadError": self._dead, "loaded": False}
+        out["frontendCpuAffinity"] = FRONTEND_CPU_AFFINITY
+        return out
+
+    def record(self, *args: Any, **kwargs: Any) -> None:
+        try:
+            self._call("record", *args, **kwargs)
+        except RuntimeError:
+            pass
+
+
+STATE: RuntimeState | InferenceProcess
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -517,7 +652,7 @@ def main() -> None:
     parser.add_argument("--addr", default=":8080")
     args = parser.parse_args()
     global STATE
-    STATE = RuntimeState()
+    STATE = InferenceProcess()
     host, port = parse_addr(args.addr)
     print(
         f"transformers runtime listening on {args.addr}, model={STATE.model_name}, "

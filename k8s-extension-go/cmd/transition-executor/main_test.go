@@ -402,15 +402,18 @@ func TestDeploymentCPUPlacementEnv(t *testing.T) {
 		}
 		return "", false
 	}
-	dep := deployment("or-sim", rt, runtimeCPUPlacement{Exclude: "1,33", Set: "4,36"})
+	dep := deployment("or-sim", rt, runtimeCPUPlacement{Exclude: "1,33", Set: "4,36", Frontend: "18,50"})
 	if v, ok := envValue(dep, "OR_SIM_CPU_EXCLUDE"); !ok || v != "1,33" {
 		t.Fatalf("OR_SIM_CPU_EXCLUDE = %q, %v; want \"1,33\"", v, ok)
 	}
 	if v, ok := envValue(dep, "OR_SIM_CPU_SET"); !ok || v != "4,36" {
 		t.Fatalf("OR_SIM_CPU_SET = %q, %v; want \"4,36\"", v, ok)
 	}
+	if v, ok := envValue(dep, "OR_SIM_FRONTEND_CPU_SET"); !ok || v != "18,50" {
+		t.Fatalf("OR_SIM_FRONTEND_CPU_SET = %q, %v; want \"18,50\"", v, ok)
+	}
 	dep = deployment("or-sim", rt, runtimeCPUPlacement{})
-	for _, name := range []string{"OR_SIM_CPU_EXCLUDE", "OR_SIM_CPU_SET"} {
+	for _, name := range []string{"OR_SIM_CPU_EXCLUDE", "OR_SIM_CPU_SET", "OR_SIM_FRONTEND_CPU_SET"} {
 		if v, ok := envValue(dep, name); ok {
 			t.Fatalf("%s must be absent without annotations, got %q", name, v)
 		}
@@ -422,7 +425,7 @@ func TestRuntimeCPUPlacementForUsesSlotIndex(t *testing.T) {
 	for i := 0; i < 16; i++ {
 		pool = append(pool, fmt.Sprintf("c%d", i))
 	}
-	cfg := nodeCPUConfig{Exclude: "1,33", Pool: pool}
+	cfg := nodeCPUConfig{Exclude: "1,33", Pool: pool, Frontend: "18,50"}
 	cases := []struct {
 		gpu, slot string
 		want      string
@@ -435,7 +438,7 @@ func TestRuntimeCPUPlacementForUsesSlotIndex(t *testing.T) {
 	for _, tc := range cases {
 		rt := system.ModelRuntimeSpec{Model: "llama", Node: "ampere", GPU: tc.gpu, SlotResource: tc.slot}
 		got, err := runtimeCPUPlacementFor(cfg, rt)
-		if err != nil || got.Set != tc.want || got.Exclude != "1,33" {
+		if err != nil || got.Set != tc.want || got.Exclude != "1,33" || got.Frontend != "18,50" {
 			t.Fatalf("%s: placement = %+v, %v; want set %s", tc.slot, got, err, tc.want)
 		}
 	}

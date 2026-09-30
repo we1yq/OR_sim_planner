@@ -3264,17 +3264,24 @@ const (
 	// runtimes never share a core.  Spreading one runtime over many cores
 	// makes GPU-launch-bound latency bimodal.
 	runtimeCPUPoolAnnotation = "mig.or-sim.io/runtime-cpu-pool"
-	migSlotsPerGPU           = 8
+	// runtimeFrontendCPUAnnotation lists the host CPUs (e.g. "34,90,36,92")
+	// the runtimes' HTTP processes share; inference runs in a separate process
+	// on the runtime's pool core, so HTTP parsing never competes with kernel
+	// launches for that core or the interpreter lock.
+	runtimeFrontendCPUAnnotation = "mig.or-sim.io/runtime-frontend-cpus"
+	migSlotsPerGPU               = 8
 )
 
 type nodeCPUConfig struct {
-	Exclude string
-	Pool    []string
+	Exclude  string
+	Pool     []string
+	Frontend string
 }
 
 type runtimeCPUPlacement struct {
-	Exclude string
-	Set     string
+	Exclude  string
+	Set      string
+	Frontend string
 }
 
 func runtimeNodeCPUConfig(client *kube.Client, nodeName string) (nodeCPUConfig, error) {
@@ -3283,7 +3290,10 @@ func runtimeNodeCPUConfig(client *kube.Client, nodeName string) (nodeCPUConfig, 
 		return nodeCPUConfig{}, err
 	}
 	annotations := asMap(asMap(node["metadata"])["annotations"])
-	cfg := nodeCPUConfig{Exclude: strings.TrimSpace(asString(annotations[runtimeCPUExcludeAnnotation]))}
+	cfg := nodeCPUConfig{
+		Exclude:  strings.TrimSpace(asString(annotations[runtimeCPUExcludeAnnotation])),
+		Frontend: strings.TrimSpace(asString(annotations[runtimeFrontendCPUAnnotation])),
+	}
 	for _, entry := range strings.Split(asString(annotations[runtimeCPUPoolAnnotation]), ";") {
 		if entry = strings.TrimSpace(entry); entry != "" {
 			cfg.Pool = append(cfg.Pool, entry)
@@ -3293,7 +3303,7 @@ func runtimeNodeCPUConfig(client *kube.Client, nodeName string) (nodeCPUConfig, 
 }
 
 func runtimeCPUPlacementFor(cfg nodeCPUConfig, rt system.ModelRuntimeSpec) (runtimeCPUPlacement, error) {
-	placement := runtimeCPUPlacement{Exclude: cfg.Exclude}
+	placement := runtimeCPUPlacement{Exclude: cfg.Exclude, Frontend: cfg.Frontend}
 	if len(cfg.Pool) == 0 {
 		return placement, nil
 	}
@@ -3340,6 +3350,9 @@ func deployment(ns string, rt system.ModelRuntimeSpec, cpu runtimeCPUPlacement) 
 	}
 	if cpu.Exclude != "" {
 		envVars = append(envVars, map[string]any{"name": "OR_SIM_CPU_EXCLUDE", "value": cpu.Exclude})
+	}
+	if cpu.Frontend != "" {
+		envVars = append(envVars, map[string]any{"name": "OR_SIM_FRONTEND_CPU_SET", "value": cpu.Frontend})
 	}
 	if isLLMRuntime(rt) {
 		if modelID := llmModelID(rt); modelID != "" {
