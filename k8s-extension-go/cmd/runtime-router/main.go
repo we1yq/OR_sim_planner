@@ -434,11 +434,14 @@ func (b *endpointBatcher) takeBatchLocked() []*batchRequest {
 	return batch
 }
 
-// run dispatches batch and, when it finishes, starts the next batch from the
-// queue without waiting.
+// run dispatches batch and, as soon as the runtime has answered, starts the
+// next batch from the queue.  The responses are handed back to the waiting
+// clients after that: the per-request bookkeeping takes locks shared with
+// arrivals and /routes, and while it held the pipeline slot a vgg16 b4
+// replica in E1 R3 re-dispatched 5 ms (p90 15 ms) late and reached only 0.78
+// of its capacity.
 func (b *endpointBatcher) run(s *routerState, batch []*batchRequest) {
-	go func() {
-		s.dispatchBatch(b.endpointSnapshot(), batch)
+	go s.dispatchBatchThen(b.endpointSnapshot(), batch, func() {
 		b.mu.Lock()
 		b.inFlight--
 		next := b.nextBatchLocked(s)
@@ -446,7 +449,7 @@ func (b *endpointBatcher) run(s *routerState, batch []*batchRequest) {
 		if next != nil {
 			b.run(s, next)
 		}
-	}()
+	})
 }
 
 func (b *endpointBatcher) endpointSnapshot() routeEndpoint {
@@ -507,7 +510,18 @@ func (s *routerState) redispatchQueuedRequest(req *batchRequest, excludeRuntimeI
 }
 
 func (s *routerState) dispatchBatch(endpoint routeEndpoint, batch []*batchRequest) {
+	s.dispatchBatchThen(endpoint, batch, nil)
+}
+
+// dispatchBatchThen sends batch to the replica and answers its requests.
+// The replica's execution slot is released, and runtimeDone (if any) called,
+// once the runtime has answered (or the call failed), before the responses
+// are handed back to the waiting clients.
+func (s *routerState) dispatchBatchThen(endpoint routeEndpoint, batch []*batchRequest, runtimeDone func()) {
 	if len(batch) == 0 {
+		if runtimeDone != nil {
+			runtimeDone()
+		}
 		return
 	}
 	endpointMetrics := s.metricsForEndpoint(endpoint.RuntimeID)
@@ -516,7 +530,16 @@ func (s *routerState) dispatchBatch(endpoint routeEndpoint, batch []*batchReques
 		endpointMetrics.begin(queued)
 	}
 	release := s.acquireEndpoint(endpoint.RuntimeID, s.visionPipelineDepth)
-	defer release()
+	var freeOnce sync.Once
+	free := func() {
+		freeOnce.Do(func() {
+			release()
+			if runtimeDone != nil {
+				runtimeDone()
+			}
+		})
+	}
+	defer free()
 	serviceStarted := time.Now()
 	payload := map[string]any{}
 	if err := json.Unmarshal(batch[0].Body, &payload); err != nil {
@@ -544,6 +567,7 @@ func (s *routerState) dispatchBatch(endpoint routeEndpoint, batch []*batchReques
 		s.finishBatch(endpointMetrics, batch, serviceStarted, http.StatusBadGateway, map[string]any{"error": err.Error(), "model": batch[0].Model}, true)
 		return
 	}
+	free()
 	contentType := resp.Header.Get("content-type")
 	enriched := enrichBatchResponse(body, map[string]any{
 		"routerBatchSize":         len(batch),
@@ -1086,8 +1110,10 @@ func (s *routerState) routeForExcluding(model, excludeRuntimeID string) (routeEn
 		if !endpoint.Active || !endpoint.AcceptingNew || endpoint.Draining {
 			continue
 		}
-		metrics := s.metricsForEndpoint(endpoint.RuntimeID).snapshot(time.Now(), s.window)
-		score := float64(metrics.Inflight+int64(s.endpointQueued(endpoint.RuntimeID))) / effectiveWeight(endpoint)
+		// Only the in-flight count is needed; a full snapshot copied the
+		// replica's whole metrics window under its lock on every arrival.
+		inflight := s.metricsForEndpoint(endpoint.RuntimeID).inflight()
+		score := float64(inflight+int64(s.endpointQueued(endpoint.RuntimeID))) / effectiveWeight(endpoint)
 		if !found || score < bestScore || (score == bestScore && endpoint.RuntimeID < best.RuntimeID) {
 			best = endpoint
 			bestScore = score
@@ -1186,6 +1212,12 @@ func (m *modelMetrics) beginN(now time.Time, count int64) {
 	for i := int64(0); i < count; i++ {
 		m.Arrivals = append(m.Arrivals, now)
 	}
+}
+
+func (m *modelMetrics) inflight() int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.Inflight
 }
 
 func (m *modelMetrics) finish(latency time.Duration, failed bool) {

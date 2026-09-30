@@ -375,3 +375,34 @@ func TestPipelineDoesNotSplitSecondBatch(t *testing.T) {
 		t.Fatalf("sizes %v peak %d, want [16 3] one at a time (partial batch only once the replica is idle)", sizes, peak)
 	}
 }
+
+// A replica's next batch must not wait for the previous batch's responses to
+// be handed back: that bookkeeping takes locks shared with arrivals and
+// /routes, and holding the pipeline slot through it idled the GPU.
+func TestNextBatchStartsBeforeResponsesAreHandedBack(t *testing.T) {
+	var calls int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&calls, 1)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	t.Cleanup(srv.Close)
+	state := newTestRouter()
+	state.visionPipelineDepth = 1
+	endpoint := routeEndpoint{Model: "vgg16_image", RuntimeID: "rt-v", Endpoint: srv.URL, BatchSize: 1}
+	stats := state.metricsFor("vgg16_image")
+	stats.mu.Lock() // blocks the hand-back of every response (ModelStats.finish)
+	b := state.batcherFor(endpoint.RuntimeID)
+	for i := 0; i < 3; i++ {
+		b.enqueue(state, endpoint, &batchRequest{Model: "vgg16_image", Body: []byte(`{"batch":1}`), ArrivedAt: time.Now(),
+			ModelStats: stats, Done: make(chan batchResponse, 1)})
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for atomic.LoadInt64(&calls) < 3 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	got := atomic.LoadInt64(&calls)
+	stats.mu.Unlock()
+	if got != 3 {
+		t.Fatalf("runtime saw %d batches while responses were held back, want 3", got)
+	}
+}
