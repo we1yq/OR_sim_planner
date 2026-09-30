@@ -1,0 +1,135 @@
+# Fast-start runtime release 3 (2026-09-30), built from commit 22fe3d5: as fast2-20260930,
+# and the inference child spins on its pipe between requests so its core keeps
+# full speed (OR_SIM_BUSY_POLL=0 restores blocking).
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-fast3-llama-runtime-20260930
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.llama32-3b \
+                --destination=localhost:10690/migrant-model-runtime:llama32-3b-fast3-20260930 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-fast3-runtime-context-20260930
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-fast3-gpt2-runtime-20260930
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.gpt2-medium \
+                --destination=localhost:10690/migrant-model-runtime:gpt2-medium-fast3-20260930 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-fast3-runtime-context-20260930
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-fast3-vision-runtime-20260930
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.torchvision \
+                --destination=localhost:10690/migrant-model-runtime:torchvision-fast3-20260930 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-fast3-runtime-context-20260930

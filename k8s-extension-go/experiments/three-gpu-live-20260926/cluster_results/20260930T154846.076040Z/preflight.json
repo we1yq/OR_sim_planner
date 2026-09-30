@@ -1,0 +1,885 @@
+{
+  "controllers": {
+    "cluster-state-manager": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "annotations": {
+          "deployment.kubernetes.io/revision": "23",
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/component\":\"cluster-state-manager\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"},\"name\":\"cluster-state-manager\",\"namespace\":\"or-sim-exp\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app.kubernetes.io/component\":\"cluster-state-manager\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"2026-07-13T03:57:19Z\",\"or-sim.io/rebuilt-images-at\":\"2026-07-13T03:57:19Z\"},\"labels\":{\"app.kubernetes.io/component\":\"cluster-state-manager\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"spec\":{\"containers\":[{\"command\":[\"/cluster-state-manager\"],\"env\":[{\"name\":\"NAMESPACE\",\"valueFrom\":{\"fieldRef\":{\"fieldPath\":\"metadata.namespace\"}}},{\"name\":\"ROUTER_URL\",\"value\":\"http://runtime-router:8080\"}],\"image\":\"localhost:10690/migrant-control-plane:go\",\"imagePullPolicy\":\"Always\",\"name\":\"controller\",\"ports\":[{\"containerPort\":8080}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":8080}}}],\"nodeSelector\":{\"kubernetes.io/hostname\":\"or-sim-control-plane\"},\"serviceAccountName\":\"migrant-go-control-plane\"}}}}\n"
+        },
+        "creationTimestamp": "2026-07-09T20:36:17Z",
+        "generation": 23,
+        "labels": {
+          "app.kubernetes.io/component": "cluster-state-manager",
+          "app.kubernetes.io/name": "migrant-go-control-plane"
+        },
+        "name": "cluster-state-manager",
+        "namespace": "or-sim-exp",
+        "resourceVersion": "60540727",
+        "uid": "455fbd8c-04a4-4520-8b95-688528a38e34"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app.kubernetes.io/component": "cluster-state-manager",
+            "app.kubernetes.io/name": "migrant-go-control-plane"
+          }
+        },
+        "strategy": {
+          "rollingUpdate": {
+            "maxSurge": "25%",
+            "maxUnavailable": "25%"
+          },
+          "type": "RollingUpdate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "kubectl.kubernetes.io/restartedAt": "2026-07-15T15:02:28+09:00",
+              "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+            },
+            "creationTimestamp": null,
+            "labels": {
+              "app.kubernetes.io/component": "cluster-state-manager",
+              "app.kubernetes.io/name": "migrant-go-control-plane"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "/cluster-state-manager"
+                ],
+                "env": [
+                  {
+                    "name": "NAMESPACE",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      }
+                    }
+                  },
+                  {
+                    "name": "ROUTER_URL",
+                    "value": "http://runtime-router:8080"
+                  }
+                ],
+                "image": "localhost:10690/migrant-control-plane:batch-state-concurrency-20260928",
+                "imagePullPolicy": "Always",
+                "name": "controller",
+                "ports": [
+                  {
+                    "containerPort": 8080,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": 8080,
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File"
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "nodeSelector": {
+              "kubernetes.io/hostname": "or-sim-control-plane"
+            },
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "serviceAccount": "migrant-go-control-plane",
+            "serviceAccountName": "migrant-go-control-plane",
+            "terminationGracePeriodSeconds": 30
+          }
+        }
+      },
+      "status": {
+        "availableReplicas": 1,
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-07-10T04:10:53Z",
+            "lastUpdateTime": "2026-07-10T04:10:53Z",
+            "message": "Deployment has minimum availability.",
+            "reason": "MinimumReplicasAvailable",
+            "status": "True",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-07-09T20:36:17Z",
+            "lastUpdateTime": "2026-09-28T08:34:49Z",
+            "message": "ReplicaSet \"cluster-state-manager-5769b5954f\" has successfully progressed.",
+            "reason": "NewReplicaSetAvailable",
+            "status": "True",
+            "type": "Progressing"
+          }
+        ],
+        "observedGeneration": 23,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "updatedReplicas": 1
+      }
+    },
+    "planner-controller": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "annotations": {
+          "deployment.kubernetes.io/revision": "26",
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/component\":\"planner-controller\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"},\"name\":\"planner-controller\",\"namespace\":\"or-sim-exp\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app.kubernetes.io/component\":\"planner-controller\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"2026-07-13T03:57:19Z\",\"or-sim.io/rebuilt-images-at\":\"2026-07-13T03:57:19Z\"},\"labels\":{\"app.kubernetes.io/component\":\"planner-controller\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"spec\":{\"containers\":[{\"command\":[\"/planner-controller\"],\"env\":[{\"name\":\"NAMESPACE\",\"valueFrom\":{\"fieldRef\":{\"fieldPath\":\"metadata.namespace\"}}},{\"name\":\"PLANNER_ENGINE_URL\",\"value\":\"http://planner-engine:8080\"}],\"image\":\"localhost:10690/migrant-control-plane:go\",\"imagePullPolicy\":\"Always\",\"name\":\"controller\",\"ports\":[{\"containerPort\":8080}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":8080}}}],\"nodeSelector\":{\"kubernetes.io/hostname\":\"or-sim-control-plane\"},\"serviceAccountName\":\"migrant-go-control-plane\"}}}}\n"
+        },
+        "creationTimestamp": "2026-07-09T20:36:17Z",
+        "generation": 26,
+        "labels": {
+          "app.kubernetes.io/component": "planner-controller",
+          "app.kubernetes.io/name": "migrant-go-control-plane"
+        },
+        "name": "planner-controller",
+        "namespace": "or-sim-exp",
+        "resourceVersion": "61050939",
+        "uid": "3e2319c9-b18c-490e-98d9-eb4587cfe9a1"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app.kubernetes.io/component": "planner-controller",
+            "app.kubernetes.io/name": "migrant-go-control-plane"
+          }
+        },
+        "strategy": {
+          "rollingUpdate": {
+            "maxSurge": "25%",
+            "maxUnavailable": "25%"
+          },
+          "type": "RollingUpdate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "kubectl.kubernetes.io/restartedAt": "2026-09-26T17:57:18+09:00",
+              "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+            },
+            "creationTimestamp": null,
+            "labels": {
+              "app.kubernetes.io/component": "planner-controller",
+              "app.kubernetes.io/name": "migrant-go-control-plane"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "/planner-controller"
+                ],
+                "env": [
+                  {
+                    "name": "NAMESPACE",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      }
+                    }
+                  },
+                  {
+                    "name": "PLANNER_ENGINE_URL",
+                    "value": "http://planner-engine:8080"
+                  }
+                ],
+                "image": "localhost:10690/migrant-control-plane:headroom-20260929",
+                "imagePullPolicy": "Always",
+                "name": "controller",
+                "ports": [
+                  {
+                    "containerPort": 8080,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": 8080,
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File"
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "nodeSelector": {
+              "kubernetes.io/hostname": "or-sim-control-plane"
+            },
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "serviceAccount": "migrant-go-control-plane",
+            "serviceAccountName": "migrant-go-control-plane",
+            "terminationGracePeriodSeconds": 30
+          }
+        }
+      },
+      "status": {
+        "availableReplicas": 1,
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-07-10T04:00:51Z",
+            "lastUpdateTime": "2026-07-10T04:00:51Z",
+            "message": "Deployment has minimum availability.",
+            "reason": "MinimumReplicasAvailable",
+            "status": "True",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-07-09T20:36:17Z",
+            "lastUpdateTime": "2026-09-29T14:30:09Z",
+            "message": "ReplicaSet \"planner-controller-d5f476f99\" has successfully progressed.",
+            "reason": "NewReplicaSetAvailable",
+            "status": "True",
+            "type": "Progressing"
+          }
+        ],
+        "observedGeneration": 26,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "updatedReplicas": 1
+      }
+    },
+    "runtime-router": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "annotations": {
+          "deployment.kubernetes.io/revision": "25",
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/name\":\"migrant-runtime-router\"},\"name\":\"runtime-router\",\"namespace\":\"or-sim-exp\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app.kubernetes.io/name\":\"migrant-runtime-router\"}},\"strategy\":{\"type\":\"Recreate\"},\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"2026-07-13T03:57:19Z\",\"or-sim.io/rebuilt-images-at\":\"2026-07-13T03:57:19Z\"},\"labels\":{\"app.kubernetes.io/name\":\"migrant-runtime-router\"}},\"spec\":{\"containers\":[{\"args\":[\"--addr=:10680\"],\"image\":\"localhost:10690/migrant-runtime-router:go\",\"imagePullPolicy\":\"Always\",\"name\":\"router\",\"ports\":[{\"containerPort\":10680,\"name\":\"http\"}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":\"http\"}}}],\"dnsPolicy\":\"ClusterFirstWithHostNet\",\"hostNetwork\":true,\"nodeSelector\":{\"kubernetes.io/hostname\":\"or-sim-control-plane\"},\"serviceAccountName\":\"migrant-go-control-plane\"}}}}\n"
+        },
+        "creationTimestamp": "2026-07-09T20:36:17Z",
+        "generation": 25,
+        "labels": {
+          "app.kubernetes.io/name": "migrant-runtime-router"
+        },
+        "name": "runtime-router",
+        "namespace": "or-sim-exp",
+        "resourceVersion": "61406710",
+        "uid": "546f6ab6-bfd7-402f-9226-4bba30130b29"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app.kubernetes.io/name": "migrant-runtime-router"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "kubectl.kubernetes.io/restartedAt": "2026-09-26T23:00:13+09:00",
+              "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+            },
+            "creationTimestamp": null,
+            "labels": {
+              "app.kubernetes.io/name": "migrant-runtime-router"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "args": [
+                  "--addr=:10680"
+                ],
+                "env": [
+                  {
+                    "name": "NAMESPACE",
+                    "value": "or-sim-exp"
+                  },
+                  {
+                    "name": "VISION_PIPELINE_DEPTH",
+                    "value": "2"
+                  }
+                ],
+                "image": "localhost:10690/migrant-runtime-router:early-20260930",
+                "imagePullPolicy": "Always",
+                "name": "router",
+                "ports": [
+                  {
+                    "containerPort": 10680,
+                    "name": "http",
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": "http",
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File"
+              }
+            ],
+            "dnsPolicy": "ClusterFirstWithHostNet",
+            "hostNetwork": true,
+            "nodeSelector": {
+              "kubernetes.io/hostname": "or-sim-control-plane"
+            },
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "serviceAccount": "migrant-go-control-plane",
+            "serviceAccountName": "migrant-go-control-plane",
+            "terminationGracePeriodSeconds": 30
+          }
+        }
+      },
+      "status": {
+        "availableReplicas": 1,
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-09-30T10:14:22Z",
+            "lastUpdateTime": "2026-09-30T10:14:22Z",
+            "message": "Deployment has minimum availability.",
+            "reason": "MinimumReplicasAvailable",
+            "status": "True",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-07-09T20:36:17Z",
+            "lastUpdateTime": "2026-09-30T10:14:22Z",
+            "message": "ReplicaSet \"runtime-router-94c97d995\" has successfully progressed.",
+            "reason": "NewReplicaSetAvailable",
+            "status": "True",
+            "type": "Progressing"
+          }
+        ],
+        "observedGeneration": 25,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "updatedReplicas": 1
+      }
+    },
+    "transition-executor": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "annotations": {
+          "deployment.kubernetes.io/revision": "69",
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/component\":\"transition-executor\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"},\"name\":\"transition-executor\",\"namespace\":\"or-sim-exp\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app.kubernetes.io/component\":\"transition-executor\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"2026-07-13T03:57:19Z\",\"or-sim.io/rebuilt-images-at\":\"2026-07-13T03:57:19Z\"},\"labels\":{\"app.kubernetes.io/component\":\"transition-executor\",\"app.kubernetes.io/name\":\"migrant-go-control-plane\"}},\"spec\":{\"containers\":[{\"command\":[\"/transition-executor\"],\"env\":[{\"name\":\"NAMESPACE\",\"valueFrom\":{\"fieldRef\":{\"fieldPath\":\"metadata.namespace\"}}},{\"name\":\"ROUTER_URL\",\"value\":\"http://runtime-router:8080\"},{\"name\":\"MODEL_RUNTIME_IMAGE\",\"value\":\"localhost:10690/migrant-model-runtime:go\"}],\"image\":\"localhost:10690/migrant-control-plane:go\",\"imagePullPolicy\":\"Always\",\"name\":\"controller\",\"ports\":[{\"containerPort\":8080}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":8080}}}],\"nodeSelector\":{\"kubernetes.io/hostname\":\"or-sim-control-plane\"},\"serviceAccountName\":\"migrant-go-control-plane\"}}}}\n"
+        },
+        "creationTimestamp": "2026-07-09T20:36:17Z",
+        "generation": 69,
+        "labels": {
+          "app.kubernetes.io/component": "transition-executor",
+          "app.kubernetes.io/name": "migrant-go-control-plane"
+        },
+        "name": "transition-executor",
+        "namespace": "or-sim-exp",
+        "resourceVersion": "61510854",
+        "uid": "e230b3ff-0269-43ca-b4f7-8325455d7a75"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app.kubernetes.io/component": "transition-executor",
+            "app.kubernetes.io/name": "migrant-go-control-plane"
+          }
+        },
+        "strategy": {
+          "rollingUpdate": {
+            "maxSurge": "25%",
+            "maxUnavailable": "25%"
+          },
+          "type": "RollingUpdate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "kubectl.kubernetes.io/restartedAt": "2026-09-28T18:13:51+09:00",
+              "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+            },
+            "creationTimestamp": null,
+            "labels": {
+              "app.kubernetes.io/component": "transition-executor",
+              "app.kubernetes.io/name": "migrant-go-control-plane"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "/transition-executor"
+                ],
+                "env": [
+                  {
+                    "name": "NAMESPACE",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      }
+                    }
+                  },
+                  {
+                    "name": "ROUTER_URL",
+                    "value": "http://runtime-router:8080"
+                  },
+                  {
+                    "name": "MODEL_RUNTIME_IMAGE",
+                    "value": "localhost:10690/migrant-model-runtime:go"
+                  },
+                  {
+                    "name": "VISION_MODEL_RUNTIME_IMAGE",
+                    "value": "localhost:10690/migrant-model-runtime:torchvision-fast3-20260930"
+                  },
+                  {
+                    "name": "VISION_RUNTIME_MODE",
+                    "value": "torchvision"
+                  },
+                  {
+                    "name": "LLM_MODEL_RUNTIME_IMAGE",
+                    "value": "localhost:10690/migrant-model-runtime:llm-transformers-profile2-20260714"
+                  },
+                  {
+                    "name": "LLM_RUNTIME_MODE",
+                    "value": "transformers"
+                  },
+                  {
+                    "name": "MODEL_RUNTIME_HF_HOME",
+                    "value": "/opt/hf-cache"
+                  },
+                  {
+                    "name": "MODEL_RUNTIME_HF_HUB_CACHE",
+                    "value": "/opt/hf-cache/hub"
+                  },
+                  {
+                    "name": "MODEL_RUNTIME_HF_CACHE_HOST_PATH",
+                    "value": "/var/lib/or-sim/hf-cache"
+                  },
+                  {
+                    "name": "HF_TOKEN_SECRET_NAME",
+                    "value": "hf-token"
+                  },
+                  {
+                    "name": "RUNTIME_INIT_IMAGE",
+                    "value": "busybox:1.36"
+                  },
+                  {
+                    "name": "RUNTIME_READY_TIMEOUT_SECONDS",
+                    "value": "600"
+                  },
+                  {
+                    "name": "GPT2_MODEL_RUNTIME_IMAGE",
+                    "value": "localhost:10690/migrant-model-runtime:gpt2-medium-fast3-20260930"
+                  },
+                  {
+                    "name": "GPT2_MODEL_ID",
+                    "value": "/opt/models/gpt2-medium"
+                  },
+                  {
+                    "name": "LLAMA_MODEL_RUNTIME_IMAGE",
+                    "value": "localhost:10690/migrant-model-runtime:llama32-3b-fast3-20260930"
+                  },
+                  {
+                    "name": "LLAMA_MODEL_ID",
+                    "value": "/opt/models/llama32-3b"
+                  },
+                  {
+                    "name": "RUNTIME_TERMINATION_GRACE_SECONDS",
+                    "value": "2"
+                  }
+                ],
+                "image": "localhost:10690/migrant-control-plane:fast-20260930",
+                "imagePullPolicy": "Always",
+                "name": "controller",
+                "ports": [
+                  {
+                    "containerPort": 8080,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": 8080,
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File"
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "nodeSelector": {
+              "kubernetes.io/hostname": "or-sim-control-plane"
+            },
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "serviceAccount": "migrant-go-control-plane",
+            "serviceAccountName": "migrant-go-control-plane",
+            "terminationGracePeriodSeconds": 30
+          }
+        }
+      },
+      "status": {
+        "availableReplicas": 1,
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-07-10T04:00:53Z",
+            "lastUpdateTime": "2026-07-10T04:00:53Z",
+            "message": "Deployment has minimum availability.",
+            "reason": "MinimumReplicasAvailable",
+            "status": "True",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-07-09T20:36:17Z",
+            "lastUpdateTime": "2026-09-30T15:42:30Z",
+            "message": "ReplicaSet \"transition-executor-7695c998b6\" has successfully progressed.",
+            "reason": "NewReplicaSetAvailable",
+            "status": "True",
+            "type": "Progressing"
+          }
+        ],
+        "observedGeneration": 69,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "updatedReplicas": 1
+      }
+    }
+  },
+  "errors": [],
+  "observedA100Ids": [
+    "ampere-gpu0",
+    "ampere-gpu1",
+    "rtx1-worker-gpu0"
+  ],
+  "ok": true,
+  "registry": {
+    "apiVersion": "mig.or-sim.io/v1alpha1",
+    "kind": "PhysicalGpuRegistry",
+    "metadata": {
+      "creationTimestamp": "2026-07-09T20:36:19Z",
+      "generation": 2,
+      "labels": {
+        "app.kubernetes.io/name": "migrant-go"
+      },
+      "name": "default",
+      "namespace": "or-sim-exp",
+      "resourceVersion": "61513282",
+      "uid": "7b7f6249-da54-4ff3-ab32-55ac9f6c3e58"
+    },
+    "spec": {
+      "policy": {
+        "source": "cluster-state-manager"
+      }
+    },
+    "status": {
+      "activeQueue": [],
+      "availableQueue": [
+        "ampere-gpu0",
+        "ampere-gpu1",
+        "rtx1-worker-gpu0"
+      ],
+      "bindings": {
+        "ampere-gpu0": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 0,
+          "gpuIndex": 0,
+          "gpuUUID": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+          "gpuUuid": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "ampere",
+          "nodeName": "ampere",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "ampere-gpu0",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        },
+        "ampere-gpu1": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 1,
+          "gpuIndex": 1,
+          "gpuUUID": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+          "gpuUuid": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "ampere",
+          "nodeName": "ampere",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "ampere-gpu1",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        },
+        "rtx1-worker-gpu0": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 0,
+          "gpuIndex": 0,
+          "gpuUUID": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+          "gpuUuid": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "rtx1-worker",
+          "nodeName": "rtx1-worker",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "rtx1-worker-gpu0",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        }
+      },
+      "currentAllocation": {
+        "canonicalizedAt": "2026-09-30T15:48:35.450164379Z",
+        "format": "migrant.current-allocation/v1",
+        "freePhysicalGpuPool": [
+          "ampere-gpu0",
+          "ampere-gpu1",
+          "rtx1-worker-gpu0"
+        ],
+        "gpus": {},
+        "logicalGpuCount": 0,
+        "logicalGpus": [],
+        "metadata": {
+          "canonical_observed_physical_map": {},
+          "logical_id_map": {},
+          "physical_id_map": {}
+        },
+        "source": "cluster-state-manager"
+      },
+      "health": {
+        "observedAt": "2026-09-30T15:48:35.45017577Z",
+        "queueCounts": {
+          "active": 0,
+          "available": 3,
+          "transitioning": 0
+        },
+        "reasons": [],
+        "repairRequired": false,
+        "requiredActions": [],
+        "stable": true
+      },
+      "logicalBindingLedger": {
+        "available": true,
+        "bindings": {},
+        "lastPlanName": "plan-live-v2-pprobe1790783000-r99-warmup",
+        "updatedAt": "2026-09-30T15:48:30.966639731Z",
+        "version": "migrant.logical-binding-ledger/v1"
+      },
+      "observedAt": "2026-09-30T15:48:35.458778414Z",
+      "phase": "Observed",
+      "profileCalibrationOverlay": {
+        "available": true,
+        "generatedAt": "2026-09-30T15:48:34.984267438Z",
+        "observations": [
+          {
+            "arrivalRate": 75.4833,
+            "avgLatencyMs": 6.478,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 81,
+            "model": "vgg16_image",
+            "p95LatencyMs": 7,
+            "queued": 0,
+            "requests": 2521416,
+            "sampleCount": 2521416,
+            "windowErrors": 0,
+            "windowRequests": 4532
+          },
+          {
+            "arrivalRate": 20.05,
+            "avgLatencyMs": 21.919,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 119,
+            "model": "vit_base_image",
+            "p95LatencyMs": 21,
+            "queued": 0,
+            "requests": 604573,
+            "sampleCount": 604573,
+            "windowErrors": 0,
+            "windowRequests": 1205
+          },
+          {
+            "arrivalRate": 27.05,
+            "avgLatencyMs": 7.121,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 82,
+            "model": "resnet50_image",
+            "p95LatencyMs": 8,
+            "queued": 0,
+            "requests": 802697,
+            "sampleCount": 802697,
+            "windowErrors": 0,
+            "windowRequests": 1624
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 6,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "llama_p1024_o128",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 1234,
+            "sampleCount": 1234,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 5496,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 2,
+            "inflight": 0,
+            "maxLatencyMs": 5496,
+            "model": "gpt2_p512_o512",
+            "p95LatencyMs": 5496,
+            "queued": 0,
+            "requests": 569,
+            "sampleCount": 569,
+            "windowErrors": 0,
+            "windowRequests": 1
+          },
+          {
+            "arrivalRate": 0.0333,
+            "avgLatencyMs": 1627.5,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 1633,
+            "model": "llama_p2048_o64",
+            "p95LatencyMs": 1633,
+            "queued": 0,
+            "requests": 808,
+            "sampleCount": 808,
+            "windowErrors": 0,
+            "windowRequests": 2
+          },
+          {
+            "arrivalRate": 0.0333,
+            "avgLatencyMs": 745,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 751,
+            "model": "gpt2_p64_o64",
+            "p95LatencyMs": 751,
+            "queued": 0,
+            "requests": 1633,
+            "sampleCount": 1633,
+            "windowErrors": 0,
+            "windowRequests": 2
+          }
+        ]
+      },
+      "queueCounts": {
+        "active": 0,
+        "available": 3,
+        "transitioning": 0
+      },
+      "routingState": {
+        "available": true,
+        "generatedAt": "2026-09-30T15:48:34.978999991Z",
+        "routes": []
+      },
+      "transitioningQueue": []
+    }
+  },
+  "routes": {
+    "generatedAt": "2026-09-30T15:48:46.160854119Z",
+    "routes": []
+  }
+}

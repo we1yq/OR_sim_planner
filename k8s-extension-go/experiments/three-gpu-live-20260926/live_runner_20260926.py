@@ -981,6 +981,7 @@ def _write_initial_outputs(ctx: RunContext, args: argparse.Namespace, hashes: Ma
         "capacity_headroom": getattr(args, "capacity_headroom", None),
         "conservative_3g_mu": bool(getattr(args, "conservative_3g_mu", False)),
         "e1_arrivals": getattr(args, "arrivals", "fixed") if ctx.e1_mode else None,
+        "e1_first_round": int(getattr(args, "e1_first_round", 1)) if ctx.e1_mode else None,
         "solver": {"threads": 8, "seed": 1, "mip_gap": 0, "accepted_status": "OPTIMAL"},
     })
     _json_output(ctx.output_dir / "profile_protocol.json", {
@@ -1782,7 +1783,8 @@ def _validate_and_record_outputs(ctx: RunContext, result: dict[str, Any]) -> dic
         finalization_errors.append(f"finalization failed before validation: {type(exc).__name__}: {exc}")
     try:
         if ctx.e1_mode:
-            artifact_errors = _validate_makespan_outputs(ctx.output_dir, expected_rounds=int(result.get("expected_rounds", ROUND_COUNT)))
+            artifact_errors = _validate_makespan_outputs(ctx.output_dir, expected_rounds=int(result.get("expected_rounds", ROUND_COUNT)),
+                                                         first_round=int(result.get("first_round", 1)))
             for name in ("requests.jsonl", "e1_rate_events.jsonl", "e1_windows.csv"):
                 if not (ctx.output_dir / name).exists():
                     artifact_errors.append(f"missing {name}")
@@ -1823,7 +1825,7 @@ def _validate_and_record_outputs(ctx: RunContext, result: dict[str, Any]) -> dic
     return result
 
 
-def _validate_makespan_outputs(root: Path, *, expected_rounds: int) -> list[str]:
+def _validate_makespan_outputs(root: Path, *, expected_rounds: int, first_round: int = 1) -> list[str]:
     """Strictly validate convergence artifacts without requiring traffic/profile files."""
     errors: list[str] = []
     try:
@@ -1832,7 +1834,7 @@ def _validate_makespan_outputs(root: Path, *, expected_rounds: int) -> list[str]
         return [f"round_summary.csv unreadable: {exc}"]
     if len(rows) != expected_rounds:
         errors.append(f"round_summary.csv expected {expected_rounds} rows, got {len(rows)}")
-    for round_number in range(1, expected_rounds + 1):
+    for round_number in range(first_round, first_round + expected_rounds):
         row = next((x for x in rows if str(x.get("live_round")) == str(round_number)), None)
         if row is None:
             errors.append(f"round_summary.csv missing round {round_number}"); continue
@@ -2495,7 +2497,7 @@ def e1_warmup(ctx: RunContext, args: argparse.Namespace, kube: Kubectl, router: 
 
     (ctx.output_dir / "warmup").mkdir(exist_ok=True)
     zero = {key: 0.0 for key in WORKLOAD_KEYS}
-    r1 = demand_rates(demand[0])
+    r1 = demand_rates(demand[int(getattr(args, "e1_first_round", 1)) - 1])
     started = utc_now()
     steps = [
         _e1_warmup_step(ctx, args, kube, router, label="up", number=90, source_rates=zero,
@@ -2529,6 +2531,9 @@ def execute_e1_experiment(
     """
 
     zero = {key: 0.0 for key in WORKLOAD_KEYS}
+    # --e1-first-round N skips R1..R(N-1): RN is deployed from empty, as R1 is.
+    first_round = int(getattr(args, "e1_first_round", 1))
+    expected_rounds = ROUND_COUNT - first_round + 1
     if getattr(args, "e1_warmup", True):
         e1_warmup(ctx, args, kube, router, demand)
     sender = traffic.BoundedAsyncSender(traffic.urllib_transport(ctx.router_url, timeout_s=900.0))
@@ -2543,6 +2548,8 @@ def execute_e1_experiment(
     trace_rounds: dict[int, int] = {}
     try:
         for live_round, raw_target in enumerate(demand, 1):
+            if live_round < first_round:
+                continue
             trace_round = _int(raw_target.get("round"))
             trace_rounds[live_round] = trace_round
             target_rates = demand_rates(raw_target)
@@ -2553,7 +2560,7 @@ def execute_e1_experiment(
             try:
                 current_preflight = preflight(
                     kube, router, controllers=controller_names,
-                    require_empty=(live_round == 1), allow_inflight=(live_round > 1),
+                    require_empty=(live_round == first_round), allow_inflight=(live_round > first_round),
                 )
                 current_preflight["pods"] = kube.get_json("pods")
                 observed_source_signature = source_state_signature(
@@ -2584,7 +2591,7 @@ def execute_e1_experiment(
                 registry = kube.get_json("physicalgpuregistries", "default")
                 audit = audit_plan(
                     plan, registry, source_gpu_count=active_gpu_count(registry),
-                    require_nonzero_target=(live_round == 1 and sum(float(v) for v in target_rates.values()) > 0.0),
+                    require_nonzero_target=(live_round == first_round and sum(float(v) for v in target_rates.values()) > 0.0),
                     expected_stage3_variant=args.stage3_variant,
                 )
                 _save_plan_and_audit(ctx, live_round, plan, audit)
@@ -2692,12 +2699,12 @@ def execute_e1_experiment(
             cleanup_summary = {"runId": ctx.run_id, "round": 13, "purpose": "explicit-zero-demand-cleanup",
                                "includedInMeasuredTwelveRoundAggregate": False, "ok": False, "errors": [str(exc)]}
             _json_output(ctx.output_dir / "r13_cleanup_summary.json", cleanup_summary)
-    if completed_rounds == ROUND_COUNT:
+    if completed_rounds == expected_rounds:
         # Post-run strict audit (target vs routes, action completion, executor
         # validation, same-GPU distinct-slot parallelism); writes
         # strict_runtime_audit.json, which output validation requires.
         audit = subprocess.run(
-            [sys.executable, str(ROOT / "audit_makespan_run.py"), str(ctx.output_dir)],
+            [sys.executable, str(ROOT / "audit_makespan_run.py"), str(ctx.output_dir), "--expected-rounds", str(expected_rounds)],
             text=True, capture_output=True, check=False,
         )
         if audit.returncode != 0 and failure is None:
@@ -2705,8 +2712,9 @@ def execute_e1_experiment(
     result = {
         "run_id": ctx.run_id,
         "completed_rounds": completed_rounds,
-        "expected_rounds": ROUND_COUNT,
-        "ok": failure is None and completed_rounds == ROUND_COUNT,
+        "expected_rounds": expected_rounds,
+        "first_round": first_round,
+        "ok": failure is None and completed_rounds == expected_rounds,
         "failure": failure,
         "range_run": False,
         "r13_cleanup": cleanup_summary,
@@ -2881,6 +2889,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="planner provisions for (1 + h) x demand, lowered per round to fit the GPU budget (default: off)")
     parser.add_argument("--conservative-3g-mu", action="store_true",
                         help="planner Stage 1 uses min(mu_3g, mu_4g) for 3g options (default: off)")
+    parser.add_argument("--e1-first-round", type=int, default=1,
+                        help="E1: first live round; it is deployed from empty and earlier rounds are skipped (default: 1)")
     parser.add_argument("--arrivals", choices=["fixed", "poisson"], default="fixed",
                         help="E1 inter-arrival times: fixed 1/d, or exponential with mean 1/d (default: fixed)")
     parser.add_argument("--catalog", default="catalog.csv", help="ledger catalog file in the experiment directory (default: frozen catalog.csv)")

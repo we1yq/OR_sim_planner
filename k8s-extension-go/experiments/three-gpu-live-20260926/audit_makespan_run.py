@@ -10,7 +10,7 @@ def load(p: Path):
     with p.open() as f: return json.load(f)
 
 def main() -> int:
-    ap = argparse.ArgumentParser(); ap.add_argument("run_dir", type=Path); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("run_dir", type=Path); ap.add_argument("--expected-rounds", type=int, default=12); a = ap.parse_args()
     root = a.run_dir; rows = list(csv.DictReader((root / "round_summary.csv").open()))
     report = {"runId": rows[0]["run_id"] if rows else None, "rounds": [], "errors": [], "sameGpuDistinctSlotPlaceOverlaps": []}
     for row in rows:
@@ -45,7 +45,7 @@ def main() -> int:
         item = {"round": r, "targetRuntimeCount":len(wanted), "actualRouteCount":len(actual), "targetMatchesActual":not mismatches, "mismatches":mismatches, "allActionsCompleted":not bad, "nonCompletedActions":bad, "executorFinalValidationOk":final.get("ok") is True, "makespanSeconds":float(row["makespan_seconds"]), "actionCount":int(row["action_count"]), "sameGpuDistinctSlotPlaceOverlapCount":len(overlaps)}
         report["rounds"].append(item)
         if not (item["targetMatchesActual"] and item["allActionsCompleted"] and item["executorFinalValidationOk"]): report["errors"].append({"round":r,"detail":item})
-    report["ok"] = not report["errors"] and len(rows) == 12
+    report["ok"] = not report["errors"] and len(rows) == a.expected_rounds
     (root / "strict_runtime_audit.json").write_text(json.dumps(report, indent=2, sort_keys=True)+"\n")
     (root / "strict_runtime_audit.md").write_text("# Strict runtime audit\n\n" + f"- result: {'PASS' if report['ok'] else 'FAIL'}\n- rounds: {len(rows)}\n- same-GPU/distinct-slot placement overlaps: {len(report['sameGpuDistinctSlotPlaceOverlaps'])}\n")
     print(json.dumps({"ok":report["ok"],"rounds":len(rows),"overlaps":len(report["sameGpuDistinctSlotPlaceOverlaps"]),"errors":len(report["errors"])}, sort_keys=True))
