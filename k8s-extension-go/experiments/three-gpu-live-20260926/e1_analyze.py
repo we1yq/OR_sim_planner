@@ -37,6 +37,16 @@ Outputs:
   min_ratio.csv                  per workload: min over transitions of the
       throughput / commitment ratio (vision: min per-second completed /
       commitment inside transition windows; llm: completed / offered)
+  makespan_window_metrics.csv    per round x workload x window: "makespan" =
+      requests sent while the cluster was changing (first action start to
+      last action end of the round's plan; the sender switches to the
+      commitment rate earlier, when the plan is approved), "steady" = the
+      dwell after it.  Each offered request is on time, late (completed over
+      the router-adjusted SLO, see makespan_window_metrics), failed by outage
+      (HTTP 404: no ready replica) or by overload (sender pending bound);
+      bad_fraction = not on time / offered, goodput = on time / offered.
+      Requests the sender rejected have no send time; their scheduled time is
+      used.
 """
 from __future__ import annotations
 
@@ -192,6 +202,129 @@ def rebuild_ledger(run: Path, ledger: list[dict], rounds: list[int]) -> dict[str
     return steps
 
 
+def plan_makespan_bounds(run: Path, rounds: list[int]) -> dict[int, tuple[float, float]]:
+    """Per round: (first action start, last action end) in UTC seconds."""
+    out = {}
+    for rnd in rounds:
+        path = run / "plans" / f"r{rnd:02d}_terminal_plan.json"
+        if not path.exists():
+            continue
+        starts, ends = [], []
+
+        def walk(o):
+            if isinstance(o, dict):
+                if "startedAt" in o and "finishedAt" in o and "type" in o and "id" in o:
+                    starts.append(utc(o["startedAt"][:26].rstrip("Z") + "+00:00" if "." in o["startedAt"] else o["startedAt"]))
+                    ends.append(utc(o["finishedAt"][:26].rstrip("Z") + "+00:00" if "." in o["finishedAt"] else o["finishedAt"]))
+                for v in o.values():
+                    walk(v)
+            elif isinstance(o, list):
+                for v in o:
+                    walk(v)
+
+        walk(json.loads(path.read_text()))
+        if starts:
+            out[rnd] = (min(starts), max(ends))
+    return out
+
+
+ROUTER_RTT_MS = 2.0
+
+
+def makespan_window_metrics(run: Path, requests: list[dict], slo: dict, token_slo: dict) -> list[dict]:
+    """Per round x workload x window (makespan, steady): every offered request
+    is exactly one of on time, late (completed over the router-adjusted SLO),
+    failed by outage (404) or failed by overload (sender pending bound).
+
+    The catalog SLO bounds a batch's compute time, as profiled; requests also
+    wait in the router, and part of that wait is there whatever the capacity.
+    Vision threshold = SLO + (b - 1) / lambda (the first request of a batch
+    waits for the other b - 1) + the batch compute time (the batch ahead of it
+    in the two-deep pipeline) + round trip, with lambda the replica's
+    completion rate in the window and the compute time its median.  LLM
+    replicas run one request at a time: TTFT threshold = TTFT SLO + round
+    trip, TPOT threshold = TPOT SLO.  over_slo_profile_basis counts completed
+    requests whose compute time alone exceeds the SLO (the planner's check)."""
+    rounds = sorted({r["live_round"] for r in requests if r.get("live_round")})
+    mbounds = plan_makespan_bounds(run, rounds)
+    sbounds = {}
+    for w in csv.DictReader((run / "e1_windows.csv").open()):
+        t1 = utc(w["steady_switch_utc"])
+        sbounds[int(w["live_round"])] = (t1, t1 + float(w["dwell_end_offset"]) - float(w["steady_switch_offset"]))
+    offsets = [r["actual_send"] - r["scheduled_send"] - (r.get("send_lag_s") or 0.0)
+               for r in requests if r.get("actual_send") and r.get("scheduled_send") is not None]
+    sender_start = sorted(offsets)[len(offsets) // 2] if offsets else 0.0
+
+    cells: dict[tuple[int, str, str], list[tuple[dict, float]]] = defaultdict(list)
+    for r in requests:
+        rnd = r.get("live_round")
+        phase = r.get("phase")
+        if phase == "transition":
+            window, bounds = "makespan", mbounds.get(rnd)
+        elif phase == "steady":
+            window, bounds = "steady", sbounds.get(rnd)
+        else:
+            continue
+        sent = r.get("actual_send") or (sender_start + r["scheduled_send"] if r.get("scheduled_send") is not None else None)
+        if bounds is None or sent is None or not (bounds[0] <= sent < bounds[1]):
+            continue
+        cells[(rnd, r["workload"], window)].append((r, sent))
+
+    rows = []
+    for (rnd, workload, window), items in sorted(cells.items()):
+        span = (mbounds if window == "makespan" else sbounds)[rnd]
+        span_s = span[1] - span[0]
+        replica: dict[str, list[dict]] = defaultdict(list)
+        for r, _ in items:
+            if r.get("status") == "success":
+                replica[json.loads(r["response_json"]).get("runtimeId", "")].append(r)
+        threshold: dict[str, float] = {}
+        for rid, done in replica.items():
+            responses = [json.loads(r["response_json"]) for r in done]
+            batch = int(max(x.get("maxBatchSize") or 1 for x in responses))
+            compute = sorted(float(x.get("runtimeLatencyMs") or 0.0) for x in responses)[len(responses) // 2]
+            lam = len(done) / span_s if span_s > 0 else 0.0
+            fill = (batch - 1) / lam * 1000.0 if batch > 1 and lam > 0 else 0.0
+            threshold[rid] = slo[workload] + fill + compute + ROUTER_RTT_MS
+        on_time = late = outage = overload = other = profile_over = 0
+        outage_sent = []
+        for r, sent in items:
+            error = r.get("error") or ""
+            if r.get("status") == "success":
+                x = json.loads(r["response_json"])
+                if workload in VISION:
+                    e2e = (float(r["completion"]) - float(r["actual_send"])) * 1000.0
+                    ok = e2e <= threshold[x.get("runtimeId", "")]
+                    profile_over += float(x.get("runtimeLatencyMs") or 0.0) > slo[workload]
+                else:
+                    tokens = llm_token_latency_ms(r)
+                    ttft_slo, tpot_slo = token_slo[workload]
+                    ok = tokens is not None and tokens[0] <= ttft_slo + ROUTER_RTT_MS and tokens[1] <= tpot_slo
+                    profile_over += float(x.get("ttftMs") or 0.0) > ttft_slo or float(x.get("tpotMs") or 0.0) > tpot_slo
+                on_time += ok
+                late += not ok
+            elif "404" in error:
+                outage += 1
+                outage_sent.append(sent)
+            elif "pending" in error:
+                overload += 1
+            else:
+                other += 1
+        offered = len(items)
+        completed = on_time + late
+        rows.append({
+            "live_round": rnd, "workload": workload, "window": window, "window_s": round(span_s, 3),
+            "offered": offered, "on_time": on_time, "late": late,
+            "failed_outage_404": outage, "failed_overload": overload, "failed_other": other,
+            "bad_fraction": round((late + outage + overload + other) / offered, 4) if offered else None,
+            "goodput": round(on_time / offered, 4) if offered else None,
+            "late_fraction_of_completed": round(late / completed, 4) if completed else None,
+            "over_slo_profile_basis_of_completed": round(profile_over / completed, 4) if completed else None,
+            "outage_span_s": round(max(outage_sent) - min(outage_sent), 3) if outage_sent else None,
+        })
+    return rows
+
+
 def analyze(run: Path) -> dict:
     out = run / "analysis"
     out.mkdir(exist_ok=True)
@@ -332,6 +465,9 @@ def analyze(run: Path) -> dict:
             "min_ratio": round(worst[0], 4) if worst else None, "at_round": worst[1] if worst else None,
         })
     write_csv(out / "min_ratio.csv", min_rows, list(min_rows[0].keys()))
+    ms_rows = makespan_window_metrics(run, requests, slo, token_slo)
+    if ms_rows:
+        write_csv(out / "makespan_window_metrics.csv", ms_rows, list(ms_rows[0].keys()))
     return {"run": str(run), "rounds": len(bounds), "requests": len(requests), "min_ratio": min_rows}
 
 
