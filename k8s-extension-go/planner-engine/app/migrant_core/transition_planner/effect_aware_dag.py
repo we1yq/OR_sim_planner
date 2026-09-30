@@ -956,7 +956,20 @@ def _append_effect_bridge_reconfiguration_actions(
 
 
 def _partial_effect_feasible(source_state: ClusterState, src_gpu: GPUState, partial_plan: Any, required: dict[str, float]) -> bool:
-    return action_builder._partial_reconfiguration_capacity_safe(source_state, src_gpu, partial_plan, required)
+    """Partial reconfiguration is a candidate when the source alone still
+    covers the commitment after the deletes, or when every deleted instance's
+    workload has a producer elsewhere: the deletes then get capacity edges to
+    the new producers (see the capacity gates below), as for a workload
+    replacement on a slot (_workload_replacement_possible).  Checking the
+    source alone sent partials whose workload had no spare capacity to a
+    bridge, borrowing a GPU (E1 R5)."""
+    if action_builder._partial_reconfiguration_capacity_safe(source_state, src_gpu, partial_plan, required):
+        return True
+    delete_slots = set(partial_plan.delete_slots)
+    for inst in src_gpu.instances:
+        if (inst.start, inst.end, inst.profile) in delete_slots and not _same_workload_producer_exists(source_state, inst.workload, exclude=inst):
+            return False
+    return True
 
 
 def _append_preserved_slot_serving_updates(
