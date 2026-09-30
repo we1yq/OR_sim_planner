@@ -1,0 +1,183 @@
+# Fast-start release (2026-09-30), built from commit 5c8b743: as split-20260930, but the
+# HTTP process does not import the model libraries and the executor skips the
+# redundant nvidia-smi check on batch re-activation.  Runtimes run
+# inference in a spawned single-threaded child process and serve HTTP from a
+# parent pinned to the node's frontend CPUs (mig.or-sim.io/runtime-frontend-cpus);
+# control-plane image for the transition-executor that passes
+# OR_SIM_FRONTEND_CPU_SET.  Runtime images overlay the *-batchctl-20260926 bases.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-fast-llama-runtime-20260930
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.llama32-3b \
+                --destination=localhost:10690/migrant-model-runtime:llama32-3b-fast-20260930 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-fast-runtime-context-20260930
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-fast-gpt2-runtime-20260930
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.gpt2-medium \
+                --destination=localhost:10690/migrant-model-runtime:gpt2-medium-fast-20260930 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-fast-runtime-context-20260930
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-fast-vision-runtime-20260930
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.torchvision \
+                --destination=localhost:10690/migrant-model-runtime:torchvision-fast-20260930 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-fast-runtime-context-20260930
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-fast-control-plane-20260930
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.control-plane \
+                --destination=localhost:10690/migrant-control-plane:fast-20260930 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-fast-cp-context-20260930

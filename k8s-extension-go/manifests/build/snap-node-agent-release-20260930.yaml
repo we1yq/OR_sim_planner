@@ -1,0 +1,46 @@
+# node-agent built from commit 3ce56d7: /processes?migUuid= requests share one MIG
+# process snapshot (a request only shares a snapshot started after it arrived).
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-snap-node-agent-20260930
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.node-agent \
+                --destination=localhost:10690/migrant-node-agent:snap-20260930 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-snap-node-agent-context-20260930
