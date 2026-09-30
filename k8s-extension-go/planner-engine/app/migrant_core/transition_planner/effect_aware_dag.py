@@ -964,20 +964,23 @@ def _partial_effect_feasible(
     required: dict[str, float],
 ) -> bool:
     """Partial reconfiguration is a candidate when, per workload, the source
-    capacity left after this GPU's deletes plus the capacity the target
-    creates covers the commitment.  Checking the source alone sent partials
-    whose workload had no spare capacity to a bridge that borrows a GPU (E1
-    R5), although the capacity gates make each delete wait for enough new
+    capacity left after this GPU's deletes plus the capacity the target adds
+    elsewhere covers the commitment.  Checking the source alone sent partials
+    whose workload had no spare capacity to a bridge that borrows a GPU,
+    although the capacity gates make each delete wait for enough new
     producers.
 
-    New slots on other GPUs all count.  A new slot on this GPU counts only
-    if it overlaps none of the deleted slots: one that does can only be
-    created after the delete, so it cannot cover it (the rule
-    _same_physical_capacity_dependency_allowed applies to capacity edges).
-    Same rule as eval."""
+    Added capacity is what can be ready before this GPU's deletes:
+      - on other GPUs, every new instance, and on a kept slot (same slot and
+        workload) the growth of mu from a batch change;
+      - on this GPU, only its preserved slots (a workload swapped in, or the
+        mu growth of a batch change).  The slots this partial creates come
+        from the configure_partial_profile that runs after all its deletes,
+        so they cannot cover them, overlapping or not."""
     if action_builder._partial_reconfiguration_capacity_safe(source_state, src_gpu, partial_plan, required):
         return True
     delete_slots = set(partial_plan.delete_slots)
+    preserve_slots = set(partial_plan.preserve_slots)
     available = provided_by_workload(source_state)
     for inst in src_gpu.instances:
         if (inst.start, inst.end, inst.profile) in delete_slots and inst.workload is not None:
@@ -985,15 +988,18 @@ def _partial_effect_feasible(
     source_gpus = gpu_map_by_id(source_state)
     for tgt in target_state.real_gpus():
         src = source_gpus.get(tgt.gpu_id)
-        existing = set() if src is None else {(inst.start, inst.end, inst.profile, inst.workload) for inst in src.instances}
+        kept = {} if src is None else {
+            (inst.start, inst.end, inst.profile, inst.workload): float(inst.mu) for inst in src.instances
+        }
         for inst in tgt.instances:
-            if inst.workload is None or (inst.start, inst.end, inst.profile, inst.workload) in existing:
+            if inst.workload is None:
                 continue
-            if tgt.gpu_id == gpu_id and any(
-                max(int(inst.start), int(start)) < min(int(inst.end), int(end)) for start, end, _ in delete_slots
-            ):
+            if tgt.gpu_id == gpu_id and (inst.start, inst.end, inst.profile) not in preserve_slots:
                 continue
-            available[inst.workload] = available.get(inst.workload, 0.0) + float(inst.mu)
+            key = (inst.start, inst.end, inst.profile, inst.workload)
+            added = float(inst.mu) - kept[key] if key in kept else float(inst.mu)
+            if added > 0.0:
+                available[inst.workload] = available.get(inst.workload, 0.0) + added
     return all(available.get(workload, 0.0) + 1e-9 >= float(rate) for workload, rate in required.items())
 
 
