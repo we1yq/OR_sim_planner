@@ -598,3 +598,17 @@ func TestTemporaryCapacityRuntimeResolvesFromExecutionRuntimes(t *testing.T) {
 		t.Fatalf("unexpected runtime %+v", rt)
 	}
 }
+
+func TestTargetPhysicalIDsLeaveOutBorrowedGPUs(t *testing.T) {
+	targetState := map[string]any{
+		"gpus":     []any{map[string]any{"gpuId": 1, "instances": []any{}}},
+		"metadata": map[string]any{"physical_id_map": map[string]any{"1": "ampere-gpu1", "1001": "rtx1-worker-gpu0"}},
+	}
+	got := targetPhysicalIDs(targetState)
+	if !got["ampere-gpu1"] || got["rtx1-worker-gpu0"] || len(got) != 1 {
+		t.Fatalf("expected only the target GPU, got %v", got)
+	}
+	if targetPhysicalIDs(map[string]any{}) != nil {
+		t.Fatalf("no target GPUs should not filter")
+	}
+}

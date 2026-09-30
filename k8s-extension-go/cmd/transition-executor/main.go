@@ -1269,10 +1269,13 @@ func persistFinalLogicalBindings(client *kube.Client, planName string, spec map[
 	now := time.Now().Format(time.RFC3339Nano)
 	logicalBindingLedgerMu.Lock()
 	defer logicalBindingLedgerMu.Unlock()
+	// physical_id_map also names GPUs the transition only borrowed (Stage 3
+	// temporary capacity) and has returned by now; only target GPUs stay bound.
+	inTarget := targetPhysicalIDs(asMap(asMap(asMap(spec["validationTargets"])["targetAllocationPlan"])["targetState"]))
 	ledger := loadLogicalBindingLedger(client)
 	bindings := map[string]any{}
 	for logicalID, physicalID := range physicalByLogical {
-		if physicalID == "" {
+		if physicalID == "" || (inTarget != nil && !inTarget[physicalID]) {
 			continue
 		}
 		bindings[physicalID] = map[string]any{
@@ -1292,6 +1295,36 @@ func persistFinalLogicalBindings(client *kube.Client, planName string, spec map[
 	ledger["updatedAt"] = now
 	ledger["lastPlanName"] = planName
 	return persistLogicalBindingLedger(client, ledger)
+}
+
+// targetPhysicalIDs returns the physical GPUs of the target state's GPUs, or
+// nil when the target state lists none.
+func targetPhysicalIDs(targetState map[string]any) map[string]bool {
+	gpus := asSlice(targetState["gpus"])
+	if len(gpus) == 0 {
+		return nil
+	}
+	metadata := asMap(targetState["metadata"])
+	physicalByLogical := stringMap(metadata, "physical_id_map")
+	displayIDs := stringMap(metadata, "display_id_map")
+	out := map[string]bool{}
+	for _, rawGPU := range gpus {
+		gpu := asMap(rawGPU)
+		logicalID := asString(gpu["gpuId"])
+		if logicalID == "" {
+			if id, ok := intString(gpu["gpuId"]); ok {
+				logicalID = id
+			}
+		}
+		physicalID := physicalByLogical[logicalID]
+		if physicalID == "" {
+			physicalID = physicalByLogical[displayIDs[logicalID]]
+		}
+		if physicalID != "" {
+			out[physicalID] = true
+		}
+	}
+	return out
 }
 
 func finalPhysicalIDMap(spec map[string]any) map[string]string {
