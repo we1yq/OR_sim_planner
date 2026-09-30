@@ -553,3 +553,24 @@ func TestMissingIDs(t *testing.T) {
 		t.Fatalf("missingIDs = %v", got)
 	}
 }
+
+func TestRuntimeContainerPredates(t *testing.T) {
+	pod := func(started string, restarts any) map[string]any {
+		return map[string]any{"status": map[string]any{"containerStatuses": []any{
+			map[string]any{"name": "runtime", "restartCount": restarts, "state": map[string]any{"running": map[string]any{"startedAt": started}}},
+		}}}
+	}
+	action := time.Date(2026, 9, 30, 4, 47, 50, 0, time.UTC)
+	if !runtimeContainerPredates(pod("2026-09-30T04:46:19Z", 0), action) {
+		t.Fatal("a container started 91 s before the action predates it")
+	}
+	if runtimeContainerPredates(pod("2026-09-30T04:47:48Z", 0), action) {
+		t.Fatal("a container started within the grace must get the full CUDA check")
+	}
+	if runtimeContainerPredates(pod("2026-09-30T04:46:19Z", 1), action) {
+		t.Fatal("a restarted container must get the full CUDA check")
+	}
+	if runtimeContainerPredates(pod("", 0), action) || runtimeContainerPredates(pod("2026-09-30T04:46:19Z", 0), time.Time{}) {
+		t.Fatal("unknown start or action time must get the full CUDA check")
+	}
+}

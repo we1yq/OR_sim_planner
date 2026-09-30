@@ -2932,6 +2932,25 @@ func waitForOneRuntimeReadyAndCUDA(client *kube.Client, nodes map[string]string,
 		return nil, readiness, fmt.Errorf("runtime %s got MIG UUID %s, expected %s", rt.Model, migUUID, rt.ExpectedMIGUUID)
 	}
 	parentGPUUUID, _ := parentGPUUUIDForRuntime(nodes[rt.Node], rt)
+	if runtimeContainerPredates(pod, deploymentCreatedAt) {
+		// The container was already running before this action (a batch
+		// change on a replica whose CUDA placement was verified when it was
+		// placed).  Health and the reported MIG UUID are checked above; the
+		// nvidia-smi process query (1.5-2.7 s per call under load) would only
+		// re-confirm the same process.
+		readiness["cudaVerification"] = "skipped: runtime container predates this action"
+		return map[string]any{
+			"node":                    rt.Node,
+			"gpu":                     rt.GPU,
+			"slotResource":            rt.SlotResource,
+			"deviceResource":          rt.DeviceResource,
+			"expectedMigUUID":         rt.ExpectedMIGUUID,
+			"migUUID":                 migUUID,
+			"parentGPUUUID":           parentGPUUUID,
+			"cudaVerificationSkipped": true,
+			"health":                  health,
+		}, readiness, nil
+	}
 	processes, foundAt, err := waitForCUDAProcess(nodes[rt.Node], migUUID, parentGPUUUID, deadline)
 	if err != nil {
 		return nil, readiness, fmt.Errorf("runtime %s CUDA verification failed: %w", rt.Model, err)
@@ -2948,6 +2967,26 @@ func waitForOneRuntimeReadyAndCUDA(client *kube.Client, nodes map[string]string,
 		"processes":       processes,
 		"health":          health,
 	}, readiness, nil
+}
+
+// runtimeContainerStartGrace allows for the whole-second resolution of the
+// container start time when deciding that a container predates an action.
+const runtimeContainerStartGrace = 5 * time.Second
+
+// runtimeContainerPredates reports whether the runtime container started
+// before `since` (by more than the grace) and has not restarted.
+func runtimeContainerPredates(pod map[string]any, since time.Time) bool {
+	started, err := time.Parse(time.RFC3339, runtimeContainerStartedAt(pod))
+	if err != nil || since.IsZero() {
+		return false
+	}
+	for _, raw := range asSlice(asMap(pod["status"])["containerStatuses"]) {
+		container := asMap(raw)
+		if asString(container["name"]) == "runtime" && fmt.Sprint(container["restartCount"]) != "0" {
+			return false
+		}
+	}
+	return started.Before(since.Add(-runtimeContainerStartGrace))
 }
 
 func waitForRuntimePod(client *kube.Client, rt system.ModelRuntimeSpec, deadline time.Time, readiness map[string]any, deploymentCreatedAt time.Time) (map[string]any, error) {

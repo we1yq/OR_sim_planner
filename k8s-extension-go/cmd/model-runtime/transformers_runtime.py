@@ -65,18 +65,32 @@ def apply_cpu_exclude() -> str:
 
 CPU_AFFINITY = apply_cpu_exclude()
 
-try:
-    import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList
-except Exception as exc:  # pragma: no cover - surfaced through /healthz
+# The HTTP process (this module run as __main__) never touches CUDA, so it
+# skips the model libraries; only the spawned inference child (which
+# re-imports this module as __mp_main__) imports them.  Importing torch in
+# both processes, one after the other, added seconds to every runtime start.
+HTTP_PROCESS = __name__ == "__main__"
+
+if HTTP_PROCESS:
     torch = None
     AutoModelForCausalLM = None
     AutoTokenizer = None
     StoppingCriteria = object
     StoppingCriteriaList = None
-    IMPORT_ERROR = str(exc)
-else:
     IMPORT_ERROR = ""
+else:
+    try:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList
+    except Exception as exc:  # pragma: no cover - surfaced through /healthz
+        torch = None
+        AutoModelForCausalLM = None
+        AutoTokenizer = None
+        StoppingCriteria = object
+        StoppingCriteriaList = None
+        IMPORT_ERROR = str(exc)
+    else:
+        IMPORT_ERROR = ""
 
 
 class FirstTokenMark(StoppingCriteria):
