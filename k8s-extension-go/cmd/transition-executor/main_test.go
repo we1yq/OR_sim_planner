@@ -574,3 +574,27 @@ func TestRuntimeContainerPredates(t *testing.T) {
 		t.Fatal("unknown start or action time must get the full CUDA check")
 	}
 }
+
+func TestTemporaryCapacityRuntimeResolvesFromExecutionRuntimes(t *testing.T) {
+	target := map[string]any{"model": "vgg16_image", "gpu": "ampere-gpu0", "slotResource": "or-sim.io/ampere-gpu0-s4-6-2g", "profile": "2g", "hostPort": 10685, "batchSize": 16}
+	temp := map[string]any{"model": "resnet50_image", "gpu": "rtx1-worker-gpu0", "slotResource": "or-sim.io/rtx1-worker-gpu0-s0-2-2g", "profile": "2g", "hostPort": 10681, "batchSize": 1}
+	spec := map[string]any{"summary": map[string]any{
+		"desiredRuntimes":   []any{target},
+		"executionRuntimes": []any{target, temp},
+	}}
+	action := map[string]any{"type": "place_instance", "workload": "resnet50_image", "physical_gpu_id": "rtx1-worker-gpu0", "slot": []any{0, 2, "2g"}}
+	if _, err := targetRuntimeForAction(action, parseRuntimes(spec)); err == nil {
+		t.Fatalf("temporary runtime should not be part of the target runtimes")
+	}
+	runtimes := parseExecutionRuntimes(spec)
+	if len(runtimes) != 2 {
+		t.Fatalf("expected target and temporary runtime once each, got %d", len(runtimes))
+	}
+	rt, err := targetRuntimeForAction(action, runtimes)
+	if err != nil {
+		t.Fatalf("temporary runtime not resolved: %v", err)
+	}
+	if rt.HostPort != 10681 || rt.GPU != "rtx1-worker-gpu0" {
+		t.Fatalf("unexpected runtime %+v", rt)
+	}
+}

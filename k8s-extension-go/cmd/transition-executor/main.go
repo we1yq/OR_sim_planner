@@ -123,7 +123,7 @@ func reconcile(client *kube.Client, router string) error {
 		} else {
 			trace.SetMetric("routerMonitor", snapshot)
 		}
-		runtimes := parseRuntimes(spec)
+		runtimes := parseExecutionRuntimes(spec)
 		actions := parseActionNodes(spec)
 		sourceGpuCount := intNumber(asMap(spec["summary"])["sourceGpuCount"])
 		targetGpuCount := firstNonZeroInt(intNumber(asMap(spec["summary"])["targetGpuCount"]), intNumber(spec["targetGpuCount"]))
@@ -3545,6 +3545,29 @@ func parseRuntimes(spec map[string]any) []system.ModelRuntimeSpec {
 	if len(items) == 0 {
 		items = asSlice(asMap(spec["podLifecyclePreview"])["desiredRuntimes"])
 	}
+	return runtimeSpecsFromItems(items)
+}
+
+// parseExecutionRuntimes returns the runtimes actions may deploy: the target
+// runtimes plus those only the transition needs (Stage 3 temporary capacity),
+// which the planner lists in summary.executionRuntimes but not in the target.
+func parseExecutionRuntimes(spec map[string]any) []system.ModelRuntimeSpec {
+	out := parseRuntimes(spec)
+	seen := map[string]bool{}
+	for _, rt := range out {
+		seen[rt.Model+"|"+rt.GPU+"|"+rt.SlotResource] = true
+	}
+	for _, rt := range runtimeSpecsFromItems(asSlice(asMap(spec["summary"])["executionRuntimes"])) {
+		key := rt.Model + "|" + rt.GPU + "|" + rt.SlotResource
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, rt)
+		}
+	}
+	return out
+}
+
+func runtimeSpecsFromItems(items []any) []system.ModelRuntimeSpec {
 	out := []system.ModelRuntimeSpec{}
 	for _, item := range items {
 		m := asMap(item)
