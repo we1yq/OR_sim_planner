@@ -957,11 +957,11 @@ type migProcessSnapshot struct {
 	processes string
 }
 
-// migProcessSnapshots shares snapshots among /processes?migUuid= requests that
-// wait at the same time.  Under load one snapshot takes 1.5-2.7 s and
+// migProcessSnapshots shares one snapshot among the /processes?migUuid=
+// requests that arrive while it is taken.  Under load one snapshot takes 1.5-2.7 s and
 // concurrent nvidia-smi calls queue in the driver, so the runtimes placed
 // together in one transition used to wait 7-10 s for each other's checks.
-var migProcessSnapshots = &freshShared[migProcessSnapshot]{fn: takeMIGProcessSnapshot}
+var migProcessSnapshots = &sharedRun[migProcessSnapshot]{fn: takeMIGProcessSnapshot}
 
 func takeMIGProcessSnapshot() (migProcessSnapshot, string, error) {
 	snap := migProcessSnapshot{instances: map[string][]gpuInstance{}}
@@ -1019,52 +1019,43 @@ func activeComputeProcessesForMIGUUID(migUUID string) ([]string, string, map[str
 	return processes, snap.processes, location, nil
 }
 
-// freshShared runs fn once for all callers waiting at the same time, but a
-// caller only shares a run that starts after it arrived, so its result is
-// never older than its request.
-type freshShared[T any] struct {
-	fn      func() (T, string, error)
-	mu      sync.Mutex
-	running bool
-	next    *freshCall[T]
+// sharedRun runs fn once for all callers that arrive while it runs; a caller
+// arriving when no run is in progress starts one.  A result can therefore be
+// up to one run older than the request.  That is enough for the executor's
+// CUDA check: the runtime's CUDA context exists seconds before its health
+// check passes and the executor asks, and a check that misses the process is
+// simply repeated.  (Waiting for a run that starts after the request, as
+// before, doubled the wait of a lone activation: 1.0 -> 3.8-4.0 s in E1 R4.)
+type sharedRun[T any] struct {
+	fn   func() (T, string, error)
+	mu   sync.Mutex
+	call *sharedCall[T]
 }
 
-type freshCall[T any] struct {
+type sharedCall[T any] struct {
 	done chan struct{}
 	val  T
 	raw  string
 	err  error
 }
 
-func (f *freshShared[T]) do() (T, string, error) {
+func (f *sharedRun[T]) do() (T, string, error) {
 	f.mu.Lock()
-	if f.next == nil {
-		f.next = &freshCall[T]{done: make(chan struct{})}
-	}
-	c := f.next
-	if !f.running {
-		f.running = true
-		go f.loop()
+	c := f.call
+	if c == nil {
+		c = &sharedCall[T]{done: make(chan struct{})}
+		f.call = c
+		f.mu.Unlock()
+		c.val, c.raw, c.err = f.fn()
+		f.mu.Lock()
+		f.call = nil
+		f.mu.Unlock()
+		close(c.done)
+		return c.val, c.raw, c.err
 	}
 	f.mu.Unlock()
 	<-c.done
 	return c.val, c.raw, c.err
-}
-
-func (f *freshShared[T]) loop() {
-	for {
-		f.mu.Lock()
-		c := f.next
-		f.next = nil
-		if c == nil {
-			f.running = false
-			f.mu.Unlock()
-			return
-		}
-		f.mu.Unlock()
-		c.val, c.raw, c.err = f.fn()
-		close(c.done)
-	}
 }
 
 func listGPUInstances(gpuIndex string) ([]gpuInstance, string, error) {

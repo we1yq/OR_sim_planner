@@ -184,11 +184,11 @@ func TestHostLockDoesNotWaitForGPULock(t *testing.T) {
 	}
 }
 
-func TestFreshSharedOnlySharesRunsStartedAfterArrival(t *testing.T) {
+func TestSharedRunSharesTheRunInProgress(t *testing.T) {
 	var mu sync.Mutex
 	runs := 0
 	release := make(chan struct{})
-	f := &freshShared[int]{fn: func() (int, string, error) {
+	f := &sharedRun[int]{fn: func() (int, string, error) {
 		mu.Lock()
 		runs++
 		n := runs
@@ -197,31 +197,26 @@ func TestFreshSharedOnlySharesRunsStartedAfterArrival(t *testing.T) {
 		return n, "", nil
 	}}
 
-	first := make(chan int)
-	go func() { v, _, _ := f.do(); first <- v }()
+	got := make(chan int, 4)
+	go func() { v, _, _ := f.do(); got <- v }()
 	waitFor(t, func() bool { mu.Lock(); defer mu.Unlock(); return runs == 1 })
-
-	// Three callers arrive while run 1 is in progress: they must share run 2.
-	later := make(chan int, 3)
+	// Three callers arrive while run 1 is in progress: they share it.
 	for i := 0; i < 3; i++ {
-		go func() { v, _, _ := f.do(); later <- v }()
+		go func() { v, _, _ := f.do(); got <- v }()
 	}
 	time.Sleep(50 * time.Millisecond)
-	release <- struct{}{} // finish run 1
-	if v := <-first; v != 1 {
-		t.Fatalf("first caller got run %d, want 1", v)
-	}
-	waitFor(t, func() bool { mu.Lock(); defer mu.Unlock(); return runs == 2 })
-	release <- struct{}{} // finish run 2
-	for i := 0; i < 3; i++ {
-		if v := <-later; v != 2 {
-			t.Fatalf("late caller got run %d, want 2", v)
+	release <- struct{}{}
+	for i := 0; i < 4; i++ {
+		if v := <-got; v != 1 {
+			t.Fatalf("caller got run %d, want 1", v)
 		}
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	if runs != 2 {
-		t.Fatalf("runs = %d, want 2", runs)
+	// A caller arriving after the run finished starts a new one.
+	go func() { v, _, _ := f.do(); got <- v }()
+	waitFor(t, func() bool { mu.Lock(); defer mu.Unlock(); return runs == 2 })
+	release <- struct{}{}
+	if v := <-got; v != 2 {
+		t.Fatalf("later caller got run %d, want 2", v)
 	}
 }
 
