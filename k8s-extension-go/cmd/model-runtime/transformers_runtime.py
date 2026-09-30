@@ -518,6 +518,9 @@ class InferenceProcess:
         self.load_error = info.get("load_error", "")
         self.model = True if info["loaded"] else None
         threading.Thread(target=self._reader, name="inference-reader", daemon=True).start()
+        self._snapshot_lock = threading.Lock()
+        self._refreshing = False
+        self._snapshot = self._call("snapshot")
 
     def _reader(self) -> None:
         try:
@@ -562,12 +565,39 @@ class InferenceProcess:
         return out
 
     def control_batch(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        return self._call("control_batch", payload)
+        out = self._call("control_batch", payload)
+        # verify_batch reads batchSize from /metrics right after this returns.
+        self._snapshot = self._call("snapshot")
+        return out
 
     def snapshot(self) -> dict[str, Any]:
-        out = self._call("snapshot") if not self._dead else {"model": self.model_name, "loadError": self._dead, "loaded": False}
+        # /healthz and /metrics answer from a cached copy instead of queueing
+        # behind the request the child is running: an LLM generate takes up to
+        # several seconds and the router drops a route whose /healthz misses
+        # its 3 s timeout three times in a row.  Each call starts at most one
+        # background refresh, so the copy lags by at most one request.
+        if self._dead:
+            out = {"model": self.model_name, "loadError": self._dead, "loaded": False}
+        else:
+            self._refresh_snapshot_async()
+            out = dict(self._snapshot)
         out["frontendCpuAffinity"] = FRONTEND_CPU_AFFINITY
         return out
+
+    def _refresh_snapshot_async(self) -> None:
+        with self._snapshot_lock:
+            if self._refreshing:
+                return
+            self._refreshing = True
+        threading.Thread(target=self._refresh_snapshot, name="snapshot-refresh", daemon=True).start()
+
+    def _refresh_snapshot(self) -> None:
+        try:
+            self._snapshot = self._call("snapshot")
+        except RuntimeError:
+            pass
+        finally:
+            self._refreshing = False
 
     def record(self, *args: Any, **kwargs: Any) -> None:
         try:
