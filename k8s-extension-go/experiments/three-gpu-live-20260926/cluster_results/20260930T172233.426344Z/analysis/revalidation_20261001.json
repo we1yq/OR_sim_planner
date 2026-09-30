@@ -1,0 +1,5 @@
+{
+ "revalidatedAt": "2026-10-01",
+ "errors": [],
+ "note": "The runner's output validation required every round to have action statuses. R3 and R5 of this mu=0.93 run are no-op rounds (0 planned actions; the R2/R4 layout already covers their demand), so it reported 'incomplete actions' and exited 1. The validator now only requires statuses when the plan has actions; re-running it on this run gives no errors. audit_makespan_run.py --expected-rounds 11: ok, 0 errors."
+}

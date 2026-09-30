@@ -1,0 +1,52 @@
+{
+  "action_counts": {
+    "by_category": {
+      "create_instance": 3,
+      "gpu_acquire": 1,
+      "instance_update": 3,
+      "other": 2,
+      "reconfiguration": 1,
+      "routing": 4
+    },
+    "by_status": {
+      "completed": 14
+    },
+    "by_type": {
+      "activate_instance_route": 4,
+      "allocate_gpu": 1,
+      "apply_batch": 1,
+      "bind_target_gpu": 1,
+      "configure_full_template": 1,
+      "patch_batch_config": 1,
+      "place_instance": 3,
+      "register_mig_devices": 1,
+      "verify_batch": 1
+    },
+    "total": 14
+  },
+  "capacity_uncertain_events": 0,
+  "finalValidation": {
+    "actualMigSlotCount": 8,
+    "actualRuntimeCount": 7,
+    "expectedMigSlotCount": 8,
+    "expectedRuntimeCount": 7,
+    "extraMigSlots": [],
+    "extraRuntimeBindings": [],
+    "liveBatchFailures": [],
+    "missingMigSlots": [],
+    "missingRuntimeBindings": [],
+    "ok": true
+  },
+  "finalValidationOk": true,
+  "gpu_capacity": 3,
+  "headroom": 1.0,
+  "live_round": 9,
+  "makespan_reason": null,
+  "makespan_seconds": 22.925576,
+  "peak_active_gpu_count": 2.0,
+  "phase": "R9",
+  "planner_makespan_seconds": 0.09067369624972343,
+  "reached_target": true,
+  "run_id": "20260930T172233.426344Z",
+  "trace_round": 12
+}

@@ -1,0 +1,39 @@
+{
+  "actionCount": 36,
+  "actionCounts": {
+    "clear_gpu_binding": 3,
+    "clear_template": 3,
+    "deactivate_instance_route": 9,
+    "delete_instance": 9,
+    "return_gpu": 3,
+    "wait_instance_drain": 9
+  },
+  "allActionsCompleted": true,
+  "errors": [],
+  "finalValidation": {
+    "errors": [],
+    "observedPhysicalIds": [
+      "ampere-gpu0",
+      "ampere-gpu1",
+      "rtx1-worker-gpu0"
+    ],
+    "ok": true,
+    "routesObserved": 0,
+    "targetPhysicalIds": []
+  },
+  "includedInMeasuredTwelveRoundAggregate": false,
+  "makespanSeconds": 0.08772268518805504,
+  "ok": true,
+  "planName": "plan-live-v2-20260930t172233426344z-r13",
+  "planPhase": "Executed",
+  "purpose": "explicit-zero-demand-cleanup",
+  "queueCounts": {
+    "active": 0,
+    "available": 3,
+    "transitioning": 0
+  },
+  "round": 13,
+  "routeCount": 0,
+  "runId": "20260930T172233.426344Z",
+  "runtimePodCount": 0
+}

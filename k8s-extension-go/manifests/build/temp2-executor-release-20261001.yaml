@@ -1,0 +1,48 @@
+# Temp-capacity executor (2026-10-01), built from commit 37615f0: the
+# transition-executor resolves Stage 3 temporary-capacity runtimes from
+# summary.executionRuntimes and leaves borrowed GPUs out of the final
+# logical-binding ledger.  Only transition-executor switches to it.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrant-temp2-control-plane-20261001
+  namespace: or-sim
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: or-sim-control-plane
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:debug
+          imagePullPolicy: IfNotPresent
+          command:
+            - /busybox/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /workspace/context
+              tar -xzf /input/context.tar.gz -C /workspace/context
+              /kaniko/executor \
+                --context=/workspace/context \
+                --dockerfile=/workspace/context/Dockerfile.control-plane \
+                --destination=localhost:10690/migrant-control-plane:temp2-20261001 \
+                --insecure \
+                --insecure-pull \
+                --skip-tls-verify \
+                --skip-tls-verify-pull
+          volumeMounts:
+            - name: context
+              mountPath: /input
+              readOnly: true
+      volumes:
+        - name: context
+          configMap:
+            name: migrant-temp2-cp-context-20261001

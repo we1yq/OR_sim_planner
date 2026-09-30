@@ -1847,7 +1847,9 @@ def _validate_makespan_outputs(root: Path, *, expected_rounds: int, first_round:
             plan = json.loads((root / "plans" / f"r{round_number:02d}_terminal_plan.json").read_text(encoding="utf-8"))
             if _mapping(_mapping(plan).get("status")).get("phase") != "Executed": errors.append(f"round {round_number} terminal plan not Executed")
             statuses = _items(_mapping(_mapping(plan).get("status")).get("actionStatuses"))
-            if not statuses or any(_mapping(item).get("status") != "completed" for item in statuses): errors.append(f"round {round_number} has incomplete actions")
+            # a round whose demand the current layout already covers has no actions
+            planned = _items(_mapping(_mapping(_mapping(plan).get("spec")).get("actionDag")).get("nodes"))
+            if (planned and not statuses) or any(_mapping(item).get("status") != "completed" for item in statuses): errors.append(f"round {round_number} has incomplete actions")
             final = _mapping(_mapping(_mapping(_mapping(plan).get("status")).get("transitionExecution")).get("metrics")).get("finalValidation")
             if not _mapping(final).get("ok"): errors.append(f"round {round_number} lacks successful executor finalValidation")
         except (OSError, ValueError, json.JSONDecodeError) as exc:

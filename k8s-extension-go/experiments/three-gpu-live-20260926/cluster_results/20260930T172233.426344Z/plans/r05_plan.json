@@ -1,0 +1,2641 @@
+{
+  "apiVersion": "mig.or-sim.io/v1alpha1",
+  "kind": "MigActionPlan",
+  "metadata": {
+    "creationTimestamp": "2026-09-30T17:28:17Z",
+    "generation": 1,
+    "labels": {
+      "app.kubernetes.io/name": "migrant-go",
+      "mig.or-sim.io/component": "planner-controller"
+    },
+    "name": "plan-live-v2-20260930t172233426344z-r05",
+    "namespace": "or-sim-exp",
+    "resourceVersion": "61546961",
+    "uid": "4002cdcd-fd31-45cc-a3e6-5875a0b36a0a"
+  },
+  "spec": {
+    "abstractActions": [],
+    "actionCount": 0,
+    "actionDag": {
+      "actionCount": 0,
+      "criticalPathLength": 0,
+      "edgeCount": 0,
+      "name": "epoch-three-gpu-live-20260926-r05-final",
+      "nodeCount": 0,
+      "nodes": [],
+      "phaseCount": 0,
+      "phases": [],
+      "representation": "migrant.phased-action-dag/v1",
+      "roots": []
+    },
+    "currentAllocationRef": "physicalgpuregistries/default",
+    "executor": "go-transition-executor",
+    "phaseGate": "manual",
+    "plannerMetadata": {
+      "metrics": {
+        "actionCount": 0,
+        "elapsedSec": 0.0014267154037952423,
+        "feasibleOptionBuildElapsedSec": 0.11391454190015793,
+        "finalActiveGpu": 2,
+        "gpuCount": 2,
+        "iterationCount": 1,
+        "milpElapsedSec": 0.052153587341308594,
+        "peakActiveGpu": 2,
+        "plannerMakespanSec": 0.06423403695225716,
+        "sourceActiveGpu": 2,
+        "stage1ElapsedSec": 0.052153587341308594,
+        "stage2ElapsedSec": 0.01065373420715332,
+        "stage3ElapsedSec": 0.0014267154037952423,
+        "targetBuildElapsedSec": 0.01065373420715332,
+        "transitionPlanningElapsedSec": 0.0014267154037952423
+      },
+      "pipeline": "source -> feasible-options -> milp -> target-build -> effect_aware_dag -> canonical-next-state",
+      "planner": "original-gurobi-milp-exact-stage2-effect-aware-dag",
+      "plannerEngineElapsedSec": 0.2297201007604599,
+      "plannerMessage": "epoch-three-gpu-live-20260926-r05: planned with real MILP target builder and effect_aware_dag transition planner",
+      "plannerPhase": "ReachedTarget",
+      "planningTrace": {
+        "canonicalization": {
+          "canonicalGpuCount": 2,
+          "canonicalPhysicalIds": {
+            "0": "ampere-gpu0",
+            "1": "ampere-gpu1"
+          },
+          "freePhysicalGpuPool": [
+            "rtx1-worker-gpu0"
+          ],
+          "note": "Planner-engine canonicalization predicts the post-action state. The transition-executor validates the actual post-action GPU/MIG state after hardware execution."
+        },
+        "currentStateFeasibility": {
+          "a100ValidLayout": true,
+          "capacityByWorkload": {
+            "gpt2_p512_o512": 0.163,
+            "gpt2_p64_o64": 1.327,
+            "llama_p1024_o128": 0,
+            "llama_p2048_o64": 0.594,
+            "resnet50_image": 370.33500000000004,
+            "vgg16_image": 553.509,
+            "vit_base_image": 131.391
+          },
+          "feasible": true,
+          "gpuModel": "A100",
+          "phase": "CurrentStateSatisfiesDemand",
+          "reasons": [],
+          "recommendedAction": "no-op",
+          "safetyFactor": 1,
+          "targetByWorkload": {
+            "gpt2_p512_o512": 0.0853080568720379,
+            "gpt2_p64_o64": 0.232258064516129,
+            "llama_p1024_o128": 0,
+            "llama_p2048_o64": 0,
+            "resnet50_image": 91.3690271927075,
+            "vgg16_image": 462.9532710280373,
+            "vit_base_image": 122.60061919504642
+          },
+          "workloads": [
+            {
+              "currentCapacity": 370.33500000000004,
+              "requiredWithSafetyFactor": 91.3690271927075,
+              "satisfied": true,
+              "targetArrival": 91.3690271927075,
+              "workload": "resnet50_image"
+            },
+            {
+              "currentCapacity": 553.509,
+              "requiredWithSafetyFactor": 462.9532710280373,
+              "satisfied": true,
+              "targetArrival": 462.9532710280373,
+              "workload": "vgg16_image"
+            },
+            {
+              "currentCapacity": 131.391,
+              "requiredWithSafetyFactor": 122.60061919504642,
+              "satisfied": true,
+              "targetArrival": 122.60061919504642,
+              "workload": "vit_base_image"
+            },
+            {
+              "currentCapacity": 1.327,
+              "requiredWithSafetyFactor": 0.232258064516129,
+              "satisfied": true,
+              "targetArrival": 0.232258064516129,
+              "workload": "gpt2_p64_o64"
+            },
+            {
+              "currentCapacity": 0.163,
+              "requiredWithSafetyFactor": 0.0853080568720379,
+              "satisfied": true,
+              "targetArrival": 0.0853080568720379,
+              "workload": "gpt2_p512_o512"
+            },
+            {
+              "currentCapacity": 0,
+              "requiredWithSafetyFactor": 0,
+              "satisfied": true,
+              "targetArrival": 0,
+              "workload": "llama_p1024_o128"
+            },
+            {
+              "currentCapacity": 0.594,
+              "requiredWithSafetyFactor": 0,
+              "satisfied": true,
+              "targetArrival": 0,
+              "workload": "llama_p2048_o64"
+            }
+          ]
+        },
+        "feasibleOptions": {
+          "byProfile": [
+            {
+              "optionCount": 12,
+              "profile": "1g"
+            },
+            {
+              "optionCount": 16,
+              "profile": "2g"
+            },
+            {
+              "optionCount": 18,
+              "profile": "3g"
+            },
+            {
+              "optionCount": 19,
+              "profile": "4g"
+            },
+            {
+              "optionCount": 19,
+              "profile": "7g"
+            }
+          ],
+          "byWorkload": [
+            {
+              "batches": [
+                1
+              ],
+              "maxMu": 0.171,
+              "optionCount": 5,
+              "profiles": [
+                "1g",
+                "2g",
+                "3g",
+                "4g",
+                "7g"
+              ],
+              "workload": "gpt2_p512_o512"
+            },
+            {
+              "batches": [
+                1
+              ],
+              "maxMu": 1.387,
+              "optionCount": 5,
+              "profiles": [
+                "1g",
+                "2g",
+                "3g",
+                "4g",
+                "7g"
+              ],
+              "workload": "gpt2_p64_o64"
+            },
+            {
+              "batches": [
+                1
+              ],
+              "maxMu": 0.338,
+              "optionCount": 4,
+              "profiles": [
+                "2g",
+                "3g",
+                "4g",
+                "7g"
+              ],
+              "workload": "llama_p1024_o128"
+            },
+            {
+              "batches": [
+                1
+              ],
+              "maxMu": 0.645,
+              "optionCount": 3,
+              "profiles": [
+                "3g",
+                "4g",
+                "7g"
+              ],
+              "workload": "llama_p2048_o64"
+            },
+            {
+              "batches": [
+                1,
+                4,
+                16,
+                32,
+                64
+              ],
+              "maxMu": 2425.077,
+              "optionCount": 24,
+              "profiles": [
+                "1g",
+                "2g",
+                "3g",
+                "4g",
+                "7g"
+              ],
+              "workload": "resnet50_image"
+            },
+            {
+              "batches": [
+                1,
+                4,
+                16,
+                32,
+                64
+              ],
+              "maxMu": 1453.467,
+              "optionCount": 22,
+              "profiles": [
+                "1g",
+                "2g",
+                "3g",
+                "4g",
+                "7g"
+              ],
+              "workload": "vgg16_image"
+            },
+            {
+              "batches": [
+                1,
+                4,
+                16,
+                32,
+                64
+              ],
+              "maxMu": 357.153,
+              "optionCount": 21,
+              "profiles": [
+                "1g",
+                "2g",
+                "3g",
+                "4g",
+                "7g"
+              ],
+              "workload": "vit_base_image"
+            }
+          ],
+          "elapsedSec": 0.11391454190015793,
+          "optionCount": 84,
+          "runtimeProfileCorrectionApplied": 0
+        },
+        "inputs": {
+          "sourceGpuCount": 2,
+          "sourcePhysicalIds": {
+            "0": "ampere-gpu0",
+            "1": "ampere-gpu1"
+          },
+          "sourceStateRef": "/app/mock/gpu-states/migrant-empty-9-a100.yaml",
+          "targetStateRef": "target0",
+          "workloadCount": 7,
+          "workloads": [
+            {
+              "delta": -74.06904684752641,
+              "name": "resnet50_image",
+              "profileCatalogConfigMap": null,
+              "profileCatalogRef": "/app/mock/profile-catalogs/resnet50_image.yaml",
+              "sourceArrival": 165.43807404023391,
+              "targetArrival": 91.3690271927075,
+              "workloadRef": "/app/manifests/examples/workloadrequests/resnet50_image.yaml"
+            },
+            {
+              "delta": 1.4355140186914923,
+              "name": "vgg16_image",
+              "profileCatalogConfigMap": null,
+              "profileCatalogRef": "/app/mock/profile-catalogs/vgg16_image.yaml",
+              "sourceArrival": 461.5177570093458,
+              "targetArrival": 462.9532710280373,
+              "workloadRef": "/app/manifests/examples/workloadrequests/vgg16_image.yaml"
+            },
+            {
+              "delta": 0,
+              "name": "vit_base_image",
+              "profileCatalogConfigMap": null,
+              "profileCatalogRef": "/app/mock/profile-catalogs/vit_base_image.yaml",
+              "sourceArrival": 122.60061919504642,
+              "targetArrival": 122.60061919504642,
+              "workloadRef": "/app/manifests/examples/workloadrequests/vit_base_image.yaml"
+            },
+            {
+              "delta": 0,
+              "name": "gpt2_p64_o64",
+              "profileCatalogConfigMap": null,
+              "profileCatalogRef": "/app/mock/profile-catalogs/gpt2_p64_o64.yaml",
+              "sourceArrival": 0.232258064516129,
+              "targetArrival": 0.232258064516129,
+              "workloadRef": "/app/manifests/examples/workloadrequests/gpt2_p64_o64.yaml"
+            },
+            {
+              "delta": 0,
+              "name": "gpt2_p512_o512",
+              "profileCatalogConfigMap": null,
+              "profileCatalogRef": "/app/mock/profile-catalogs/gpt2_p512_o512.yaml",
+              "sourceArrival": 0.0853080568720379,
+              "targetArrival": 0.0853080568720379,
+              "workloadRef": "/app/manifests/examples/workloadrequests/gpt2_p512_o512.yaml"
+            },
+            {
+              "delta": 0,
+              "name": "llama_p1024_o128",
+              "profileCatalogConfigMap": null,
+              "profileCatalogRef": "/app/mock/profile-catalogs/llama_p1024_o128.yaml",
+              "sourceArrival": 0,
+              "targetArrival": 0,
+              "workloadRef": "/app/manifests/examples/workloadrequests/llama_p1024_o128.yaml"
+            },
+            {
+              "delta": -0.1795511221945137,
+              "name": "llama_p2048_o64",
+              "profileCatalogConfigMap": null,
+              "profileCatalogRef": "/app/mock/profile-catalogs/llama_p2048_o64.yaml",
+              "sourceArrival": 0.1795511221945137,
+              "targetArrival": 0,
+              "workloadRef": "/app/manifests/examples/workloadrequests/llama_p2048_o64.yaml"
+            }
+          ]
+        },
+        "milp": {
+          "KTotal": {
+            "1g": 4,
+            "2g": 2,
+            "3g": 2,
+            "4g": 0,
+            "7g": 0
+          },
+          "allocSummary": [
+            {
+              "arrival": 91.3690271927075,
+              "instanceCount": 2,
+              "instances": [
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 176.875,
+                  "profile": "1g"
+                },
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 193.46,
+                  "profile": "2g"
+                }
+              ],
+              "provided": 370.33500000000004,
+              "slack": 278.96597280729253,
+              "workload": "resnet50_image"
+            },
+            {
+              "arrival": 462.9532710280373,
+              "instanceCount": 1,
+              "instances": [
+                {
+                  "batch": 4,
+                  "count": 1,
+                  "mu": 553.509,
+                  "profile": "3g"
+                }
+              ],
+              "provided": 553.509,
+              "slack": 90.55572897196271,
+              "workload": "vgg16_image"
+            },
+            {
+              "arrival": 122.60061919504642,
+              "instanceCount": 2,
+              "instances": [
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 46.526,
+                  "profile": "1g"
+                },
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 84.865,
+                  "profile": "2g"
+                }
+              ],
+              "provided": 131.391,
+              "slack": 8.790380804953571,
+              "workload": "vit_base_image"
+            },
+            {
+              "arrival": 0.232258064516129,
+              "instanceCount": 1,
+              "instances": [
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 1.327,
+                  "profile": "1g"
+                }
+              ],
+              "provided": 1.327,
+              "slack": 1.094741935483871,
+              "workload": "gpt2_p64_o64"
+            },
+            {
+              "arrival": 0.0853080568720379,
+              "instanceCount": 1,
+              "instances": [
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 0.163,
+                  "profile": "1g"
+                }
+              ],
+              "provided": 0.163,
+              "slack": 0.07769194312796211,
+              "workload": "gpt2_p512_o512"
+            },
+            {
+              "arrival": 0,
+              "instanceCount": 0,
+              "instances": [],
+              "provided": 0,
+              "slack": 0,
+              "workload": "llama_p1024_o128"
+            },
+            {
+              "arrival": 0,
+              "instanceCount": 1,
+              "instances": [
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 0.594,
+                  "profile": "3g"
+                }
+              ],
+              "provided": 0.594,
+              "slack": 0.594,
+              "workload": "llama_p2048_o64"
+            }
+          ],
+          "chosenTemplates": [
+            "2+2+3",
+            "3+1+1+1+1"
+          ],
+          "elapsedSec": 0.052153587341308594,
+          "feasible": true,
+          "gpuCount": 2,
+          "method": "MILP-Gurobi(batch)",
+          "objectiveGpuCount": 2,
+          "stage1ObjectiveMode": "logical_delta",
+          "status": "OPTIMAL",
+          "totalElasticSlack": 957.494,
+          "totalInstances": 8,
+          "totalLogicalDelta": 0,
+          "totalRemainingSlots": 0,
+          "totalSlack": 380.0785164628206,
+          "usedProfileTypes": 3,
+          "warmStart": {
+            "available": true,
+            "source": "currentAllocation",
+            "templateMissCount": 0,
+            "templateMisses": [],
+            "unmatchedInstanceCount": 0,
+            "unmatchedInstances": [],
+            "xSolCount": 8,
+            "ySolCount": 2
+          }
+        },
+        "pipeline": "source -> feasible-options -> milp -> target-build -> effect_aware_dag -> canonical-next-state",
+        "plannerTiming": {
+          "excludedCommonPreprocessingSec": 0.11391454190015793,
+          "plannerMakespanSec": 0.06423403695225716,
+          "stage1ElapsedSec": 0.052153587341308594,
+          "stage1Name": "target_allocation_milp",
+          "stage2ElapsedSec": 0.01065373420715332,
+          "stage2Name": "exact_global_stage2_milp",
+          "stage3ElapsedSec": 0.0014267154037952423,
+          "stage3Name": "effect_aware_dag"
+        },
+        "runtimeProfileCorrection": {
+          "available": false,
+          "observationCount": 0
+        },
+        "scenario": "epoch-three-gpu-live-20260926-r05",
+        "targetBuild": {
+          "elapsedSec": 0.01065373420715332,
+          "method": "exact_global_milp_aggregated",
+          "orderedPhysicalTemplates": [],
+          "physicalTemplateCount": 0,
+          "preservation": {
+            "collocatePairs": null,
+            "exact": 8,
+            "mixedGpuCount": null,
+            "sameGpu": null,
+            "scoreTuple": [
+              0,
+              8,
+              0,
+              8
+            ],
+            "upgrade": 0
+          },
+          "targetGpuCount": 2,
+          "targetPhysicalIds": {
+            "0": "ampere-gpu0",
+            "1": "ampere-gpu1"
+          }
+        },
+        "transition": {
+          "actionCount": 0,
+          "actionCountsByType": {},
+          "candidateDecisions": [],
+          "capacityDependenciesEnforced": true,
+          "elapsedSec": 0.0014267154037952423,
+          "executedPhysicalIds": {
+            "0": "ampere-gpu0",
+            "1": "ampere-gpu1"
+          },
+          "finalActiveGpu": 2,
+          "finalCoarseActions": [],
+          "finalPlanItems": [],
+          "iterationCount": 1,
+          "iterations": [
+            {
+              "actionCountsByType": {},
+              "activeGpuAfter": 0,
+              "candidateActionCount": 0,
+              "candidateActionCountsByType": {},
+              "candidateActions": [],
+              "candidateDecisions": [],
+              "chosenActionCount": 0,
+              "chosenActions": [],
+              "chosenRootCount": 0,
+              "chosenRoots": [],
+              "iterPeakActiveGpu": 0,
+              "iteration": 1,
+              "madeProgress": true,
+              "phasedActionPlan": {
+                "actionCount": 0,
+                "criticalPathLength": 0,
+                "edgeCount": 0,
+                "nodeCount": 0,
+                "phaseCount": 0,
+                "phases": [],
+                "representation": "migrant.phased-action-dag/v1"
+              },
+              "reachedTarget": true,
+              "stateAfter": {
+                "gpus": [
+                  {
+                    "gpuId": 0,
+                    "instances": [
+                      {
+                        "batch": 1,
+                        "end": 1,
+                        "modelKey": null,
+                        "mu": 0.163,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "1g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "gpt2",
+                        "start": 0,
+                        "workload": "gpt2_p512_o512"
+                      },
+                      {
+                        "batch": 1,
+                        "end": 2,
+                        "modelKey": null,
+                        "mu": 1.327,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "1g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "gpt2",
+                        "start": 1,
+                        "workload": "gpt2_p64_o64"
+                      },
+                      {
+                        "batch": 1,
+                        "end": 3,
+                        "modelKey": null,
+                        "mu": 176.875,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "1g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "resnet50",
+                        "start": 2,
+                        "workload": "resnet50_image"
+                      },
+                      {
+                        "batch": 1,
+                        "end": 4,
+                        "modelKey": null,
+                        "mu": 46.526,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "1g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "vit_base",
+                        "start": 3,
+                        "workload": "vit_base_image"
+                      },
+                      {
+                        "batch": 1,
+                        "end": 7,
+                        "modelKey": null,
+                        "mu": 0.594,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "3g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "llama",
+                        "start": 4,
+                        "workload": "llama_p2048_o64"
+                      }
+                    ],
+                    "source": "planned"
+                  },
+                  {
+                    "gpuId": 1,
+                    "instances": [
+                      {
+                        "batch": 1,
+                        "end": 2,
+                        "modelKey": null,
+                        "mu": 193.46,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "2g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "resnet50",
+                        "start": 0,
+                        "workload": "resnet50_image"
+                      },
+                      {
+                        "batch": 1,
+                        "end": 4,
+                        "modelKey": null,
+                        "mu": 84.865,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "2g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "vit_base",
+                        "start": 2,
+                        "workload": "vit_base_image"
+                      },
+                      {
+                        "batch": 4,
+                        "end": 7,
+                        "modelKey": null,
+                        "mu": 553.509,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "3g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "vgg16",
+                        "start": 4,
+                        "workload": "vgg16_image"
+                      }
+                    ],
+                    "source": "planned"
+                  }
+                ],
+                "metadata": {
+                  "free_physical_gpu_pool": [
+                    "rtx1-worker-gpu0"
+                  ],
+                  "free_physical_gpu_pool_policy": "lifo",
+                  "logical_id_map": {
+                    "0": 0,
+                    "1": 1
+                  },
+                  "next_physical_idx": 0,
+                  "physicalGpuBindings": {
+                    "ampere-gpu0": {
+                      "deviceIndex": 0,
+                      "nodeName": "ampere"
+                    },
+                    "ampere-gpu1": {
+                      "deviceIndex": 1,
+                      "nodeName": "ampere"
+                    }
+                  },
+                  "physical_id_map": {
+                    "0": "ampere-gpu0",
+                    "1": "ampere-gpu1"
+                  },
+                  "source": "go-cluster-state-manager-canonical",
+                  "transition_draining_instances": {},
+                  "transition_reconfig_targets": {},
+                  "transition_runtime_instances": {
+                    "0:0:1:1g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "0:1:2:1g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "0:2:3:1g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "0:3:4:1g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "0:4:7:3g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "1:0:2:2g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "1:2:4:2g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "1:4:7:3g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    }
+                  }
+                }
+              },
+              "stateBefore": {
+                "gpus": [
+                  {
+                    "gpuId": 0,
+                    "instances": [
+                      {
+                        "batch": 1,
+                        "end": 1,
+                        "modelKey": null,
+                        "mu": 0.163,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "1g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "gpt2",
+                        "start": 0,
+                        "workload": "gpt2_p512_o512"
+                      },
+                      {
+                        "batch": 1,
+                        "end": 2,
+                        "modelKey": null,
+                        "mu": 1.327,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "1g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "gpt2",
+                        "start": 1,
+                        "workload": "gpt2_p64_o64"
+                      },
+                      {
+                        "batch": 1,
+                        "end": 3,
+                        "modelKey": null,
+                        "mu": 176.875,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "1g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "resnet50",
+                        "start": 2,
+                        "workload": "resnet50_image"
+                      },
+                      {
+                        "batch": 1,
+                        "end": 4,
+                        "modelKey": null,
+                        "mu": 46.526,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "1g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "vit_base",
+                        "start": 3,
+                        "workload": "vit_base_image"
+                      },
+                      {
+                        "batch": 1,
+                        "end": 7,
+                        "modelKey": null,
+                        "mu": 0.594,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "3g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "llama",
+                        "start": 4,
+                        "workload": "llama_p2048_o64"
+                      }
+                    ],
+                    "source": "planned"
+                  },
+                  {
+                    "gpuId": 1,
+                    "instances": [
+                      {
+                        "batch": 1,
+                        "end": 2,
+                        "modelKey": null,
+                        "mu": 193.46,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "2g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "resnet50",
+                        "start": 0,
+                        "workload": "resnet50_image"
+                      },
+                      {
+                        "batch": 1,
+                        "end": 4,
+                        "modelKey": null,
+                        "mu": 84.865,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "2g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "vit_base",
+                        "start": 2,
+                        "workload": "vit_base_image"
+                      },
+                      {
+                        "batch": 4,
+                        "end": 7,
+                        "modelKey": null,
+                        "mu": 553.509,
+                        "outputTokens": null,
+                        "placementGroup": null,
+                        "preserved": false,
+                        "profile": "3g",
+                        "promptLen": null,
+                        "requestClass": "x",
+                        "runtimeModel": "vgg16",
+                        "start": 4,
+                        "workload": "vgg16_image"
+                      }
+                    ],
+                    "source": "planned"
+                  }
+                ],
+                "metadata": {
+                  "free_physical_gpu_pool": [
+                    "rtx1-worker-gpu0"
+                  ],
+                  "free_physical_gpu_pool_policy": "lifo",
+                  "logical_id_map": {
+                    "0": 0,
+                    "1": 1
+                  },
+                  "next_physical_idx": 0,
+                  "physicalGpuBindings": {
+                    "ampere-gpu0": {
+                      "deviceIndex": 0,
+                      "nodeName": "ampere"
+                    },
+                    "ampere-gpu1": {
+                      "deviceIndex": 1,
+                      "nodeName": "ampere"
+                    }
+                  },
+                  "physical_id_map": {
+                    "0": "ampere-gpu0",
+                    "1": "ampere-gpu1"
+                  },
+                  "source": "go-cluster-state-manager-canonical",
+                  "transition_draining_instances": {},
+                  "transition_reconfig_targets": {},
+                  "transition_runtime_instances": {
+                    "0:0:1:1g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "0:1:2:1g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "0:2:3:1g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "0:3:4:1g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "0:4:7:3g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "1:0:2:2g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "1:2:4:2g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    },
+                    "1:4:7:3g": {
+                      "accepting_new": true,
+                      "inflight": 0,
+                      "queued": 0,
+                      "rerouted_to": null
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "peakActiveGpu": 2,
+          "phasedActionPlan": {
+            "actionCount": 0,
+            "criticalPathLength": 0,
+            "edgeCount": 0,
+            "name": "epoch-three-gpu-live-20260926-r05-final",
+            "nodeCount": 0,
+            "nodes": [],
+            "phaseCount": 0,
+            "phases": [],
+            "representation": "migrant.phased-action-dag/v1",
+            "roots": []
+          },
+          "phasedActionPlanSummary": {
+            "actionCount": 0,
+            "criticalPathLength": 0,
+            "edgeCount": 0,
+            "nodeCount": 0,
+            "phaseCount": 0,
+            "phases": [],
+            "representation": "migrant.phased-action-dag/v1"
+          },
+          "planner": "effect_aware_dag",
+          "plannerModule": "transition.effect_aware_dag",
+          "reachedTarget": true,
+          "removedCapacityDependencyCount": 0,
+          "runtimeAssumptions": {
+            "capacityDependenciesEnforced": true,
+            "committedDemandPolicy": "component-wise min(source demand, target demand)",
+            "defaultInflight": 1,
+            "defaultQueued": 2,
+            "overrideExistingChangedSlots": false,
+            "removedCapacityDependencyCount": 0,
+            "removedCapacityDependencyCountByKind": {
+              "capacityGate": 0,
+              "temporaryCapacityCleanup": 0
+            },
+            "stage3Variant": "slicewise",
+            "transitionDemandPolicy": "min"
+          },
+          "sourceActiveGpu": 2,
+          "stage3Variant": "slicewise",
+          "stageName": "epoch-three-gpu-live-20260926-r05"
+        }
+      },
+      "reachedTarget": true,
+      "requestedPlanner": "ours"
+    },
+    "planningInput": {
+      "calibrationOverlayRef": "physicalgpuregistry/default",
+      "conservative3gMu": true,
+      "currentAllocationRef": "physicalgpuregistry/default",
+      "epoch": "three-gpu-live-20260926-r05",
+      "forceReplan": true,
+      "mode": "target",
+      "observedAt": "2026-09-30T17:28:04.480Z",
+      "planner": "ours",
+      "profileCatalogRef": "default",
+      "registeredSLOMs": {
+        "gpt2_p512_o512": 100,
+        "gpt2_p64_o64": 50,
+        "llama_p1024_o128": 180,
+        "llama_p2048_o64": 250,
+        "resnet50_image": 100,
+        "vgg16_image": 100,
+        "vit_base_image": 300
+      },
+      "scenarioPath": "mock/scenarios/real8gpu.yaml",
+      "slo": {
+        "gpt2_p512_o512": {
+          "tpotMs": 20,
+          "ttftMs": 100
+        },
+        "gpt2_p64_o64": {
+          "tpotMs": 20,
+          "ttftMs": 50
+        },
+        "llama_p1024_o128": {
+          "tpotMs": 35,
+          "ttftMs": 180
+        },
+        "llama_p2048_o64": {
+          "tpotMs": 35,
+          "ttftMs": 250
+        },
+        "resnet50_image": {
+          "e2eMs": 100,
+          "latencyMs": 100
+        },
+        "vgg16_image": {
+          "e2eMs": 100,
+          "latencyMs": 100
+        },
+        "vit_base_image": {
+          "e2eMs": 300,
+          "latencyMs": 300
+        }
+      },
+      "source": "three-gpu-live-20260926-v2",
+      "sourceArrival": {
+        "gpt2_p512_o512": 0.0853080568720379,
+        "gpt2_p64_o64": 0.232258064516129,
+        "llama_p1024_o128": 0,
+        "llama_p2048_o64": 0.1795511221945137,
+        "resnet50_image": 165.43807404023391,
+        "vgg16_image": 461.5177570093458,
+        "vit_base_image": 122.60061919504642
+      },
+      "stage3Variant": "slicewise",
+      "targetArrival": {
+        "gpt2_p512_o512": 0.0853080568720379,
+        "gpt2_p64_o64": 0.232258064516129,
+        "llama_p1024_o128": 0,
+        "llama_p2048_o64": 0,
+        "resnet50_image": 91.3690271927075,
+        "vgg16_image": 462.9532710280373,
+        "vit_base_image": 122.60061919504642
+      },
+      "transitionDemandPolicy": "min",
+      "triggerReason": "frozen-selected-demand",
+      "unit": "requestsPerSecond",
+      "windowSeconds": 60
+    },
+    "summary": {
+      "arrivalSnapshotRef": "live-v2-20260930t172233426344z-r05",
+      "desiredRuntimes": [
+        {
+          "batchSize": 1,
+          "capacity": 0.163,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10681,
+          "model": "gpt2_p512_o512",
+          "modelKey": "gpt2_p512_o512",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "gpt2_p512_o512",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "gpt2-p512-o512-ampere-gpu0-s0-1-1g",
+          "runtimeModel": "gpt2_p512_o512",
+          "slotResource": "or-sim.io/ampere-gpu0-s0-1-1g",
+          "weight": 0.163
+        },
+        {
+          "batchSize": 1,
+          "capacity": 1.327,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10682,
+          "model": "gpt2_p64_o64",
+          "modelKey": "gpt2_p64_o64",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "gpt2_p64_o64",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "gpt2-p64-o64-ampere-gpu0-s1-2-1g",
+          "runtimeModel": "gpt2_p64_o64",
+          "slotResource": "or-sim.io/ampere-gpu0-s1-2-1g",
+          "weight": 1.327
+        },
+        {
+          "batchSize": 1,
+          "capacity": 0.594,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10686,
+          "model": "llama_p2048_o64",
+          "modelKey": "llama_p2048_o64",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "llama_p2048_o64",
+          "profile": "3g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "llama-p2048-o64-ampere-gpu0-s4-7-3g",
+          "runtimeModel": "llama_p2048_o64",
+          "slotResource": "or-sim.io/ampere-gpu0-s4-8-3g",
+          "weight": 0.594
+        },
+        {
+          "batchSize": 1,
+          "capacity": 176.875,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10683,
+          "model": "resnet50_image",
+          "modelKey": "resnet50_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "resnet50_image",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "resnet50-image-ampere-gpu0-s2-3-1g",
+          "runtimeModel": "resnet50_image",
+          "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+          "weight": 176.875
+        },
+        {
+          "batchSize": 1,
+          "capacity": 193.46,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10689,
+          "model": "resnet50_image",
+          "modelKey": "resnet50_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "resnet50_image",
+          "profile": "2g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "resnet50-image-ampere-gpu1-s0-2-2g",
+          "runtimeModel": "resnet50_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s0-2-2g",
+          "weight": 193.46
+        },
+        {
+          "batchSize": 4,
+          "capacity": 553.509,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10694,
+          "model": "vgg16_image",
+          "modelKey": "vgg16_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vgg16_image",
+          "profile": "3g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+          "runtimeModel": "vgg16_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+          "weight": 553.509
+        },
+        {
+          "batchSize": 1,
+          "capacity": 46.526,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10685,
+          "model": "vit_base_image",
+          "modelKey": "vit_base_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vit_base_image",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vit-base-image-ampere-gpu0-s3-4-1g",
+          "runtimeModel": "vit_base_image",
+          "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+          "weight": 46.526
+        },
+        {
+          "batchSize": 1,
+          "capacity": 84.865,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10692,
+          "model": "vit_base_image",
+          "modelKey": "vit_base_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vit_base_image",
+          "profile": "2g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+          "runtimeModel": "vit_base_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+          "weight": 84.865
+        }
+      ],
+      "executionRuntimes": [
+        {
+          "batchSize": 1,
+          "capacity": 0.163,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10681,
+          "model": "gpt2_p512_o512",
+          "modelKey": "gpt2_p512_o512",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "gpt2_p512_o512",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "gpt2-p512-o512-ampere-gpu0-s0-1-1g",
+          "runtimeModel": "gpt2_p512_o512",
+          "slotResource": "or-sim.io/ampere-gpu0-s0-1-1g",
+          "weight": 0.163
+        },
+        {
+          "batchSize": 1,
+          "capacity": 1.327,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10682,
+          "model": "gpt2_p64_o64",
+          "modelKey": "gpt2_p64_o64",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "gpt2_p64_o64",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "gpt2-p64-o64-ampere-gpu0-s1-2-1g",
+          "runtimeModel": "gpt2_p64_o64",
+          "slotResource": "or-sim.io/ampere-gpu0-s1-2-1g",
+          "weight": 1.327
+        },
+        {
+          "batchSize": 1,
+          "capacity": 0.594,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10686,
+          "model": "llama_p2048_o64",
+          "modelKey": "llama_p2048_o64",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "llama_p2048_o64",
+          "profile": "3g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "llama-p2048-o64-ampere-gpu0-s4-7-3g",
+          "runtimeModel": "llama_p2048_o64",
+          "slotResource": "or-sim.io/ampere-gpu0-s4-8-3g",
+          "weight": 0.594
+        },
+        {
+          "batchSize": 1,
+          "capacity": 176.875,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10683,
+          "model": "resnet50_image",
+          "modelKey": "resnet50_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "resnet50_image",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "resnet50-image-ampere-gpu0-s2-3-1g",
+          "runtimeModel": "resnet50_image",
+          "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+          "weight": 176.875
+        },
+        {
+          "batchSize": 1,
+          "capacity": 193.46,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10689,
+          "model": "resnet50_image",
+          "modelKey": "resnet50_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "resnet50_image",
+          "profile": "2g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "resnet50-image-ampere-gpu1-s0-2-2g",
+          "runtimeModel": "resnet50_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s0-2-2g",
+          "weight": 193.46
+        },
+        {
+          "batchSize": 4,
+          "capacity": 553.509,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10694,
+          "model": "vgg16_image",
+          "modelKey": "vgg16_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vgg16_image",
+          "profile": "3g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+          "runtimeModel": "vgg16_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+          "weight": 553.509
+        },
+        {
+          "batchSize": 1,
+          "capacity": 46.526,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10685,
+          "model": "vit_base_image",
+          "modelKey": "vit_base_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vit_base_image",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vit-base-image-ampere-gpu0-s3-4-1g",
+          "runtimeModel": "vit_base_image",
+          "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+          "weight": 46.526
+        },
+        {
+          "batchSize": 1,
+          "capacity": 84.865,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10692,
+          "model": "vit_base_image",
+          "modelKey": "vit_base_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vit_base_image",
+          "profile": "2g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+          "runtimeModel": "vit_base_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+          "weight": 84.865
+        }
+      ],
+      "finalDesiredRuntimes": [
+        {
+          "batchSize": 1,
+          "capacity": 0.163,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10681,
+          "model": "gpt2_p512_o512",
+          "modelKey": "gpt2_p512_o512",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "gpt2_p512_o512",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "gpt2-p512-o512-ampere-gpu0-s0-1-1g",
+          "runtimeModel": "gpt2_p512_o512",
+          "slotResource": "or-sim.io/ampere-gpu0-s0-1-1g",
+          "weight": 0.163
+        },
+        {
+          "batchSize": 1,
+          "capacity": 1.327,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10682,
+          "model": "gpt2_p64_o64",
+          "modelKey": "gpt2_p64_o64",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "gpt2_p64_o64",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "gpt2-p64-o64-ampere-gpu0-s1-2-1g",
+          "runtimeModel": "gpt2_p64_o64",
+          "slotResource": "or-sim.io/ampere-gpu0-s1-2-1g",
+          "weight": 1.327
+        },
+        {
+          "batchSize": 1,
+          "capacity": 0.594,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10686,
+          "model": "llama_p2048_o64",
+          "modelKey": "llama_p2048_o64",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "llama_p2048_o64",
+          "profile": "3g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "llama-p2048-o64-ampere-gpu0-s4-7-3g",
+          "runtimeModel": "llama_p2048_o64",
+          "slotResource": "or-sim.io/ampere-gpu0-s4-8-3g",
+          "weight": 0.594
+        },
+        {
+          "batchSize": 1,
+          "capacity": 176.875,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10683,
+          "model": "resnet50_image",
+          "modelKey": "resnet50_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "resnet50_image",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "resnet50-image-ampere-gpu0-s2-3-1g",
+          "runtimeModel": "resnet50_image",
+          "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+          "weight": 176.875
+        },
+        {
+          "batchSize": 1,
+          "capacity": 193.46,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10689,
+          "model": "resnet50_image",
+          "modelKey": "resnet50_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "resnet50_image",
+          "profile": "2g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "resnet50-image-ampere-gpu1-s0-2-2g",
+          "runtimeModel": "resnet50_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s0-2-2g",
+          "weight": 193.46
+        },
+        {
+          "batchSize": 4,
+          "capacity": 553.509,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10694,
+          "model": "vgg16_image",
+          "modelKey": "vgg16_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vgg16_image",
+          "profile": "3g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+          "runtimeModel": "vgg16_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+          "weight": 553.509
+        },
+        {
+          "batchSize": 1,
+          "capacity": 46.526,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10685,
+          "model": "vit_base_image",
+          "modelKey": "vit_base_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vit_base_image",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vit-base-image-ampere-gpu0-s3-4-1g",
+          "runtimeModel": "vit_base_image",
+          "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+          "weight": 46.526
+        },
+        {
+          "batchSize": 1,
+          "capacity": 84.865,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10692,
+          "model": "vit_base_image",
+          "modelKey": "vit_base_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vit_base_image",
+          "profile": "2g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+          "runtimeModel": "vit_base_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+          "weight": 84.865
+        }
+      ],
+      "planner": "ours",
+      "plannerMakespanSec": 0.06423403695225716,
+      "sourceArrival": {
+        "gpt2_p512_o512": 0.0853080568720379,
+        "gpt2_p64_o64": 0.232258064516129,
+        "llama_p1024_o128": 0,
+        "llama_p2048_o64": 0.1795511221945137,
+        "resnet50_image": 165.43807404023391,
+        "vgg16_image": 461.5177570093458,
+        "vit_base_image": 122.60061919504642
+      },
+      "sourceGpuCount": 2,
+      "targetArrival": {
+        "gpt2_p512_o512": 0.0853080568720379,
+        "gpt2_p64_o64": 0.232258064516129,
+        "llama_p1024_o128": 0,
+        "llama_p2048_o64": 0,
+        "resnet50_image": 91.3690271927075,
+        "vgg16_image": 462.9532710280373,
+        "vit_base_image": 122.60061919504642
+      },
+      "targetGpuCount": 2
+    },
+    "targetAllocationPlan": {
+      "desiredRuntimes": [
+        {
+          "batchSize": 1,
+          "capacity": 0.163,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10681,
+          "model": "gpt2_p512_o512",
+          "modelKey": "gpt2_p512_o512",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "gpt2_p512_o512",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "gpt2-p512-o512-ampere-gpu0-s0-1-1g",
+          "runtimeModel": "gpt2_p512_o512",
+          "slotResource": "or-sim.io/ampere-gpu0-s0-1-1g",
+          "weight": 0.163
+        },
+        {
+          "batchSize": 1,
+          "capacity": 1.327,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10682,
+          "model": "gpt2_p64_o64",
+          "modelKey": "gpt2_p64_o64",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "gpt2_p64_o64",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "gpt2-p64-o64-ampere-gpu0-s1-2-1g",
+          "runtimeModel": "gpt2_p64_o64",
+          "slotResource": "or-sim.io/ampere-gpu0-s1-2-1g",
+          "weight": 1.327
+        },
+        {
+          "batchSize": 1,
+          "capacity": 0.594,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10686,
+          "model": "llama_p2048_o64",
+          "modelKey": "llama_p2048_o64",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "llama_p2048_o64",
+          "profile": "3g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "llama-p2048-o64-ampere-gpu0-s4-7-3g",
+          "runtimeModel": "llama_p2048_o64",
+          "slotResource": "or-sim.io/ampere-gpu0-s4-8-3g",
+          "weight": 0.594
+        },
+        {
+          "batchSize": 1,
+          "capacity": 176.875,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10683,
+          "model": "resnet50_image",
+          "modelKey": "resnet50_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "resnet50_image",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "resnet50-image-ampere-gpu0-s2-3-1g",
+          "runtimeModel": "resnet50_image",
+          "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+          "weight": 176.875
+        },
+        {
+          "batchSize": 1,
+          "capacity": 193.46,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10689,
+          "model": "resnet50_image",
+          "modelKey": "resnet50_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "resnet50_image",
+          "profile": "2g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "resnet50-image-ampere-gpu1-s0-2-2g",
+          "runtimeModel": "resnet50_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s0-2-2g",
+          "weight": 193.46
+        },
+        {
+          "batchSize": 4,
+          "capacity": 553.509,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10694,
+          "model": "vgg16_image",
+          "modelKey": "vgg16_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vgg16_image",
+          "profile": "3g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+          "runtimeModel": "vgg16_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+          "weight": 553.509
+        },
+        {
+          "batchSize": 1,
+          "capacity": 46.526,
+          "gpu": "ampere-gpu0",
+          "hostPort": 10685,
+          "model": "vit_base_image",
+          "modelKey": "vit_base_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vit_base_image",
+          "profile": "1g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vit-base-image-ampere-gpu0-s3-4-1g",
+          "runtimeModel": "vit_base_image",
+          "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+          "weight": 46.526
+        },
+        {
+          "batchSize": 1,
+          "capacity": 84.865,
+          "gpu": "ampere-gpu1",
+          "hostPort": 10692,
+          "model": "vit_base_image",
+          "modelKey": "vit_base_image",
+          "node": "ampere",
+          "outputTokens": null,
+          "placementGroup": "vit_base_image",
+          "profile": "2g",
+          "promptLen": null,
+          "requestClass": null,
+          "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+          "runtimeModel": "vit_base_image",
+          "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+          "weight": 84.865
+        }
+      ],
+      "milp": {
+        "KTotal": {
+          "1g": 4,
+          "2g": 2,
+          "3g": 2,
+          "4g": 0,
+          "7g": 0
+        },
+        "alloc": [
+          {
+            "arrival": 91.3690271927075,
+            "instances": [
+              {
+                "batch": 1,
+                "count": 1,
+                "mu": 176.875,
+                "profile": "1g"
+              },
+              {
+                "batch": 1,
+                "count": 1,
+                "mu": 193.46,
+                "profile": "2g"
+              }
+            ],
+            "provided": 370.33500000000004,
+            "slack": 278.96597280729253,
+            "workload": "resnet50_image"
+          },
+          {
+            "arrival": 462.9532710280373,
+            "instances": [
+              {
+                "batch": 4,
+                "count": 1,
+                "mu": 553.509,
+                "profile": "3g"
+              }
+            ],
+            "provided": 553.509,
+            "slack": 90.55572897196271,
+            "workload": "vgg16_image"
+          },
+          {
+            "arrival": 122.60061919504642,
+            "instances": [
+              {
+                "batch": 1,
+                "count": 1,
+                "mu": 46.526,
+                "profile": "1g"
+              },
+              {
+                "batch": 1,
+                "count": 1,
+                "mu": 84.865,
+                "profile": "2g"
+              }
+            ],
+            "provided": 131.391,
+            "slack": 8.790380804953571,
+            "workload": "vit_base_image"
+          },
+          {
+            "arrival": 0.232258064516129,
+            "instances": [
+              {
+                "batch": 1,
+                "count": 1,
+                "mu": 1.327,
+                "profile": "1g"
+              }
+            ],
+            "provided": 1.327,
+            "slack": 1.094741935483871,
+            "workload": "gpt2_p64_o64"
+          },
+          {
+            "arrival": 0.0853080568720379,
+            "instances": [
+              {
+                "batch": 1,
+                "count": 1,
+                "mu": 0.163,
+                "profile": "1g"
+              }
+            ],
+            "provided": 0.163,
+            "slack": 0.07769194312796211,
+            "workload": "gpt2_p512_o512"
+          },
+          {
+            "arrival": 0,
+            "instances": [],
+            "provided": 0,
+            "slack": 0,
+            "workload": "llama_p1024_o128"
+          },
+          {
+            "arrival": 0,
+            "instances": [
+              {
+                "batch": 1,
+                "count": 1,
+                "mu": 0.594,
+                "profile": "3g"
+              }
+            ],
+            "provided": 0.594,
+            "slack": 0.594,
+            "workload": "llama_p2048_o64"
+          }
+        ],
+        "capacityHeadroomEffective": 0,
+        "capacityHeadroomRequested": 0,
+        "chosenTemplates": [
+          "2+2+3",
+          "3+1+1+1+1"
+        ],
+        "conservative3gMu": true,
+        "gpuCount": 2,
+        "rawSolution": {
+          "x_sol": {
+            "3": 1,
+            "34": 1,
+            "48": 1,
+            "52": 1,
+            "67": 1,
+            "72": 1,
+            "8": 1,
+            "81": 1
+          },
+          "y_sol": {
+            "7": 1,
+            "9": 1
+          }
+        },
+        "status": "OPTIMAL",
+        "warmStart": {
+          "available": true,
+          "source": "currentAllocation",
+          "templateMissCount": 0,
+          "templateMisses": [],
+          "unmatchedInstanceCount": 0,
+          "unmatchedInstances": [],
+          "xSolCount": 8,
+          "ySolCount": 2
+        }
+      },
+      "objective": "Gurobi MILP target allocation followed by exact global Stage 2 materialization",
+      "planner": "original-gurobi-milp-exact-stage2-effect-aware-dag",
+      "targetState": {
+        "gpus": [
+          {
+            "gpuId": 0,
+            "instances": [
+              {
+                "batch": 1,
+                "end": 1,
+                "modelKey": null,
+                "mu": 0.163,
+                "outputTokens": null,
+                "placementGroup": null,
+                "preserved": true,
+                "profile": "1g",
+                "promptLen": null,
+                "requestClass": null,
+                "runtimeModel": null,
+                "start": 0,
+                "workload": "gpt2_p512_o512"
+              },
+              {
+                "batch": 1,
+                "end": 2,
+                "modelKey": null,
+                "mu": 1.327,
+                "outputTokens": null,
+                "placementGroup": null,
+                "preserved": true,
+                "profile": "1g",
+                "promptLen": null,
+                "requestClass": null,
+                "runtimeModel": null,
+                "start": 1,
+                "workload": "gpt2_p64_o64"
+              },
+              {
+                "batch": 1,
+                "end": 3,
+                "modelKey": null,
+                "mu": 176.875,
+                "outputTokens": null,
+                "placementGroup": null,
+                "preserved": true,
+                "profile": "1g",
+                "promptLen": null,
+                "requestClass": null,
+                "runtimeModel": null,
+                "start": 2,
+                "workload": "resnet50_image"
+              },
+              {
+                "batch": 1,
+                "end": 4,
+                "modelKey": null,
+                "mu": 46.526,
+                "outputTokens": null,
+                "placementGroup": null,
+                "preserved": true,
+                "profile": "1g",
+                "promptLen": null,
+                "requestClass": null,
+                "runtimeModel": null,
+                "start": 3,
+                "workload": "vit_base_image"
+              },
+              {
+                "batch": 1,
+                "end": 7,
+                "modelKey": null,
+                "mu": 0.594,
+                "outputTokens": null,
+                "placementGroup": null,
+                "preserved": true,
+                "profile": "3g",
+                "promptLen": null,
+                "requestClass": null,
+                "runtimeModel": null,
+                "start": 4,
+                "workload": "llama_p2048_o64"
+              }
+            ],
+            "source": "planned"
+          },
+          {
+            "gpuId": 1,
+            "instances": [
+              {
+                "batch": 1,
+                "end": 2,
+                "modelKey": null,
+                "mu": 193.46,
+                "outputTokens": null,
+                "placementGroup": null,
+                "preserved": true,
+                "profile": "2g",
+                "promptLen": null,
+                "requestClass": null,
+                "runtimeModel": null,
+                "start": 0,
+                "workload": "resnet50_image"
+              },
+              {
+                "batch": 1,
+                "end": 4,
+                "modelKey": null,
+                "mu": 84.865,
+                "outputTokens": null,
+                "placementGroup": null,
+                "preserved": true,
+                "profile": "2g",
+                "promptLen": null,
+                "requestClass": null,
+                "runtimeModel": null,
+                "start": 2,
+                "workload": "vit_base_image"
+              },
+              {
+                "batch": 4,
+                "end": 7,
+                "modelKey": null,
+                "mu": 553.509,
+                "outputTokens": null,
+                "placementGroup": null,
+                "preserved": true,
+                "profile": "3g",
+                "promptLen": null,
+                "requestClass": null,
+                "runtimeModel": null,
+                "start": 4,
+                "workload": "vgg16_image"
+              }
+            ],
+            "source": "planned"
+          }
+        ],
+        "metadata": {
+          "arrivals": {
+            "gpt2_p512_o512": 0.0853080568720379,
+            "gpt2_p64_o64": 0.232258064516129,
+            "llama_p1024_o128": 0,
+            "llama_p2048_o64": 0,
+            "resnet50_image": 91.3690271927075,
+            "vgg16_image": 462.9532710280373,
+            "vit_base_image": 122.60061919504642
+          },
+          "build_method": "exact_global_milp_aggregated",
+          "build_metrics": {
+            "aggregated_new_gpu_count": 0,
+            "cold_workload_gpu_incidence": null,
+            "configured_mip_gap": 0,
+            "current_gpu_count": 2,
+            "demand_count": 8,
+            "demand_type_count": 8,
+            "elapsed_time_sec": 0.01065373420715332,
+            "exact_preserve": 8,
+            "gpu_count": 2,
+            "gurobi_seed": 1,
+            "gurobi_threads": 8,
+            "indexed_new_gpu_count": 0,
+            "layout_count": 16,
+            "mig_preserve": 8,
+            "mip_gap": null,
+            "new_gpu_count": 0,
+            "num_constraints": 167,
+            "num_vars": 208,
+            "objective_mode": "transition_preservation",
+            "objective_order": [
+              "exact_workload"
+            ],
+            "optimality_proven": true,
+            "reused_current_gpu_count": 2,
+            "score_tuple": [
+              0,
+              8,
+              0,
+              8
+            ],
+            "selected_layouts": {
+              "0": "1+1+1+1+3",
+              "1": "2+2+3"
+            },
+            "solver_status": "OPTIMAL",
+            "upgrade_preserve": 0,
+            "whole_gpu_preserve": 0
+          },
+          "capacity_basis": "physical_profile_catalog",
+          "free_physical_gpu_pool": [
+            "rtx1-worker-gpu0"
+          ],
+          "free_physical_gpu_pool_policy": "lifo",
+          "logical_capacity_assignments": [
+            {
+              "batch": 1,
+              "gpu_id": 0,
+              "logical_mu": 0.163,
+              "slot": [
+                0,
+                1,
+                "1g"
+              ],
+              "workload": "gpt2_p512_o512"
+            },
+            {
+              "batch": 1,
+              "gpu_id": 0,
+              "logical_mu": 1.327,
+              "slot": [
+                1,
+                2,
+                "1g"
+              ],
+              "workload": "gpt2_p64_o64"
+            },
+            {
+              "batch": 1,
+              "gpu_id": 0,
+              "logical_mu": 176.875,
+              "slot": [
+                2,
+                3,
+                "1g"
+              ],
+              "workload": "resnet50_image"
+            },
+            {
+              "batch": 1,
+              "gpu_id": 0,
+              "logical_mu": 46.526,
+              "slot": [
+                3,
+                4,
+                "1g"
+              ],
+              "workload": "vit_base_image"
+            },
+            {
+              "batch": 1,
+              "gpu_id": 0,
+              "logical_mu": 0.594,
+              "slot": [
+                4,
+                7,
+                "3g"
+              ],
+              "workload": "llama_p2048_o64"
+            },
+            {
+              "batch": 1,
+              "gpu_id": 1,
+              "logical_mu": 193.46,
+              "slot": [
+                0,
+                2,
+                "2g"
+              ],
+              "workload": "resnet50_image"
+            },
+            {
+              "batch": 1,
+              "gpu_id": 1,
+              "logical_mu": 84.865,
+              "slot": [
+                2,
+                4,
+                "2g"
+              ],
+              "workload": "vit_base_image"
+            },
+            {
+              "batch": 4,
+              "gpu_id": 1,
+              "logical_mu": 553.509,
+              "slot": [
+                4,
+                7,
+                "3g"
+              ],
+              "workload": "vgg16_image"
+            }
+          ],
+          "next_physical_idx": 0,
+          "physical_id_map": {
+            "0": "ampere-gpu0",
+            "1": "ampere-gpu1"
+          },
+          "stage2_demand_count": 8,
+          "stage2_demand_type_count": 8
+        }
+      }
+    },
+    "targetGpuCount": 2,
+    "validationTargets": {
+      "targetAllocationPlan": {
+        "desiredRuntimes": [
+          {
+            "batchSize": 1,
+            "capacity": 0.163,
+            "gpu": "ampere-gpu0",
+            "hostPort": 10681,
+            "model": "gpt2_p512_o512",
+            "modelKey": "gpt2_p512_o512",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "gpt2_p512_o512",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "gpt2-p512-o512-ampere-gpu0-s0-1-1g",
+            "runtimeModel": "gpt2_p512_o512",
+            "slotResource": "or-sim.io/ampere-gpu0-s0-1-1g",
+            "weight": 0.163
+          },
+          {
+            "batchSize": 1,
+            "capacity": 1.327,
+            "gpu": "ampere-gpu0",
+            "hostPort": 10682,
+            "model": "gpt2_p64_o64",
+            "modelKey": "gpt2_p64_o64",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "gpt2_p64_o64",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "gpt2-p64-o64-ampere-gpu0-s1-2-1g",
+            "runtimeModel": "gpt2_p64_o64",
+            "slotResource": "or-sim.io/ampere-gpu0-s1-2-1g",
+            "weight": 1.327
+          },
+          {
+            "batchSize": 1,
+            "capacity": 0.594,
+            "gpu": "ampere-gpu0",
+            "hostPort": 10686,
+            "model": "llama_p2048_o64",
+            "modelKey": "llama_p2048_o64",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "llama_p2048_o64",
+            "profile": "3g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "llama-p2048-o64-ampere-gpu0-s4-7-3g",
+            "runtimeModel": "llama_p2048_o64",
+            "slotResource": "or-sim.io/ampere-gpu0-s4-8-3g",
+            "weight": 0.594
+          },
+          {
+            "batchSize": 1,
+            "capacity": 176.875,
+            "gpu": "ampere-gpu0",
+            "hostPort": 10683,
+            "model": "resnet50_image",
+            "modelKey": "resnet50_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "resnet50_image",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "resnet50-image-ampere-gpu0-s2-3-1g",
+            "runtimeModel": "resnet50_image",
+            "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+            "weight": 176.875
+          },
+          {
+            "batchSize": 1,
+            "capacity": 193.46,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10689,
+            "model": "resnet50_image",
+            "modelKey": "resnet50_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "resnet50_image",
+            "profile": "2g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "resnet50-image-ampere-gpu1-s0-2-2g",
+            "runtimeModel": "resnet50_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s0-2-2g",
+            "weight": 193.46
+          },
+          {
+            "batchSize": 4,
+            "capacity": 553.509,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10694,
+            "model": "vgg16_image",
+            "modelKey": "vgg16_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vgg16_image",
+            "profile": "3g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+            "runtimeModel": "vgg16_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+            "weight": 553.509
+          },
+          {
+            "batchSize": 1,
+            "capacity": 46.526,
+            "gpu": "ampere-gpu0",
+            "hostPort": 10685,
+            "model": "vit_base_image",
+            "modelKey": "vit_base_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vit_base_image",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vit-base-image-ampere-gpu0-s3-4-1g",
+            "runtimeModel": "vit_base_image",
+            "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+            "weight": 46.526
+          },
+          {
+            "batchSize": 1,
+            "capacity": 84.865,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10692,
+            "model": "vit_base_image",
+            "modelKey": "vit_base_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vit_base_image",
+            "profile": "2g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+            "runtimeModel": "vit_base_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+            "weight": 84.865
+          }
+        ],
+        "targetState": {
+          "gpus": [
+            {
+              "gpuId": 0,
+              "instances": [
+                {
+                  "batch": 1,
+                  "end": 1,
+                  "modelKey": null,
+                  "mu": 0.163,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "1g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 0,
+                  "workload": "gpt2_p512_o512"
+                },
+                {
+                  "batch": 1,
+                  "end": 2,
+                  "modelKey": null,
+                  "mu": 1.327,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "1g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 1,
+                  "workload": "gpt2_p64_o64"
+                },
+                {
+                  "batch": 1,
+                  "end": 3,
+                  "modelKey": null,
+                  "mu": 176.875,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "1g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 2,
+                  "workload": "resnet50_image"
+                },
+                {
+                  "batch": 1,
+                  "end": 4,
+                  "modelKey": null,
+                  "mu": 46.526,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "1g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 3,
+                  "workload": "vit_base_image"
+                },
+                {
+                  "batch": 1,
+                  "end": 7,
+                  "modelKey": null,
+                  "mu": 0.594,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "3g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 4,
+                  "workload": "llama_p2048_o64"
+                }
+              ],
+              "source": "planned"
+            },
+            {
+              "gpuId": 1,
+              "instances": [
+                {
+                  "batch": 1,
+                  "end": 2,
+                  "modelKey": null,
+                  "mu": 193.46,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "2g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 0,
+                  "workload": "resnet50_image"
+                },
+                {
+                  "batch": 1,
+                  "end": 4,
+                  "modelKey": null,
+                  "mu": 84.865,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "2g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 2,
+                  "workload": "vit_base_image"
+                },
+                {
+                  "batch": 4,
+                  "end": 7,
+                  "modelKey": null,
+                  "mu": 553.509,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "3g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 4,
+                  "workload": "vgg16_image"
+                }
+              ],
+              "source": "planned"
+            }
+          ],
+          "metadata": {
+            "arrivals": {
+              "gpt2_p512_o512": 0.0853080568720379,
+              "gpt2_p64_o64": 0.232258064516129,
+              "llama_p1024_o128": 0,
+              "llama_p2048_o64": 0,
+              "resnet50_image": 91.3690271927075,
+              "vgg16_image": 462.9532710280373,
+              "vit_base_image": 122.60061919504642
+            },
+            "build_method": "exact_global_milp_aggregated",
+            "build_metrics": {
+              "aggregated_new_gpu_count": 0,
+              "cold_workload_gpu_incidence": null,
+              "configured_mip_gap": 0,
+              "current_gpu_count": 2,
+              "demand_count": 8,
+              "demand_type_count": 8,
+              "elapsed_time_sec": 0.01065373420715332,
+              "exact_preserve": 8,
+              "gpu_count": 2,
+              "gurobi_seed": 1,
+              "gurobi_threads": 8,
+              "indexed_new_gpu_count": 0,
+              "layout_count": 16,
+              "mig_preserve": 8,
+              "mip_gap": null,
+              "new_gpu_count": 0,
+              "num_constraints": 167,
+              "num_vars": 208,
+              "objective_mode": "transition_preservation",
+              "objective_order": [
+                "exact_workload"
+              ],
+              "optimality_proven": true,
+              "reused_current_gpu_count": 2,
+              "score_tuple": [
+                0,
+                8,
+                0,
+                8
+              ],
+              "selected_layouts": {
+                "0": "1+1+1+1+3",
+                "1": "2+2+3"
+              },
+              "solver_status": "OPTIMAL",
+              "upgrade_preserve": 0,
+              "whole_gpu_preserve": 0
+            },
+            "capacity_basis": "physical_profile_catalog",
+            "free_physical_gpu_pool": [
+              "rtx1-worker-gpu0"
+            ],
+            "free_physical_gpu_pool_policy": "lifo",
+            "logical_capacity_assignments": [
+              {
+                "batch": 1,
+                "gpu_id": 0,
+                "logical_mu": 0.163,
+                "slot": [
+                  0,
+                  1,
+                  "1g"
+                ],
+                "workload": "gpt2_p512_o512"
+              },
+              {
+                "batch": 1,
+                "gpu_id": 0,
+                "logical_mu": 1.327,
+                "slot": [
+                  1,
+                  2,
+                  "1g"
+                ],
+                "workload": "gpt2_p64_o64"
+              },
+              {
+                "batch": 1,
+                "gpu_id": 0,
+                "logical_mu": 176.875,
+                "slot": [
+                  2,
+                  3,
+                  "1g"
+                ],
+                "workload": "resnet50_image"
+              },
+              {
+                "batch": 1,
+                "gpu_id": 0,
+                "logical_mu": 46.526,
+                "slot": [
+                  3,
+                  4,
+                  "1g"
+                ],
+                "workload": "vit_base_image"
+              },
+              {
+                "batch": 1,
+                "gpu_id": 0,
+                "logical_mu": 0.594,
+                "slot": [
+                  4,
+                  7,
+                  "3g"
+                ],
+                "workload": "llama_p2048_o64"
+              },
+              {
+                "batch": 1,
+                "gpu_id": 1,
+                "logical_mu": 193.46,
+                "slot": [
+                  0,
+                  2,
+                  "2g"
+                ],
+                "workload": "resnet50_image"
+              },
+              {
+                "batch": 1,
+                "gpu_id": 1,
+                "logical_mu": 84.865,
+                "slot": [
+                  2,
+                  4,
+                  "2g"
+                ],
+                "workload": "vit_base_image"
+              },
+              {
+                "batch": 4,
+                "gpu_id": 1,
+                "logical_mu": 553.509,
+                "slot": [
+                  4,
+                  7,
+                  "3g"
+                ],
+                "workload": "vgg16_image"
+              }
+            ],
+            "next_physical_idx": 0,
+            "physical_id_map": {
+              "0": "ampere-gpu0",
+              "1": "ampere-gpu1"
+            },
+            "stage2_demand_count": 8,
+            "stage2_demand_type_count": 8
+          }
+        }
+      }
+    }
+  },
+  "status": {
+    "message": "planned by planner-engine using planner=ours",
+    "phase": "Planned"
+  }
+}

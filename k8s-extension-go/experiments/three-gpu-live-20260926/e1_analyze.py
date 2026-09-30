@@ -46,7 +46,8 @@ Outputs:
       (HTTP 404: no ready replica) or by overload (sender pending bound);
       bad_fraction = not on time / offered, goodput = on time / offered.
       Requests the sender rejected have no send time; their scheduled time is
-      used.
+      used.  A round whose plan has no actions gets makespan rows with
+      no_op = True, a 0 s window and nothing offered.
 """
 from __future__ import annotations
 
@@ -321,7 +322,27 @@ def makespan_window_metrics(run: Path, requests: list[dict], slo: dict, token_sl
             "late_fraction_of_completed": round(late / completed, 4) if completed else None,
             "over_slo_profile_basis_of_completed": round(profile_over / completed, 4) if completed else None,
             "outage_span_s": round(max(outage_sent) - min(outage_sent), 3) if outage_sent else None,
+            "no_op": False,
         })
+    # A round whose demand the current layout already covers has no actions:
+    # no makespan window, so nothing is offered during a transition and
+    # nothing violates.  Record it explicitly rather than drop it.
+    for rnd in rounds:
+        path = run / "plans" / f"r{rnd:02d}_terminal_plan.json"
+        if rnd in mbounds or not path.exists():
+            continue
+        plan = json.loads(path.read_text())
+        if (plan.get("spec") or {}).get("actionDag", {}).get("nodes"):
+            continue
+        for workload in sorted({r["workload"] for r in requests if r.get("live_round") == rnd}):
+            rows.append({
+                "live_round": rnd, "workload": workload, "window": "makespan", "window_s": 0.0,
+                "offered": 0, "on_time": 0, "late": 0,
+                "failed_outage_404": 0, "failed_overload": 0, "failed_other": 0,
+                "bad_fraction": 0.0, "goodput": None, "late_fraction_of_completed": 0.0,
+                "over_slo_profile_basis_of_completed": 0.0, "outage_span_s": None, "no_op": True,
+            })
+    rows.sort(key=lambda row: (row["live_round"], row["workload"], row["window"]))
     return rows
 
 
