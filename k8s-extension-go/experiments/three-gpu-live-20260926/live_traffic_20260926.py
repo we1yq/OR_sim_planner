@@ -13,6 +13,7 @@ import hashlib
 import io
 import json
 import math
+import random
 import socket
 import threading
 import time
@@ -633,9 +634,16 @@ def _response_value(response: Mapping[str, Any], *keys: str) -> Any:
 class ContinuousRateSender:
     """E1 open-loop generator whose rates switch at run-time events.
 
-    Each workload sends at fixed inter-arrival 1/d.  After ``set_rates`` at
-    monotonic time t, workload w sends at ``t + phi_w(d) + n/d`` (n = 0, 1, ...),
-    with phi from the traffic seed as in ``request_offsets``; d = 0 stops w.
+    arrivals="fixed": each workload sends at fixed inter-arrival 1/d.  After
+    ``set_rates`` at monotonic time t, workload w sends at ``t + phi_w(d) +
+    n/d`` (n = 0, 1, ...), with phi from the traffic seed as in
+    ``request_offsets``; d = 0 stops w.
+
+    arrivals="poisson": inter-arrival times are exponential with mean 1/d
+    (users do not send at a steady pace).  Each ``set_rates`` starts, per
+    workload, a generator seeded from (seed, workload, live round, window), so
+    two runs that switch through the same rounds offer identical sequences of
+    inter-arrival times.
     Every request is tagged at send time with the live round and window
     ("transition" or "steady") that were current when it was scheduled, so
     requests still in flight after a switch keep their original window.
@@ -649,9 +657,12 @@ class ContinuousRateSender:
     """
 
     def __init__(self, sender: "BoundedAsyncSender", *, seed: int = SEED, tick_s: float = 0.002,
-                 gc_freeze_s: float = 1.0) -> None:
+                 gc_freeze_s: float = 1.0, arrivals: str = "fixed") -> None:
+        if arrivals not in ("fixed", "poisson"):
+            raise ValueError(f"unknown arrivals {arrivals!r}")
         self.sender = sender
         self.seed = int(seed)
+        self.arrivals = arrivals
         self.tick_s = float(tick_s)
         self.gc_freeze_s = float(gc_freeze_s)
         self._lock = threading.Lock()
@@ -681,12 +692,17 @@ class ContinuousRateSender:
             self._label = {"live_round": int(live_round), "window": str(window)}
             for workload in WORKLOAD_KEYS:
                 rate = normalized[workload]
-                self._schedule[workload] = {
+                entry = {
                     "rate": rate,
                     "base": now + (phase_offset(rate, workload, self.seed) if rate > 0 else 0.0),
                     "n": 0,
                     "label": dict(self._label),
                 }
+                if self.arrivals == "poisson" and rate > 0:
+                    key = f"{self.seed}:{workload}:{int(live_round)}:{window}".encode()
+                    entry["rng"] = random.Random(int.from_bytes(hashlib.sha256(key).digest()[:8], "big"))
+                    entry["next_at"] = now + entry["rng"].expovariate(rate)
+                self._schedule[workload] = entry
             self._events.append(event)
         return event
 
@@ -715,7 +731,10 @@ class ContinuousRateSender:
                     if rate <= 0:
                         continue
                     while True:
-                        at = float(entry["base"]) + int(entry["n"]) / rate
+                        if "rng" in entry:
+                            at = float(entry["next_at"])
+                        else:
+                            at = float(entry["base"]) + int(entry["n"]) / rate
                         if at > now:
                             break
                         label = entry["label"]
@@ -738,6 +757,8 @@ class ContinuousRateSender:
                             "payload_json": json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True),
                         })
                         entry["n"] = n + 1
+                        if "rng" in entry:
+                            entry["next_at"] = at + entry["rng"].expovariate(rate)
             for row in sorted(due, key=lambda r: float(r["scheduled_offset"])):
                 self.sender.submit(row)
             time.sleep(self.tick_s)

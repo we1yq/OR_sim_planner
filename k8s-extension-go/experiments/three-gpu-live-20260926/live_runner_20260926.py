@@ -980,6 +980,7 @@ def _write_initial_outputs(ctx: RunContext, args: argparse.Namespace, hashes: Ma
         "stage3_variant": getattr(args, "stage3_variant", "slicewise"),
         "capacity_headroom": getattr(args, "capacity_headroom", None),
         "conservative_3g_mu": bool(getattr(args, "conservative_3g_mu", False)),
+        "e1_arrivals": getattr(args, "arrivals", "fixed") if ctx.e1_mode else None,
         "solver": {"threads": 8, "seed": 1, "mip_gap": 0, "accepted_status": "OPTIMAL"},
     })
     _json_output(ctx.output_dir / "profile_protocol.json", {
@@ -2531,7 +2532,7 @@ def execute_e1_experiment(
     if getattr(args, "e1_warmup", True):
         e1_warmup(ctx, args, kube, router, demand)
     sender = traffic.BoundedAsyncSender(traffic.urllib_transport(ctx.router_url, timeout_s=900.0))
-    generator = traffic.ContinuousRateSender(sender, seed=TRAFFIC_SEED)
+    generator = traffic.ContinuousRateSender(sender, seed=TRAFFIC_SEED, arrivals=getattr(args, "arrivals", "fixed"))
     generator.start()
     previous_rates = dict(zero)
     completed_rounds = 0
@@ -2880,6 +2881,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="planner provisions for (1 + h) x demand, lowered per round to fit the GPU budget (default: off)")
     parser.add_argument("--conservative-3g-mu", action="store_true",
                         help="planner Stage 1 uses min(mu_3g, mu_4g) for 3g options (default: off)")
+    parser.add_argument("--arrivals", choices=["fixed", "poisson"], default="fixed",
+                        help="E1 inter-arrival times: fixed 1/d, or exponential with mean 1/d (default: fixed)")
     parser.add_argument("--catalog", default="catalog.csv", help="ledger catalog file in the experiment directory (default: frozen catalog.csv)")
     parser.add_argument("--watchdog-seconds", type=float, default=1800.0)
     parser.add_argument("--poll-seconds", type=float, default=2.0)

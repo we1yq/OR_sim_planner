@@ -9,7 +9,11 @@ while requests wait in the router queue: the router hands the next request to
 a replica as soon as it has room, so each replica then completes requests as
 fast as it can.  A second counts as saturated for a workload when the median
 router queue wait (response.queueWaitMs) of the requests dispatched in that
-second exceeds queue_ms (default 50).  Per replica, option (profile from the
+second exceeds queue_ms (default 50) and at least 95% of them went out in full
+batches.  The second condition matters for large batches: requests arrive one
+by one, so a b16 replica whose batch takes about as long to fill as to run
+queues its requests for the fill time and sends partial batches although it
+keeps up (vit_base 1g b16: ~130 ms waits, 44% full batches).  Per replica, option (profile from the
 runtime id, batch = the replica's configured maxBatchSize) and round,
 capacity = requests completed in its saturated seconds / number of those seconds; the first and last
 saturated second of each run of consecutive seconds are dropped as partial.
@@ -32,6 +36,7 @@ def main() -> int:
     mu = {(r["workload"], r["profile"], int(r["batch"])): float(r["mu"]) for r in csv.DictReader(catalog.open())}
 
     waits: dict[tuple[str, int], list[float]] = defaultdict(list)
+    full: dict[tuple[str, int], list[bool]] = defaultdict(list)
     done: dict[tuple[str, int, str, int, int], int] = defaultdict(int)  # (workload, second, runtime, batch, round)
     for r in csv.DictReader(gzip.open(run / "requests.csv.gz", "rt")):
         if r["status"] != "success" or not r["response.routerDispatchAt"]:
@@ -41,9 +46,11 @@ def main() -> int:
         dispatched = datetime.fromisoformat(r["response.routerDispatchAt"][:26].rstrip("Z") + "+00:00").timestamp()
         batch = int(r["response.maxBatchSize"] or r["response.batchSize"] or 1)
         waits[(w, int(dispatched))].append(float(r["response.queueWaitMs"] or 0))
+        full[(w, int(dispatched))].append(int(r["response.batchSize"] or 1) >= batch)
         done[(w, int(float(r["completion"])), r["response.runtimeId"], batch, int(r["live_round"]))] += 1
 
-    saturated = {k for k, v in waits.items() if statistics.median(v) > queue_ms}
+    saturated = {k for k, v in waits.items()
+                 if statistics.median(v) > queue_ms and sum(full[k]) >= 0.95 * len(full[k])}
     interior = set()
     for (w, s) in saturated:
         if (w, s - 1) in saturated and (w, s + 1) in saturated:
