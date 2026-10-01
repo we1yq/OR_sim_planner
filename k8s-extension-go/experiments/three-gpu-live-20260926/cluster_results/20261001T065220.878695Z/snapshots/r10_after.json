@@ -1,0 +1,4836 @@
+{
+  "pods": {
+    "apiVersion": "v1",
+    "items": [
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "cni.projectcalico.org/containerID": "18a68650c529108b74b0c294c7aacb55beca6065ae9205fdced8ea03a8fd368a",
+            "cni.projectcalico.org/podIP": "10.42.0.142/32",
+            "cni.projectcalico.org/podIPs": "10.42.0.142/32",
+            "kubectl.kubernetes.io/restartedAt": "2026-07-15T15:02:28+09:00",
+            "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+          },
+          "creationTimestamp": "2026-09-28T08:34:48Z",
+          "generateName": "cluster-state-manager-5769b5954f-",
+          "labels": {
+            "app.kubernetes.io/component": "cluster-state-manager",
+            "app.kubernetes.io/name": "migrant-go-control-plane",
+            "pod-template-hash": "5769b5954f"
+          },
+          "name": "cluster-state-manager-5769b5954f-rbdq7",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "cluster-state-manager-5769b5954f",
+              "uid": "1e8ed064-c0d2-4b53-83de-30c754e3c3bb"
+            }
+          ],
+          "resourceVersion": "61742325",
+          "uid": "01130a7c-14e8-44de-9891-b727464ff045"
+        },
+        "spec": {
+          "containers": [
+            {
+              "command": [
+                "/cluster-state-manager"
+              ],
+              "env": [
+                {
+                  "name": "NAMESPACE",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.namespace"
+                    }
+                  }
+                },
+                {
+                  "name": "ROUTER_URL",
+                  "value": "http://runtime-router:8080"
+                }
+              ],
+              "image": "localhost:10690/migrant-control-plane:batch-state-concurrency-20260928",
+              "imagePullPolicy": "Always",
+              "name": "controller",
+              "ports": [
+                {
+                  "containerPort": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8080,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-96dk6",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "or-sim-control-plane",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "or-sim-control-plane"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "migrant-go-control-plane",
+          "serviceAccountName": "migrant-go-control-plane",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-96dk6",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T08:34:49Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T08:34:48Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T06:01:08Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T06:01:08Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-28T08:34:48Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://92402b55862dda9ae8729cb97a1cc9d9e0ed56dee0b921a5bb0221b9122d6017",
+              "image": "localhost:10690/migrant-control-plane:batch-state-concurrency-20260928",
+              "imageID": "localhost:10690/migrant-control-plane@sha256:2917fa29ec74954bfb583e2f70c1f094c328a20b80fee5ad6cc543054d78ae93",
+              "lastState": {},
+              "name": "controller",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-28T08:34:49Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-96dk6",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.179.144",
+          "hostIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "10.42.0.142",
+          "podIPs": [
+            {
+              "ip": "10.42.0.142"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-28T08:34:48Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "migrant.io/binding-layer": "kubelet-device-plugin-allocate",
+            "migrant.io/binding-mechanism": "per-mig-uuid-resource",
+            "migrant.io/capacity": "0.163",
+            "migrant.io/device-resource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "migrant.io/expected-mig-uuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "migrant.io/long-term-identity": "logical-slot",
+            "migrant.io/route-weight": "0.163",
+            "migrant.io/slot-resource": "or-sim.io/ampere-gpu0-s2-3-1g"
+          },
+          "creationTimestamp": "2026-10-01T07:03:20Z",
+          "generateName": "gpt2-p512-o512-ampere-gpu0-s2-3-1g-runtime-595f58cf6c-",
+          "labels": {
+            "app.kubernetes.io/name": "migrant-model-runtime",
+            "migrant.io/gpu": "ampere-gpu0",
+            "migrant.io/model": "gpt2_p512_o512",
+            "migrant.io/output-tokens": "0",
+            "migrant.io/profile": "1g",
+            "migrant.io/prompt-len": "0",
+            "migrant.io/request-class": "x",
+            "migrant.io/runtime-id": "gpt2-p512-o512-ampere-gpu0-s2-3-1g",
+            "migrant.io/runtime-model": "gpt2",
+            "pod-template-hash": "595f58cf6c"
+          },
+          "name": "gpt2-p512-o512-ampere-gpu0-s2-3-1g-runtime-595f58cf6c-hw2ds",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "gpt2-p512-o512-ampere-gpu0-s2-3-1g-runtime-595f58cf6c",
+              "uid": "330b7ede-2ddc-4d60-a495-5afd40e7fde8"
+            }
+          ],
+          "resourceVersion": "61760099",
+          "uid": "d5c17ad9-daee-4d5e-98f6-fa5169788e8a"
+        },
+        "spec": {
+          "containers": [
+            {
+              "args": [
+                "--addr=:10683"
+              ],
+              "env": [
+                {
+                  "name": "MODEL_NAME",
+                  "value": "gpt2"
+                },
+                {
+                  "name": "OR_SIM_WORKLOAD",
+                  "value": "gpt2_p512_o512"
+                },
+                {
+                  "name": "OR_SIM_REQUEST_CLASS"
+                },
+                {
+                  "name": "PROMPT_LEN",
+                  "value": "0"
+                },
+                {
+                  "name": "OUTPUT_TOKENS",
+                  "value": "0"
+                },
+                {
+                  "name": "RUNTIME_MODE",
+                  "value": "transformers"
+                },
+                {
+                  "name": "TORCHVISION_WEIGHTS",
+                  "value": "default"
+                },
+                {
+                  "name": "TORCH_HOME",
+                  "value": "/opt/torch-cache"
+                },
+                {
+                  "name": "XDG_CACHE_HOME",
+                  "value": "/opt/cache"
+                },
+                {
+                  "name": "OR_SIM_RUNTIME_ID",
+                  "value": "gpt2-p512-o512-ampere-gpu0-s2-3-1g"
+                },
+                {
+                  "name": "BATCH_SIZE",
+                  "value": "1"
+                },
+                {
+                  "name": "OR_SIM_GPU",
+                  "value": "ampere-gpu0"
+                },
+                {
+                  "name": "OR_SIM_PROFILE",
+                  "value": "1g"
+                },
+                {
+                  "name": "OR_SIM_SLOT_RESOURCE",
+                  "value": "or-sim.io/ampere-gpu0-s2-3-1g"
+                },
+                {
+                  "name": "OR_SIM_DEVICE_RESOURCE",
+                  "value": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf"
+                },
+                {
+                  "name": "OR_SIM_EXPECTED_MIG_UUID",
+                  "value": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf"
+                },
+                {
+                  "name": "OR_SIM_CPU_SET",
+                  "value": "6,62"
+                },
+                {
+                  "name": "OR_SIM_FRONTEND_CPU_SET",
+                  "value": "34,90,36,92"
+                },
+                {
+                  "name": "MODEL_ID",
+                  "value": "/opt/models/gpt2-medium"
+                },
+                {
+                  "name": "HF_HOME",
+                  "value": "/opt/hf-cache"
+                },
+                {
+                  "name": "HUGGINGFACE_HUB_CACHE",
+                  "value": "/opt/hf-cache/hub"
+                },
+                {
+                  "name": "TRANSFORMERS_CACHE",
+                  "value": "/opt/hf-cache/hub"
+                },
+                {
+                  "name": "HF_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "HF_TOKEN",
+                      "name": "hf-token",
+                      "optional": true
+                    }
+                  }
+                }
+              ],
+              "image": "localhost:10690/migrant-model-runtime:gpt2-medium-fast3-20260930",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "runtime",
+              "ports": [
+                {
+                  "containerPort": 10683,
+                  "hostPort": 10683,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 10683,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 1,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {
+                "limits": {
+                  "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf": "1"
+                },
+                "requests": {
+                  "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf": "1"
+                }
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/opt/hf-cache",
+                  "name": "hf-cache"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-glrch",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirstWithHostNet",
+          "enableServiceLinks": true,
+          "hostNetwork": true,
+          "initContainers": [
+            {
+              "command": [
+                "sh",
+                "-c",
+                "mkdir -p /cache/hub && chown -R 65532:65532 /cache"
+              ],
+              "image": "busybox:1.36",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "prepare-hf-cache",
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/cache",
+                  "name": "hf-cache"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-glrch",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "nodeName": "ampere",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "ampere"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "runtimeClassName": "nvidia",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "terminationGracePeriodSeconds": 2,
+          "tolerations": [
+            {
+              "operator": "Exists"
+            }
+          ],
+          "volumes": [
+            {
+              "hostPath": {
+                "path": "/var/lib/or-sim/hf-cache",
+                "type": "DirectoryOrCreate"
+              },
+              "name": "hf-cache"
+            },
+            {
+              "name": "kube-api-access-glrch",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:03:21Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:03:21Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:03:27Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:03:27Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:03:20Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://02d0c577fdb58b66b67f15cd36b5ca736fcc64bf7be67c0637c6383ae4a84ca3",
+              "image": "localhost:10690/migrant-model-runtime:gpt2-medium-fast3-20260930",
+              "imageID": "localhost:10690/migrant-model-runtime@sha256:1e87400bab996430133540dee68c44738d900c9ea3d1f5a779608adf3ede964b",
+              "lastState": {},
+              "name": "runtime",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-10-01T07:03:22Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/opt/hf-cache",
+                  "name": "hf-cache"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-glrch",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.135.205",
+          "hostIPs": [
+            {
+              "ip": "115.145.135.205"
+            }
+          ],
+          "initContainerStatuses": [
+            {
+              "containerID": "containerd://107bb5ea0b13d74a2e4feb422ee99b7b20563ffc65bd9227a4425ea6e4bcbc5a",
+              "image": "docker.io/library/busybox:1.36",
+              "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+              "lastState": {},
+              "name": "prepare-hf-cache",
+              "ready": true,
+              "restartCount": 0,
+              "started": false,
+              "state": {
+                "terminated": {
+                  "containerID": "containerd://107bb5ea0b13d74a2e4feb422ee99b7b20563ffc65bd9227a4425ea6e4bcbc5a",
+                  "exitCode": 0,
+                  "finishedAt": "2026-10-01T07:03:21Z",
+                  "reason": "Completed",
+                  "startedAt": "2026-10-01T07:03:21Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/cache",
+                  "name": "hf-cache"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-glrch",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "phase": "Running",
+          "podIP": "115.145.135.205",
+          "podIPs": [
+            {
+              "ip": "115.145.135.205"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-10-01T07:03:20Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "migrant.io/binding-layer": "kubelet-device-plugin-allocate",
+            "migrant.io/binding-mechanism": "per-mig-uuid-resource",
+            "migrant.io/capacity": "1.327",
+            "migrant.io/device-resource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+            "migrant.io/expected-mig-uuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+            "migrant.io/long-term-identity": "logical-slot",
+            "migrant.io/route-weight": "1.327",
+            "migrant.io/slot-resource": "or-sim.io/ampere-gpu0-s3-4-1g"
+          },
+          "creationTimestamp": "2026-10-01T07:03:20Z",
+          "generateName": "gpt2-p64-o64-ampere-gpu0-s3-4-1g-runtime-76f6f8bd6f-",
+          "labels": {
+            "app.kubernetes.io/name": "migrant-model-runtime",
+            "migrant.io/gpu": "ampere-gpu0",
+            "migrant.io/model": "gpt2_p64_o64",
+            "migrant.io/output-tokens": "0",
+            "migrant.io/profile": "1g",
+            "migrant.io/prompt-len": "0",
+            "migrant.io/request-class": "x",
+            "migrant.io/runtime-id": "gpt2-p64-o64-ampere-gpu0-s3-4-1g",
+            "migrant.io/runtime-model": "gpt2",
+            "pod-template-hash": "76f6f8bd6f"
+          },
+          "name": "gpt2-p64-o64-ampere-gpu0-s3-4-1g-runtime-76f6f8bd6f-wpxwd",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "gpt2-p64-o64-ampere-gpu0-s3-4-1g-runtime-76f6f8bd6f",
+              "uid": "aacfbbd5-2fac-4d4c-9c94-85101fb4ae70"
+            }
+          ],
+          "resourceVersion": "61760096",
+          "uid": "67b89166-376e-473e-be17-03ec5fa1b814"
+        },
+        "spec": {
+          "containers": [
+            {
+              "args": [
+                "--addr=:10685"
+              ],
+              "env": [
+                {
+                  "name": "MODEL_NAME",
+                  "value": "gpt2"
+                },
+                {
+                  "name": "OR_SIM_WORKLOAD",
+                  "value": "gpt2_p64_o64"
+                },
+                {
+                  "name": "OR_SIM_REQUEST_CLASS"
+                },
+                {
+                  "name": "PROMPT_LEN",
+                  "value": "0"
+                },
+                {
+                  "name": "OUTPUT_TOKENS",
+                  "value": "0"
+                },
+                {
+                  "name": "RUNTIME_MODE",
+                  "value": "transformers"
+                },
+                {
+                  "name": "TORCHVISION_WEIGHTS",
+                  "value": "default"
+                },
+                {
+                  "name": "TORCH_HOME",
+                  "value": "/opt/torch-cache"
+                },
+                {
+                  "name": "XDG_CACHE_HOME",
+                  "value": "/opt/cache"
+                },
+                {
+                  "name": "OR_SIM_RUNTIME_ID",
+                  "value": "gpt2-p64-o64-ampere-gpu0-s3-4-1g"
+                },
+                {
+                  "name": "BATCH_SIZE",
+                  "value": "1"
+                },
+                {
+                  "name": "OR_SIM_GPU",
+                  "value": "ampere-gpu0"
+                },
+                {
+                  "name": "OR_SIM_PROFILE",
+                  "value": "1g"
+                },
+                {
+                  "name": "OR_SIM_SLOT_RESOURCE",
+                  "value": "or-sim.io/ampere-gpu0-s3-4-1g"
+                },
+                {
+                  "name": "OR_SIM_DEVICE_RESOURCE",
+                  "value": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038"
+                },
+                {
+                  "name": "OR_SIM_EXPECTED_MIG_UUID",
+                  "value": "MIG-74220c29-c0f9-5684-97c7-557424996038"
+                },
+                {
+                  "name": "OR_SIM_CPU_SET",
+                  "value": "8,64"
+                },
+                {
+                  "name": "OR_SIM_FRONTEND_CPU_SET",
+                  "value": "34,90,36,92"
+                },
+                {
+                  "name": "MODEL_ID",
+                  "value": "/opt/models/gpt2-medium"
+                },
+                {
+                  "name": "HF_HOME",
+                  "value": "/opt/hf-cache"
+                },
+                {
+                  "name": "HUGGINGFACE_HUB_CACHE",
+                  "value": "/opt/hf-cache/hub"
+                },
+                {
+                  "name": "TRANSFORMERS_CACHE",
+                  "value": "/opt/hf-cache/hub"
+                },
+                {
+                  "name": "HF_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "HF_TOKEN",
+                      "name": "hf-token",
+                      "optional": true
+                    }
+                  }
+                }
+              ],
+              "image": "localhost:10690/migrant-model-runtime:gpt2-medium-fast3-20260930",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "runtime",
+              "ports": [
+                {
+                  "containerPort": 10685,
+                  "hostPort": 10685,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 10685,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 1,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {
+                "limits": {
+                  "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038": "1"
+                },
+                "requests": {
+                  "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038": "1"
+                }
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/opt/hf-cache",
+                  "name": "hf-cache"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-jfpv8",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirstWithHostNet",
+          "enableServiceLinks": true,
+          "hostNetwork": true,
+          "initContainers": [
+            {
+              "command": [
+                "sh",
+                "-c",
+                "mkdir -p /cache/hub && chown -R 65532:65532 /cache"
+              ],
+              "image": "busybox:1.36",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "prepare-hf-cache",
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/cache",
+                  "name": "hf-cache"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-jfpv8",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "nodeName": "ampere",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "ampere"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "runtimeClassName": "nvidia",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "terminationGracePeriodSeconds": 2,
+          "tolerations": [
+            {
+              "operator": "Exists"
+            }
+          ],
+          "volumes": [
+            {
+              "hostPath": {
+                "path": "/var/lib/or-sim/hf-cache",
+                "type": "DirectoryOrCreate"
+              },
+              "name": "hf-cache"
+            },
+            {
+              "name": "kube-api-access-jfpv8",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:03:21Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:03:21Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:03:27Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:03:27Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:03:20Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://4e4e2586c3ac67e00bf490082a91461108db5cc2641b52aa12b8d408f0fe01ba",
+              "image": "localhost:10690/migrant-model-runtime:gpt2-medium-fast3-20260930",
+              "imageID": "localhost:10690/migrant-model-runtime@sha256:1e87400bab996430133540dee68c44738d900c9ea3d1f5a779608adf3ede964b",
+              "lastState": {},
+              "name": "runtime",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-10-01T07:03:22Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/opt/hf-cache",
+                  "name": "hf-cache"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-jfpv8",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.135.205",
+          "hostIPs": [
+            {
+              "ip": "115.145.135.205"
+            }
+          ],
+          "initContainerStatuses": [
+            {
+              "containerID": "containerd://a0cd1e2778c400f42edf319366ff48c2b090e7dbc7c6c21a86a97203311b3bb9",
+              "image": "docker.io/library/busybox:1.36",
+              "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+              "lastState": {},
+              "name": "prepare-hf-cache",
+              "ready": true,
+              "restartCount": 0,
+              "started": false,
+              "state": {
+                "terminated": {
+                  "containerID": "containerd://a0cd1e2778c400f42edf319366ff48c2b090e7dbc7c6c21a86a97203311b3bb9",
+                  "exitCode": 0,
+                  "finishedAt": "2026-10-01T07:03:21Z",
+                  "reason": "Completed",
+                  "startedAt": "2026-10-01T07:03:21Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/cache",
+                  "name": "hf-cache"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-jfpv8",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "phase": "Running",
+          "podIP": "115.145.135.205",
+          "podIPs": [
+            {
+              "ip": "115.145.135.205"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-10-01T07:03:20Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "cni.projectcalico.org/containerID": "1e0da74514b41ddeee8b04079fbddbaba7f79e1bbff781f7b8e406d0fc613c5d",
+            "cni.projectcalico.org/podIP": "10.42.0.164/32",
+            "cni.projectcalico.org/podIPs": "10.42.0.164/32",
+            "kubectl.kubernetes.io/restartedAt": "2026-09-26T17:57:18+09:00",
+            "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+          },
+          "creationTimestamp": "2026-09-29T14:30:08Z",
+          "generateName": "planner-controller-d5f476f99-",
+          "labels": {
+            "app.kubernetes.io/component": "planner-controller",
+            "app.kubernetes.io/name": "migrant-go-control-plane",
+            "pod-template-hash": "d5f476f99"
+          },
+          "name": "planner-controller-d5f476f99-z9zkh",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "planner-controller-d5f476f99",
+              "uid": "1989ff8e-d35f-423e-a48c-b71fa0687edc"
+            }
+          ],
+          "resourceVersion": "61742344",
+          "uid": "8c0ad311-5f76-425f-9aad-0ac4d39b1825"
+        },
+        "spec": {
+          "containers": [
+            {
+              "command": [
+                "/planner-controller"
+              ],
+              "env": [
+                {
+                  "name": "NAMESPACE",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.namespace"
+                    }
+                  }
+                },
+                {
+                  "name": "PLANNER_ENGINE_URL",
+                  "value": "http://planner-engine:8080"
+                }
+              ],
+              "image": "localhost:10690/migrant-control-plane:headroom-20260929",
+              "imagePullPolicy": "Always",
+              "name": "controller",
+              "ports": [
+                {
+                  "containerPort": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8080,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-ld7pt",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "or-sim-control-plane",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "or-sim-control-plane"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "migrant-go-control-plane",
+          "serviceAccountName": "migrant-go-control-plane",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-ld7pt",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-29T14:30:09Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-29T14:30:08Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T06:01:08Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T06:01:08Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-29T14:30:08Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://7570f7bdab41f66e018d2baae40f3edd10578142cce20c8b8d82f63726265bac",
+              "image": "localhost:10690/migrant-control-plane:headroom-20260929",
+              "imageID": "localhost:10690/migrant-control-plane@sha256:f0be52030a1ec200dd4905e6ccb58597a347bafb673be35602274f4b6bebd96b",
+              "lastState": {},
+              "name": "controller",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-29T14:30:09Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-ld7pt",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.179.144",
+          "hostIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "10.42.0.164",
+          "podIPs": [
+            {
+              "ip": "10.42.0.164"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-29T14:30:08Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "cni.projectcalico.org/containerID": "77d91a65cf8c3e922886b81a8cb5cd527fcbd64128e6aba1f07663054fc8cfd9",
+            "cni.projectcalico.org/podIP": "10.42.0.180/32",
+            "cni.projectcalico.org/podIPs": "10.42.0.180/32",
+            "kubectl.kubernetes.io/restartedAt": "2026-09-27T00:38:44+09:00",
+            "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+          },
+          "creationTimestamp": "2026-09-30T17:02:26Z",
+          "generateName": "planner-engine-6879b774f9-",
+          "labels": {
+            "app.kubernetes.io/name": "migrant-planner-engine",
+            "pod-template-hash": "6879b774f9"
+          },
+          "name": "planner-engine-6879b774f9-76k8t",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "planner-engine-6879b774f9",
+              "uid": "8b855018-f2fe-4c40-8251-2dc01be2054e"
+            }
+          ],
+          "resourceVersion": "61742341",
+          "uid": "f5dd9195-8634-4f47-a10b-4f621b4d4dfb"
+        },
+        "spec": {
+          "containers": [
+            {
+              "image": "localhost:10690/migrant-planner-engine:mu093-20260930",
+              "imagePullPolicy": "Always",
+              "name": "planner-engine",
+              "ports": [
+                {
+                  "containerPort": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8080,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 1,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-qgvh4",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "or-sim-control-plane",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "or-sim-control-plane"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-qgvh4",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-30T17:02:27Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-30T17:02:26Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T06:01:08Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T06:01:08Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-30T17:02:26Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://261c9780dff98b0ef95ed815adbf938508df446d4120e3d95377a54e24f46566",
+              "image": "localhost:10690/migrant-planner-engine:mu093-20260930",
+              "imageID": "localhost:10690/migrant-planner-engine@sha256:a73411635c8e8d50e4147dc88becaec8829bbfe7faa2e4886230563863c30001",
+              "lastState": {},
+              "name": "planner-engine",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-30T17:02:27Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-qgvh4",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.179.144",
+          "hostIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "10.42.0.180",
+          "podIPs": [
+            {
+              "ip": "10.42.0.180"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-30T17:02:26Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "migrant.io/binding-layer": "kubelet-device-plugin-allocate",
+            "migrant.io/binding-mechanism": "per-mig-uuid-resource",
+            "migrant.io/capacity": "176.875",
+            "migrant.io/device-resource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+            "migrant.io/expected-mig-uuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+            "migrant.io/long-term-identity": "logical-slot",
+            "migrant.io/route-weight": "176.875",
+            "migrant.io/slot-resource": "or-sim.io/ampere-gpu0-s6-7-1g"
+          },
+          "creationTimestamp": "2026-10-01T07:04:42Z",
+          "generateName": "resnet50-image-ampere-gpu0-s6-7-1g-runtime-68fbccf8d-",
+          "labels": {
+            "app.kubernetes.io/name": "migrant-model-runtime",
+            "migrant.io/gpu": "ampere-gpu0",
+            "migrant.io/model": "resnet50_image",
+            "migrant.io/output-tokens": "0",
+            "migrant.io/profile": "1g",
+            "migrant.io/prompt-len": "0",
+            "migrant.io/request-class": "x",
+            "migrant.io/runtime-id": "resnet50-image-ampere-gpu0-s6-7-1g",
+            "migrant.io/runtime-model": "resnet50",
+            "pod-template-hash": "68fbccf8d"
+          },
+          "name": "resnet50-image-ampere-gpu0-s6-7-1g-runtime-68fbccf8d-n9z59",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "resnet50-image-ampere-gpu0-s6-7-1g-runtime-68fbccf8d",
+              "uid": "75dcdc0c-72bc-4bfb-9fa0-bd265243bc28"
+            }
+          ],
+          "resourceVersion": "61760612",
+          "uid": "de532c20-60cc-421a-8ccb-77cdb0815be1"
+        },
+        "spec": {
+          "containers": [
+            {
+              "args": [
+                "--addr=:10688"
+              ],
+              "env": [
+                {
+                  "name": "MODEL_NAME",
+                  "value": "resnet50"
+                },
+                {
+                  "name": "OR_SIM_WORKLOAD",
+                  "value": "resnet50_image"
+                },
+                {
+                  "name": "OR_SIM_REQUEST_CLASS"
+                },
+                {
+                  "name": "PROMPT_LEN",
+                  "value": "0"
+                },
+                {
+                  "name": "OUTPUT_TOKENS",
+                  "value": "0"
+                },
+                {
+                  "name": "RUNTIME_MODE",
+                  "value": "torchvision"
+                },
+                {
+                  "name": "TORCHVISION_WEIGHTS",
+                  "value": "default"
+                },
+                {
+                  "name": "TORCH_HOME",
+                  "value": "/opt/torch-cache"
+                },
+                {
+                  "name": "XDG_CACHE_HOME",
+                  "value": "/opt/cache"
+                },
+                {
+                  "name": "OR_SIM_RUNTIME_ID",
+                  "value": "resnet50-image-ampere-gpu0-s6-7-1g"
+                },
+                {
+                  "name": "BATCH_SIZE",
+                  "value": "1"
+                },
+                {
+                  "name": "OR_SIM_GPU",
+                  "value": "ampere-gpu0"
+                },
+                {
+                  "name": "OR_SIM_PROFILE",
+                  "value": "1g"
+                },
+                {
+                  "name": "OR_SIM_SLOT_RESOURCE",
+                  "value": "or-sim.io/ampere-gpu0-s6-7-1g"
+                },
+                {
+                  "name": "OR_SIM_DEVICE_RESOURCE",
+                  "value": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979"
+                },
+                {
+                  "name": "OR_SIM_EXPECTED_MIG_UUID",
+                  "value": "MIG-f832d650-30f6-510a-8584-d8e4f5982979"
+                },
+                {
+                  "name": "OR_SIM_CPU_SET",
+                  "value": "14,70"
+                },
+                {
+                  "name": "OR_SIM_FRONTEND_CPU_SET",
+                  "value": "34,90,36,92"
+                }
+              ],
+              "image": "localhost:10690/migrant-model-runtime:torchvision-fast3-20260930",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "runtime",
+              "ports": [
+                {
+                  "containerPort": 10688,
+                  "hostPort": 10688,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 10688,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 1,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {
+                "limits": {
+                  "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979": "1"
+                },
+                "requests": {
+                  "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979": "1"
+                }
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-x4c92",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirstWithHostNet",
+          "enableServiceLinks": true,
+          "hostNetwork": true,
+          "nodeName": "ampere",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "ampere"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "runtimeClassName": "nvidia",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "terminationGracePeriodSeconds": 2,
+          "tolerations": [
+            {
+              "operator": "Exists"
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-x4c92",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:43Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:42Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:47Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:47Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:42Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://7abc6bc6eff3a587b4c2c47d0856b1344a626b9349cb74678221d36fb74cb2fd",
+              "image": "localhost:10690/migrant-model-runtime:torchvision-fast3-20260930",
+              "imageID": "localhost:10690/migrant-model-runtime@sha256:8f6b99e94594078f34246ce0b2d7632ce48a6b163508283e6aece1d8c32acfb6",
+              "lastState": {},
+              "name": "runtime",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-10-01T07:04:42Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-x4c92",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.135.205",
+          "hostIPs": [
+            {
+              "ip": "115.145.135.205"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "115.145.135.205",
+          "podIPs": [
+            {
+              "ip": "115.145.135.205"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-10-01T07:04:42Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "kubectl.kubernetes.io/restartedAt": "2026-09-26T23:00:13+09:00",
+            "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+          },
+          "creationTimestamp": "2026-09-30T10:14:21Z",
+          "generateName": "runtime-router-94c97d995-",
+          "labels": {
+            "app.kubernetes.io/name": "migrant-runtime-router",
+            "pod-template-hash": "94c97d995"
+          },
+          "name": "runtime-router-94c97d995-df7k7",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "runtime-router-94c97d995",
+              "uid": "bc6437c7-6ec2-480a-a0b1-1abcdddef117"
+            }
+          ],
+          "resourceVersion": "61742332",
+          "uid": "7e4fd915-21f7-43b0-b926-1e634a8c16f8"
+        },
+        "spec": {
+          "containers": [
+            {
+              "args": [
+                "--addr=:10680"
+              ],
+              "env": [
+                {
+                  "name": "NAMESPACE",
+                  "value": "or-sim-exp"
+                },
+                {
+                  "name": "VISION_PIPELINE_DEPTH",
+                  "value": "2"
+                }
+              ],
+              "image": "localhost:10690/migrant-runtime-router:early-20260930",
+              "imagePullPolicy": "Always",
+              "name": "router",
+              "ports": [
+                {
+                  "containerPort": 10680,
+                  "hostPort": 10680,
+                  "name": "http",
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": "http",
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-brt45",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirstWithHostNet",
+          "enableServiceLinks": true,
+          "hostNetwork": true,
+          "nodeName": "or-sim-control-plane",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "or-sim-control-plane"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "migrant-go-control-plane",
+          "serviceAccountName": "migrant-go-control-plane",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-brt45",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-30T10:14:22Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-30T10:14:21Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T06:01:08Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T06:01:08Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-30T10:14:21Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://02365ba053f9e008c823a7947a7cbfa761fe49b4fc8a7c1daa51eed2c9c7162c",
+              "image": "localhost:10690/migrant-runtime-router:early-20260930",
+              "imageID": "localhost:10690/migrant-runtime-router@sha256:6783b37c0ea0912569b73ab88fc38f1ee7d2bb813933441ce2cfb51809e3bd5a",
+              "lastState": {},
+              "name": "router",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-30T10:14:22Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-brt45",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.179.144",
+          "hostIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "115.145.179.144",
+          "podIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-30T10:14:21Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "cni.projectcalico.org/containerID": "4d0062471b66b9e73da533501aebf715ba35640254d5f84e36c04b99c964857f",
+            "cni.projectcalico.org/podIP": "10.42.0.181/32",
+            "cni.projectcalico.org/podIPs": "10.42.0.181/32",
+            "kubectl.kubernetes.io/restartedAt": "2026-09-28T18:13:51+09:00",
+            "or-sim.io/rebuilt-images-at": "2026-07-13T03:57:19Z"
+          },
+          "creationTimestamp": "2026-09-30T17:21:10Z",
+          "generateName": "transition-executor-56458cbd98-",
+          "labels": {
+            "app.kubernetes.io/component": "transition-executor",
+            "app.kubernetes.io/name": "migrant-go-control-plane",
+            "pod-template-hash": "56458cbd98"
+          },
+          "name": "transition-executor-56458cbd98-t4jnq",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "transition-executor-56458cbd98",
+              "uid": "2e720691-75ed-40fc-95b7-9cf2d1a3dfd1"
+            }
+          ],
+          "resourceVersion": "61742335",
+          "uid": "03e105a6-7e24-4296-99ba-2d15b466c917"
+        },
+        "spec": {
+          "containers": [
+            {
+              "command": [
+                "/transition-executor"
+              ],
+              "env": [
+                {
+                  "name": "NAMESPACE",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.namespace"
+                    }
+                  }
+                },
+                {
+                  "name": "ROUTER_URL",
+                  "value": "http://runtime-router:8080"
+                },
+                {
+                  "name": "MODEL_RUNTIME_IMAGE",
+                  "value": "localhost:10690/migrant-model-runtime:go"
+                },
+                {
+                  "name": "VISION_MODEL_RUNTIME_IMAGE",
+                  "value": "localhost:10690/migrant-model-runtime:torchvision-fast3-20260930"
+                },
+                {
+                  "name": "VISION_RUNTIME_MODE",
+                  "value": "torchvision"
+                },
+                {
+                  "name": "LLM_MODEL_RUNTIME_IMAGE",
+                  "value": "localhost:10690/migrant-model-runtime:llm-transformers-profile2-20260714"
+                },
+                {
+                  "name": "LLM_RUNTIME_MODE",
+                  "value": "transformers"
+                },
+                {
+                  "name": "MODEL_RUNTIME_HF_HOME",
+                  "value": "/opt/hf-cache"
+                },
+                {
+                  "name": "MODEL_RUNTIME_HF_HUB_CACHE",
+                  "value": "/opt/hf-cache/hub"
+                },
+                {
+                  "name": "MODEL_RUNTIME_HF_CACHE_HOST_PATH",
+                  "value": "/var/lib/or-sim/hf-cache"
+                },
+                {
+                  "name": "HF_TOKEN_SECRET_NAME",
+                  "value": "hf-token"
+                },
+                {
+                  "name": "RUNTIME_INIT_IMAGE",
+                  "value": "busybox:1.36"
+                },
+                {
+                  "name": "RUNTIME_READY_TIMEOUT_SECONDS",
+                  "value": "600"
+                },
+                {
+                  "name": "GPT2_MODEL_RUNTIME_IMAGE",
+                  "value": "localhost:10690/migrant-model-runtime:gpt2-medium-fast3-20260930"
+                },
+                {
+                  "name": "GPT2_MODEL_ID",
+                  "value": "/opt/models/gpt2-medium"
+                },
+                {
+                  "name": "LLAMA_MODEL_RUNTIME_IMAGE",
+                  "value": "localhost:10690/migrant-model-runtime:llama32-3b-fast3-20260930"
+                },
+                {
+                  "name": "LLAMA_MODEL_ID",
+                  "value": "/opt/models/llama32-3b"
+                },
+                {
+                  "name": "RUNTIME_TERMINATION_GRACE_SECONDS",
+                  "value": "2"
+                }
+              ],
+              "image": "localhost:10690/migrant-control-plane:temp2-20261001",
+              "imagePullPolicy": "Always",
+              "name": "controller",
+              "ports": [
+                {
+                  "containerPort": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8080,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-fsl7c",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "or-sim-control-plane",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "or-sim-control-plane"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "migrant-go-control-plane",
+          "serviceAccountName": "migrant-go-control-plane",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-fsl7c",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-30T17:21:12Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-30T17:21:10Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T06:01:08Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T06:01:08Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-30T17:21:10Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://a1808039e11bcaf727ef11e99dde740d57f32aa6773f3047fa1b72cbc858ff64",
+              "image": "localhost:10690/migrant-control-plane:temp2-20261001",
+              "imageID": "localhost:10690/migrant-control-plane@sha256:af81d57ee7d4f2dbc5f5133b0229391e1a5b6f34ca64ce6e76c36bed98412e9f",
+              "lastState": {},
+              "name": "controller",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-30T17:21:11Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-fsl7c",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.179.144",
+          "hostIPs": [
+            {
+              "ip": "115.145.179.144"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "10.42.0.181",
+          "podIPs": [
+            {
+              "ip": "10.42.0.181"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-30T17:21:10Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "migrant.io/binding-layer": "kubelet-device-plugin-allocate",
+            "migrant.io/binding-mechanism": "per-mig-uuid-resource",
+            "migrant.io/capacity": "458.849",
+            "migrant.io/device-resource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "migrant.io/expected-mig-uuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "migrant.io/long-term-identity": "logical-slot",
+            "migrant.io/route-weight": "458.849",
+            "migrant.io/slot-resource": "or-sim.io/ampere-gpu0-s0-2-2g"
+          },
+          "creationTimestamp": "2026-10-01T07:04:28Z",
+          "generateName": "vgg16-image-ampere-gpu0-s0-2-2g-runtime-85478ccc6-",
+          "labels": {
+            "app.kubernetes.io/name": "migrant-model-runtime",
+            "migrant.io/gpu": "ampere-gpu0",
+            "migrant.io/model": "vgg16_image",
+            "migrant.io/output-tokens": "0",
+            "migrant.io/profile": "2g",
+            "migrant.io/prompt-len": "0",
+            "migrant.io/request-class": "x",
+            "migrant.io/runtime-id": "vgg16-image-ampere-gpu0-s0-2-2g",
+            "migrant.io/runtime-model": "vgg16",
+            "pod-template-hash": "85478ccc6"
+          },
+          "name": "vgg16-image-ampere-gpu0-s0-2-2g-runtime-85478ccc6-lfkmj",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "vgg16-image-ampere-gpu0-s0-2-2g-runtime-85478ccc6",
+              "uid": "fa08f543-7bb0-4158-be08-4a5f97faa88f"
+            }
+          ],
+          "resourceVersion": "61760502",
+          "uid": "52d8e1eb-d97c-4a03-83fe-92b53c5aff8e"
+        },
+        "spec": {
+          "containers": [
+            {
+              "args": [
+                "--addr=:10681"
+              ],
+              "env": [
+                {
+                  "name": "MODEL_NAME",
+                  "value": "vgg16"
+                },
+                {
+                  "name": "OR_SIM_WORKLOAD",
+                  "value": "vgg16_image"
+                },
+                {
+                  "name": "OR_SIM_REQUEST_CLASS"
+                },
+                {
+                  "name": "PROMPT_LEN",
+                  "value": "0"
+                },
+                {
+                  "name": "OUTPUT_TOKENS",
+                  "value": "0"
+                },
+                {
+                  "name": "RUNTIME_MODE",
+                  "value": "torchvision"
+                },
+                {
+                  "name": "TORCHVISION_WEIGHTS",
+                  "value": "default"
+                },
+                {
+                  "name": "TORCH_HOME",
+                  "value": "/opt/torch-cache"
+                },
+                {
+                  "name": "XDG_CACHE_HOME",
+                  "value": "/opt/cache"
+                },
+                {
+                  "name": "OR_SIM_RUNTIME_ID",
+                  "value": "vgg16-image-ampere-gpu0-s0-2-2g"
+                },
+                {
+                  "name": "BATCH_SIZE",
+                  "value": "32"
+                },
+                {
+                  "name": "OR_SIM_GPU",
+                  "value": "ampere-gpu0"
+                },
+                {
+                  "name": "OR_SIM_PROFILE",
+                  "value": "2g"
+                },
+                {
+                  "name": "OR_SIM_SLOT_RESOURCE",
+                  "value": "or-sim.io/ampere-gpu0-s0-2-2g"
+                },
+                {
+                  "name": "OR_SIM_DEVICE_RESOURCE",
+                  "value": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282"
+                },
+                {
+                  "name": "OR_SIM_EXPECTED_MIG_UUID",
+                  "value": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282"
+                },
+                {
+                  "name": "OR_SIM_CPU_SET",
+                  "value": "2,58"
+                },
+                {
+                  "name": "OR_SIM_FRONTEND_CPU_SET",
+                  "value": "34,90,36,92"
+                }
+              ],
+              "image": "localhost:10690/migrant-model-runtime:torchvision-fast3-20260930",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "runtime",
+              "ports": [
+                {
+                  "containerPort": 10681,
+                  "hostPort": 10681,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 10681,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 1,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {
+                "limits": {
+                  "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282": "1"
+                },
+                "requests": {
+                  "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282": "1"
+                }
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-gj2mp",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirstWithHostNet",
+          "enableServiceLinks": true,
+          "hostNetwork": true,
+          "nodeName": "ampere",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "ampere"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "runtimeClassName": "nvidia",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "terminationGracePeriodSeconds": 2,
+          "tolerations": [
+            {
+              "operator": "Exists"
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-gj2mp",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:29Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:28Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:35Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:35Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:28Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://cf46244ccf12556a79e5af8ec024626079a67f1cda42f9812f4a2fa5485a860f",
+              "image": "localhost:10690/migrant-model-runtime:torchvision-fast3-20260930",
+              "imageID": "localhost:10690/migrant-model-runtime@sha256:8f6b99e94594078f34246ce0b2d7632ce48a6b163508283e6aece1d8c32acfb6",
+              "lastState": {},
+              "name": "runtime",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-10-01T07:04:29Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-gj2mp",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.135.205",
+          "hostIPs": [
+            {
+              "ip": "115.145.135.205"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "115.145.135.205",
+          "podIPs": [
+            {
+              "ip": "115.145.135.205"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-10-01T07:04:28Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "migrant.io/binding-layer": "kubelet-device-plugin-allocate",
+            "migrant.io/binding-mechanism": "per-mig-uuid-resource",
+            "migrant.io/capacity": "84.865",
+            "migrant.io/device-resource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "migrant.io/expected-mig-uuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "migrant.io/long-term-identity": "logical-slot",
+            "migrant.io/route-weight": "84.865",
+            "migrant.io/slot-resource": "or-sim.io/ampere-gpu0-s4-6-2g"
+          },
+          "creationTimestamp": "2026-10-01T07:04:42Z",
+          "generateName": "vit-base-image-ampere-gpu0-s4-6-2g-runtime-f8df8f45c-",
+          "labels": {
+            "app.kubernetes.io/name": "migrant-model-runtime",
+            "migrant.io/gpu": "ampere-gpu0",
+            "migrant.io/model": "vit_base_image",
+            "migrant.io/output-tokens": "0",
+            "migrant.io/profile": "2g",
+            "migrant.io/prompt-len": "0",
+            "migrant.io/request-class": "x",
+            "migrant.io/runtime-id": "vit-base-image-ampere-gpu0-s4-6-2g",
+            "migrant.io/runtime-model": "vit_base",
+            "pod-template-hash": "f8df8f45c"
+          },
+          "name": "vit-base-image-ampere-gpu0-s4-6-2g-runtime-f8df8f45c-cqt7x",
+          "namespace": "or-sim-exp",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "vit-base-image-ampere-gpu0-s4-6-2g-runtime-f8df8f45c",
+              "uid": "6c28d69e-d066-4c4c-b211-194b57ccaae8"
+            }
+          ],
+          "resourceVersion": "61760609",
+          "uid": "14a35998-55fc-4116-a8be-a8b2cdc535a6"
+        },
+        "spec": {
+          "containers": [
+            {
+              "args": [
+                "--addr=:10686"
+              ],
+              "env": [
+                {
+                  "name": "MODEL_NAME",
+                  "value": "vit_base"
+                },
+                {
+                  "name": "OR_SIM_WORKLOAD",
+                  "value": "vit_base_image"
+                },
+                {
+                  "name": "OR_SIM_REQUEST_CLASS"
+                },
+                {
+                  "name": "PROMPT_LEN",
+                  "value": "0"
+                },
+                {
+                  "name": "OUTPUT_TOKENS",
+                  "value": "0"
+                },
+                {
+                  "name": "RUNTIME_MODE",
+                  "value": "torchvision"
+                },
+                {
+                  "name": "TORCHVISION_WEIGHTS",
+                  "value": "default"
+                },
+                {
+                  "name": "TORCH_HOME",
+                  "value": "/opt/torch-cache"
+                },
+                {
+                  "name": "XDG_CACHE_HOME",
+                  "value": "/opt/cache"
+                },
+                {
+                  "name": "OR_SIM_RUNTIME_ID",
+                  "value": "vit-base-image-ampere-gpu0-s4-6-2g"
+                },
+                {
+                  "name": "BATCH_SIZE",
+                  "value": "1"
+                },
+                {
+                  "name": "OR_SIM_GPU",
+                  "value": "ampere-gpu0"
+                },
+                {
+                  "name": "OR_SIM_PROFILE",
+                  "value": "2g"
+                },
+                {
+                  "name": "OR_SIM_SLOT_RESOURCE",
+                  "value": "or-sim.io/ampere-gpu0-s4-6-2g"
+                },
+                {
+                  "name": "OR_SIM_DEVICE_RESOURCE",
+                  "value": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7"
+                },
+                {
+                  "name": "OR_SIM_EXPECTED_MIG_UUID",
+                  "value": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7"
+                },
+                {
+                  "name": "OR_SIM_CPU_SET",
+                  "value": "10,66"
+                },
+                {
+                  "name": "OR_SIM_FRONTEND_CPU_SET",
+                  "value": "34,90,36,92"
+                }
+              ],
+              "image": "localhost:10690/migrant-model-runtime:torchvision-fast3-20260930",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "runtime",
+              "ports": [
+                {
+                  "containerPort": 10686,
+                  "hostPort": 10686,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 10686,
+                  "scheme": "HTTP"
+                },
+                "periodSeconds": 1,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {
+                "limits": {
+                  "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7": "1"
+                },
+                "requests": {
+                  "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7": "1"
+                }
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-cssk2",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirstWithHostNet",
+          "enableServiceLinks": true,
+          "hostNetwork": true,
+          "nodeName": "ampere",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "ampere"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "runtimeClassName": "nvidia",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "terminationGracePeriodSeconds": 2,
+          "tolerations": [
+            {
+              "operator": "Exists"
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-cssk2",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:43Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:42Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:47Z",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:47Z",
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-01T07:04:42Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://6ca95f50cb2487fe6dccc860d5bb3191dcf9cd61fd170c97c9c72057f95a142c",
+              "image": "localhost:10690/migrant-model-runtime:torchvision-fast3-20260930",
+              "imageID": "localhost:10690/migrant-model-runtime@sha256:8f6b99e94594078f34246ce0b2d7632ce48a6b163508283e6aece1d8c32acfb6",
+              "lastState": {},
+              "name": "runtime",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-10-01T07:04:42Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-cssk2",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "115.145.135.205",
+          "hostIPs": [
+            {
+              "ip": "115.145.135.205"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "115.145.135.205",
+          "podIPs": [
+            {
+              "ip": "115.145.135.205"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-10-01T07:04:42Z"
+        }
+      }
+    ],
+    "kind": "List",
+    "metadata": {
+      "resourceVersion": ""
+    }
+  },
+  "registry": {
+    "apiVersion": "mig.or-sim.io/v1alpha1",
+    "kind": "PhysicalGpuRegistry",
+    "metadata": {
+      "creationTimestamp": "2026-07-09T20:36:19Z",
+      "generation": 2,
+      "labels": {
+        "app.kubernetes.io/name": "migrant-go"
+      },
+      "name": "default",
+      "namespace": "or-sim-exp",
+      "resourceVersion": "61760678",
+      "uid": "7b7f6249-da54-4ff3-ab32-55ac9f6c3e58"
+    },
+    "spec": {
+      "policy": {
+        "source": "cluster-state-manager"
+      }
+    },
+    "status": {
+      "activeQueue": [
+        "ampere-gpu0"
+      ],
+      "availableQueue": [
+        "ampere-gpu1",
+        "rtx1-worker-gpu0"
+      ],
+      "bindings": {
+        "ampere-gpu0": {
+          "activeLogicalGpuId": "1",
+          "availabilityReason": "logical_binding_active",
+          "canonicalLogicalGpuId": 0,
+          "cleanliness": "active",
+          "deviceIndex": 0,
+          "gpuIndex": 0,
+          "gpuUUID": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+          "gpuUuid": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+          "logicalBinding": {
+            "activeLogicalGpuId": "1",
+            "lastActionType": "finalize_logical_bindings",
+            "lastPlanName": "plan-live-v2-20261001t065220878695z-r10",
+            "logicalGpuId": "1",
+            "physicalGpuId": "ampere-gpu0",
+            "state": "active",
+            "updatedAt": "2026-10-01T07:04:49.224874265Z"
+          },
+          "logicalBindingSource": "ledger",
+          "logicalGpuId": 0,
+          "logicalMigSlots": [
+            {
+              "end": 2,
+              "profile": "2g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 0,
+              "uuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282"
+            },
+            {
+              "end": 3,
+              "profile": "1g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 2,
+              "uuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf"
+            },
+            {
+              "end": 4,
+              "profile": "1g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 3,
+              "uuid": "MIG-74220c29-c0f9-5684-97c7-557424996038"
+            },
+            {
+              "end": 6,
+              "profile": "2g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 4,
+              "uuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7"
+            },
+            {
+              "end": 7,
+              "profile": "1g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 6,
+              "uuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979"
+            }
+          ],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [
+            {
+              "end": 2,
+              "profile": "2g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 0,
+              "uuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282"
+            },
+            {
+              "end": 3,
+              "profile": "1g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 2,
+              "uuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf"
+            },
+            {
+              "end": 4,
+              "profile": "1g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 3,
+              "uuid": "MIG-74220c29-c0f9-5684-97c7-557424996038"
+            },
+            {
+              "end": 6,
+              "profile": "2g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 4,
+              "uuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7"
+            },
+            {
+              "end": 7,
+              "profile": "1g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 6,
+              "uuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979"
+            }
+          ],
+          "node": "ampere",
+          "nodeName": "ampere",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "ampere-gpu0",
+          "previousLogicalGpuId": "1",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [
+            {
+              "batchObservationSource": "runtime-metrics",
+              "batchSize": 1,
+              "configuredBatchSize": 1,
+              "deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+              "expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+              "model": "gpt2_p512_o512",
+              "outputTokens": 0,
+              "phase": "Running",
+              "pod": "gpt2-p512-o512-ampere-gpu0-s2-3-1g-runtime-595f58cf6c-hw2ds",
+              "promptLen": 0,
+              "requestClass": "x",
+              "route": {
+                "acceptingNew": true,
+                "active": true,
+                "arrivalRate": 0.15,
+                "avgLatencyMs": 8100,
+                "batchSize": 1,
+                "capacity": 0.163,
+                "deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                "draining": false,
+                "endpoint": "http://115.145.135.205:10683",
+                "endpointAvgLatencyMs": 8100,
+                "endpointInflight": 3,
+                "endpointRequests": 413,
+                "errorRate": 0,
+                "errors": 1,
+                "expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                "gpu": "ampere-gpu0",
+                "inflight": 3,
+                "profile": "1g",
+                "queued": 0,
+                "requests": 413,
+                "runtime.batchSize": 1,
+                "runtime.errors": 0,
+                "runtime.migUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                "runtime.requests": 9,
+                "runtime.slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+                "runtimeId": "gpt2-p512-o512-ampere-gpu0-s2-3-1g",
+                "runtimeMetricsAvailable": true,
+                "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+                "weight": 0.163
+              },
+              "runtimeModel": "gpt2",
+              "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g"
+            },
+            {
+              "batchObservationSource": "runtime-metrics",
+              "batchSize": 1,
+              "configuredBatchSize": 1,
+              "deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+              "expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+              "model": "gpt2_p64_o64",
+              "outputTokens": 0,
+              "phase": "Running",
+              "pod": "gpt2-p64-o64-ampere-gpu0-s3-4-1g-runtime-76f6f8bd6f-wpxwd",
+              "promptLen": 0,
+              "requestClass": "x",
+              "route": {
+                "acceptingNew": true,
+                "active": true,
+                "arrivalRate": 0.2833,
+                "avgLatencyMs": 727.824,
+                "batchSize": 1,
+                "capacity": 1.327,
+                "deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+                "draining": false,
+                "endpoint": "http://115.145.135.205:10685",
+                "endpointAvgLatencyMs": 727.824,
+                "endpointInflight": 0,
+                "endpointRequests": 62,
+                "errorRate": 0,
+                "errors": 0,
+                "expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+                "gpu": "ampere-gpu0",
+                "inflight": 0,
+                "profile": "1g",
+                "queued": 0,
+                "requests": 62,
+                "runtime.batchSize": 1,
+                "runtime.errors": 0,
+                "runtime.migUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+                "runtime.requests": 24,
+                "runtime.slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+                "runtimeId": "gpt2-p64-o64-ampere-gpu0-s3-4-1g",
+                "runtimeMetricsAvailable": true,
+                "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+                "weight": 1.327
+              },
+              "runtimeModel": "gpt2",
+              "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g"
+            },
+            {
+              "batchObservationSource": "runtime-metrics",
+              "batchSize": 1,
+              "configuredBatchSize": 1,
+              "deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+              "expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+              "model": "resnet50_image",
+              "outputTokens": 0,
+              "phase": "Running",
+              "pod": "resnet50-image-ampere-gpu0-s6-7-1g-runtime-68fbccf8d-n9z59",
+              "promptLen": 0,
+              "requestClass": "x",
+              "route": {
+                "acceptingNew": true,
+                "active": true,
+                "arrivalRate": 14.9,
+                "avgLatencyMs": 9.733,
+                "batchSize": 1,
+                "capacity": 176.875,
+                "deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+                "draining": false,
+                "endpoint": "http://115.145.135.205:10688",
+                "endpointAvgLatencyMs": 9.733,
+                "endpointInflight": 2,
+                "endpointRequests": 753861,
+                "errorRate": 0,
+                "errors": 0,
+                "expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+                "gpu": "ampere-gpu0",
+                "inflight": 2,
+                "profile": "1g",
+                "queued": 0,
+                "requests": 753861,
+                "runtime.avgLatencyMs": 5.1972720059163775,
+                "runtime.batchSize": 1,
+                "runtime.errors": 0,
+                "runtime.migUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+                "runtime.requests": 810,
+                "runtime.slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+                "runtimeId": "resnet50-image-ampere-gpu0-s6-7-1g",
+                "runtimeMetricsAvailable": true,
+                "slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+                "weight": 176.875
+              },
+              "runtimeModel": "resnet50",
+              "slotResource": "or-sim.io/ampere-gpu0-s6-7-1g"
+            },
+            {
+              "batchObservationSource": "runtime-metrics",
+              "batchSize": 32,
+              "configuredBatchSize": 32,
+              "deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+              "expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+              "model": "vgg16_image",
+              "outputTokens": 0,
+              "phase": "Running",
+              "pod": "vgg16-image-ampere-gpu0-s0-2-2g-runtime-85478ccc6-lfkmj",
+              "promptLen": 0,
+              "requestClass": "x",
+              "route": {
+                "acceptingNew": true,
+                "active": true,
+                "arrivalRate": 159.6833,
+                "avgLatencyMs": 55.709,
+                "batchSize": 32,
+                "capacity": 458.849,
+                "deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                "draining": false,
+                "endpoint": "http://115.145.135.205:10681",
+                "endpointAvgLatencyMs": 55.709,
+                "endpointInflight": 22,
+                "endpointRequests": 251708,
+                "errorRate": 0,
+                "errors": 0,
+                "expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                "gpu": "ampere-gpu0",
+                "inflight": 22,
+                "profile": "2g",
+                "queued": 0,
+                "requests": 251708,
+                "runtime.avgLatencyMs": 42.79411583971828,
+                "runtime.batchSize": 32,
+                "runtime.errors": 0,
+                "runtime.migUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                "runtime.requests": 453,
+                "runtime.slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+                "runtimeId": "vgg16-image-ampere-gpu0-s0-2-2g",
+                "runtimeMetricsAvailable": true,
+                "slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+                "weight": 458.849
+              },
+              "runtimeModel": "vgg16",
+              "slotResource": "or-sim.io/ampere-gpu0-s0-2-2g"
+            },
+            {
+              "batchObservationSource": "runtime-metrics",
+              "batchSize": 1,
+              "configuredBatchSize": 1,
+              "deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+              "expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+              "model": "vit_base_image",
+              "outputTokens": 0,
+              "phase": "Running",
+              "pod": "vit-base-image-ampere-gpu0-s4-6-2g-runtime-f8df8f45c-cqt7x",
+              "promptLen": 0,
+              "requestClass": "x",
+              "route": {
+                "acceptingNew": true,
+                "active": true,
+                "arrivalRate": 9.4167,
+                "avgLatencyMs": 20.71,
+                "batchSize": 1,
+                "capacity": 84.865,
+                "deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                "draining": false,
+                "endpoint": "http://115.145.135.205:10686",
+                "endpointAvgLatencyMs": 20.71,
+                "endpointInflight": 0,
+                "endpointRequests": 15605,
+                "errorRate": 0,
+                "errors": 0,
+                "expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                "gpu": "ampere-gpu0",
+                "inflight": 0,
+                "profile": "2g",
+                "queued": 0,
+                "requests": 15605,
+                "runtime.avgLatencyMs": 10.896268815443808,
+                "runtime.batchSize": 1,
+                "runtime.errors": 0,
+                "runtime.migUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                "runtime.requests": 516,
+                "runtime.slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+                "runtimeId": "vit-base-image-ampere-gpu0-s4-6-2g",
+                "runtimeMetricsAvailable": true,
+                "slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+                "weight": 84.865
+              },
+              "runtimeModel": "vit_base",
+              "slotResource": "or-sim.io/ampere-gpu0-s4-6-2g"
+            }
+          ],
+          "state": "active"
+        },
+        "ampere-gpu1": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 1,
+          "gpuIndex": 1,
+          "gpuUUID": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+          "gpuUuid": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "ampere",
+          "nodeName": "ampere",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "ampere-gpu1",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        },
+        "rtx1-worker-gpu0": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 0,
+          "gpuIndex": 0,
+          "gpuUUID": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+          "gpuUuid": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "rtx1-worker",
+          "nodeName": "rtx1-worker",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "rtx1-worker-gpu0",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        }
+      },
+      "currentAllocation": {
+        "canonicalizedAt": "2026-10-01T07:04:58.069365889Z",
+        "format": "migrant.current-allocation/v1",
+        "freePhysicalGpuPool": [
+          "ampere-gpu1",
+          "rtx1-worker-gpu0"
+        ],
+        "gpus": {
+          "ampere-gpu0": {
+            "activeLogicalGpuId": "1",
+            "availabilityReason": "logical_binding_active",
+            "canonicalLogicalGpuId": 0,
+            "cleanliness": "active",
+            "deviceIndex": 0,
+            "gpuIndex": 0,
+            "gpuUUID": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+            "gpuUuid": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+            "logicalBinding": {
+              "activeLogicalGpuId": "1",
+              "lastActionType": "finalize_logical_bindings",
+              "lastPlanName": "plan-live-v2-20261001t065220878695z-r10",
+              "logicalGpuId": "1",
+              "physicalGpuId": "ampere-gpu0",
+              "state": "active",
+              "updatedAt": "2026-10-01T07:04:49.224874265Z"
+            },
+            "logicalBindingSource": "ledger",
+            "logicalGpuId": 0,
+            "logicalMigSlots": [
+              {
+                "end": 2,
+                "profile": "2g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 0,
+                "uuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282"
+              },
+              {
+                "end": 3,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 2,
+                "uuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf"
+              },
+              {
+                "end": 4,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 3,
+                "uuid": "MIG-74220c29-c0f9-5684-97c7-557424996038"
+              },
+              {
+                "end": 6,
+                "profile": "2g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 4,
+                "uuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7"
+              },
+              {
+                "end": 7,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 6,
+                "uuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979"
+              }
+            ],
+            "migCapable": true,
+            "migConfig": "",
+            "migConfigState": "",
+            "migDevices": [
+              {
+                "end": 2,
+                "profile": "2g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 0,
+                "uuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282"
+              },
+              {
+                "end": 3,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 2,
+                "uuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf"
+              },
+              {
+                "end": 4,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 3,
+                "uuid": "MIG-74220c29-c0f9-5684-97c7-557424996038"
+              },
+              {
+                "end": 6,
+                "profile": "2g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 4,
+                "uuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7"
+              },
+              {
+                "end": 7,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 6,
+                "uuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979"
+              }
+            ],
+            "node": "ampere",
+            "nodeName": "ampere",
+            "pendingLogicalGpuId": null,
+            "physicalGpuId": "ampere-gpu0",
+            "previousLogicalGpuId": "1",
+            "product": "NVIDIA A100-PCIE-40GB",
+            "repairPaused": false,
+            "requiredAction": "",
+            "runtimeBindings": [
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                "expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                "model": "gpt2_p512_o512",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "gpt2-p512-o512-ampere-gpu0-s2-3-1g-runtime-595f58cf6c-hw2ds",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 0.15,
+                  "avgLatencyMs": 8100,
+                  "batchSize": 1,
+                  "capacity": 0.163,
+                  "deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10683",
+                  "endpointAvgLatencyMs": 8100,
+                  "endpointInflight": 3,
+                  "endpointRequests": 413,
+                  "errorRate": 0,
+                  "errors": 1,
+                  "expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                  "gpu": "ampere-gpu0",
+                  "inflight": 3,
+                  "profile": "1g",
+                  "queued": 0,
+                  "requests": 413,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                  "runtime.requests": 9,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+                  "runtimeId": "gpt2-p512-o512-ampere-gpu0-s2-3-1g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+                  "weight": 0.163
+                },
+                "runtimeModel": "gpt2",
+                "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+                "expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+                "model": "gpt2_p64_o64",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "gpt2-p64-o64-ampere-gpu0-s3-4-1g-runtime-76f6f8bd6f-wpxwd",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 0.2833,
+                  "avgLatencyMs": 727.824,
+                  "batchSize": 1,
+                  "capacity": 1.327,
+                  "deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10685",
+                  "endpointAvgLatencyMs": 727.824,
+                  "endpointInflight": 0,
+                  "endpointRequests": 62,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+                  "gpu": "ampere-gpu0",
+                  "inflight": 0,
+                  "profile": "1g",
+                  "queued": 0,
+                  "requests": 62,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+                  "runtime.requests": 24,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+                  "runtimeId": "gpt2-p64-o64-ampere-gpu0-s3-4-1g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+                  "weight": 1.327
+                },
+                "runtimeModel": "gpt2",
+                "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+                "expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+                "model": "resnet50_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "resnet50-image-ampere-gpu0-s6-7-1g-runtime-68fbccf8d-n9z59",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 14.9,
+                  "avgLatencyMs": 9.733,
+                  "batchSize": 1,
+                  "capacity": 176.875,
+                  "deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10688",
+                  "endpointAvgLatencyMs": 9.733,
+                  "endpointInflight": 2,
+                  "endpointRequests": 753861,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+                  "gpu": "ampere-gpu0",
+                  "inflight": 2,
+                  "profile": "1g",
+                  "queued": 0,
+                  "requests": 753861,
+                  "runtime.avgLatencyMs": 5.1972720059163775,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+                  "runtime.requests": 810,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+                  "runtimeId": "resnet50-image-ampere-gpu0-s6-7-1g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+                  "weight": 176.875
+                },
+                "runtimeModel": "resnet50",
+                "slotResource": "or-sim.io/ampere-gpu0-s6-7-1g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 32,
+                "configuredBatchSize": 32,
+                "deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                "expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                "model": "vgg16_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "vgg16-image-ampere-gpu0-s0-2-2g-runtime-85478ccc6-lfkmj",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 159.6833,
+                  "avgLatencyMs": 55.709,
+                  "batchSize": 32,
+                  "capacity": 458.849,
+                  "deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10681",
+                  "endpointAvgLatencyMs": 55.709,
+                  "endpointInflight": 22,
+                  "endpointRequests": 251708,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                  "gpu": "ampere-gpu0",
+                  "inflight": 22,
+                  "profile": "2g",
+                  "queued": 0,
+                  "requests": 251708,
+                  "runtime.avgLatencyMs": 42.79411583971828,
+                  "runtime.batchSize": 32,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                  "runtime.requests": 453,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+                  "runtimeId": "vgg16-image-ampere-gpu0-s0-2-2g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+                  "weight": 458.849
+                },
+                "runtimeModel": "vgg16",
+                "slotResource": "or-sim.io/ampere-gpu0-s0-2-2g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                "expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                "model": "vit_base_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "vit-base-image-ampere-gpu0-s4-6-2g-runtime-f8df8f45c-cqt7x",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 9.4167,
+                  "avgLatencyMs": 20.71,
+                  "batchSize": 1,
+                  "capacity": 84.865,
+                  "deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10686",
+                  "endpointAvgLatencyMs": 20.71,
+                  "endpointInflight": 0,
+                  "endpointRequests": 15605,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                  "gpu": "ampere-gpu0",
+                  "inflight": 0,
+                  "profile": "2g",
+                  "queued": 0,
+                  "requests": 15605,
+                  "runtime.avgLatencyMs": 10.896268815443808,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                  "runtime.requests": 516,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+                  "runtimeId": "vit-base-image-ampere-gpu0-s4-6-2g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+                  "weight": 84.865
+                },
+                "runtimeModel": "vit_base",
+                "slotResource": "or-sim.io/ampere-gpu0-s4-6-2g"
+              }
+            ],
+            "state": "active"
+          }
+        },
+        "logicalGpuCount": 1,
+        "logicalGpus": [
+          {
+            "canonicalLogicalGpuId": 0,
+            "cleanliness": "active",
+            "gpuIndex": 0,
+            "layout": "1g+1g+1g+2g+2g",
+            "logicalBindingSource": "ledger",
+            "logicalGpuId": 0,
+            "migDevices": [
+              {
+                "end": 2,
+                "profile": "2g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 0,
+                "uuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282"
+              },
+              {
+                "end": 3,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 2,
+                "uuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf"
+              },
+              {
+                "end": 4,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 3,
+                "uuid": "MIG-74220c29-c0f9-5684-97c7-557424996038"
+              },
+              {
+                "end": 6,
+                "profile": "2g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 4,
+                "uuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7"
+              },
+              {
+                "end": 7,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 6,
+                "uuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979"
+              }
+            ],
+            "node": "ampere",
+            "physicalGpuId": "ampere-gpu0",
+            "previousLogicalGpuId": "1",
+            "runtimeBindings": [
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                "expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                "model": "gpt2_p512_o512",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "gpt2-p512-o512-ampere-gpu0-s2-3-1g-runtime-595f58cf6c-hw2ds",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 0.15,
+                  "avgLatencyMs": 8100,
+                  "batchSize": 1,
+                  "capacity": 0.163,
+                  "deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10683",
+                  "endpointAvgLatencyMs": 8100,
+                  "endpointInflight": 3,
+                  "endpointRequests": 413,
+                  "errorRate": 0,
+                  "errors": 1,
+                  "expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                  "gpu": "ampere-gpu0",
+                  "inflight": 3,
+                  "profile": "1g",
+                  "queued": 0,
+                  "requests": 413,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+                  "runtime.requests": 9,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+                  "runtimeId": "gpt2-p512-o512-ampere-gpu0-s2-3-1g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+                  "weight": 0.163
+                },
+                "runtimeModel": "gpt2",
+                "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+                "expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+                "model": "gpt2_p64_o64",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "gpt2-p64-o64-ampere-gpu0-s3-4-1g-runtime-76f6f8bd6f-wpxwd",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 0.2833,
+                  "avgLatencyMs": 727.824,
+                  "batchSize": 1,
+                  "capacity": 1.327,
+                  "deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10685",
+                  "endpointAvgLatencyMs": 727.824,
+                  "endpointInflight": 0,
+                  "endpointRequests": 62,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+                  "gpu": "ampere-gpu0",
+                  "inflight": 0,
+                  "profile": "1g",
+                  "queued": 0,
+                  "requests": 62,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+                  "runtime.requests": 24,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+                  "runtimeId": "gpt2-p64-o64-ampere-gpu0-s3-4-1g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+                  "weight": 1.327
+                },
+                "runtimeModel": "gpt2",
+                "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+                "expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+                "model": "resnet50_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "resnet50-image-ampere-gpu0-s6-7-1g-runtime-68fbccf8d-n9z59",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 14.9,
+                  "avgLatencyMs": 9.733,
+                  "batchSize": 1,
+                  "capacity": 176.875,
+                  "deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10688",
+                  "endpointAvgLatencyMs": 9.733,
+                  "endpointInflight": 2,
+                  "endpointRequests": 753861,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+                  "gpu": "ampere-gpu0",
+                  "inflight": 2,
+                  "profile": "1g",
+                  "queued": 0,
+                  "requests": 753861,
+                  "runtime.avgLatencyMs": 5.1972720059163775,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+                  "runtime.requests": 810,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+                  "runtimeId": "resnet50-image-ampere-gpu0-s6-7-1g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+                  "weight": 176.875
+                },
+                "runtimeModel": "resnet50",
+                "slotResource": "or-sim.io/ampere-gpu0-s6-7-1g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 32,
+                "configuredBatchSize": 32,
+                "deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                "expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                "model": "vgg16_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "vgg16-image-ampere-gpu0-s0-2-2g-runtime-85478ccc6-lfkmj",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 159.6833,
+                  "avgLatencyMs": 55.709,
+                  "batchSize": 32,
+                  "capacity": 458.849,
+                  "deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10681",
+                  "endpointAvgLatencyMs": 55.709,
+                  "endpointInflight": 22,
+                  "endpointRequests": 251708,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                  "gpu": "ampere-gpu0",
+                  "inflight": 22,
+                  "profile": "2g",
+                  "queued": 0,
+                  "requests": 251708,
+                  "runtime.avgLatencyMs": 42.79411583971828,
+                  "runtime.batchSize": 32,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+                  "runtime.requests": 453,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+                  "runtimeId": "vgg16-image-ampere-gpu0-s0-2-2g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+                  "weight": 458.849
+                },
+                "runtimeModel": "vgg16",
+                "slotResource": "or-sim.io/ampere-gpu0-s0-2-2g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                "expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                "model": "vit_base_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "vit-base-image-ampere-gpu0-s4-6-2g-runtime-f8df8f45c-cqt7x",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 9.4167,
+                  "avgLatencyMs": 20.71,
+                  "batchSize": 1,
+                  "capacity": 84.865,
+                  "deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10686",
+                  "endpointAvgLatencyMs": 20.71,
+                  "endpointInflight": 0,
+                  "endpointRequests": 15605,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                  "gpu": "ampere-gpu0",
+                  "inflight": 0,
+                  "profile": "2g",
+                  "queued": 0,
+                  "requests": 15605,
+                  "runtime.avgLatencyMs": 10.896268815443808,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+                  "runtime.requests": 516,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+                  "runtimeId": "vit-base-image-ampere-gpu0-s4-6-2g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+                  "weight": 84.865
+                },
+                "runtimeModel": "vit_base",
+                "slotResource": "or-sim.io/ampere-gpu0-s4-6-2g"
+              }
+            ],
+            "state": "active"
+          }
+        ],
+        "metadata": {
+          "canonical_observed_physical_map": {},
+          "logical_id_map": {
+            "1": 0
+          },
+          "physical_id_map": {
+            "0": "ampere-gpu0"
+          }
+        },
+        "source": "cluster-state-manager"
+      },
+      "health": {
+        "observedAt": "2026-10-01T07:04:58.069375337Z",
+        "queueCounts": {
+          "active": 1,
+          "available": 2,
+          "transitioning": 0
+        },
+        "reasons": [],
+        "repairRequired": false,
+        "requiredActions": [],
+        "stable": true
+      },
+      "logicalBindingLedger": {
+        "available": true,
+        "bindings": {
+          "ampere-gpu0": {
+            "activeLogicalGpuId": "1",
+            "lastActionType": "finalize_logical_bindings",
+            "lastPlanName": "plan-live-v2-20261001t065220878695z-r10",
+            "logicalGpuId": "1",
+            "physicalGpuId": "ampere-gpu0",
+            "state": "active",
+            "updatedAt": "2026-10-01T07:04:49.224874265Z"
+          }
+        },
+        "lastPlanName": "plan-live-v2-20261001t065220878695z-r10",
+        "updatedAt": "2026-10-01T07:04:49.224874265Z",
+        "version": "migrant.logical-binding-ledger/v1"
+      },
+      "observedAt": "2026-10-01T07:04:58.093889893Z",
+      "phase": "Observed",
+      "profileCalibrationOverlay": {
+        "available": true,
+        "generatedAt": "2026-10-01T07:04:57.134648577Z",
+        "observations": [
+          {
+            "arrivalRate": 396.7667,
+            "avgLatencyMs": 29.093,
+            "batchSize": 32,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "driverBatchSize": 32,
+            "endpoint": "http://115.145.135.205:10681",
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "inflight": 49,
+            "maxLatencyMs": 159,
+            "model": "vgg16_image",
+            "p95LatencyMs": 76,
+            "profile": "2g",
+            "queued": 0,
+            "requests": 4151051,
+            "runtime.avgLatencyMs": 42.75375689246896,
+            "runtime.batchSize": 32,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 46.03907012939453,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "runtime.model": "vgg16",
+            "runtime.requests": 471,
+            "runtime.runtimeId": "vgg16-image-ampere-gpu0-s0-2-2g",
+            "runtime.runtimeLatencyMs": 42.64621667396238,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 750.3596449046224,
+            "runtime.slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+            "runtime.torchvisionModel": "vgg16",
+            "runtime.weightsMode": "default",
+            "runtimeId": "vgg16-image-ampere-gpu0-s0-2-2g",
+            "runtimeMetricsAvailable": true,
+            "sampleCount": 4151051,
+            "slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+            "windowErrors": 0,
+            "windowRequests": 23769
+          },
+          {
+            "arrivalRate": 64.5667,
+            "avgLatencyMs": 26.392,
+            "batchSize": 1,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10686",
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "inflight": 1,
+            "maxLatencyMs": 198,
+            "model": "vit_base_image",
+            "p95LatencyMs": 43,
+            "profile": "2g",
+            "queued": 0,
+            "requests": 991677,
+            "runtime.avgLatencyMs": 10.896268815443808,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 10.908736228942871,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "runtime.model": "vit_base",
+            "runtime.requests": 516,
+            "runtime.runtimeId": "vit-base-image-ampere-gpu0-s4-6-2g",
+            "runtime.runtimeLatencyMs": 10.843505491581999,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 92.22109960439614,
+            "runtime.slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+            "runtime.torchvisionModel": "vit_b_16",
+            "runtime.weightsMode": "default",
+            "runtimeId": "vit-base-image-ampere-gpu0-s4-6-2g",
+            "runtimeMetricsAvailable": true,
+            "sampleCount": 991677,
+            "slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+            "windowErrors": 0,
+            "windowRequests": 3875
+          },
+          {
+            "arrivalRate": 67.3667,
+            "avgLatencyMs": 11.658,
+            "batchSize": 1,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10688",
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+            "inflight": 3,
+            "maxLatencyMs": 160,
+            "model": "resnet50_image",
+            "p95LatencyMs": 14,
+            "profile": "1g",
+            "queued": 0,
+            "requests": 1270746,
+            "runtime.avgLatencyMs": 5.181516145324226,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 4.80182409286499,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+            "runtime.model": "resnet50",
+            "runtime.requests": 894,
+            "runtime.runtimeId": "resnet50-image-ampere-gpu0-s6-7-1g",
+            "runtime.runtimeLatencyMs": 5.127931420435042,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 195.01040829347954,
+            "runtime.slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+            "runtime.torchvisionModel": "resnet50",
+            "runtime.weightsMode": "default",
+            "runtimeId": "resnet50-image-ampere-gpu0-s6-7-1g",
+            "runtimeMetricsAvailable": true,
+            "sampleCount": 1270746,
+            "slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+            "windowErrors": 0,
+            "windowRequests": 4044
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 6,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "llama_p1024_o128",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 1821,
+            "sampleCount": 1821,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 0.15,
+            "avgLatencyMs": 8100,
+            "batchSize": 1,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10683",
+            "errorRate": 0,
+            "errors": 2,
+            "expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "inflight": 3,
+            "maxLatencyMs": 11501,
+            "model": "gpt2_p512_o512",
+            "p95LatencyMs": 11501,
+            "profile": "1g",
+            "queued": 0,
+            "requests": 814,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "runtime.lastRuntimeLatencyMs": 5416.50439453125,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "runtime.model": "gpt2",
+            "runtime.requests": 9,
+            "runtime.runtimeId": "gpt2-p512-o512-ampere-gpu0-s2-3-1g",
+            "runtime.runtimeLatencyMs": 5446.764539930556,
+            "runtime.runtimeMode": "transformers",
+            "runtime.runtimeThroughput": 0.18359523211788217,
+            "runtime.slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+            "runtimeId": "gpt2-p512-o512-ampere-gpu0-s2-3-1g",
+            "runtimeMetricsAvailable": true,
+            "sampleCount": 814,
+            "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+            "windowErrors": 0,
+            "windowRequests": 6
+          },
+          {
+            "arrivalRate": 0.1167,
+            "avgLatencyMs": 1752.75,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 2956,
+            "model": "llama_p2048_o64",
+            "p95LatencyMs": 2956,
+            "queued": 0,
+            "requests": 1191,
+            "sampleCount": 1191,
+            "windowErrors": 0,
+            "windowRequests": 8
+          },
+          {
+            "arrivalRate": 0.2833,
+            "avgLatencyMs": 727.824,
+            "batchSize": 1,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10685",
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+            "inflight": 0,
+            "maxLatencyMs": 1274,
+            "model": "gpt2_p64_o64",
+            "p95LatencyMs": 1274,
+            "profile": "1g",
+            "queued": 0,
+            "requests": 2091,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+            "runtime.lastRuntimeLatencyMs": 678.945068359375,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+            "runtime.model": "gpt2",
+            "runtime.requests": 24,
+            "runtime.runtimeId": "gpt2-p64-o64-ampere-gpu0-s3-4-1g",
+            "runtime.runtimeLatencyMs": 680.0958379109701,
+            "runtime.runtimeMode": "transformers",
+            "runtime.runtimeThroughput": 1.4703810025829152,
+            "runtime.slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+            "runtimeId": "gpt2-p64-o64-ampere-gpu0-s3-4-1g",
+            "runtimeMetricsAvailable": true,
+            "sampleCount": 2091,
+            "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+            "windowErrors": 0,
+            "windowRequests": 17
+          }
+        ]
+      },
+      "queueCounts": {
+        "active": 1,
+        "available": 2,
+        "transitioning": 0
+      },
+      "routingState": {
+        "available": true,
+        "generatedAt": "2026-10-01T07:04:57.109113113Z",
+        "routes": [
+          {
+            "acceptingNew": true,
+            "active": true,
+            "arrivalRate": 0.15,
+            "avgLatencyMs": 8100,
+            "batchSize": 1,
+            "capacity": 0.163,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "draining": false,
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10683",
+            "endpointAvgLatencyMs": 8100,
+            "endpointInflight": 3,
+            "endpointQueued": 0,
+            "endpointRequests": 413,
+            "errorRate": 0,
+            "errors": 1,
+            "expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "gpu": "ampere-gpu0",
+            "inflight": 3,
+            "maxLatencyMs": 11501,
+            "model": "gpt2_p512_o512",
+            "modelArrivalRate": 0.15,
+            "networkOverheadMs": 2653.235,
+            "p95LatencyMs": 11501,
+            "profile": "1g",
+            "queued": 0,
+            "requests": 413,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "runtime.lastRuntimeLatencyMs": 5416.50439453125,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+            "runtime.model": "gpt2",
+            "runtime.requests": 9,
+            "runtime.runtimeId": "gpt2-p512-o512-ampere-gpu0-s2-3-1g",
+            "runtime.runtimeLatencyMs": 5446.764539930556,
+            "runtime.runtimeMode": "transformers",
+            "runtime.runtimeThroughput": 0.18359523211788217,
+            "runtime.slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+            "runtimeId": "gpt2-p512-o512-ampere-gpu0-s2-3-1g",
+            "runtimeMetricsAvailable": true,
+            "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+            "weight": 0.163,
+            "windowErrors": 0,
+            "windowRequests": 6
+          },
+          {
+            "acceptingNew": true,
+            "active": true,
+            "arrivalRate": 0.2833,
+            "avgLatencyMs": 727.824,
+            "batchSize": 1,
+            "capacity": 1.327,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+            "draining": false,
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10685",
+            "endpointAvgLatencyMs": 727.824,
+            "endpointInflight": 0,
+            "endpointQueued": 0,
+            "endpointRequests": 62,
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+            "gpu": "ampere-gpu0",
+            "inflight": 0,
+            "maxLatencyMs": 1274,
+            "model": "gpt2_p64_o64",
+            "modelArrivalRate": 0.2833,
+            "networkOverheadMs": 47.728,
+            "p95LatencyMs": 1274,
+            "profile": "1g",
+            "queued": 0,
+            "requests": 62,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+            "runtime.lastRuntimeLatencyMs": 678.945068359375,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+            "runtime.model": "gpt2",
+            "runtime.requests": 24,
+            "runtime.runtimeId": "gpt2-p64-o64-ampere-gpu0-s3-4-1g",
+            "runtime.runtimeLatencyMs": 680.0958379109701,
+            "runtime.runtimeMode": "transformers",
+            "runtime.runtimeThroughput": 1.4703810025829152,
+            "runtime.slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+            "runtimeId": "gpt2-p64-o64-ampere-gpu0-s3-4-1g",
+            "runtimeMetricsAvailable": true,
+            "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+            "weight": 1.327,
+            "windowErrors": 0,
+            "windowRequests": 17
+          },
+          {
+            "acceptingNew": true,
+            "active": true,
+            "arrivalRate": 14.9,
+            "avgLatencyMs": 9.733,
+            "batchSize": 1,
+            "capacity": 176.875,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+            "draining": false,
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10688",
+            "endpointAvgLatencyMs": 9.733,
+            "endpointInflight": 2,
+            "endpointQueued": 4,
+            "endpointRequests": 753861,
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+            "gpu": "ampere-gpu0",
+            "inflight": 2,
+            "maxLatencyMs": 160,
+            "model": "resnet50_image",
+            "modelArrivalRate": 67.4,
+            "networkOverheadMs": 4.589,
+            "p95LatencyMs": 13,
+            "profile": "1g",
+            "queued": 0,
+            "requests": 753861,
+            "runtime.avgLatencyMs": 5.1972720059163775,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 4.936672210693359,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+            "runtime.model": "resnet50",
+            "runtime.requests": 810,
+            "runtime.runtimeId": "resnet50-image-ampere-gpu0-s6-7-1g",
+            "runtime.runtimeLatencyMs": 5.1436039536087605,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 194.4162126437434,
+            "runtime.slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+            "runtime.torchvisionModel": "resnet50",
+            "runtime.weightsMode": "default",
+            "runtimeId": "resnet50-image-ampere-gpu0-s6-7-1g",
+            "runtimeMetricsAvailable": true,
+            "slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+            "weight": 176.875,
+            "windowErrors": 0,
+            "windowRequests": 892
+          },
+          {
+            "acceptingNew": true,
+            "active": true,
+            "arrivalRate": 159.6833,
+            "avgLatencyMs": 55.709,
+            "batchSize": 32,
+            "capacity": 458.849,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "draining": false,
+            "driverBatchSize": 32,
+            "endpoint": "http://115.145.135.205:10681",
+            "endpointAvgLatencyMs": 55.709,
+            "endpointInflight": 22,
+            "endpointQueued": 21,
+            "endpointRequests": 251708,
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "gpu": "ampere-gpu0",
+            "inflight": 22,
+            "maxLatencyMs": 159,
+            "model": "vgg16_image",
+            "modelArrivalRate": 396.85,
+            "networkOverheadMs": 13.021,
+            "p95LatencyMs": 129,
+            "profile": "2g",
+            "queued": 0,
+            "requests": 251708,
+            "runtime.avgLatencyMs": 42.79411583971828,
+            "runtime.batchSize": 32,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 59.64588928222656,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+            "runtime.model": "vgg16",
+            "runtime.requests": 453,
+            "runtime.runtimeId": "vgg16-image-ampere-gpu0-s0-2-2g",
+            "runtime.runtimeLatencyMs": 42.68753743540109,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 749.6333103877331,
+            "runtime.slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+            "runtime.torchvisionModel": "vgg16",
+            "runtime.weightsMode": "default",
+            "runtimeId": "vgg16-image-ampere-gpu0-s0-2-2g",
+            "runtimeMetricsAvailable": true,
+            "slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+            "weight": 458.849,
+            "windowErrors": 0,
+            "windowRequests": 9559
+          },
+          {
+            "acceptingNew": true,
+            "active": true,
+            "arrivalRate": 9.4167,
+            "avgLatencyMs": 20.71,
+            "batchSize": 1,
+            "capacity": 84.865,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "draining": false,
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10686",
+            "endpointAvgLatencyMs": 20.71,
+            "endpointInflight": 0,
+            "endpointQueued": 0,
+            "endpointRequests": 15605,
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "gpu": "ampere-gpu0",
+            "inflight": 0,
+            "maxLatencyMs": 198,
+            "model": "vit_base_image",
+            "modelArrivalRate": 64.5833,
+            "networkOverheadMs": 9.866,
+            "p95LatencyMs": 22,
+            "profile": "2g",
+            "queued": 0,
+            "requests": 15605,
+            "runtime.avgLatencyMs": 10.896268815443808,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 10.908736228942871,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+            "runtime.model": "vit_base",
+            "runtime.requests": 516,
+            "runtime.runtimeId": "vit-base-image-ampere-gpu0-s4-6-2g",
+            "runtime.runtimeLatencyMs": 10.843505491581999,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 92.22109960439614,
+            "runtime.slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+            "runtime.torchvisionModel": "vit_b_16",
+            "runtime.weightsMode": "default",
+            "runtimeId": "vit-base-image-ampere-gpu0-s4-6-2g",
+            "runtimeMetricsAvailable": true,
+            "slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+            "weight": 84.865,
+            "windowErrors": 0,
+            "windowRequests": 565
+          }
+        ]
+      },
+      "transitioningQueue": []
+    }
+  },
+  "routes": {
+    "generatedAt": "2026-10-01T07:05:19.712966425Z",
+    "routes": [
+      {
+        "acceptingNew": true,
+        "active": true,
+        "arrivalRate": 0.15,
+        "avgLatencyMs": 11524,
+        "batchSize": 1,
+        "capacity": 0.163,
+        "demandRatePolicy": "fixed_input_not_observed",
+        "demandRateViolated": false,
+        "deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+        "draining": false,
+        "driverBatchSize": 1,
+        "endpoint": "http://115.145.135.205:10683",
+        "endpointAvgLatencyMs": 11524,
+        "endpointInflight": 1,
+        "endpointQueued": 0,
+        "endpointRequests": 417,
+        "errorRate": 0,
+        "errors": 1,
+        "expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+        "gpu": "ampere-gpu0",
+        "inflight": 1,
+        "maxLatencyMs": 17711,
+        "model": "gpt2_p512_o512",
+        "modelArrivalRate": 0.15,
+        "networkOverheadMs": 6086.573,
+        "p95LatencyMs": 17711,
+        "profile": "1g",
+        "queued": 0,
+        "requests": 417,
+        "runtime.batchSize": 1,
+        "runtime.device": "cuda",
+        "runtime.deviceResource": "or-sim.io/mig-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+        "runtime.errors": 0,
+        "runtime.expectedMigUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+        "runtime.lastRuntimeLatencyMs": 5409.8095703125,
+        "runtime.loadError": "",
+        "runtime.loaded": true,
+        "runtime.migUuid": "MIG-90f23eb7-fa03-5ebc-8d53-e3113dd230bf",
+        "runtime.model": "gpt2",
+        "runtime.requests": 13,
+        "runtime.runtimeId": "gpt2-p512-o512-ampere-gpu0-s2-3-1g",
+        "runtime.runtimeLatencyMs": 5437.427170973558,
+        "runtime.runtimeMode": "transformers",
+        "runtime.runtimeThroughput": 0.1839105092456719,
+        "runtime.slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+        "runtimeId": "gpt2-p512-o512-ampere-gpu0-s2-3-1g",
+        "runtimeMetricsAvailable": true,
+        "slotResource": "or-sim.io/ampere-gpu0-s2-3-1g",
+        "weight": 0.163,
+        "windowErrors": 0,
+        "windowRequests": 8
+      },
+      {
+        "acceptingNew": true,
+        "active": true,
+        "arrivalRate": 0.2167,
+        "avgLatencyMs": 681.538,
+        "batchSize": 1,
+        "capacity": 1.327,
+        "demandRatePolicy": "fixed_input_not_observed",
+        "demandRateViolated": false,
+        "deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+        "draining": false,
+        "driverBatchSize": 1,
+        "endpoint": "http://115.145.135.205:10685",
+        "endpointAvgLatencyMs": 681.538,
+        "endpointInflight": 0,
+        "endpointQueued": 0,
+        "endpointRequests": 63,
+        "errorRate": 0,
+        "errors": 0,
+        "expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+        "gpu": "ampere-gpu0",
+        "inflight": 0,
+        "maxLatencyMs": 689,
+        "model": "gpt2_p64_o64",
+        "modelArrivalRate": 0.2167,
+        "networkOverheadMs": 1.51,
+        "p95LatencyMs": 689,
+        "profile": "1g",
+        "queued": 0,
+        "requests": 63,
+        "runtime.batchSize": 1,
+        "runtime.device": "cuda",
+        "runtime.deviceResource": "or-sim.io/mig-74220c29-c0f9-5684-97c7-557424996038",
+        "runtime.errors": 0,
+        "runtime.expectedMigUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+        "runtime.lastRuntimeLatencyMs": 678.404541015625,
+        "runtime.loadError": "",
+        "runtime.loaded": true,
+        "runtime.migUuid": "MIG-74220c29-c0f9-5684-97c7-557424996038",
+        "runtime.model": "gpt2",
+        "runtime.requests": 25,
+        "runtime.runtimeId": "gpt2-p64-o64-ampere-gpu0-s3-4-1g",
+        "runtime.runtimeLatencyMs": 680.0281860351563,
+        "runtime.runtimeMode": "transformers",
+        "runtime.runtimeThroughput": 1.4705272818622575,
+        "runtime.slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+        "runtimeId": "gpt2-p64-o64-ampere-gpu0-s3-4-1g",
+        "runtimeMetricsAvailable": true,
+        "slotResource": "or-sim.io/ampere-gpu0-s3-4-1g",
+        "weight": 1.327,
+        "windowErrors": 0,
+        "windowRequests": 13
+      },
+      {
+        "acceptingNew": true,
+        "active": true,
+        "arrivalRate": 55.4167,
+        "avgLatencyMs": 9.324,
+        "batchSize": 1,
+        "capacity": 176.875,
+        "demandRatePolicy": "fixed_input_not_observed",
+        "demandRateViolated": false,
+        "deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+        "draining": false,
+        "driverBatchSize": 1,
+        "endpoint": "http://115.145.135.205:10688",
+        "endpointAvgLatencyMs": 9.324,
+        "endpointInflight": 0,
+        "endpointQueued": 0,
+        "endpointRequests": 756294,
+        "errorRate": 0,
+        "errors": 0,
+        "expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+        "gpu": "ampere-gpu0",
+        "inflight": 0,
+        "maxLatencyMs": 186,
+        "model": "resnet50_image",
+        "modelArrivalRate": 69.2,
+        "networkOverheadMs": 4.18,
+        "p95LatencyMs": 13,
+        "profile": "1g",
+        "queued": 0,
+        "requests": 756294,
+        "runtime.avgLatencyMs": 5.19714081689591,
+        "runtime.batchSize": 1,
+        "runtime.device": "cuda",
+        "runtime.deviceResource": "or-sim.io/mig-f832d650-30f6-510a-8584-d8e4f5982979",
+        "runtime.errors": 0,
+        "runtime.expectedMigUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+        "runtime.imageSize": 224,
+        "runtime.lastRuntimeLatencyMs": 4.720096111297607,
+        "runtime.loadError": "",
+        "runtime.loaded": true,
+        "runtime.migUuid": "MIG-f832d650-30f6-510a-8584-d8e4f5982979",
+        "runtime.model": "resnet50",
+        "runtime.requests": 3295,
+        "runtime.runtimeId": "resnet50-image-ampere-gpu0-s6-7-1g",
+        "runtime.runtimeLatencyMs": 5.144477274349137,
+        "runtime.runtimeMode": "torchvision",
+        "runtime.runtimeThroughput": 194.3832087637158,
+        "runtime.slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+        "runtime.torchvisionModel": "resnet50",
+        "runtime.weightsMode": "default",
+        "runtimeId": "resnet50-image-ampere-gpu0-s6-7-1g",
+        "runtimeMetricsAvailable": true,
+        "slotResource": "or-sim.io/ampere-gpu0-s6-7-1g",
+        "weight": 176.875,
+        "windowErrors": 0,
+        "windowRequests": 3325
+      },
+      {
+        "acceptingNew": true,
+        "active": true,
+        "arrivalRate": 325.0167,
+        "avgLatencyMs": 55.066,
+        "batchSize": 32,
+        "capacity": 458.849,
+        "demandRatePolicy": "fixed_input_not_observed",
+        "demandRateViolated": false,
+        "deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+        "draining": false,
+        "driverBatchSize": 32,
+        "endpoint": "http://115.145.135.205:10681",
+        "endpointAvgLatencyMs": 55.066,
+        "endpointInflight": 13,
+        "endpointQueued": 7,
+        "endpointRequests": 261637,
+        "errorRate": 0,
+        "errors": 0,
+        "expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+        "gpu": "ampere-gpu0",
+        "inflight": 13,
+        "maxLatencyMs": 236,
+        "model": "vgg16_image",
+        "modelArrivalRate": 383.8667,
+        "networkOverheadMs": 14.696,
+        "p95LatencyMs": 129,
+        "profile": "2g",
+        "queued": 0,
+        "requests": 261637,
+        "runtime.avgLatencyMs": 40.47698543373762,
+        "runtime.batchSize": 32,
+        "runtime.device": "cuda",
+        "runtime.deviceResource": "or-sim.io/mig-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+        "runtime.errors": 0,
+        "runtime.expectedMigUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+        "runtime.imageSize": 224,
+        "runtime.lastRuntimeLatencyMs": 40.11974334716797,
+        "runtime.loadError": "",
+        "runtime.loaded": true,
+        "runtime.migUuid": "MIG-cade9db1-1a5a-5d9c-8368-68caf14f4282",
+        "runtime.model": "vgg16",
+        "runtime.requests": 1008,
+        "runtime.runtimeId": "vgg16-image-ampere-gpu0-s0-2-2g",
+        "runtime.runtimeLatencyMs": 40.3695517494565,
+        "runtime.runtimeMode": "torchvision",
+        "runtime.runtimeThroughput": 792.6766241696212,
+        "runtime.slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+        "runtime.torchvisionModel": "vgg16",
+        "runtime.weightsMode": "default",
+        "runtimeId": "vgg16-image-ampere-gpu0-s0-2-2g",
+        "runtimeMetricsAvailable": true,
+        "slotResource": "or-sim.io/ampere-gpu0-s0-2-2g",
+        "weight": 458.849,
+        "windowErrors": 0,
+        "windowRequests": 19488
+      },
+      {
+        "acceptingNew": true,
+        "active": true,
+        "arrivalRate": 37.0667,
+        "avgLatencyMs": 20.343,
+        "batchSize": 1,
+        "capacity": 84.865,
+        "demandRatePolicy": "fixed_input_not_observed",
+        "demandRateViolated": false,
+        "deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+        "draining": false,
+        "driverBatchSize": 1,
+        "endpoint": "http://115.145.135.205:10686",
+        "endpointAvgLatencyMs": 20.343,
+        "endpointInflight": 2,
+        "endpointQueued": 4,
+        "endpointRequests": 17262,
+        "errorRate": 0,
+        "errors": 0,
+        "expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+        "gpu": "ampere-gpu0",
+        "inflight": 2,
+        "maxLatencyMs": 198,
+        "model": "vit_base_image",
+        "modelArrivalRate": 46.7833,
+        "networkOverheadMs": 9.426,
+        "p95LatencyMs": 22,
+        "profile": "2g",
+        "queued": 0,
+        "requests": 17262,
+        "runtime.avgLatencyMs": 10.981848495165734,
+        "runtime.batchSize": 1,
+        "runtime.device": "cuda",
+        "runtime.deviceResource": "or-sim.io/mig-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+        "runtime.errors": 0,
+        "runtime.expectedMigUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+        "runtime.imageSize": 224,
+        "runtime.lastRuntimeLatencyMs": 11.164159774780273,
+        "runtime.loadError": "",
+        "runtime.loaded": true,
+        "runtime.migUuid": "MIG-2beaf8b8-1c21-5f10-aa19-b791df4b08a7",
+        "runtime.model": "vit_base",
+        "runtime.requests": 2200,
+        "runtime.runtimeId": "vit-base-image-ampere-gpu0-s4-6-2g",
+        "runtime.runtimeLatencyMs": 10.916633618528193,
+        "runtime.runtimeMode": "torchvision",
+        "runtime.runtimeThroughput": 91.60333074682984,
+        "runtime.slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+        "runtime.torchvisionModel": "vit_b_16",
+        "runtime.weightsMode": "default",
+        "runtimeId": "vit-base-image-ampere-gpu0-s4-6-2g",
+        "runtimeMetricsAvailable": true,
+        "slotResource": "or-sim.io/ampere-gpu0-s4-6-2g",
+        "weight": 84.865,
+        "windowErrors": 0,
+        "windowRequests": 2222
+      }
+    ]
+  }
+}

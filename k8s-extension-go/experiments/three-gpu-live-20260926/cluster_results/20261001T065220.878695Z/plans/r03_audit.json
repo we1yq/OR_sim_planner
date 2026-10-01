@@ -1,0 +1,10 @@
+{
+  "actionCount": 0,
+  "conservativePeakGpuCount": 3,
+  "errors": [],
+  "ok": true,
+  "physicalIds": [],
+  "plannerStatus": "OPTIMAL",
+  "stage3Variant": "sw-c",
+  "targetGpuCount": 3
+}

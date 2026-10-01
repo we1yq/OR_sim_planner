@@ -1,0 +1,51 @@
+{
+  "artifact_validation_ok": true,
+  "completed_rounds": 11,
+  "expected_rounds": 11,
+  "experiment_mode": "e1_continuous_traffic",
+  "failure": null,
+  "first_round": 2,
+  "ok": true,
+  "r13_cleanup": {
+    "actionCount": 36,
+    "actionCounts": {
+      "clear_gpu_binding": 3,
+      "clear_template": 3,
+      "deactivate_instance_route": 9,
+      "delete_instance": 9,
+      "return_gpu": 3,
+      "wait_instance_drain": 9
+    },
+    "allActionsCompleted": true,
+    "errors": [],
+    "finalValidation": {
+      "errors": [],
+      "observedPhysicalIds": [
+        "ampere-gpu0",
+        "ampere-gpu1",
+        "rtx1-worker-gpu0"
+      ],
+      "ok": true,
+      "routesObserved": 0,
+      "targetPhysicalIds": []
+    },
+    "includedInMeasuredTwelveRoundAggregate": false,
+    "makespanSeconds": 0.08471785858273506,
+    "ok": true,
+    "planName": "plan-live-v2-20261001t065220878695z-r13",
+    "planPhase": "Executed",
+    "purpose": "explicit-zero-demand-cleanup",
+    "queueCounts": {
+      "active": 0,
+      "available": 3,
+      "transitioning": 0
+    },
+    "round": 13,
+    "routeCount": 0,
+    "runId": "20261001T065220.878695Z",
+    "runtimePodCount": 0
+  },
+  "range_run": false,
+  "run_id": "20261001T065220.878695Z",
+  "stage3_variant": "sw-c"
+}

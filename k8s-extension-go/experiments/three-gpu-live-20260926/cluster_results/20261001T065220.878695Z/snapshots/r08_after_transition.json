@@ -1,0 +1,4776 @@
+{
+  "finalValidation": {
+    "errors": [],
+    "observedPhysicalIds": [
+      "ampere-gpu0",
+      "ampere-gpu1",
+      "rtx1-worker-gpu0"
+    ],
+    "ok": true,
+    "routesObserved": 4,
+    "targetPhysicalIds": []
+  },
+  "plan": {
+    "apiVersion": "mig.or-sim.io/v1alpha1",
+    "kind": "MigActionPlan",
+    "metadata": {
+      "creationTimestamp": "2026-10-01T07:01:50Z",
+      "generation": 2,
+      "labels": {
+        "app.kubernetes.io/name": "migrant-go",
+        "mig.or-sim.io/component": "planner-controller"
+      },
+      "name": "plan-live-v2-20261001t065220878695z-r08",
+      "namespace": "or-sim-exp",
+      "resourceVersion": "61759644",
+      "uid": "88d6c2a4-b38b-41ac-ba4f-4ae8c35a242c"
+    },
+    "spec": {
+      "abstractActions": [
+        {
+          "abstractAction": "Patch Config",
+          "abstractRoot": "SLOT_gpu0_4_7_3g",
+          "actionKey": "0000:SLOT_gpu0_4_7_3g:patch_batch_config",
+          "gpu_id": 0,
+          "new_batch": 1,
+          "old_batch": 4,
+          "physical_gpu_id": "ampere-gpu1",
+          "slot": [
+            4,
+            7,
+            "3g"
+          ],
+          "transitionMode": "batch_change",
+          "type": "patch_batch_config",
+          "workload": "vgg16_image"
+        },
+        {
+          "abstractAction": "Apply Batch",
+          "abstractRoot": "SLOT_gpu0_4_7_3g",
+          "actionKey": "0001:SLOT_gpu0_4_7_3g:apply_batch",
+          "capacityGate": {
+            "consumedByWorkload": {
+              "vgg16_image": 214.668
+            },
+            "policy": "ready_capacity_after_removal_must_cover_required_rate",
+            "requiredRate": {
+              "gpt2_p512_o512": 0,
+              "gpt2_p64_o64": 0,
+              "llama_p1024_o128": 0,
+              "llama_p2048_o64": 0,
+              "resnet50_image": 57.53197095336495,
+              "vgg16_image": 317.607476635514,
+              "vit_base_image": 122.60061919504642
+            }
+          },
+          "consumesCapacity": [
+            {
+              "mu": 214.668,
+              "workload": "vgg16_image"
+            }
+          ],
+          "dependsOnActionKeys": [
+            "0000:SLOT_gpu0_4_7_3g:patch_batch_config"
+          ],
+          "gpu_id": 0,
+          "new_batch": 1,
+          "old_batch": 4,
+          "physical_gpu_id": "ampere-gpu1",
+          "slot": [
+            4,
+            7,
+            "3g"
+          ],
+          "transitionMode": "batch_change",
+          "type": "apply_batch",
+          "workload": "vgg16_image"
+        },
+        {
+          "abstractAction": "Verify Batch",
+          "abstractRoot": "SLOT_gpu0_4_7_3g",
+          "actionKey": "0002:SLOT_gpu0_4_7_3g:verify_batch",
+          "dependsOnActionKeys": [
+            "0001:SLOT_gpu0_4_7_3g:apply_batch"
+          ],
+          "gpu_id": 0,
+          "new_batch": 1,
+          "old_batch": 4,
+          "physical_gpu_id": "ampere-gpu1",
+          "slot": [
+            4,
+            7,
+            "3g"
+          ],
+          "transitionMode": "batch_change",
+          "type": "verify_batch",
+          "workload": "vgg16_image"
+        },
+        {
+          "abstractAction": "Activate Route",
+          "abstractRoot": "SLOT_gpu0_4_7_3g",
+          "actionKey": "0003:SLOT_gpu0_4_7_3g:activate_instance_route",
+          "dependsOnActionKeys": [
+            "0002:SLOT_gpu0_4_7_3g:verify_batch"
+          ],
+          "gpu_id": 0,
+          "physical_gpu_id": "ampere-gpu1",
+          "routeEffect": {
+            "type": "activate_route"
+          },
+          "slot": [
+            4,
+            7,
+            "3g"
+          ],
+          "transitionMode": "batch_change",
+          "type": "activate_instance_route",
+          "workload": "vgg16_image"
+        }
+      ],
+      "actionCount": 4,
+      "actionDag": {
+        "actionCount": 4,
+        "criticalPathLength": 4,
+        "edgeCount": 3,
+        "name": "epoch-three-gpu-live-20260926-r08-final",
+        "nodeCount": 4,
+        "nodes": [
+          {
+            "action": {
+              "abstractAction": "Patch Config",
+              "abstractRoot": "SLOT_gpu0_4_7_3g",
+              "actionKey": "0000:SLOT_gpu0_4_7_3g:patch_batch_config",
+              "gpu_id": 0,
+              "new_batch": 1,
+              "old_batch": 4,
+              "physical_gpu_id": "ampere-gpu1",
+              "slot": [
+                4,
+                7,
+                "3g"
+              ],
+              "transitionMode": "batch_change",
+              "type": "patch_batch_config",
+              "workload": "vgg16_image"
+            },
+            "dependsOn": [],
+            "id": "a0000_patch_batch_config_SLOT-gpu0-4-7-3g",
+            "index": 0,
+            "operationClass": "pod-lifecycle",
+            "phase": 0,
+            "resources": [
+              "slot:0:(4, 7, '3g')"
+            ],
+            "rootId": "SLOT_gpu0_4_7_3g"
+          },
+          {
+            "action": {
+              "abstractAction": "Apply Batch",
+              "abstractRoot": "SLOT_gpu0_4_7_3g",
+              "actionKey": "0001:SLOT_gpu0_4_7_3g:apply_batch",
+              "capacityGate": {
+                "consumedByWorkload": {
+                  "vgg16_image": 214.668
+                },
+                "policy": "ready_capacity_after_removal_must_cover_required_rate",
+                "requiredRate": {
+                  "gpt2_p512_o512": 0,
+                  "gpt2_p64_o64": 0,
+                  "llama_p1024_o128": 0,
+                  "llama_p2048_o64": 0,
+                  "resnet50_image": 57.53197095336495,
+                  "vgg16_image": 317.607476635514,
+                  "vit_base_image": 122.60061919504642
+                }
+              },
+              "consumesCapacity": [
+                {
+                  "mu": 214.668,
+                  "workload": "vgg16_image"
+                }
+              ],
+              "dependsOnActionKeys": [
+                "0000:SLOT_gpu0_4_7_3g:patch_batch_config"
+              ],
+              "gpu_id": 0,
+              "new_batch": 1,
+              "old_batch": 4,
+              "physical_gpu_id": "ampere-gpu1",
+              "slot": [
+                4,
+                7,
+                "3g"
+              ],
+              "transitionMode": "batch_change",
+              "type": "apply_batch",
+              "workload": "vgg16_image"
+            },
+            "dependsOn": [
+              "a0000_patch_batch_config_SLOT-gpu0-4-7-3g"
+            ],
+            "id": "a0001_apply_batch_SLOT-gpu0-4-7-3g",
+            "index": 1,
+            "operationClass": "pod-lifecycle",
+            "phase": 1,
+            "resources": [
+              "slot:0:(4, 7, '3g')"
+            ],
+            "rootId": "SLOT_gpu0_4_7_3g"
+          },
+          {
+            "action": {
+              "abstractAction": "Verify Batch",
+              "abstractRoot": "SLOT_gpu0_4_7_3g",
+              "actionKey": "0002:SLOT_gpu0_4_7_3g:verify_batch",
+              "dependsOnActionKeys": [
+                "0001:SLOT_gpu0_4_7_3g:apply_batch"
+              ],
+              "gpu_id": 0,
+              "new_batch": 1,
+              "old_batch": 4,
+              "physical_gpu_id": "ampere-gpu1",
+              "slot": [
+                4,
+                7,
+                "3g"
+              ],
+              "transitionMode": "batch_change",
+              "type": "verify_batch",
+              "workload": "vgg16_image"
+            },
+            "dependsOn": [
+              "a0001_apply_batch_SLOT-gpu0-4-7-3g"
+            ],
+            "id": "a0002_verify_batch_SLOT-gpu0-4-7-3g",
+            "index": 2,
+            "operationClass": "pod-lifecycle",
+            "phase": 2,
+            "resources": [
+              "slot:0:(4, 7, '3g')"
+            ],
+            "rootId": "SLOT_gpu0_4_7_3g"
+          },
+          {
+            "action": {
+              "abstractAction": "Activate Route",
+              "abstractRoot": "SLOT_gpu0_4_7_3g",
+              "actionKey": "0003:SLOT_gpu0_4_7_3g:activate_instance_route",
+              "dependsOnActionKeys": [
+                "0002:SLOT_gpu0_4_7_3g:verify_batch"
+              ],
+              "gpu_id": 0,
+              "physical_gpu_id": "ampere-gpu1",
+              "routeEffect": {
+                "type": "activate_route"
+              },
+              "slot": [
+                4,
+                7,
+                "3g"
+              ],
+              "transitionMode": "batch_change",
+              "type": "activate_instance_route",
+              "workload": "vgg16_image"
+            },
+            "dependsOn": [
+              "a0002_verify_batch_SLOT-gpu0-4-7-3g"
+            ],
+            "id": "a0003_activate_instance_route_SLOT-gpu0-4-7-3g",
+            "index": 3,
+            "operationClass": "router-drain",
+            "phase": 3,
+            "resources": [
+              "slot:0:(4, 7, '3g')",
+              "traffic-slot:0:(4, 7, '3g')"
+            ],
+            "rootId": "SLOT_gpu0_4_7_3g"
+          }
+        ],
+        "phaseCount": 4,
+        "phases": [
+          {
+            "actionCountsByType": {
+              "patch_batch_config": 1
+            },
+            "name": "phase-00",
+            "nodeCount": 1,
+            "nodeIds": [
+              "a0000_patch_batch_config_SLOT-gpu0-4-7-3g"
+            ],
+            "operationClasses": {
+              "pod-lifecycle": 1
+            },
+            "phase": 0,
+            "rootIds": [
+              "SLOT_gpu0_4_7_3g"
+            ]
+          },
+          {
+            "actionCountsByType": {
+              "apply_batch": 1
+            },
+            "name": "phase-01",
+            "nodeCount": 1,
+            "nodeIds": [
+              "a0001_apply_batch_SLOT-gpu0-4-7-3g"
+            ],
+            "operationClasses": {
+              "pod-lifecycle": 1
+            },
+            "phase": 1,
+            "rootIds": [
+              "SLOT_gpu0_4_7_3g"
+            ]
+          },
+          {
+            "actionCountsByType": {
+              "verify_batch": 1
+            },
+            "name": "phase-02",
+            "nodeCount": 1,
+            "nodeIds": [
+              "a0002_verify_batch_SLOT-gpu0-4-7-3g"
+            ],
+            "operationClasses": {
+              "pod-lifecycle": 1
+            },
+            "phase": 2,
+            "rootIds": [
+              "SLOT_gpu0_4_7_3g"
+            ]
+          },
+          {
+            "actionCountsByType": {
+              "activate_instance_route": 1
+            },
+            "name": "phase-03",
+            "nodeCount": 1,
+            "nodeIds": [
+              "a0003_activate_instance_route_SLOT-gpu0-4-7-3g"
+            ],
+            "operationClasses": {
+              "router-drain": 1
+            },
+            "phase": 3,
+            "rootIds": [
+              "SLOT_gpu0_4_7_3g"
+            ]
+          }
+        ],
+        "representation": "migrant.phased-action-dag/v1",
+        "roots": [
+          {
+            "nodeIds": [
+              "a0000_patch_batch_config_SLOT-gpu0-4-7-3g",
+              "a0001_apply_batch_SLOT-gpu0-4-7-3g",
+              "a0002_verify_batch_SLOT-gpu0-4-7-3g",
+              "a0003_activate_instance_route_SLOT-gpu0-4-7-3g"
+            ],
+            "phaseSpan": {
+              "first": 0,
+              "last": 3
+            },
+            "planItem": {
+              "blocked_by": null,
+              "current_phase": "final_dag",
+              "gpu_id": 0,
+              "id": "SLOT_gpu0_4_7_3g",
+              "physical_gpu_id": "ampere-gpu1",
+              "slot": [
+                4,
+                7,
+                "3g"
+              ],
+              "status": "ready",
+              "type": "batch_update",
+              "workload": "vgg16_image"
+            },
+            "rootId": "SLOT_gpu0_4_7_3g"
+          }
+        ]
+      },
+      "currentAllocationRef": "physicalgpuregistries/default",
+      "executor": "go-transition-executor",
+      "phaseGate": "approved",
+      "plannerMetadata": {
+        "metrics": {
+          "actionCount": 4,
+          "elapsedSec": 0.0025813132524490356,
+          "feasibleOptionBuildElapsedSec": 0.11950509995222092,
+          "finalActiveGpu": 1,
+          "gpuCount": 1,
+          "iterationCount": 1,
+          "milpElapsedSec": 0.0777730941772461,
+          "peakActiveGpu": 1,
+          "plannerMakespanSec": 0.08880968391895294,
+          "sourceActiveGpu": 1,
+          "stage1ElapsedSec": 0.0777730941772461,
+          "stage2ElapsedSec": 0.008455276489257812,
+          "stage3ElapsedSec": 0.0025813132524490356,
+          "targetBuildElapsedSec": 0.008455276489257812,
+          "transitionPlanningElapsedSec": 0.0025813132524490356
+        },
+        "pipeline": "source -> feasible-options -> milp -> target-build -> effect_aware_dag -> canonical-next-state",
+        "planner": "original-gurobi-milp-exact-stage2-effect-aware-dag",
+        "plannerEngineElapsedSec": 0.24191690981388092,
+        "plannerMessage": "epoch-three-gpu-live-20260926-r08: planned with real MILP target builder and effect_aware_dag transition planner",
+        "plannerPhase": "ReachedTarget",
+        "planningTrace": {
+          "canonicalization": {
+            "canonicalGpuCount": 1,
+            "canonicalPhysicalIds": {
+              "0": "ampere-gpu1"
+            },
+            "freePhysicalGpuPool": [
+              "ampere-gpu0",
+              "rtx1-worker-gpu0"
+            ],
+            "note": "Planner-engine canonicalization predicts the post-action state. The transition-executor validates the actual post-action GPU/MIG state after hardware execution."
+          },
+          "currentStateFeasibility": {
+            "a100ValidLayout": true,
+            "capacityByWorkload": {
+              "gpt2_p512_o512": 0,
+              "gpt2_p64_o64": 0,
+              "llama_p1024_o128": 0,
+              "llama_p2048_o64": 0,
+              "resnet50_image": 176.875,
+              "vgg16_image": 553.509,
+              "vit_base_image": 131.391
+            },
+            "feasible": true,
+            "gpuModel": "A100",
+            "phase": "CurrentStateSatisfiesDemand",
+            "reasons": [],
+            "recommendedAction": "no-op",
+            "safetyFactor": 1,
+            "targetByWorkload": {
+              "gpt2_p512_o512": 0,
+              "gpt2_p64_o64": 0,
+              "llama_p1024_o128": 0,
+              "llama_p2048_o64": 0,
+              "resnet50_image": 82.23661214667806,
+              "vgg16_image": 317.607476635514,
+              "vit_base_image": 122.60061919504642
+            },
+            "workloads": [
+              {
+                "currentCapacity": 176.875,
+                "requiredWithSafetyFactor": 82.23661214667806,
+                "satisfied": true,
+                "targetArrival": 82.23661214667806,
+                "workload": "resnet50_image"
+              },
+              {
+                "currentCapacity": 553.509,
+                "requiredWithSafetyFactor": 317.607476635514,
+                "satisfied": true,
+                "targetArrival": 317.607476635514,
+                "workload": "vgg16_image"
+              },
+              {
+                "currentCapacity": 131.391,
+                "requiredWithSafetyFactor": 122.60061919504642,
+                "satisfied": true,
+                "targetArrival": 122.60061919504642,
+                "workload": "vit_base_image"
+              },
+              {
+                "currentCapacity": 0,
+                "requiredWithSafetyFactor": 0,
+                "satisfied": true,
+                "targetArrival": 0,
+                "workload": "gpt2_p64_o64"
+              },
+              {
+                "currentCapacity": 0,
+                "requiredWithSafetyFactor": 0,
+                "satisfied": true,
+                "targetArrival": 0,
+                "workload": "gpt2_p512_o512"
+              },
+              {
+                "currentCapacity": 0,
+                "requiredWithSafetyFactor": 0,
+                "satisfied": true,
+                "targetArrival": 0,
+                "workload": "llama_p1024_o128"
+              },
+              {
+                "currentCapacity": 0,
+                "requiredWithSafetyFactor": 0,
+                "satisfied": true,
+                "targetArrival": 0,
+                "workload": "llama_p2048_o64"
+              }
+            ]
+          },
+          "feasibleOptions": {
+            "byProfile": [
+              {
+                "optionCount": 12,
+                "profile": "1g"
+              },
+              {
+                "optionCount": 16,
+                "profile": "2g"
+              },
+              {
+                "optionCount": 18,
+                "profile": "3g"
+              },
+              {
+                "optionCount": 19,
+                "profile": "4g"
+              },
+              {
+                "optionCount": 19,
+                "profile": "7g"
+              }
+            ],
+            "byWorkload": [
+              {
+                "batches": [
+                  1
+                ],
+                "maxMu": 0.171,
+                "optionCount": 5,
+                "profiles": [
+                  "1g",
+                  "2g",
+                  "3g",
+                  "4g",
+                  "7g"
+                ],
+                "workload": "gpt2_p512_o512"
+              },
+              {
+                "batches": [
+                  1
+                ],
+                "maxMu": 1.387,
+                "optionCount": 5,
+                "profiles": [
+                  "1g",
+                  "2g",
+                  "3g",
+                  "4g",
+                  "7g"
+                ],
+                "workload": "gpt2_p64_o64"
+              },
+              {
+                "batches": [
+                  1
+                ],
+                "maxMu": 0.338,
+                "optionCount": 4,
+                "profiles": [
+                  "2g",
+                  "3g",
+                  "4g",
+                  "7g"
+                ],
+                "workload": "llama_p1024_o128"
+              },
+              {
+                "batches": [
+                  1
+                ],
+                "maxMu": 0.645,
+                "optionCount": 3,
+                "profiles": [
+                  "3g",
+                  "4g",
+                  "7g"
+                ],
+                "workload": "llama_p2048_o64"
+              },
+              {
+                "batches": [
+                  1,
+                  4,
+                  16,
+                  32,
+                  64
+                ],
+                "maxMu": 2425.077,
+                "optionCount": 24,
+                "profiles": [
+                  "1g",
+                  "2g",
+                  "3g",
+                  "4g",
+                  "7g"
+                ],
+                "workload": "resnet50_image"
+              },
+              {
+                "batches": [
+                  1,
+                  4,
+                  16,
+                  32,
+                  64
+                ],
+                "maxMu": 1453.467,
+                "optionCount": 22,
+                "profiles": [
+                  "1g",
+                  "2g",
+                  "3g",
+                  "4g",
+                  "7g"
+                ],
+                "workload": "vgg16_image"
+              },
+              {
+                "batches": [
+                  1,
+                  4,
+                  16,
+                  32,
+                  64
+                ],
+                "maxMu": 357.153,
+                "optionCount": 21,
+                "profiles": [
+                  "1g",
+                  "2g",
+                  "3g",
+                  "4g",
+                  "7g"
+                ],
+                "workload": "vit_base_image"
+              }
+            ],
+            "elapsedSec": 0.11950509995222092,
+            "optionCount": 84,
+            "runtimeProfileCorrectionApplied": 0
+          },
+          "inputs": {
+            "sourceGpuCount": 1,
+            "sourcePhysicalIds": {
+              "0": "ampere-gpu1"
+            },
+            "sourceStateRef": "/app/mock/gpu-states/migrant-empty-9-a100.yaml",
+            "targetStateRef": "target0",
+            "workloadCount": 7,
+            "workloads": [
+              {
+                "delta": 24.70464119331311,
+                "name": "resnet50_image",
+                "profileCatalogConfigMap": null,
+                "profileCatalogRef": "/app/mock/profile-catalogs/resnet50_image.yaml",
+                "sourceArrival": 57.53197095336495,
+                "targetArrival": 82.23661214667806,
+                "workloadRef": "/app/manifests/examples/workloadrequests/resnet50_image.yaml"
+              },
+              {
+                "delta": -152.16448598130842,
+                "name": "vgg16_image",
+                "profileCatalogConfigMap": null,
+                "profileCatalogRef": "/app/mock/profile-catalogs/vgg16_image.yaml",
+                "sourceArrival": 469.7719626168224,
+                "targetArrival": 317.607476635514,
+                "workloadRef": "/app/manifests/examples/workloadrequests/vgg16_image.yaml"
+              },
+              {
+                "delta": 0,
+                "name": "vit_base_image",
+                "profileCatalogConfigMap": null,
+                "profileCatalogRef": "/app/mock/profile-catalogs/vit_base_image.yaml",
+                "sourceArrival": 122.60061919504642,
+                "targetArrival": 122.60061919504642,
+                "workloadRef": "/app/manifests/examples/workloadrequests/vit_base_image.yaml"
+              },
+              {
+                "delta": 0,
+                "name": "gpt2_p64_o64",
+                "profileCatalogConfigMap": null,
+                "profileCatalogRef": "/app/mock/profile-catalogs/gpt2_p64_o64.yaml",
+                "sourceArrival": 0,
+                "targetArrival": 0,
+                "workloadRef": "/app/manifests/examples/workloadrequests/gpt2_p64_o64.yaml"
+              },
+              {
+                "delta": 0,
+                "name": "gpt2_p512_o512",
+                "profileCatalogConfigMap": null,
+                "profileCatalogRef": "/app/mock/profile-catalogs/gpt2_p512_o512.yaml",
+                "sourceArrival": 0,
+                "targetArrival": 0,
+                "workloadRef": "/app/manifests/examples/workloadrequests/gpt2_p512_o512.yaml"
+              },
+              {
+                "delta": 0,
+                "name": "llama_p1024_o128",
+                "profileCatalogConfigMap": null,
+                "profileCatalogRef": "/app/mock/profile-catalogs/llama_p1024_o128.yaml",
+                "sourceArrival": 0,
+                "targetArrival": 0,
+                "workloadRef": "/app/manifests/examples/workloadrequests/llama_p1024_o128.yaml"
+              },
+              {
+                "delta": 0,
+                "name": "llama_p2048_o64",
+                "profileCatalogConfigMap": null,
+                "profileCatalogRef": "/app/mock/profile-catalogs/llama_p2048_o64.yaml",
+                "sourceArrival": 0,
+                "targetArrival": 0,
+                "workloadRef": "/app/manifests/examples/workloadrequests/llama_p2048_o64.yaml"
+              }
+            ]
+          },
+          "milp": {
+            "KTotal": {
+              "1g": 2,
+              "2g": 1,
+              "3g": 1,
+              "4g": 0,
+              "7g": 0
+            },
+            "allocSummary": [
+              {
+                "arrival": 82.23661214667806,
+                "instanceCount": 1,
+                "instances": [
+                  {
+                    "batch": 1,
+                    "count": 1,
+                    "mu": 176.875,
+                    "profile": "1g"
+                  }
+                ],
+                "provided": 176.875,
+                "slack": 94.63838785332194,
+                "workload": "resnet50_image"
+              },
+              {
+                "arrival": 317.607476635514,
+                "instanceCount": 1,
+                "instances": [
+                  {
+                    "batch": 1,
+                    "count": 1,
+                    "mu": 338.841,
+                    "profile": "3g"
+                  }
+                ],
+                "provided": 338.841,
+                "slack": 21.233523364486018,
+                "workload": "vgg16_image"
+              },
+              {
+                "arrival": 122.60061919504642,
+                "instanceCount": 2,
+                "instances": [
+                  {
+                    "batch": 1,
+                    "count": 1,
+                    "mu": 46.526,
+                    "profile": "1g"
+                  },
+                  {
+                    "batch": 1,
+                    "count": 1,
+                    "mu": 84.865,
+                    "profile": "2g"
+                  }
+                ],
+                "provided": 131.391,
+                "slack": 8.790380804953571,
+                "workload": "vit_base_image"
+              },
+              {
+                "arrival": 0,
+                "instanceCount": 0,
+                "instances": [],
+                "provided": 0,
+                "slack": 0,
+                "workload": "gpt2_p64_o64"
+              },
+              {
+                "arrival": 0,
+                "instanceCount": 0,
+                "instances": [],
+                "provided": 0,
+                "slack": 0,
+                "workload": "gpt2_p512_o512"
+              },
+              {
+                "arrival": 0,
+                "instanceCount": 0,
+                "instances": [],
+                "provided": 0,
+                "slack": 0,
+                "workload": "llama_p1024_o128"
+              },
+              {
+                "arrival": 0,
+                "instanceCount": 0,
+                "instances": [],
+                "provided": 0,
+                "slack": 0,
+                "workload": "llama_p2048_o64"
+              }
+            ],
+            "chosenTemplates": [
+              "3+2+1+1"
+            ],
+            "elapsedSec": 0.0777730941772461,
+            "feasible": true,
+            "gpuCount": 1,
+            "method": "MILP-Gurobi(batch)",
+            "objectiveGpuCount": 1,
+            "stage1ObjectiveMode": "logical_delta",
+            "status": "OPTIMAL",
+            "totalElasticSlack": 647.136,
+            "totalInstances": 4,
+            "totalLogicalDelta": 0,
+            "totalRemainingSlots": 0,
+            "totalSlack": 124.66229202276148,
+            "usedProfileTypes": 3,
+            "warmStart": {
+              "available": true,
+              "source": "currentAllocation",
+              "templateMissCount": 0,
+              "templateMisses": [],
+              "unmatchedInstanceCount": 0,
+              "unmatchedInstances": [],
+              "xSolCount": 4,
+              "ySolCount": 1
+            }
+          },
+          "pipeline": "source -> feasible-options -> milp -> target-build -> effect_aware_dag -> canonical-next-state",
+          "plannerTiming": {
+            "excludedCommonPreprocessingSec": 0.11950509995222092,
+            "plannerMakespanSec": 0.08880968391895294,
+            "stage1ElapsedSec": 0.0777730941772461,
+            "stage1Name": "target_allocation_milp",
+            "stage2ElapsedSec": 0.008455276489257812,
+            "stage2Name": "exact_global_stage2_milp",
+            "stage3ElapsedSec": 0.0025813132524490356,
+            "stage3Name": "effect_aware_dag"
+          },
+          "runtimeProfileCorrection": {
+            "available": false,
+            "observationCount": 0
+          },
+          "scenario": "epoch-three-gpu-live-20260926-r08",
+          "targetBuild": {
+            "elapsedSec": 0.008455276489257812,
+            "method": "exact_global_milp_aggregated",
+            "orderedPhysicalTemplates": [],
+            "physicalTemplateCount": 0,
+            "preservation": {
+              "collocatePairs": null,
+              "exact": 4,
+              "mixedGpuCount": null,
+              "sameGpu": null,
+              "scoreTuple": [
+                0,
+                4,
+                0,
+                4
+              ],
+              "upgrade": 0
+            },
+            "targetGpuCount": 1,
+            "targetPhysicalIds": {
+              "0": "ampere-gpu1"
+            }
+          },
+          "transition": {
+            "actionCount": 4,
+            "actionCountsByType": {
+              "activate_instance_route": 1,
+              "apply_batch": 1,
+              "patch_batch_config": 1,
+              "verify_batch": 1
+            },
+            "candidateDecisions": [
+              {
+                "candidates": [
+                  {
+                    "actionTypes": [
+                      "patch_batch_config",
+                      "apply_batch",
+                      "verify_batch",
+                      "activate_instance_route"
+                    ],
+                    "chosen": true,
+                    "feasible": true,
+                    "mode": "instance_diff",
+                    "rank": 0
+                  }
+                ],
+                "chosenMode": "instance_diff",
+                "gpuId": 0,
+                "type": "instance_diff"
+              }
+            ],
+            "capacityDependenciesEnforced": false,
+            "elapsedSec": 0.0025813132524490356,
+            "executedPhysicalIds": {
+              "0": "ampere-gpu1"
+            },
+            "finalActiveGpu": 1,
+            "finalCoarseActions": [],
+            "finalPlanItems": [
+              {
+                "blocked_by": null,
+                "current_phase": "final_dag",
+                "gpu_id": 0,
+                "id": "SLOT_gpu0_4_7_3g",
+                "physical_gpu_id": "ampere-gpu1",
+                "slot": [
+                  4,
+                  7,
+                  "3g"
+                ],
+                "status": "ready",
+                "type": "batch_update",
+                "workload": "vgg16_image"
+              }
+            ],
+            "iterationCount": 1,
+            "iterations": [
+              {
+                "actionCountsByType": {
+                  "activate_instance_route": 1,
+                  "apply_batch": 1,
+                  "patch_batch_config": 1,
+                  "verify_batch": 1
+                },
+                "activeGpuAfter": 0,
+                "candidateActionCount": 4,
+                "candidateActionCountsByType": {
+                  "activate_instance_route": 1,
+                  "apply_batch": 1,
+                  "patch_batch_config": 1,
+                  "verify_batch": 1
+                },
+                "candidateActions": [
+                  {
+                    "abstractAction": "Patch Config",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0000:SLOT_gpu0_4_7_3g:patch_batch_config",
+                    "gpu_id": 0,
+                    "new_batch": 1,
+                    "old_batch": 4,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "patch_batch_config",
+                    "workload": "vgg16_image"
+                  },
+                  {
+                    "abstractAction": "Apply Batch",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0001:SLOT_gpu0_4_7_3g:apply_batch",
+                    "capacityGate": {
+                      "consumedByWorkload": {
+                        "vgg16_image": 214.668
+                      },
+                      "policy": "ready_capacity_after_removal_must_cover_required_rate",
+                      "requiredRate": {
+                        "gpt2_p512_o512": 0,
+                        "gpt2_p64_o64": 0,
+                        "llama_p1024_o128": 0,
+                        "llama_p2048_o64": 0,
+                        "resnet50_image": 57.53197095336495,
+                        "vgg16_image": 317.607476635514,
+                        "vit_base_image": 122.60061919504642
+                      }
+                    },
+                    "consumesCapacity": [
+                      {
+                        "mu": 214.668,
+                        "workload": "vgg16_image"
+                      }
+                    ],
+                    "dependsOnActionKeys": [
+                      "0000:SLOT_gpu0_4_7_3g:patch_batch_config"
+                    ],
+                    "gpu_id": 0,
+                    "new_batch": 1,
+                    "old_batch": 4,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "apply_batch",
+                    "workload": "vgg16_image"
+                  },
+                  {
+                    "abstractAction": "Verify Batch",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0002:SLOT_gpu0_4_7_3g:verify_batch",
+                    "dependsOnActionKeys": [
+                      "0001:SLOT_gpu0_4_7_3g:apply_batch"
+                    ],
+                    "gpu_id": 0,
+                    "new_batch": 1,
+                    "old_batch": 4,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "verify_batch",
+                    "workload": "vgg16_image"
+                  },
+                  {
+                    "abstractAction": "Activate Route",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0003:SLOT_gpu0_4_7_3g:activate_instance_route",
+                    "dependsOnActionKeys": [
+                      "0002:SLOT_gpu0_4_7_3g:verify_batch"
+                    ],
+                    "gpu_id": 0,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "routeEffect": {
+                      "type": "activate_route"
+                    },
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "activate_instance_route",
+                    "workload": "vgg16_image"
+                  }
+                ],
+                "candidateDecisions": [
+                  {
+                    "candidates": [
+                      {
+                        "actionTypes": [
+                          "patch_batch_config",
+                          "apply_batch",
+                          "verify_batch",
+                          "activate_instance_route"
+                        ],
+                        "chosen": true,
+                        "feasible": true,
+                        "mode": "instance_diff",
+                        "rank": 0
+                      }
+                    ],
+                    "chosenMode": "instance_diff",
+                    "gpuId": 0,
+                    "type": "instance_diff"
+                  }
+                ],
+                "chosenActionCount": 4,
+                "chosenActions": [
+                  {
+                    "abstractAction": "Patch Config",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0000:SLOT_gpu0_4_7_3g:patch_batch_config",
+                    "gpu_id": 0,
+                    "new_batch": 1,
+                    "old_batch": 4,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "patch_batch_config",
+                    "workload": "vgg16_image"
+                  },
+                  {
+                    "abstractAction": "Apply Batch",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0001:SLOT_gpu0_4_7_3g:apply_batch",
+                    "capacityGate": {
+                      "consumedByWorkload": {
+                        "vgg16_image": 214.668
+                      },
+                      "policy": "ready_capacity_after_removal_must_cover_required_rate",
+                      "requiredRate": {
+                        "gpt2_p512_o512": 0,
+                        "gpt2_p64_o64": 0,
+                        "llama_p1024_o128": 0,
+                        "llama_p2048_o64": 0,
+                        "resnet50_image": 57.53197095336495,
+                        "vgg16_image": 317.607476635514,
+                        "vit_base_image": 122.60061919504642
+                      }
+                    },
+                    "consumesCapacity": [
+                      {
+                        "mu": 214.668,
+                        "workload": "vgg16_image"
+                      }
+                    ],
+                    "dependsOnActionKeys": [
+                      "0000:SLOT_gpu0_4_7_3g:patch_batch_config"
+                    ],
+                    "gpu_id": 0,
+                    "new_batch": 1,
+                    "old_batch": 4,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "apply_batch",
+                    "workload": "vgg16_image"
+                  },
+                  {
+                    "abstractAction": "Verify Batch",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0002:SLOT_gpu0_4_7_3g:verify_batch",
+                    "dependsOnActionKeys": [
+                      "0001:SLOT_gpu0_4_7_3g:apply_batch"
+                    ],
+                    "gpu_id": 0,
+                    "new_batch": 1,
+                    "old_batch": 4,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "verify_batch",
+                    "workload": "vgg16_image"
+                  },
+                  {
+                    "abstractAction": "Activate Route",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0003:SLOT_gpu0_4_7_3g:activate_instance_route",
+                    "dependsOnActionKeys": [
+                      "0002:SLOT_gpu0_4_7_3g:verify_batch"
+                    ],
+                    "gpu_id": 0,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "routeEffect": {
+                      "type": "activate_route"
+                    },
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "activate_instance_route",
+                    "workload": "vgg16_image"
+                  }
+                ],
+                "chosenRootCount": 0,
+                "chosenRoots": [],
+                "iterPeakActiveGpu": 0,
+                "iteration": 1,
+                "madeProgress": true,
+                "phasedActionPlan": {
+                  "actionCount": 4,
+                  "criticalPathLength": 4,
+                  "edgeCount": 3,
+                  "nodeCount": 4,
+                  "phaseCount": 4,
+                  "phases": [
+                    {
+                      "actionCountsByType": {
+                        "patch_batch_config": 1
+                      },
+                      "nodeCount": 1,
+                      "phase": 0,
+                      "rootIds": [
+                        "SLOT_gpu0_4_7_3g"
+                      ]
+                    },
+                    {
+                      "actionCountsByType": {
+                        "apply_batch": 1
+                      },
+                      "nodeCount": 1,
+                      "phase": 1,
+                      "rootIds": [
+                        "SLOT_gpu0_4_7_3g"
+                      ]
+                    },
+                    {
+                      "actionCountsByType": {
+                        "verify_batch": 1
+                      },
+                      "nodeCount": 1,
+                      "phase": 2,
+                      "rootIds": [
+                        "SLOT_gpu0_4_7_3g"
+                      ]
+                    },
+                    {
+                      "actionCountsByType": {
+                        "activate_instance_route": 1
+                      },
+                      "nodeCount": 1,
+                      "phase": 3,
+                      "rootIds": [
+                        "SLOT_gpu0_4_7_3g"
+                      ]
+                    }
+                  ],
+                  "representation": "migrant.phased-action-dag/v1"
+                },
+                "reachedTarget": true,
+                "stateAfter": {
+                  "gpus": [
+                    {
+                      "gpuId": 0,
+                      "instances": [
+                        {
+                          "batch": 1,
+                          "end": 1,
+                          "modelKey": null,
+                          "mu": 46.526,
+                          "outputTokens": null,
+                          "placementGroup": null,
+                          "preserved": true,
+                          "profile": "1g",
+                          "promptLen": null,
+                          "requestClass": null,
+                          "runtimeModel": null,
+                          "start": 0,
+                          "workload": "vit_base_image"
+                        },
+                        {
+                          "batch": 1,
+                          "end": 2,
+                          "modelKey": null,
+                          "mu": 176.875,
+                          "outputTokens": null,
+                          "placementGroup": null,
+                          "preserved": true,
+                          "profile": "1g",
+                          "promptLen": null,
+                          "requestClass": null,
+                          "runtimeModel": null,
+                          "start": 1,
+                          "workload": "resnet50_image"
+                        },
+                        {
+                          "batch": 1,
+                          "end": 4,
+                          "modelKey": null,
+                          "mu": 84.865,
+                          "outputTokens": null,
+                          "placementGroup": null,
+                          "preserved": true,
+                          "profile": "2g",
+                          "promptLen": null,
+                          "requestClass": null,
+                          "runtimeModel": null,
+                          "start": 2,
+                          "workload": "vit_base_image"
+                        },
+                        {
+                          "batch": 1,
+                          "end": 7,
+                          "modelKey": null,
+                          "mu": 338.841,
+                          "outputTokens": null,
+                          "placementGroup": null,
+                          "preserved": true,
+                          "profile": "3g",
+                          "promptLen": null,
+                          "requestClass": null,
+                          "runtimeModel": null,
+                          "start": 4,
+                          "workload": "vgg16_image"
+                        }
+                      ],
+                      "source": "planned"
+                    }
+                  ],
+                  "metadata": {
+                    "active_serving_routes": {
+                      "0": {
+                        "physical_gpu_id": "ampere-gpu1",
+                        "status": "active"
+                      }
+                    },
+                    "free_physical_gpu_pool": [
+                      "ampere-gpu0",
+                      "rtx1-worker-gpu0"
+                    ],
+                    "free_physical_gpu_pool_policy": "lifo",
+                    "logical_id_map": {
+                      "0": 0
+                    },
+                    "next_physical_idx": 0,
+                    "physicalGpuBindings": {
+                      "ampere-gpu1": {
+                        "deviceIndex": 1,
+                        "nodeName": "ampere"
+                      }
+                    },
+                    "physical_id_map": {
+                      "0": "ampere-gpu1"
+                    },
+                    "source": "go-cluster-state-manager-canonical",
+                    "transition_draining_instances": {},
+                    "transition_reconfig_targets": {},
+                    "transition_runtime_instances": {
+                      "0:0:1:1g": {
+                        "accepting_new": true,
+                        "inflight": 0,
+                        "queued": 0,
+                        "rerouted_to": null
+                      },
+                      "0:1:2:1g": {
+                        "accepting_new": true,
+                        "inflight": 0,
+                        "queued": 0,
+                        "rerouted_to": null
+                      },
+                      "0:2:4:2g": {
+                        "accepting_new": true,
+                        "inflight": 0,
+                        "queued": 0,
+                        "rerouted_to": null
+                      },
+                      "0:4:7:3g": {
+                        "accepting_new": true,
+                        "inflight": 0,
+                        "queued": 0,
+                        "rerouted_to": null
+                      }
+                    }
+                  }
+                },
+                "stateBefore": {
+                  "gpus": [
+                    {
+                      "gpuId": 0,
+                      "instances": [
+                        {
+                          "batch": 1,
+                          "end": 1,
+                          "modelKey": null,
+                          "mu": 46.526,
+                          "outputTokens": null,
+                          "placementGroup": null,
+                          "preserved": false,
+                          "profile": "1g",
+                          "promptLen": null,
+                          "requestClass": "x",
+                          "runtimeModel": "vit_base",
+                          "start": 0,
+                          "workload": "vit_base_image"
+                        },
+                        {
+                          "batch": 1,
+                          "end": 2,
+                          "modelKey": null,
+                          "mu": 176.875,
+                          "outputTokens": null,
+                          "placementGroup": null,
+                          "preserved": false,
+                          "profile": "1g",
+                          "promptLen": null,
+                          "requestClass": "x",
+                          "runtimeModel": "resnet50",
+                          "start": 1,
+                          "workload": "resnet50_image"
+                        },
+                        {
+                          "batch": 1,
+                          "end": 4,
+                          "modelKey": null,
+                          "mu": 84.865,
+                          "outputTokens": null,
+                          "placementGroup": null,
+                          "preserved": false,
+                          "profile": "2g",
+                          "promptLen": null,
+                          "requestClass": "x",
+                          "runtimeModel": "vit_base",
+                          "start": 2,
+                          "workload": "vit_base_image"
+                        },
+                        {
+                          "batch": 4,
+                          "end": 7,
+                          "modelKey": null,
+                          "mu": 553.509,
+                          "outputTokens": null,
+                          "placementGroup": null,
+                          "preserved": false,
+                          "profile": "3g",
+                          "promptLen": null,
+                          "requestClass": "x",
+                          "runtimeModel": "vgg16",
+                          "start": 4,
+                          "workload": "vgg16_image"
+                        }
+                      ],
+                      "source": "planned"
+                    }
+                  ],
+                  "metadata": {
+                    "free_physical_gpu_pool": [
+                      "ampere-gpu0",
+                      "rtx1-worker-gpu0"
+                    ],
+                    "free_physical_gpu_pool_policy": "lifo",
+                    "logical_id_map": {
+                      "0": 0
+                    },
+                    "next_physical_idx": 0,
+                    "physicalGpuBindings": {
+                      "ampere-gpu1": {
+                        "deviceIndex": 1,
+                        "nodeName": "ampere"
+                      }
+                    },
+                    "physical_id_map": {
+                      "0": "ampere-gpu1"
+                    },
+                    "source": "go-cluster-state-manager-canonical",
+                    "transition_draining_instances": {},
+                    "transition_reconfig_targets": {},
+                    "transition_runtime_instances": {
+                      "0:0:1:1g": {
+                        "accepting_new": true,
+                        "inflight": 0,
+                        "queued": 0,
+                        "rerouted_to": null
+                      },
+                      "0:1:2:1g": {
+                        "accepting_new": true,
+                        "inflight": 0,
+                        "queued": 0,
+                        "rerouted_to": null
+                      },
+                      "0:2:4:2g": {
+                        "accepting_new": true,
+                        "inflight": 0,
+                        "queued": 0,
+                        "rerouted_to": null
+                      },
+                      "0:4:7:3g": {
+                        "accepting_new": true,
+                        "inflight": 0,
+                        "queued": 0,
+                        "rerouted_to": null
+                      }
+                    }
+                  }
+                }
+              }
+            ],
+            "peakActiveGpu": 1,
+            "phasedActionPlan": {
+              "actionCount": 4,
+              "criticalPathLength": 4,
+              "edgeCount": 3,
+              "name": "epoch-three-gpu-live-20260926-r08-final",
+              "nodeCount": 4,
+              "nodes": [
+                {
+                  "action": {
+                    "abstractAction": "Patch Config",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0000:SLOT_gpu0_4_7_3g:patch_batch_config",
+                    "gpu_id": 0,
+                    "new_batch": 1,
+                    "old_batch": 4,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "patch_batch_config",
+                    "workload": "vgg16_image"
+                  },
+                  "dependsOn": [],
+                  "id": "a0000_patch_batch_config_SLOT-gpu0-4-7-3g",
+                  "index": 0,
+                  "operationClass": "pod-lifecycle",
+                  "phase": 0,
+                  "resources": [
+                    "slot:0:(4, 7, '3g')"
+                  ],
+                  "rootId": "SLOT_gpu0_4_7_3g"
+                },
+                {
+                  "action": {
+                    "abstractAction": "Apply Batch",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0001:SLOT_gpu0_4_7_3g:apply_batch",
+                    "capacityGate": {
+                      "consumedByWorkload": {
+                        "vgg16_image": 214.668
+                      },
+                      "policy": "ready_capacity_after_removal_must_cover_required_rate",
+                      "requiredRate": {
+                        "gpt2_p512_o512": 0,
+                        "gpt2_p64_o64": 0,
+                        "llama_p1024_o128": 0,
+                        "llama_p2048_o64": 0,
+                        "resnet50_image": 57.53197095336495,
+                        "vgg16_image": 317.607476635514,
+                        "vit_base_image": 122.60061919504642
+                      }
+                    },
+                    "consumesCapacity": [
+                      {
+                        "mu": 214.668,
+                        "workload": "vgg16_image"
+                      }
+                    ],
+                    "dependsOnActionKeys": [
+                      "0000:SLOT_gpu0_4_7_3g:patch_batch_config"
+                    ],
+                    "gpu_id": 0,
+                    "new_batch": 1,
+                    "old_batch": 4,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "apply_batch",
+                    "workload": "vgg16_image"
+                  },
+                  "dependsOn": [
+                    "a0000_patch_batch_config_SLOT-gpu0-4-7-3g"
+                  ],
+                  "id": "a0001_apply_batch_SLOT-gpu0-4-7-3g",
+                  "index": 1,
+                  "operationClass": "pod-lifecycle",
+                  "phase": 1,
+                  "resources": [
+                    "slot:0:(4, 7, '3g')"
+                  ],
+                  "rootId": "SLOT_gpu0_4_7_3g"
+                },
+                {
+                  "action": {
+                    "abstractAction": "Verify Batch",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0002:SLOT_gpu0_4_7_3g:verify_batch",
+                    "dependsOnActionKeys": [
+                      "0001:SLOT_gpu0_4_7_3g:apply_batch"
+                    ],
+                    "gpu_id": 0,
+                    "new_batch": 1,
+                    "old_batch": 4,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "verify_batch",
+                    "workload": "vgg16_image"
+                  },
+                  "dependsOn": [
+                    "a0001_apply_batch_SLOT-gpu0-4-7-3g"
+                  ],
+                  "id": "a0002_verify_batch_SLOT-gpu0-4-7-3g",
+                  "index": 2,
+                  "operationClass": "pod-lifecycle",
+                  "phase": 2,
+                  "resources": [
+                    "slot:0:(4, 7, '3g')"
+                  ],
+                  "rootId": "SLOT_gpu0_4_7_3g"
+                },
+                {
+                  "action": {
+                    "abstractAction": "Activate Route",
+                    "abstractRoot": "SLOT_gpu0_4_7_3g",
+                    "actionKey": "0003:SLOT_gpu0_4_7_3g:activate_instance_route",
+                    "dependsOnActionKeys": [
+                      "0002:SLOT_gpu0_4_7_3g:verify_batch"
+                    ],
+                    "gpu_id": 0,
+                    "physical_gpu_id": "ampere-gpu1",
+                    "routeEffect": {
+                      "type": "activate_route"
+                    },
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "transitionMode": "batch_change",
+                    "type": "activate_instance_route",
+                    "workload": "vgg16_image"
+                  },
+                  "dependsOn": [
+                    "a0002_verify_batch_SLOT-gpu0-4-7-3g"
+                  ],
+                  "id": "a0003_activate_instance_route_SLOT-gpu0-4-7-3g",
+                  "index": 3,
+                  "operationClass": "router-drain",
+                  "phase": 3,
+                  "resources": [
+                    "slot:0:(4, 7, '3g')",
+                    "traffic-slot:0:(4, 7, '3g')"
+                  ],
+                  "rootId": "SLOT_gpu0_4_7_3g"
+                }
+              ],
+              "phaseCount": 4,
+              "phases": [
+                {
+                  "actionCountsByType": {
+                    "patch_batch_config": 1
+                  },
+                  "name": "phase-00",
+                  "nodeCount": 1,
+                  "nodeIds": [
+                    "a0000_patch_batch_config_SLOT-gpu0-4-7-3g"
+                  ],
+                  "operationClasses": {
+                    "pod-lifecycle": 1
+                  },
+                  "phase": 0,
+                  "rootIds": [
+                    "SLOT_gpu0_4_7_3g"
+                  ]
+                },
+                {
+                  "actionCountsByType": {
+                    "apply_batch": 1
+                  },
+                  "name": "phase-01",
+                  "nodeCount": 1,
+                  "nodeIds": [
+                    "a0001_apply_batch_SLOT-gpu0-4-7-3g"
+                  ],
+                  "operationClasses": {
+                    "pod-lifecycle": 1
+                  },
+                  "phase": 1,
+                  "rootIds": [
+                    "SLOT_gpu0_4_7_3g"
+                  ]
+                },
+                {
+                  "actionCountsByType": {
+                    "verify_batch": 1
+                  },
+                  "name": "phase-02",
+                  "nodeCount": 1,
+                  "nodeIds": [
+                    "a0002_verify_batch_SLOT-gpu0-4-7-3g"
+                  ],
+                  "operationClasses": {
+                    "pod-lifecycle": 1
+                  },
+                  "phase": 2,
+                  "rootIds": [
+                    "SLOT_gpu0_4_7_3g"
+                  ]
+                },
+                {
+                  "actionCountsByType": {
+                    "activate_instance_route": 1
+                  },
+                  "name": "phase-03",
+                  "nodeCount": 1,
+                  "nodeIds": [
+                    "a0003_activate_instance_route_SLOT-gpu0-4-7-3g"
+                  ],
+                  "operationClasses": {
+                    "router-drain": 1
+                  },
+                  "phase": 3,
+                  "rootIds": [
+                    "SLOT_gpu0_4_7_3g"
+                  ]
+                }
+              ],
+              "representation": "migrant.phased-action-dag/v1",
+              "roots": [
+                {
+                  "nodeIds": [
+                    "a0000_patch_batch_config_SLOT-gpu0-4-7-3g",
+                    "a0001_apply_batch_SLOT-gpu0-4-7-3g",
+                    "a0002_verify_batch_SLOT-gpu0-4-7-3g",
+                    "a0003_activate_instance_route_SLOT-gpu0-4-7-3g"
+                  ],
+                  "phaseSpan": {
+                    "first": 0,
+                    "last": 3
+                  },
+                  "planItem": {
+                    "blocked_by": null,
+                    "current_phase": "final_dag",
+                    "gpu_id": 0,
+                    "id": "SLOT_gpu0_4_7_3g",
+                    "physical_gpu_id": "ampere-gpu1",
+                    "slot": [
+                      4,
+                      7,
+                      "3g"
+                    ],
+                    "status": "ready",
+                    "type": "batch_update",
+                    "workload": "vgg16_image"
+                  },
+                  "rootId": "SLOT_gpu0_4_7_3g"
+                }
+              ]
+            },
+            "phasedActionPlanSummary": {
+              "actionCount": 4,
+              "criticalPathLength": 4,
+              "edgeCount": 3,
+              "nodeCount": 4,
+              "phaseCount": 4,
+              "phases": [
+                {
+                  "actionCountsByType": {
+                    "patch_batch_config": 1
+                  },
+                  "nodeCount": 1,
+                  "phase": 0,
+                  "rootIds": [
+                    "SLOT_gpu0_4_7_3g"
+                  ]
+                },
+                {
+                  "actionCountsByType": {
+                    "apply_batch": 1
+                  },
+                  "nodeCount": 1,
+                  "phase": 1,
+                  "rootIds": [
+                    "SLOT_gpu0_4_7_3g"
+                  ]
+                },
+                {
+                  "actionCountsByType": {
+                    "verify_batch": 1
+                  },
+                  "nodeCount": 1,
+                  "phase": 2,
+                  "rootIds": [
+                    "SLOT_gpu0_4_7_3g"
+                  ]
+                },
+                {
+                  "actionCountsByType": {
+                    "activate_instance_route": 1
+                  },
+                  "nodeCount": 1,
+                  "phase": 3,
+                  "rootIds": [
+                    "SLOT_gpu0_4_7_3g"
+                  ]
+                }
+              ],
+              "representation": "migrant.phased-action-dag/v1"
+            },
+            "planner": "effect_aware_dag",
+            "plannerModule": "transition.effect_aware_dag",
+            "reachedTarget": true,
+            "removedCapacityDependencyCount": 0,
+            "runtimeAssumptions": {
+              "capacityDependenciesEnforced": false,
+              "committedDemandPolicy": "component-wise min(source demand, target demand)",
+              "defaultInflight": 1,
+              "defaultQueued": 2,
+              "overrideExistingChangedSlots": false,
+              "removedCapacityDependencyCount": 0,
+              "removedCapacityDependencyCountByKind": {
+                "capacityGate": 0,
+                "temporaryCapacityCleanup": 0
+              },
+              "stage3Variant": "sw-c",
+              "transitionDemandPolicy": "min"
+            },
+            "sourceActiveGpu": 1,
+            "stage3Variant": "sw-c",
+            "stageName": "epoch-three-gpu-live-20260926-r08"
+          }
+        },
+        "reachedTarget": true,
+        "requestedPlanner": "ours"
+      },
+      "planningInput": {
+        "calibrationOverlayRef": "physicalgpuregistry/default",
+        "conservative3gMu": true,
+        "currentAllocationRef": "physicalgpuregistry/default",
+        "epoch": "three-gpu-live-20260926-r08",
+        "forceReplan": true,
+        "mode": "target",
+        "observedAt": "2026-10-01T07:01:35.047Z",
+        "planner": "ours",
+        "profileCatalogRef": "default",
+        "registeredSLOMs": {
+          "gpt2_p512_o512": 100,
+          "gpt2_p64_o64": 50,
+          "llama_p1024_o128": 180,
+          "llama_p2048_o64": 250,
+          "resnet50_image": 100,
+          "vgg16_image": 100,
+          "vit_base_image": 300
+        },
+        "scenarioPath": "mock/scenarios/real8gpu.yaml",
+        "slo": {
+          "gpt2_p512_o512": {
+            "tpotMs": 20,
+            "ttftMs": 100
+          },
+          "gpt2_p64_o64": {
+            "tpotMs": 20,
+            "ttftMs": 50
+          },
+          "llama_p1024_o128": {
+            "tpotMs": 35,
+            "ttftMs": 180
+          },
+          "llama_p2048_o64": {
+            "tpotMs": 35,
+            "ttftMs": 250
+          },
+          "resnet50_image": {
+            "e2eMs": 100,
+            "latencyMs": 100
+          },
+          "vgg16_image": {
+            "e2eMs": 100,
+            "latencyMs": 100
+          },
+          "vit_base_image": {
+            "e2eMs": 300,
+            "latencyMs": 300
+          }
+        },
+        "source": "three-gpu-live-20260926-v2",
+        "sourceArrival": {
+          "gpt2_p512_o512": 0,
+          "gpt2_p64_o64": 0,
+          "llama_p1024_o128": 0,
+          "llama_p2048_o64": 0,
+          "resnet50_image": 57.53197095336495,
+          "vgg16_image": 469.7719626168224,
+          "vit_base_image": 122.60061919504642
+        },
+        "stage3Variant": "sw-c",
+        "targetArrival": {
+          "gpt2_p512_o512": 0,
+          "gpt2_p64_o64": 0,
+          "llama_p1024_o128": 0,
+          "llama_p2048_o64": 0,
+          "resnet50_image": 82.23661214667806,
+          "vgg16_image": 317.607476635514,
+          "vit_base_image": 122.60061919504642
+        },
+        "transitionDemandPolicy": "min",
+        "triggerReason": "frozen-selected-demand",
+        "unit": "requestsPerSecond",
+        "windowSeconds": 60
+      },
+      "summary": {
+        "arrivalSnapshotRef": "live-v2-20261001t065220878695z-r08",
+        "desiredRuntimes": [
+          {
+            "batchSize": 1,
+            "capacity": 176.875,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10691,
+            "model": "resnet50_image",
+            "modelKey": "resnet50_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "resnet50_image",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+            "runtimeModel": "resnet50_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+            "weight": 176.875
+          },
+          {
+            "batchSize": 1,
+            "capacity": 338.841,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10694,
+            "model": "vgg16_image",
+            "modelKey": "vgg16_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vgg16_image",
+            "profile": "3g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+            "runtimeModel": "vgg16_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+            "weight": 338.841
+          },
+          {
+            "batchSize": 1,
+            "capacity": 46.526,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10689,
+            "model": "vit_base_image",
+            "modelKey": "vit_base_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vit_base_image",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+            "runtimeModel": "vit_base_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+            "weight": 46.526
+          },
+          {
+            "batchSize": 1,
+            "capacity": 84.865,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10692,
+            "model": "vit_base_image",
+            "modelKey": "vit_base_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vit_base_image",
+            "profile": "2g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+            "runtimeModel": "vit_base_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+            "weight": 84.865
+          }
+        ],
+        "executionRuntimes": [
+          {
+            "batchSize": 1,
+            "capacity": 176.875,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10691,
+            "model": "resnet50_image",
+            "modelKey": "resnet50_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "resnet50_image",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+            "runtimeModel": "resnet50_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+            "weight": 176.875
+          },
+          {
+            "batchSize": 1,
+            "capacity": 338.841,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10694,
+            "model": "vgg16_image",
+            "modelKey": "vgg16_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vgg16_image",
+            "profile": "3g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+            "runtimeModel": "vgg16_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+            "weight": 338.841
+          },
+          {
+            "batchSize": 1,
+            "capacity": 46.526,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10689,
+            "model": "vit_base_image",
+            "modelKey": "vit_base_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vit_base_image",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+            "runtimeModel": "vit_base_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+            "weight": 46.526
+          },
+          {
+            "batchSize": 1,
+            "capacity": 84.865,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10692,
+            "model": "vit_base_image",
+            "modelKey": "vit_base_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vit_base_image",
+            "profile": "2g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+            "runtimeModel": "vit_base_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+            "weight": 84.865
+          }
+        ],
+        "finalDesiredRuntimes": [
+          {
+            "batchSize": 1,
+            "capacity": 176.875,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10691,
+            "model": "resnet50_image",
+            "modelKey": "resnet50_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "resnet50_image",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+            "runtimeModel": "resnet50_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+            "weight": 176.875
+          },
+          {
+            "batchSize": 1,
+            "capacity": 338.841,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10694,
+            "model": "vgg16_image",
+            "modelKey": "vgg16_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vgg16_image",
+            "profile": "3g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+            "runtimeModel": "vgg16_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+            "weight": 338.841
+          },
+          {
+            "batchSize": 1,
+            "capacity": 46.526,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10689,
+            "model": "vit_base_image",
+            "modelKey": "vit_base_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vit_base_image",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+            "runtimeModel": "vit_base_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+            "weight": 46.526
+          },
+          {
+            "batchSize": 1,
+            "capacity": 84.865,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10692,
+            "model": "vit_base_image",
+            "modelKey": "vit_base_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vit_base_image",
+            "profile": "2g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+            "runtimeModel": "vit_base_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+            "weight": 84.865
+          }
+        ],
+        "planner": "ours",
+        "plannerMakespanSec": 0.08880968391895294,
+        "sourceArrival": {
+          "gpt2_p512_o512": 0,
+          "gpt2_p64_o64": 0,
+          "llama_p1024_o128": 0,
+          "llama_p2048_o64": 0,
+          "resnet50_image": 57.53197095336495,
+          "vgg16_image": 469.7719626168224,
+          "vit_base_image": 122.60061919504642
+        },
+        "sourceGpuCount": 1,
+        "targetArrival": {
+          "gpt2_p512_o512": 0,
+          "gpt2_p64_o64": 0,
+          "llama_p1024_o128": 0,
+          "llama_p2048_o64": 0,
+          "resnet50_image": 82.23661214667806,
+          "vgg16_image": 317.607476635514,
+          "vit_base_image": 122.60061919504642
+        },
+        "targetGpuCount": 1
+      },
+      "targetAllocationPlan": {
+        "desiredRuntimes": [
+          {
+            "batchSize": 1,
+            "capacity": 176.875,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10691,
+            "model": "resnet50_image",
+            "modelKey": "resnet50_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "resnet50_image",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+            "runtimeModel": "resnet50_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+            "weight": 176.875
+          },
+          {
+            "batchSize": 1,
+            "capacity": 338.841,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10694,
+            "model": "vgg16_image",
+            "modelKey": "vgg16_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vgg16_image",
+            "profile": "3g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+            "runtimeModel": "vgg16_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+            "weight": 338.841
+          },
+          {
+            "batchSize": 1,
+            "capacity": 46.526,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10689,
+            "model": "vit_base_image",
+            "modelKey": "vit_base_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vit_base_image",
+            "profile": "1g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+            "runtimeModel": "vit_base_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+            "weight": 46.526
+          },
+          {
+            "batchSize": 1,
+            "capacity": 84.865,
+            "gpu": "ampere-gpu1",
+            "hostPort": 10692,
+            "model": "vit_base_image",
+            "modelKey": "vit_base_image",
+            "node": "ampere",
+            "outputTokens": null,
+            "placementGroup": "vit_base_image",
+            "profile": "2g",
+            "promptLen": null,
+            "requestClass": null,
+            "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+            "runtimeModel": "vit_base_image",
+            "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+            "weight": 84.865
+          }
+        ],
+        "milp": {
+          "KTotal": {
+            "1g": 2,
+            "2g": 1,
+            "3g": 1,
+            "4g": 0,
+            "7g": 0
+          },
+          "alloc": [
+            {
+              "arrival": 82.23661214667806,
+              "instances": [
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 176.875,
+                  "profile": "1g"
+                }
+              ],
+              "provided": 176.875,
+              "slack": 94.63838785332194,
+              "workload": "resnet50_image"
+            },
+            {
+              "arrival": 317.607476635514,
+              "instances": [
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 338.841,
+                  "profile": "3g"
+                }
+              ],
+              "provided": 338.841,
+              "slack": 21.233523364486018,
+              "workload": "vgg16_image"
+            },
+            {
+              "arrival": 122.60061919504642,
+              "instances": [
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 46.526,
+                  "profile": "1g"
+                },
+                {
+                  "batch": 1,
+                  "count": 1,
+                  "mu": 84.865,
+                  "profile": "2g"
+                }
+              ],
+              "provided": 131.391,
+              "slack": 8.790380804953571,
+              "workload": "vit_base_image"
+            },
+            {
+              "arrival": 0,
+              "instances": [],
+              "provided": 0,
+              "slack": 0,
+              "workload": "gpt2_p64_o64"
+            },
+            {
+              "arrival": 0,
+              "instances": [],
+              "provided": 0,
+              "slack": 0,
+              "workload": "gpt2_p512_o512"
+            },
+            {
+              "arrival": 0,
+              "instances": [],
+              "provided": 0,
+              "slack": 0,
+              "workload": "llama_p1024_o128"
+            },
+            {
+              "arrival": 0,
+              "instances": [],
+              "provided": 0,
+              "slack": 0,
+              "workload": "llama_p2048_o64"
+            }
+          ],
+          "capacityHeadroomEffective": 0,
+          "capacityHeadroomRequested": 0,
+          "chosenTemplates": [
+            "3+2+1+1"
+          ],
+          "conservative3gMu": true,
+          "gpuCount": 1,
+          "rawSolution": {
+            "x_sol": {
+              "3": 1,
+              "35": 1,
+              "48": 1,
+              "52": 1
+            },
+            "y_sol": {
+              "8": 1
+            }
+          },
+          "status": "OPTIMAL",
+          "warmStart": {
+            "available": true,
+            "source": "currentAllocation",
+            "templateMissCount": 0,
+            "templateMisses": [],
+            "unmatchedInstanceCount": 0,
+            "unmatchedInstances": [],
+            "xSolCount": 4,
+            "ySolCount": 1
+          }
+        },
+        "objective": "Gurobi MILP target allocation followed by exact global Stage 2 materialization",
+        "planner": "original-gurobi-milp-exact-stage2-effect-aware-dag",
+        "targetState": {
+          "gpus": [
+            {
+              "gpuId": 0,
+              "instances": [
+                {
+                  "batch": 1,
+                  "end": 1,
+                  "modelKey": null,
+                  "mu": 46.526,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "1g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 0,
+                  "workload": "vit_base_image"
+                },
+                {
+                  "batch": 1,
+                  "end": 2,
+                  "modelKey": null,
+                  "mu": 176.875,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "1g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 1,
+                  "workload": "resnet50_image"
+                },
+                {
+                  "batch": 1,
+                  "end": 4,
+                  "modelKey": null,
+                  "mu": 84.865,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "2g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 2,
+                  "workload": "vit_base_image"
+                },
+                {
+                  "batch": 1,
+                  "end": 7,
+                  "modelKey": null,
+                  "mu": 338.841,
+                  "outputTokens": null,
+                  "placementGroup": null,
+                  "preserved": true,
+                  "profile": "3g",
+                  "promptLen": null,
+                  "requestClass": null,
+                  "runtimeModel": null,
+                  "start": 4,
+                  "workload": "vgg16_image"
+                }
+              ],
+              "source": "planned"
+            }
+          ],
+          "metadata": {
+            "arrivals": {
+              "gpt2_p512_o512": 0,
+              "gpt2_p64_o64": 0,
+              "llama_p1024_o128": 0,
+              "llama_p2048_o64": 0,
+              "resnet50_image": 82.23661214667806,
+              "vgg16_image": 317.607476635514,
+              "vit_base_image": 122.60061919504642
+            },
+            "build_method": "exact_global_milp_aggregated",
+            "build_metrics": {
+              "aggregated_new_gpu_count": 0,
+              "cold_workload_gpu_incidence": null,
+              "configured_mip_gap": 0,
+              "current_gpu_count": 1,
+              "demand_count": 4,
+              "demand_type_count": 4,
+              "elapsed_time_sec": 0.008455276489257812,
+              "exact_preserve": 4,
+              "gpu_count": 1,
+              "gurobi_seed": 1,
+              "gurobi_threads": 8,
+              "indexed_new_gpu_count": 0,
+              "layout_count": 16,
+              "mig_preserve": 4,
+              "mip_gap": null,
+              "new_gpu_count": 0,
+              "num_constraints": 105,
+              "num_vars": 107,
+              "objective_mode": "transition_preservation",
+              "objective_order": [
+                "exact_workload"
+              ],
+              "optimality_proven": true,
+              "reused_current_gpu_count": 1,
+              "score_tuple": [
+                0,
+                4,
+                0,
+                4
+              ],
+              "selected_layouts": {
+                "0": "1+1+2+3"
+              },
+              "solver_status": "OPTIMAL",
+              "upgrade_preserve": 0,
+              "whole_gpu_preserve": 0
+            },
+            "capacity_basis": "physical_profile_catalog",
+            "free_physical_gpu_pool": [
+              "rtx1-worker-gpu0",
+              "ampere-gpu0"
+            ],
+            "free_physical_gpu_pool_policy": "lifo",
+            "logical_capacity_assignments": [
+              {
+                "batch": 1,
+                "gpu_id": 0,
+                "logical_mu": 46.526,
+                "slot": [
+                  0,
+                  1,
+                  "1g"
+                ],
+                "workload": "vit_base_image"
+              },
+              {
+                "batch": 1,
+                "gpu_id": 0,
+                "logical_mu": 176.875,
+                "slot": [
+                  1,
+                  2,
+                  "1g"
+                ],
+                "workload": "resnet50_image"
+              },
+              {
+                "batch": 1,
+                "gpu_id": 0,
+                "logical_mu": 84.865,
+                "slot": [
+                  2,
+                  4,
+                  "2g"
+                ],
+                "workload": "vit_base_image"
+              },
+              {
+                "batch": 1,
+                "gpu_id": 0,
+                "logical_mu": 338.841,
+                "slot": [
+                  4,
+                  7,
+                  "3g"
+                ],
+                "workload": "vgg16_image"
+              }
+            ],
+            "next_physical_idx": 0,
+            "physical_id_map": {
+              "0": "ampere-gpu1"
+            },
+            "stage2_demand_count": 4,
+            "stage2_demand_type_count": 4
+          }
+        }
+      },
+      "targetGpuCount": 1,
+      "validationTargets": {
+        "targetAllocationPlan": {
+          "desiredRuntimes": [
+            {
+              "batchSize": 1,
+              "capacity": 176.875,
+              "gpu": "ampere-gpu1",
+              "hostPort": 10691,
+              "model": "resnet50_image",
+              "modelKey": "resnet50_image",
+              "node": "ampere",
+              "outputTokens": null,
+              "placementGroup": "resnet50_image",
+              "profile": "1g",
+              "promptLen": null,
+              "requestClass": null,
+              "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+              "runtimeModel": "resnet50_image",
+              "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+              "weight": 176.875
+            },
+            {
+              "batchSize": 1,
+              "capacity": 338.841,
+              "gpu": "ampere-gpu1",
+              "hostPort": 10694,
+              "model": "vgg16_image",
+              "modelKey": "vgg16_image",
+              "node": "ampere",
+              "outputTokens": null,
+              "placementGroup": "vgg16_image",
+              "profile": "3g",
+              "promptLen": null,
+              "requestClass": null,
+              "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+              "runtimeModel": "vgg16_image",
+              "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+              "weight": 338.841
+            },
+            {
+              "batchSize": 1,
+              "capacity": 46.526,
+              "gpu": "ampere-gpu1",
+              "hostPort": 10689,
+              "model": "vit_base_image",
+              "modelKey": "vit_base_image",
+              "node": "ampere",
+              "outputTokens": null,
+              "placementGroup": "vit_base_image",
+              "profile": "1g",
+              "promptLen": null,
+              "requestClass": null,
+              "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+              "runtimeModel": "vit_base_image",
+              "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+              "weight": 46.526
+            },
+            {
+              "batchSize": 1,
+              "capacity": 84.865,
+              "gpu": "ampere-gpu1",
+              "hostPort": 10692,
+              "model": "vit_base_image",
+              "modelKey": "vit_base_image",
+              "node": "ampere",
+              "outputTokens": null,
+              "placementGroup": "vit_base_image",
+              "profile": "2g",
+              "promptLen": null,
+              "requestClass": null,
+              "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+              "runtimeModel": "vit_base_image",
+              "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+              "weight": 84.865
+            }
+          ],
+          "targetState": {
+            "gpus": [
+              {
+                "gpuId": 0,
+                "instances": [
+                  {
+                    "batch": 1,
+                    "end": 1,
+                    "modelKey": null,
+                    "mu": 46.526,
+                    "outputTokens": null,
+                    "placementGroup": null,
+                    "preserved": true,
+                    "profile": "1g",
+                    "promptLen": null,
+                    "requestClass": null,
+                    "runtimeModel": null,
+                    "start": 0,
+                    "workload": "vit_base_image"
+                  },
+                  {
+                    "batch": 1,
+                    "end": 2,
+                    "modelKey": null,
+                    "mu": 176.875,
+                    "outputTokens": null,
+                    "placementGroup": null,
+                    "preserved": true,
+                    "profile": "1g",
+                    "promptLen": null,
+                    "requestClass": null,
+                    "runtimeModel": null,
+                    "start": 1,
+                    "workload": "resnet50_image"
+                  },
+                  {
+                    "batch": 1,
+                    "end": 4,
+                    "modelKey": null,
+                    "mu": 84.865,
+                    "outputTokens": null,
+                    "placementGroup": null,
+                    "preserved": true,
+                    "profile": "2g",
+                    "promptLen": null,
+                    "requestClass": null,
+                    "runtimeModel": null,
+                    "start": 2,
+                    "workload": "vit_base_image"
+                  },
+                  {
+                    "batch": 1,
+                    "end": 7,
+                    "modelKey": null,
+                    "mu": 338.841,
+                    "outputTokens": null,
+                    "placementGroup": null,
+                    "preserved": true,
+                    "profile": "3g",
+                    "promptLen": null,
+                    "requestClass": null,
+                    "runtimeModel": null,
+                    "start": 4,
+                    "workload": "vgg16_image"
+                  }
+                ],
+                "source": "planned"
+              }
+            ],
+            "metadata": {
+              "arrivals": {
+                "gpt2_p512_o512": 0,
+                "gpt2_p64_o64": 0,
+                "llama_p1024_o128": 0,
+                "llama_p2048_o64": 0,
+                "resnet50_image": 82.23661214667806,
+                "vgg16_image": 317.607476635514,
+                "vit_base_image": 122.60061919504642
+              },
+              "build_method": "exact_global_milp_aggregated",
+              "build_metrics": {
+                "aggregated_new_gpu_count": 0,
+                "cold_workload_gpu_incidence": null,
+                "configured_mip_gap": 0,
+                "current_gpu_count": 1,
+                "demand_count": 4,
+                "demand_type_count": 4,
+                "elapsed_time_sec": 0.008455276489257812,
+                "exact_preserve": 4,
+                "gpu_count": 1,
+                "gurobi_seed": 1,
+                "gurobi_threads": 8,
+                "indexed_new_gpu_count": 0,
+                "layout_count": 16,
+                "mig_preserve": 4,
+                "mip_gap": null,
+                "new_gpu_count": 0,
+                "num_constraints": 105,
+                "num_vars": 107,
+                "objective_mode": "transition_preservation",
+                "objective_order": [
+                  "exact_workload"
+                ],
+                "optimality_proven": true,
+                "reused_current_gpu_count": 1,
+                "score_tuple": [
+                  0,
+                  4,
+                  0,
+                  4
+                ],
+                "selected_layouts": {
+                  "0": "1+1+2+3"
+                },
+                "solver_status": "OPTIMAL",
+                "upgrade_preserve": 0,
+                "whole_gpu_preserve": 0
+              },
+              "capacity_basis": "physical_profile_catalog",
+              "free_physical_gpu_pool": [
+                "rtx1-worker-gpu0",
+                "ampere-gpu0"
+              ],
+              "free_physical_gpu_pool_policy": "lifo",
+              "logical_capacity_assignments": [
+                {
+                  "batch": 1,
+                  "gpu_id": 0,
+                  "logical_mu": 46.526,
+                  "slot": [
+                    0,
+                    1,
+                    "1g"
+                  ],
+                  "workload": "vit_base_image"
+                },
+                {
+                  "batch": 1,
+                  "gpu_id": 0,
+                  "logical_mu": 176.875,
+                  "slot": [
+                    1,
+                    2,
+                    "1g"
+                  ],
+                  "workload": "resnet50_image"
+                },
+                {
+                  "batch": 1,
+                  "gpu_id": 0,
+                  "logical_mu": 84.865,
+                  "slot": [
+                    2,
+                    4,
+                    "2g"
+                  ],
+                  "workload": "vit_base_image"
+                },
+                {
+                  "batch": 1,
+                  "gpu_id": 0,
+                  "logical_mu": 338.841,
+                  "slot": [
+                    4,
+                    7,
+                    "3g"
+                  ],
+                  "workload": "vgg16_image"
+                }
+              ],
+              "next_physical_idx": 0,
+              "physical_id_map": {
+                "0": "ampere-gpu1"
+              },
+              "stage2_demand_count": 4,
+              "stage2_demand_type_count": 4
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "actionStatuses": [
+        {
+          "affectedInstanceCount": 1,
+          "category": "instance_update",
+          "durationSeconds": 0.000435,
+          "finishedAt": "2026-10-01T07:02:06.124451509Z",
+          "id": "a0000_patch_batch_config_SLOT-gpu0-4-7-3g",
+          "logicalGpuId": "0",
+          "model": "vgg16_image",
+          "phase": 0,
+          "physicalGpuId": "ampere-gpu1",
+          "relativeEndSeconds": 0.034639,
+          "relativeStartSeconds": 0.034204,
+          "startedAt": "2026-10-01T07:02:06.124016497Z",
+          "status": "completed",
+          "traceMetrics": {
+            "batchPatchTarget.vgg16_image": 1
+          },
+          "type": "patch_batch_config"
+        },
+        {
+          "affectedInstanceCount": 1,
+          "category": "instance_update",
+          "dependsOn": [
+            "a0000_patch_batch_config_SLOT-gpu0-4-7-3g"
+          ],
+          "durationSeconds": 0.005176,
+          "durationsSeconds": {
+            "batchApply": 0.00516944
+          },
+          "finishedAt": "2026-10-01T07:02:06.129645154Z",
+          "id": "a0001_apply_batch_SLOT-gpu0-4-7-3g",
+          "logicalGpuId": "0",
+          "model": "vgg16_image",
+          "phase": 1,
+          "physicalGpuId": "ampere-gpu1",
+          "relativeEndSeconds": 0.039833,
+          "relativeStartSeconds": 0.034657,
+          "startedAt": "2026-10-01T07:02:06.124469002Z",
+          "status": "completed",
+          "timestamps": {
+            "batchApplyFinishedAt": "2026-10-01T07:02:06.129644583Z",
+            "batchApplyStartedAt": "2026-10-01T07:02:06.124475173Z"
+          },
+          "type": "apply_batch"
+        },
+        {
+          "affectedInstanceCount": 1,
+          "category": "instance_update",
+          "dependsOn": [
+            "a0001_apply_batch_SLOT-gpu0-4-7-3g"
+          ],
+          "durationSeconds": 0.010764,
+          "durationsSeconds": {
+            "batchVerify": 0.002560805
+          },
+          "finishedAt": "2026-10-01T07:02:06.140461486Z",
+          "id": "a0002_verify_batch_SLOT-gpu0-4-7-3g",
+          "logicalGpuId": "0",
+          "model": "vgg16_image",
+          "phase": 2,
+          "physicalGpuId": "ampere-gpu1",
+          "relativeEndSeconds": 0.050649,
+          "relativeStartSeconds": 0.039885,
+          "startedAt": "2026-10-01T07:02:06.129696992Z",
+          "status": "completed",
+          "timestamps": {
+            "batchVerifyFinishedAt": "2026-10-01T07:02:06.132284397Z",
+            "batchVerifyStartedAt": "2026-10-01T07:02:06.129723592Z"
+          },
+          "type": "verify_batch"
+        },
+        {
+          "affectedInstanceCount": 1,
+          "category": "routing",
+          "dependsOn": [
+            "a0002_verify_batch_SLOT-gpu0-4-7-3g"
+          ],
+          "durationSeconds": 0.560502,
+          "durationsSeconds": {
+            "routeSync": 0.007117557,
+            "runtimeReadyAndCUDAVerify": 0.553349518
+          },
+          "finishedAt": "2026-10-01T07:02:06.701018832Z",
+          "id": "a0003_activate_instance_route_SLOT-gpu0-4-7-3g",
+          "logicalGpuId": "0",
+          "model": "vgg16_image",
+          "phase": 3,
+          "physicalGpuId": "ampere-gpu1",
+          "relativeEndSeconds": 0.611206,
+          "relativeStartSeconds": 0.050705,
+          "runtimeReadiness": {
+            "vgg16-image-ampere-gpu1-s4-7-3g": {
+              "containerReady": true,
+              "containerStartedAt": "2026-10-01T06:55:02Z",
+              "containerStartedAtSinceDeploymentSeconds": -424.140550655,
+              "cudaVerification": "skipped: runtime container predates this action",
+              "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+              "expectedMigUUID": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+              "gpu": "ampere-gpu1",
+              "healthDevice": "cuda",
+              "healthLoaded": true,
+              "healthModelId": "",
+              "healthReadyAt": "2026-10-01T07:02:06.407392108Z",
+              "healthReadyAtSinceDeploymentSeconds": 0.266841463,
+              "healthRuntimeMode": "torchvision",
+              "hostPort": 10694,
+              "loadTimings": {
+                "inputTensorBuildSec": 0.0018935700063593686,
+                "loadedAtSinceStartSec": 1.744448184967041,
+                "modelEvalAndDeviceSyncSec": 0.28659026604145765,
+                "modelFactorySec": 1.1410546050174162,
+                "totalLoadSec": 1.6938354559824802,
+                "warmupSec": 0.26427979598520324,
+                "weightsResolveSec": 5.843001417815685e-06
+              },
+              "node": "ampere",
+              "pod": "vgg16-image-ampere-gpu1-s4-7-3g-runtime-589f56bc8d-ntllq",
+              "podCreatedAt": "2026-10-01T06:55:01Z",
+              "podCreatedAtSinceDeploymentSeconds": -425.140550655,
+              "podScheduledAt": "2026-10-01T06:55:01Z",
+              "podScheduledAtSinceDeploymentSeconds": -425.140550655,
+              "podStartTime": "2026-10-01T06:55:01Z",
+              "podStartTimeSinceDeploymentSeconds": -425.140550655,
+              "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g"
+            }
+          },
+          "startedAt": "2026-10-01T07:02:06.140517362Z",
+          "status": "completed",
+          "timestamps": {
+            "routeSyncedAt": "2026-10-01T07:02:06.70101773Z",
+            "runtimeDeploymentCreatedAt": "2026-10-01T07:02:06.140550655Z",
+            "runtimeReadyAndCUDAVerifiedAt": "2026-10-01T07:02:06.693900173Z"
+          },
+          "type": "activate_instance_route"
+        }
+      ],
+      "message": "action DAG executed by Go transition executor",
+      "phase": "Executed",
+      "transitionExecution": {
+        "cudaVerification": {
+          "vgg16-image-ampere-gpu1-s4-7-3g": {
+            "cudaVerificationSkipped": true,
+            "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "expectedMigUUID": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "gpu": "ampere-gpu1",
+            "health": {
+              "avgLatencyMs": 6.077927754132901,
+              "batchSize": 1,
+              "cpuAffinity": "26,82",
+              "cpuExclude": "",
+              "cpuSet": "26,82",
+              "device": "cuda",
+              "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+              "errors": 0,
+              "expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+              "frontendCpuAffinity": "34,36,90,92",
+              "imageSize": 224,
+              "lastRuntimeLatencyMs": 2.736639976501465,
+              "loadError": "",
+              "loadTimings": {
+                "inputTensorBuildSec": 0.0018935700063593686,
+                "loadedAtSinceStartSec": 1.744448184967041,
+                "modelEvalAndDeviceSyncSec": 0.28659026604145765,
+                "modelFactorySec": 1.1410546050174162,
+                "totalLoadSec": 1.6938354559824802,
+                "warmupSec": 0.26427979598520324,
+                "weightsResolveSec": 5.843001417815685e-06
+              },
+              "loaded": true,
+              "migUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+              "model": "vgg16",
+              "nvidiaVisibleDevices": "void",
+              "ok": true,
+              "orSimDeviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+              "orSimExpectedMIGUUID": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+              "orSimMIGUUID": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+              "orSimPhysicalGpuID": "ampere-gpu1",
+              "orSimSlot": "4-8-3g",
+              "orSimSlotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+              "physicalGpuId": "ampere-gpu1",
+              "profile": "3g",
+              "requests": 54921,
+              "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+              "runtimeLatencyMs": 6.014116473838773,
+              "runtimeMode": "torchvision",
+              "runtimeThroughput": 166.27546279656707,
+              "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+              "torchvisionModel": "vgg16",
+              "uptimeSeconds": 421.0084583759308,
+              "weightsMode": "default"
+            },
+            "migUUID": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "node": "ampere",
+            "parentGPUUUID": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+            "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g"
+          }
+        },
+        "durationsSeconds": {
+          "total": 2.684714543
+        },
+        "metrics": {
+          "actionScheduler": {
+            "dependencyKey": "dependsOn",
+            "phaseBarrier": false,
+            "policy": "event_driven_dag"
+          },
+          "actionSummary": {
+            "activeGpuCountOverTime": [
+              {
+                "activeGpuCount": 1,
+                "reason": "source_allocation",
+                "relativeSeconds": 0
+              }
+            ],
+            "blockedDagNodes": 0,
+            "byCategory": {
+              "instance_update": 3,
+              "routing": 1
+            },
+            "byType": {
+              "activate_instance_route": 1,
+              "apply_batch": 1,
+              "patch_batch_config": 1,
+              "verify_batch": 1
+            },
+            "completedDagNodes": 4,
+            "createInstanceNodes": 0,
+            "createdInstanceCount": 0,
+            "createdMIGSlotCount": 0,
+            "deleteInstanceNodes": 0,
+            "deletedInstanceCount": 0,
+            "deletedMIGSlotCount": 0,
+            "failedDagNodes": 0,
+            "finalActiveGPUCountEvent": 1,
+            "reconfigurationNodes": 0,
+            "totalDagNodes": 4
+          },
+          "finalValidation": {
+            "actualMigSlotCount": 4,
+            "actualRuntimeCount": 4,
+            "expectedMigSlotCount": 4,
+            "expectedRuntimeCount": 4,
+            "extraMigSlots": [],
+            "extraRuntimeBindings": [],
+            "liveBatchFailures": [],
+            "missingMigSlots": [],
+            "missingRuntimeBindings": [],
+            "ok": true
+          },
+          "gpuCountBaseline": {
+            "source": 1,
+            "target": 1
+          },
+          "routerMonitor": {
+            "active": true,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "generatedAt": "2026-10-01T07:02:06.122290439Z",
+            "latencySLOMs": {
+              "gpt2_p512_o512": 100,
+              "gpt2_p64_o64": 50,
+              "llama_p1024_o128": 180,
+              "llama_p2048_o64": 250,
+              "resnet50_image": 100,
+              "vgg16_image": 100,
+              "vit_base_image": 300
+            },
+            "models": {},
+            "planName": "plan-live-v2-20261001t065220878695z-r08",
+            "sourceArrival": {
+              "gpt2_p512_o512": 0,
+              "gpt2_p64_o64": 0,
+              "llama_p1024_o128": 0,
+              "llama_p2048_o64": 0,
+              "resnet50_image": 57.53197095336495,
+              "vgg16_image": 469.7719626168224,
+              "vit_base_image": 122.60061919504642
+            },
+            "startedAt": "2026-10-01T07:02:06.122284728Z",
+            "targetArrival": {
+              "gpt2_p512_o512": 0,
+              "gpt2_p64_o64": 0,
+              "llama_p1024_o128": 0,
+              "llama_p2048_o64": 0,
+              "resnet50_image": 82.23661214667806,
+              "vgg16_image": 317.607476635514,
+              "vit_base_image": 122.60061919504642
+            }
+          },
+          "routerSLO": {
+            "active": false,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "finishedAt": "2026-10-01T07:02:08.774712373Z",
+            "generatedAt": "2026-10-01T07:02:08.77472678Z",
+            "latencySLOMs": {
+              "gpt2_p512_o512": 100,
+              "gpt2_p64_o64": 50,
+              "llama_p1024_o128": 180,
+              "llama_p2048_o64": 250,
+              "resnet50_image": 100,
+              "vgg16_image": 100,
+              "vit_base_image": 300
+            },
+            "models": {
+              "resnet50_image": {
+                "avgLatencyMs": 11.203,
+                "demandRate": 82.23661214667806,
+                "demandRatePolicy": "fixed_input_not_observed",
+                "demandRateSLOEvaluated": false,
+                "demandRateSLOViolated": false,
+                "errors": 0,
+                "latencySLOMs": 100,
+                "latencySLOViolated": false,
+                "latencySLOViolationSeconds": 0,
+                "latencyViolationCount": 0,
+                "maxLatencyMs": 20,
+                "requests": 153,
+                "sourceDemandRate": 57.53197095336495
+              },
+              "vgg16_image": {
+                "avgLatencyMs": 5.372,
+                "demandRate": 317.607476635514,
+                "demandRatePolicy": "fixed_input_not_observed",
+                "demandRateSLOEvaluated": false,
+                "demandRateSLOViolated": false,
+                "errors": 0,
+                "latencySLOMs": 100,
+                "latencySLOViolated": false,
+                "latencySLOViolationSeconds": 0,
+                "latencyViolationCount": 0,
+                "maxLatencyMs": 9,
+                "requests": 836,
+                "sourceDemandRate": 469.7719626168224
+              },
+              "vit_base_image": {
+                "avgLatencyMs": 27.427,
+                "demandRate": 122.60061919504642,
+                "demandRatePolicy": "fixed_input_not_observed",
+                "demandRateSLOEvaluated": false,
+                "demandRateSLOViolated": false,
+                "errors": 0,
+                "latencySLOMs": 300,
+                "latencySLOViolated": false,
+                "latencySLOViolationSeconds": 0,
+                "latencyViolationCount": 0,
+                "maxLatencyMs": 42,
+                "requests": 337,
+                "sourceDemandRate": 122.60061919504642
+              }
+            },
+            "planName": "plan-live-v2-20261001t065220878695z-r08",
+            "sourceArrival": {
+              "gpt2_p512_o512": 0,
+              "gpt2_p64_o64": 0,
+              "llama_p1024_o128": 0,
+              "llama_p2048_o64": 0,
+              "resnet50_image": 57.53197095336495,
+              "vgg16_image": 469.7719626168224,
+              "vit_base_image": 122.60061919504642
+            },
+            "startedAt": "2026-10-01T07:02:06.122284728Z",
+            "targetArrival": {
+              "gpt2_p512_o512": 0,
+              "gpt2_p64_o64": 0,
+              "llama_p1024_o128": 0,
+              "llama_p2048_o64": 0,
+              "resnet50_image": 82.23661214667806,
+              "vgg16_image": 317.607476635514,
+              "vit_base_image": 122.60061919504642
+            }
+          }
+        },
+        "timestamps": {
+          "executorFinishedAt": "2026-10-01T07:02:08.774530089Z",
+          "executorStartedAt": "2026-10-01T07:02:06.089815556Z",
+          "finalValidationFinishedAt": "2026-10-01T07:02:08.76860884Z",
+          "finalValidationPassedAt": "2026-10-01T07:02:08.774529217Z",
+          "finalValidationStartedAt": "2026-10-01T07:02:06.701082512Z"
+        }
+      }
+    }
+  },
+  "registry": {
+    "apiVersion": "mig.or-sim.io/v1alpha1",
+    "kind": "PhysicalGpuRegistry",
+    "metadata": {
+      "creationTimestamp": "2026-07-09T20:36:19Z",
+      "generation": 2,
+      "labels": {
+        "app.kubernetes.io/name": "migrant-go"
+      },
+      "name": "default",
+      "namespace": "or-sim-exp",
+      "resourceVersion": "61759639",
+      "uid": "7b7f6249-da54-4ff3-ab32-55ac9f6c3e58"
+    },
+    "spec": {
+      "policy": {
+        "source": "cluster-state-manager"
+      }
+    },
+    "status": {
+      "activeQueue": [
+        "ampere-gpu1"
+      ],
+      "availableQueue": [
+        "ampere-gpu0",
+        "rtx1-worker-gpu0"
+      ],
+      "bindings": {
+        "ampere-gpu0": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 0,
+          "gpuIndex": 0,
+          "gpuUUID": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+          "gpuUuid": "GPU-565d962e-2b15-aaad-cbe0-97c5c4b447ac",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "ampere",
+          "nodeName": "ampere",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "ampere-gpu0",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        },
+        "ampere-gpu1": {
+          "activeLogicalGpuId": "0",
+          "availabilityReason": "logical_binding_active",
+          "canonicalLogicalGpuId": 0,
+          "cleanliness": "active",
+          "deviceIndex": 1,
+          "gpuIndex": 1,
+          "gpuUUID": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+          "gpuUuid": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+          "logicalBinding": {
+            "activeLogicalGpuId": "0",
+            "lastActionType": "finalize_logical_bindings",
+            "lastPlanName": "plan-live-v2-20261001t065220878695z-r07",
+            "logicalGpuId": "0",
+            "physicalGpuId": "ampere-gpu1",
+            "state": "active",
+            "updatedAt": "2026-10-01T07:01:04.405693344Z"
+          },
+          "logicalBindingSource": "ledger",
+          "logicalGpuId": 0,
+          "logicalMigSlots": [
+            {
+              "end": 1,
+              "profile": "1g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 0,
+              "uuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406"
+            },
+            {
+              "end": 2,
+              "profile": "1g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 1,
+              "uuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665"
+            },
+            {
+              "end": 4,
+              "profile": "2g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 2,
+              "uuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f"
+            },
+            {
+              "end": 8,
+              "profile": "3g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 4,
+              "uuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9"
+            }
+          ],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [
+            {
+              "end": 1,
+              "profile": "1g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 0,
+              "uuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406"
+            },
+            {
+              "end": 2,
+              "profile": "1g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 1,
+              "uuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665"
+            },
+            {
+              "end": 4,
+              "profile": "2g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 2,
+              "uuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f"
+            },
+            {
+              "end": 8,
+              "profile": "3g",
+              "source": "fast-mig-node-agent-provisional",
+              "start": 4,
+              "uuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9"
+            }
+          ],
+          "node": "ampere",
+          "nodeName": "ampere",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "ampere-gpu1",
+          "previousLogicalGpuId": "0",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [
+            {
+              "batchObservationSource": "runtime-metrics",
+              "batchSize": 1,
+              "configuredBatchSize": 1,
+              "deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+              "expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+              "model": "resnet50_image",
+              "outputTokens": 0,
+              "phase": "Running",
+              "pod": "resnet50-image-ampere-gpu1-s1-2-1g-runtime-7458d8dbdf-l7wcm",
+              "promptLen": 0,
+              "requestClass": "x",
+              "route": {
+                "acceptingNew": true,
+                "active": true,
+                "arrivalRate": 58.25,
+                "avgLatencyMs": 11.673,
+                "batchSize": 1,
+                "capacity": 176.875,
+                "deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+                "draining": false,
+                "endpoint": "http://115.145.135.205:10691",
+                "endpointAvgLatencyMs": 11.673,
+                "endpointInflight": 0,
+                "endpointRequests": 35863,
+                "errorRate": 0,
+                "errors": 0,
+                "expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+                "gpu": "ampere-gpu1",
+                "inflight": 0,
+                "profile": "1g",
+                "queued": 0,
+                "requests": 35863,
+                "runtime.avgLatencyMs": 6.942008331931474,
+                "runtime.batchSize": 1,
+                "runtime.errors": 0,
+                "runtime.migUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+                "runtime.requests": 8977,
+                "runtime.slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+                "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+                "runtimeMetricsAvailable": true,
+                "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+                "weight": 176.875
+              },
+              "runtimeModel": "resnet50",
+              "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g"
+            },
+            {
+              "batchObservationSource": "runtime-metrics",
+              "batchSize": 1,
+              "configuredBatchSize": 4,
+              "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+              "expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+              "model": "vgg16_image",
+              "outputTokens": 0,
+              "phase": "Running",
+              "pod": "vgg16-image-ampere-gpu1-s4-7-3g-runtime-589f56bc8d-ntllq",
+              "promptLen": 0,
+              "requestClass": "x",
+              "route": {
+                "acceptingNew": true,
+                "active": true,
+                "arrivalRate": 428.4667,
+                "avgLatencyMs": 10.828,
+                "batchSize": 1,
+                "capacity": 338.841,
+                "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                "draining": false,
+                "endpoint": "http://115.145.135.205:10694",
+                "endpointAvgLatencyMs": 10.828,
+                "endpointInflight": 2,
+                "endpointRequests": 714071,
+                "errorRate": 0,
+                "errors": 0,
+                "expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                "gpu": "ampere-gpu1",
+                "inflight": 2,
+                "profile": "3g",
+                "queued": 0,
+                "requests": 714071,
+                "runtime.avgLatencyMs": 6.071857277588491,
+                "runtime.batchSize": 1,
+                "runtime.errors": 0,
+                "runtime.migUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                "runtime.requests": 55022,
+                "runtime.slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+                "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+                "runtimeMetricsAvailable": true,
+                "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+                "weight": 338.841
+              },
+              "runtimeModel": "vgg16",
+              "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g"
+            },
+            {
+              "batchObservationSource": "runtime-metrics",
+              "batchSize": 1,
+              "configuredBatchSize": 1,
+              "deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+              "expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+              "model": "vit_base_image",
+              "outputTokens": 0,
+              "phase": "Running",
+              "pod": "vit-base-image-ampere-gpu1-s0-1-1g-runtime-77d794f98c-jrnd2",
+              "promptLen": 0,
+              "requestClass": "x",
+              "route": {
+                "acceptingNew": true,
+                "active": true,
+                "arrivalRate": 43.8667,
+                "avgLatencyMs": 38.822,
+                "batchSize": 1,
+                "capacity": 46.526,
+                "deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+                "draining": false,
+                "endpoint": "http://115.145.135.205:10689",
+                "endpointAvgLatencyMs": 38.822,
+                "endpointInflight": 2,
+                "endpointRequests": 11407,
+                "errorRate": 0,
+                "errors": 0,
+                "expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+                "gpu": "ampere-gpu1",
+                "inflight": 2,
+                "profile": "1g",
+                "queued": 0,
+                "requests": 11407,
+                "runtime.avgLatencyMs": 21.14765286962024,
+                "runtime.batchSize": 1,
+                "runtime.errors": 0,
+                "runtime.migUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+                "runtime.requests": 2730,
+                "runtime.slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+                "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+                "runtimeMetricsAvailable": true,
+                "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+                "weight": 46.526
+              },
+              "runtimeModel": "vit_base",
+              "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g"
+            },
+            {
+              "batchObservationSource": "runtime-metrics",
+              "batchSize": 1,
+              "configuredBatchSize": 1,
+              "deviceResource": "or-sim.io/mig-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+              "expectedMigUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+              "model": "vit_base_image",
+              "outputTokens": 0,
+              "phase": "Running",
+              "pod": "vit-base-image-ampere-gpu1-s2-4-2g-runtime-779d6b8c7b-p8rch",
+              "promptLen": 0,
+              "requestClass": "x",
+              "route": {
+                "acceptingNew": true,
+                "active": true,
+                "arrivalRate": 78.0833,
+                "avgLatencyMs": 22.106,
+                "batchSize": 1,
+                "capacity": 84.865,
+                "deviceResource": "or-sim.io/mig-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                "draining": false,
+                "endpoint": "http://115.145.135.205:10692",
+                "endpointAvgLatencyMs": 22.106,
+                "endpointInflight": 2,
+                "endpointRequests": 118785,
+                "errorRate": 0,
+                "errors": 0,
+                "expectedMigUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                "gpu": "ampere-gpu1",
+                "inflight": 2,
+                "profile": "2g",
+                "queued": 0,
+                "requests": 118785,
+                "runtime.avgLatencyMs": 11.193538520621487,
+                "runtime.batchSize": 1,
+                "runtime.errors": 0,
+                "runtime.migUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                "runtime.requests": 31166,
+                "runtime.slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+                "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+                "runtimeMetricsAvailable": true,
+                "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+                "weight": 84.865
+              },
+              "runtimeModel": "vit_base",
+              "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g"
+            }
+          ],
+          "state": "active"
+        },
+        "rtx1-worker-gpu0": {
+          "activeLogicalGpuId": null,
+          "availabilityReason": "empty",
+          "cleanliness": "empty",
+          "deviceIndex": 0,
+          "gpuIndex": 0,
+          "gpuUUID": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+          "gpuUuid": "GPU-03ca4983-f693-39d2-d7e0-25090fe07b2f",
+          "logicalBinding": {},
+          "logicalMigSlots": [],
+          "migCapable": true,
+          "migConfig": "",
+          "migConfigState": "",
+          "migDevices": [],
+          "node": "rtx1-worker",
+          "nodeName": "rtx1-worker",
+          "pendingLogicalGpuId": null,
+          "physicalGpuId": "rtx1-worker-gpu0",
+          "product": "NVIDIA A100-PCIE-40GB",
+          "repairPaused": false,
+          "requiredAction": "",
+          "runtimeBindings": [],
+          "state": "available"
+        }
+      },
+      "currentAllocation": {
+        "canonicalizedAt": "2026-10-01T07:02:07.834051358Z",
+        "format": "migrant.current-allocation/v1",
+        "freePhysicalGpuPool": [
+          "ampere-gpu0",
+          "rtx1-worker-gpu0"
+        ],
+        "gpus": {
+          "ampere-gpu1": {
+            "activeLogicalGpuId": "0",
+            "availabilityReason": "logical_binding_active",
+            "canonicalLogicalGpuId": 0,
+            "cleanliness": "active",
+            "deviceIndex": 1,
+            "gpuIndex": 1,
+            "gpuUUID": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+            "gpuUuid": "GPU-2f76cbca-88aa-4e8e-2fde-65765797dbbb",
+            "logicalBinding": {
+              "activeLogicalGpuId": "0",
+              "lastActionType": "finalize_logical_bindings",
+              "lastPlanName": "plan-live-v2-20261001t065220878695z-r07",
+              "logicalGpuId": "0",
+              "physicalGpuId": "ampere-gpu1",
+              "state": "active",
+              "updatedAt": "2026-10-01T07:01:04.405693344Z"
+            },
+            "logicalBindingSource": "ledger",
+            "logicalGpuId": 0,
+            "logicalMigSlots": [
+              {
+                "end": 1,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 0,
+                "uuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406"
+              },
+              {
+                "end": 2,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 1,
+                "uuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665"
+              },
+              {
+                "end": 4,
+                "profile": "2g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 2,
+                "uuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f"
+              },
+              {
+                "end": 8,
+                "profile": "3g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 4,
+                "uuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9"
+              }
+            ],
+            "migCapable": true,
+            "migConfig": "",
+            "migConfigState": "",
+            "migDevices": [
+              {
+                "end": 1,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 0,
+                "uuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406"
+              },
+              {
+                "end": 2,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 1,
+                "uuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665"
+              },
+              {
+                "end": 4,
+                "profile": "2g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 2,
+                "uuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f"
+              },
+              {
+                "end": 8,
+                "profile": "3g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 4,
+                "uuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9"
+              }
+            ],
+            "node": "ampere",
+            "nodeName": "ampere",
+            "pendingLogicalGpuId": null,
+            "physicalGpuId": "ampere-gpu1",
+            "previousLogicalGpuId": "0",
+            "product": "NVIDIA A100-PCIE-40GB",
+            "repairPaused": false,
+            "requiredAction": "",
+            "runtimeBindings": [
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+                "expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+                "model": "resnet50_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "resnet50-image-ampere-gpu1-s1-2-1g-runtime-7458d8dbdf-l7wcm",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 58.25,
+                  "avgLatencyMs": 11.673,
+                  "batchSize": 1,
+                  "capacity": 176.875,
+                  "deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10691",
+                  "endpointAvgLatencyMs": 11.673,
+                  "endpointInflight": 0,
+                  "endpointRequests": 35863,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+                  "gpu": "ampere-gpu1",
+                  "inflight": 0,
+                  "profile": "1g",
+                  "queued": 0,
+                  "requests": 35863,
+                  "runtime.avgLatencyMs": 6.942008331931474,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+                  "runtime.requests": 8977,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+                  "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+                  "weight": 176.875
+                },
+                "runtimeModel": "resnet50",
+                "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 4,
+                "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                "expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                "model": "vgg16_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "vgg16-image-ampere-gpu1-s4-7-3g-runtime-589f56bc8d-ntllq",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 428.4667,
+                  "avgLatencyMs": 10.828,
+                  "batchSize": 1,
+                  "capacity": 338.841,
+                  "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10694",
+                  "endpointAvgLatencyMs": 10.828,
+                  "endpointInflight": 2,
+                  "endpointRequests": 714071,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                  "gpu": "ampere-gpu1",
+                  "inflight": 2,
+                  "profile": "3g",
+                  "queued": 0,
+                  "requests": 714071,
+                  "runtime.avgLatencyMs": 6.071857277588491,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                  "runtime.requests": 55022,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+                  "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+                  "weight": 338.841
+                },
+                "runtimeModel": "vgg16",
+                "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+                "expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+                "model": "vit_base_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "vit-base-image-ampere-gpu1-s0-1-1g-runtime-77d794f98c-jrnd2",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 43.8667,
+                  "avgLatencyMs": 38.822,
+                  "batchSize": 1,
+                  "capacity": 46.526,
+                  "deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10689",
+                  "endpointAvgLatencyMs": 38.822,
+                  "endpointInflight": 2,
+                  "endpointRequests": 11407,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+                  "gpu": "ampere-gpu1",
+                  "inflight": 2,
+                  "profile": "1g",
+                  "queued": 0,
+                  "requests": 11407,
+                  "runtime.avgLatencyMs": 21.14765286962024,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+                  "runtime.requests": 2730,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+                  "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+                  "weight": 46.526
+                },
+                "runtimeModel": "vit_base",
+                "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                "expectedMigUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                "model": "vit_base_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "vit-base-image-ampere-gpu1-s2-4-2g-runtime-779d6b8c7b-p8rch",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 78.0833,
+                  "avgLatencyMs": 22.106,
+                  "batchSize": 1,
+                  "capacity": 84.865,
+                  "deviceResource": "or-sim.io/mig-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10692",
+                  "endpointAvgLatencyMs": 22.106,
+                  "endpointInflight": 2,
+                  "endpointRequests": 118785,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                  "gpu": "ampere-gpu1",
+                  "inflight": 2,
+                  "profile": "2g",
+                  "queued": 0,
+                  "requests": 118785,
+                  "runtime.avgLatencyMs": 11.193538520621487,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                  "runtime.requests": 31166,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+                  "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+                  "weight": 84.865
+                },
+                "runtimeModel": "vit_base",
+                "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g"
+              }
+            ],
+            "state": "active"
+          }
+        },
+        "logicalGpuCount": 1,
+        "logicalGpus": [
+          {
+            "canonicalLogicalGpuId": 0,
+            "cleanliness": "active",
+            "gpuIndex": 1,
+            "layout": "1g+1g+2g+3g",
+            "logicalBindingSource": "ledger",
+            "logicalGpuId": 0,
+            "migDevices": [
+              {
+                "end": 1,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 0,
+                "uuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406"
+              },
+              {
+                "end": 2,
+                "profile": "1g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 1,
+                "uuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665"
+              },
+              {
+                "end": 4,
+                "profile": "2g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 2,
+                "uuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f"
+              },
+              {
+                "end": 8,
+                "profile": "3g",
+                "source": "fast-mig-node-agent-provisional",
+                "start": 4,
+                "uuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9"
+              }
+            ],
+            "node": "ampere",
+            "physicalGpuId": "ampere-gpu1",
+            "previousLogicalGpuId": "0",
+            "runtimeBindings": [
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+                "expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+                "model": "resnet50_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "resnet50-image-ampere-gpu1-s1-2-1g-runtime-7458d8dbdf-l7wcm",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 58.25,
+                  "avgLatencyMs": 11.673,
+                  "batchSize": 1,
+                  "capacity": 176.875,
+                  "deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10691",
+                  "endpointAvgLatencyMs": 11.673,
+                  "endpointInflight": 0,
+                  "endpointRequests": 35863,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+                  "gpu": "ampere-gpu1",
+                  "inflight": 0,
+                  "profile": "1g",
+                  "queued": 0,
+                  "requests": 35863,
+                  "runtime.avgLatencyMs": 6.942008331931474,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+                  "runtime.requests": 8977,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+                  "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+                  "weight": 176.875
+                },
+                "runtimeModel": "resnet50",
+                "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 4,
+                "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                "expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                "model": "vgg16_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "vgg16-image-ampere-gpu1-s4-7-3g-runtime-589f56bc8d-ntllq",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 428.4667,
+                  "avgLatencyMs": 10.828,
+                  "batchSize": 1,
+                  "capacity": 338.841,
+                  "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10694",
+                  "endpointAvgLatencyMs": 10.828,
+                  "endpointInflight": 2,
+                  "endpointRequests": 714071,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                  "gpu": "ampere-gpu1",
+                  "inflight": 2,
+                  "profile": "3g",
+                  "queued": 0,
+                  "requests": 714071,
+                  "runtime.avgLatencyMs": 6.071857277588491,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+                  "runtime.requests": 55022,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+                  "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+                  "weight": 338.841
+                },
+                "runtimeModel": "vgg16",
+                "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+                "expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+                "model": "vit_base_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "vit-base-image-ampere-gpu1-s0-1-1g-runtime-77d794f98c-jrnd2",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 43.8667,
+                  "avgLatencyMs": 38.822,
+                  "batchSize": 1,
+                  "capacity": 46.526,
+                  "deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10689",
+                  "endpointAvgLatencyMs": 38.822,
+                  "endpointInflight": 2,
+                  "endpointRequests": 11407,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+                  "gpu": "ampere-gpu1",
+                  "inflight": 2,
+                  "profile": "1g",
+                  "queued": 0,
+                  "requests": 11407,
+                  "runtime.avgLatencyMs": 21.14765286962024,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+                  "runtime.requests": 2730,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+                  "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+                  "weight": 46.526
+                },
+                "runtimeModel": "vit_base",
+                "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g"
+              },
+              {
+                "batchObservationSource": "runtime-metrics",
+                "batchSize": 1,
+                "configuredBatchSize": 1,
+                "deviceResource": "or-sim.io/mig-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                "expectedMigUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                "model": "vit_base_image",
+                "outputTokens": 0,
+                "phase": "Running",
+                "pod": "vit-base-image-ampere-gpu1-s2-4-2g-runtime-779d6b8c7b-p8rch",
+                "promptLen": 0,
+                "requestClass": "x",
+                "route": {
+                  "acceptingNew": true,
+                  "active": true,
+                  "arrivalRate": 78.0833,
+                  "avgLatencyMs": 22.106,
+                  "batchSize": 1,
+                  "capacity": 84.865,
+                  "deviceResource": "or-sim.io/mig-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                  "draining": false,
+                  "endpoint": "http://115.145.135.205:10692",
+                  "endpointAvgLatencyMs": 22.106,
+                  "endpointInflight": 2,
+                  "endpointRequests": 118785,
+                  "errorRate": 0,
+                  "errors": 0,
+                  "expectedMigUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                  "gpu": "ampere-gpu1",
+                  "inflight": 2,
+                  "profile": "2g",
+                  "queued": 0,
+                  "requests": 118785,
+                  "runtime.avgLatencyMs": 11.193538520621487,
+                  "runtime.batchSize": 1,
+                  "runtime.errors": 0,
+                  "runtime.migUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+                  "runtime.requests": 31166,
+                  "runtime.slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+                  "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+                  "runtimeMetricsAvailable": true,
+                  "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+                  "weight": 84.865
+                },
+                "runtimeModel": "vit_base",
+                "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g"
+              }
+            ],
+            "state": "active"
+          }
+        ],
+        "metadata": {
+          "canonical_observed_physical_map": {},
+          "logical_id_map": {
+            "0": 0
+          },
+          "physical_id_map": {
+            "0": "ampere-gpu1"
+          }
+        },
+        "source": "cluster-state-manager"
+      },
+      "health": {
+        "observedAt": "2026-10-01T07:02:07.834061487Z",
+        "queueCounts": {
+          "active": 1,
+          "available": 2,
+          "transitioning": 0
+        },
+        "reasons": [],
+        "repairRequired": false,
+        "requiredActions": [],
+        "stable": true
+      },
+      "logicalBindingLedger": {
+        "available": true,
+        "bindings": {
+          "ampere-gpu1": {
+            "activeLogicalGpuId": "0",
+            "lastActionType": "finalize_logical_bindings",
+            "lastPlanName": "plan-live-v2-20261001t065220878695z-r07",
+            "logicalGpuId": "0",
+            "physicalGpuId": "ampere-gpu1",
+            "state": "active",
+            "updatedAt": "2026-10-01T07:01:04.405693344Z"
+          }
+        },
+        "lastPlanName": "plan-live-v2-20261001t065220878695z-r07",
+        "updatedAt": "2026-10-01T07:01:04.405693344Z",
+        "version": "migrant.logical-binding-ledger/v1"
+      },
+      "observedAt": "2026-10-01T07:02:07.854050846Z",
+      "phase": "Observed",
+      "profileCalibrationOverlay": {
+        "available": true,
+        "generatedAt": "2026-10-01T07:02:07.120066822Z",
+        "observations": [
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "llama_p2048_o64",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 1179,
+            "sampleCount": 1179,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 0,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "gpt2_p64_o64",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 2067,
+            "sampleCount": 2067,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 428.4667,
+            "avgLatencyMs": 10.825,
+            "batchSize": 1,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10694",
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "inflight": 18,
+            "maxLatencyMs": 138,
+            "model": "vgg16_image",
+            "p95LatencyMs": 14,
+            "profile": "3g",
+            "queued": 0,
+            "requests": 4089081,
+            "runtime.avgLatencyMs": 6.064293902713056,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 2.7464001178741455,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "runtime.model": "vgg16",
+            "runtime.requests": 55149,
+            "runtime.runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+            "runtime.runtimeLatencyMs": 6.00050427308465,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 166.65266025815774,
+            "runtime.slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+            "runtime.torchvisionModel": "vgg16",
+            "runtime.weightsMode": "default",
+            "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+            "runtimeMetricsAvailable": true,
+            "sampleCount": 4089081,
+            "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+            "windowErrors": 0,
+            "windowRequests": 25708
+          },
+          {
+            "arrivalRate": 121.9,
+            "avgLatencyMs": 28.116,
+            "batchSize": 1,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10689",
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+            "inflight": 5,
+            "maxLatencyMs": 210,
+            "model": "vit_base_image",
+            "p95LatencyMs": 43,
+            "profile": "1g",
+            "queued": 0,
+            "requests": 974162,
+            "runtime.avgLatencyMs": 21.14765286962024,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 21.036447525024414,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+            "runtime.model": "vit_base",
+            "runtime.requests": 2730,
+            "runtime.runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+            "runtime.runtimeLatencyMs": 21.09834726913508,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 47.39707746980291,
+            "runtime.slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+            "runtime.torchvisionModel": "vit_b_16",
+            "runtime.weightsMode": "default",
+            "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+            "runtimeMetricsAvailable": true,
+            "sampleCount": 974162,
+            "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+            "windowErrors": 0,
+            "windowRequests": 7316
+          },
+          {
+            "arrivalRate": 58.2833,
+            "avgLatencyMs": 11.674,
+            "batchSize": 1,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10691",
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+            "inflight": 3,
+            "maxLatencyMs": 160,
+            "model": "resnet50_image",
+            "p95LatencyMs": 16,
+            "profile": "1g",
+            "queued": 0,
+            "requests": 1257223,
+            "runtime.avgLatencyMs": 6.942616442280186,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 6.512671947479248,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+            "runtime.model": "resnet50",
+            "runtime.requests": 8987,
+            "runtime.runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+            "runtime.runtimeLatencyMs": 6.878570113336468,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 145.37905168127267,
+            "runtime.slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+            "runtime.torchvisionModel": "resnet50",
+            "runtime.weightsMode": "default",
+            "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+            "runtimeMetricsAvailable": true,
+            "sampleCount": 1257223,
+            "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+            "windowErrors": 0,
+            "windowRequests": 3495
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 6,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "llama_p1024_o128",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 1821,
+            "sampleCount": 1821,
+            "windowErrors": 0,
+            "windowRequests": 0
+          },
+          {
+            "arrivalRate": 0,
+            "avgLatencyMs": 0,
+            "confidence": "high",
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "errorRate": 0,
+            "errors": 2,
+            "inflight": 0,
+            "maxLatencyMs": 0,
+            "model": "gpt2_p512_o512",
+            "p95LatencyMs": 0,
+            "queued": 0,
+            "requests": 805,
+            "sampleCount": 805,
+            "windowErrors": 0,
+            "windowRequests": 0
+          }
+        ]
+      },
+      "queueCounts": {
+        "active": 1,
+        "available": 2,
+        "transitioning": 0
+      },
+      "routingState": {
+        "available": true,
+        "generatedAt": "2026-10-01T07:02:07.099533064Z",
+        "routes": [
+          {
+            "acceptingNew": true,
+            "active": true,
+            "arrivalRate": 58.25,
+            "avgLatencyMs": 11.673,
+            "batchSize": 1,
+            "capacity": 176.875,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+            "draining": false,
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10691",
+            "endpointAvgLatencyMs": 11.673,
+            "endpointInflight": 0,
+            "endpointQueued": 0,
+            "endpointRequests": 35863,
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+            "gpu": "ampere-gpu1",
+            "inflight": 0,
+            "maxLatencyMs": 160,
+            "model": "resnet50_image",
+            "modelArrivalRate": 58.25,
+            "networkOverheadMs": 4.795,
+            "p95LatencyMs": 16,
+            "profile": "1g",
+            "queued": 0,
+            "requests": 35863,
+            "runtime.avgLatencyMs": 6.942008331931474,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 6.471968173980713,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+            "runtime.model": "resnet50",
+            "runtime.requests": 8977,
+            "runtime.runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+            "runtime.runtimeLatencyMs": 6.877968890398452,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 145.3917596800977,
+            "runtime.slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+            "runtime.torchvisionModel": "resnet50",
+            "runtime.weightsMode": "default",
+            "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+            "runtimeMetricsAvailable": true,
+            "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+            "weight": 176.875,
+            "windowErrors": 0,
+            "windowRequests": 3496
+          },
+          {
+            "acceptingNew": true,
+            "active": true,
+            "arrivalRate": 428.4667,
+            "avgLatencyMs": 10.828,
+            "batchSize": 1,
+            "capacity": 338.841,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "draining": false,
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10694",
+            "endpointAvgLatencyMs": 10.828,
+            "endpointInflight": 2,
+            "endpointQueued": 15,
+            "endpointRequests": 714071,
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "gpu": "ampere-gpu1",
+            "inflight": 2,
+            "maxLatencyMs": 138,
+            "model": "vgg16_image",
+            "modelArrivalRate": 428.5667,
+            "networkOverheadMs": 4.82,
+            "p95LatencyMs": 14,
+            "profile": "3g",
+            "queued": 0,
+            "requests": 714071,
+            "runtime.avgLatencyMs": 6.071857277588491,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 2.7175040245056152,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+            "runtime.model": "vgg16",
+            "runtime.requests": 55022,
+            "runtime.runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+            "runtime.runtimeLatencyMs": 6.008055199076992,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 166.44321113321803,
+            "runtime.slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+            "runtime.torchvisionModel": "vgg16",
+            "runtime.weightsMode": "default",
+            "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+            "runtimeMetricsAvailable": true,
+            "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+            "weight": 338.841,
+            "windowErrors": 0,
+            "windowRequests": 25714
+          },
+          {
+            "acceptingNew": true,
+            "active": true,
+            "arrivalRate": 43.8667,
+            "avgLatencyMs": 38.822,
+            "batchSize": 1,
+            "capacity": 46.526,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+            "draining": false,
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10689",
+            "endpointAvgLatencyMs": 38.822,
+            "endpointInflight": 2,
+            "endpointQueued": 0,
+            "endpointRequests": 11407,
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+            "gpu": "ampere-gpu1",
+            "inflight": 2,
+            "maxLatencyMs": 210,
+            "model": "vit_base_image",
+            "modelArrivalRate": 121.8833,
+            "networkOverheadMs": 17.724,
+            "p95LatencyMs": 44,
+            "profile": "1g",
+            "queued": 0,
+            "requests": 11407,
+            "runtime.avgLatencyMs": 21.14765286962024,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 21.036447525024414,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+            "runtime.model": "vit_base",
+            "runtime.requests": 2730,
+            "runtime.runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+            "runtime.runtimeLatencyMs": 21.09834726913508,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 47.39707746980291,
+            "runtime.slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+            "runtime.torchvisionModel": "vit_b_16",
+            "runtime.weightsMode": "default",
+            "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+            "runtimeMetricsAvailable": true,
+            "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+            "weight": 46.526,
+            "windowErrors": 0,
+            "windowRequests": 2632
+          },
+          {
+            "acceptingNew": true,
+            "active": true,
+            "arrivalRate": 78.0833,
+            "avgLatencyMs": 22.106,
+            "batchSize": 1,
+            "capacity": 84.865,
+            "demandRatePolicy": "fixed_input_not_observed",
+            "demandRateViolated": false,
+            "deviceResource": "or-sim.io/mig-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+            "draining": false,
+            "driverBatchSize": 1,
+            "endpoint": "http://115.145.135.205:10692",
+            "endpointAvgLatencyMs": 22.106,
+            "endpointInflight": 2,
+            "endpointQueued": 1,
+            "endpointRequests": 118785,
+            "errorRate": 0,
+            "errors": 0,
+            "expectedMigUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+            "gpu": "ampere-gpu1",
+            "inflight": 2,
+            "maxLatencyMs": 186,
+            "model": "vit_base_image",
+            "modelArrivalRate": 121.8833,
+            "networkOverheadMs": 10.964,
+            "p95LatencyMs": 24,
+            "profile": "2g",
+            "queued": 0,
+            "requests": 118785,
+            "runtime.avgLatencyMs": 11.193538520621487,
+            "runtime.batchSize": 1,
+            "runtime.device": "cuda",
+            "runtime.deviceResource": "or-sim.io/mig-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+            "runtime.errors": 0,
+            "runtime.expectedMigUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+            "runtime.imageSize": 224,
+            "runtime.lastRuntimeLatencyMs": 11.437055587768555,
+            "runtime.loadError": "",
+            "runtime.loaded": true,
+            "runtime.migUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+            "runtime.model": "vit_base",
+            "runtime.requests": 31166,
+            "runtime.runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+            "runtime.runtimeLatencyMs": 11.14225300042427,
+            "runtime.runtimeMode": "torchvision",
+            "runtime.runtimeThroughput": 89.74845571734213,
+            "runtime.slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+            "runtime.torchvisionModel": "vit_b_16",
+            "runtime.weightsMode": "default",
+            "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+            "runtimeMetricsAvailable": true,
+            "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+            "weight": 84.865,
+            "windowErrors": 0,
+            "windowRequests": 4685
+          }
+        ]
+      },
+      "transitioningQueue": []
+    }
+  },
+  "routes": {
+    "generatedAt": "2026-10-01T07:02:09.203475072Z",
+    "routes": [
+      {
+        "acceptingNew": true,
+        "active": true,
+        "arrivalRate": 58.1,
+        "avgLatencyMs": 11.662,
+        "batchSize": 1,
+        "capacity": 176.875,
+        "demandRatePolicy": "fixed_input_not_observed",
+        "demandRateViolated": false,
+        "deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+        "draining": false,
+        "driverBatchSize": 1,
+        "endpoint": "http://115.145.135.205:10691",
+        "endpointAvgLatencyMs": 11.662,
+        "endpointInflight": 0,
+        "endpointQueued": 0,
+        "endpointRequests": 35981,
+        "errorRate": 0,
+        "errors": 0,
+        "expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+        "gpu": "ampere-gpu1",
+        "inflight": 0,
+        "maxLatencyMs": 160,
+        "model": "resnet50_image",
+        "modelArrivalRate": 58.1,
+        "networkOverheadMs": 4.78,
+        "p95LatencyMs": 16,
+        "profile": "1g",
+        "queued": 0,
+        "requests": 35981,
+        "runtime.avgLatencyMs": 6.9464179849668755,
+        "runtime.batchSize": 1,
+        "runtime.device": "cuda",
+        "runtime.deviceResource": "or-sim.io/mig-6743f82e-c561-5af9-911d-99366eb16665",
+        "runtime.errors": 0,
+        "runtime.expectedMigUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+        "runtime.imageSize": 224,
+        "runtime.lastRuntimeLatencyMs": 6.4897918701171875,
+        "runtime.loadError": "",
+        "runtime.loaded": true,
+        "runtime.migUuid": "MIG-6743f82e-c561-5af9-911d-99366eb16665",
+        "runtime.model": "resnet50",
+        "runtime.requests": 9093,
+        "runtime.runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+        "runtime.runtimeLatencyMs": 6.88229911633874,
+        "runtime.runtimeMode": "torchvision",
+        "runtime.runtimeThroughput": 145.300281649482,
+        "runtime.slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+        "runtime.torchvisionModel": "resnet50",
+        "runtime.weightsMode": "default",
+        "runtimeId": "resnet50-image-ampere-gpu1-s1-2-1g",
+        "runtimeMetricsAvailable": true,
+        "slotResource": "or-sim.io/ampere-gpu1-s1-2-1g",
+        "weight": 176.875,
+        "windowErrors": 0,
+        "windowRequests": 3486
+      },
+      {
+        "acceptingNew": true,
+        "active": true,
+        "arrivalRate": 423.2667,
+        "avgLatencyMs": 10.676,
+        "batchSize": 1,
+        "capacity": 338.841,
+        "demandRatePolicy": "fixed_input_not_observed",
+        "demandRateViolated": false,
+        "deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+        "draining": false,
+        "driverBatchSize": 1,
+        "endpoint": "http://115.145.135.205:10694",
+        "endpointAvgLatencyMs": 10.676,
+        "endpointInflight": 2,
+        "endpointQueued": 8,
+        "endpointRequests": 714728,
+        "errorRate": 0,
+        "errors": 0,
+        "expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+        "gpu": "ampere-gpu1",
+        "inflight": 2,
+        "maxLatencyMs": 138,
+        "model": "vgg16_image",
+        "modelArrivalRate": 423.3833,
+        "networkOverheadMs": 4.707,
+        "p95LatencyMs": 14,
+        "profile": "3g",
+        "queued": 0,
+        "requests": 714728,
+        "runtime.avgLatencyMs": 6.032793613041116,
+        "runtime.batchSize": 1,
+        "runtime.device": "cuda",
+        "runtime.deviceResource": "or-sim.io/mig-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+        "runtime.errors": 0,
+        "runtime.expectedMigUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+        "runtime.imageSize": 224,
+        "runtime.lastRuntimeLatencyMs": 2.725696086883545,
+        "runtime.loadError": "",
+        "runtime.loaded": true,
+        "runtime.migUuid": "MIG-d58ca0e3-8e23-5fab-8c7c-77f3888693a9",
+        "runtime.model": "vgg16",
+        "runtime.requests": 55680,
+        "runtime.runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+        "runtime.runtimeLatencyMs": 5.969054219798966,
+        "runtime.runtimeMode": "torchvision",
+        "runtime.runtimeThroughput": 167.53072818187255,
+        "runtime.slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+        "runtime.torchvisionModel": "vgg16",
+        "runtime.weightsMode": "default",
+        "runtimeId": "vgg16-image-ampere-gpu1-s4-7-3g",
+        "runtimeMetricsAvailable": true,
+        "slotResource": "or-sim.io/ampere-gpu1-s4-8-3g",
+        "weight": 338.841,
+        "windowErrors": 0,
+        "windowRequests": 25394
+      },
+      {
+        "acceptingNew": true,
+        "active": true,
+        "arrivalRate": 43.8333,
+        "avgLatencyMs": 38.609,
+        "batchSize": 1,
+        "capacity": 46.526,
+        "demandRatePolicy": "fixed_input_not_observed",
+        "demandRateViolated": false,
+        "deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+        "draining": false,
+        "driverBatchSize": 1,
+        "endpoint": "http://115.145.135.205:10689",
+        "endpointAvgLatencyMs": 38.609,
+        "endpointInflight": 2,
+        "endpointQueued": 1,
+        "endpointRequests": 11500,
+        "errorRate": 0,
+        "errors": 0,
+        "expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+        "gpu": "ampere-gpu1",
+        "inflight": 2,
+        "maxLatencyMs": 210,
+        "model": "vit_base_image",
+        "modelArrivalRate": 121.8667,
+        "networkOverheadMs": 17.516,
+        "p95LatencyMs": 44,
+        "profile": "1g",
+        "queued": 0,
+        "requests": 11500,
+        "runtime.avgLatencyMs": 21.142181624949423,
+        "runtime.batchSize": 1,
+        "runtime.device": "cuda",
+        "runtime.deviceResource": "or-sim.io/mig-183fa215-464e-5359-9394-6bca2fef6406",
+        "runtime.errors": 0,
+        "runtime.expectedMigUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+        "runtime.imageSize": 224,
+        "runtime.lastRuntimeLatencyMs": 21.023136138916016,
+        "runtime.loadError": "",
+        "runtime.loaded": true,
+        "runtime.migUuid": "MIG-183fa215-464e-5359-9394-6bca2fef6406",
+        "runtime.model": "vit_base",
+        "runtime.requests": 2821,
+        "runtime.runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+        "runtime.runtimeLatencyMs": 21.092929828593764,
+        "runtime.runtimeMode": "torchvision",
+        "runtime.runtimeThroughput": 47.409250783378184,
+        "runtime.slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+        "runtime.torchvisionModel": "vit_b_16",
+        "runtime.weightsMode": "default",
+        "runtimeId": "vit-base-image-ampere-gpu1-s0-1-1g",
+        "runtimeMetricsAvailable": true,
+        "slotResource": "or-sim.io/ampere-gpu1-s0-1-1g",
+        "weight": 46.526,
+        "windowErrors": 0,
+        "windowRequests": 2628
+      },
+      {
+        "acceptingNew": true,
+        "active": true,
+        "arrivalRate": 77.9833,
+        "avgLatencyMs": 22.034,
+        "batchSize": 1,
+        "capacity": 84.865,
+        "demandRatePolicy": "fixed_input_not_observed",
+        "demandRateViolated": false,
+        "deviceResource": "or-sim.io/mig-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+        "draining": false,
+        "driverBatchSize": 1,
+        "endpoint": "http://115.145.135.205:10692",
+        "endpointAvgLatencyMs": 22.034,
+        "endpointInflight": 2,
+        "endpointQueued": 3,
+        "endpointRequests": 118954,
+        "errorRate": 0,
+        "errors": 0,
+        "expectedMigUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+        "gpu": "ampere-gpu1",
+        "inflight": 2,
+        "maxLatencyMs": 186,
+        "model": "vit_base_image",
+        "modelArrivalRate": 121.8667,
+        "networkOverheadMs": 10.89,
+        "p95LatencyMs": 24,
+        "profile": "2g",
+        "queued": 0,
+        "requests": 118954,
+        "runtime.avgLatencyMs": 11.194797053764047,
+        "runtime.batchSize": 1,
+        "runtime.device": "cuda",
+        "runtime.deviceResource": "or-sim.io/mig-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+        "runtime.errors": 0,
+        "runtime.expectedMigUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+        "runtime.imageSize": 224,
+        "runtime.lastRuntimeLatencyMs": 11.438431739807129,
+        "runtime.loadError": "",
+        "runtime.loaded": true,
+        "runtime.migUuid": "MIG-b827d67e-6f77-5e3c-b36f-678866e61a1f",
+        "runtime.model": "vit_base",
+        "runtime.requests": 31333,
+        "runtime.runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+        "runtime.runtimeLatencyMs": 11.14354246812361,
+        "runtime.runtimeMode": "torchvision",
+        "runtime.runtimeThroughput": 89.73807053372173,
+        "runtime.slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+        "runtime.torchvisionModel": "vit_b_16",
+        "runtime.weightsMode": "default",
+        "runtimeId": "vit-base-image-ampere-gpu1-s2-4-2g",
+        "runtimeMetricsAvailable": true,
+        "slotResource": "or-sim.io/ampere-gpu1-s2-4-2g",
+        "weight": 84.865,
+        "windowErrors": 0,
+        "windowRequests": 4677
+      }
+    ]
+  }
+}
