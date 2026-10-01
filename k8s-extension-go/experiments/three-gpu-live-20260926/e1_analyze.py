@@ -37,6 +37,10 @@ Outputs:
   min_ratio.csv                  per workload: min over transitions of the
       throughput / commitment ratio (vision: min per-second completed /
       commitment inside transition windows; llm: completed / offered)
+  slo_margin_summary.csv         per window x workload over all rounds: the
+      catalog SLO, the request-weighted margin the router-adjusted criterion
+      adds (p10 / p50 / p90, and its fill / compute terms) and the late
+      fractions against the adjusted and the unadjusted SLO
   makespan_window_metrics.csv    per round x workload x window: "makespan" =
       requests sent while the cluster was changing (first action start to
       last action end of the round's plan; the sender switches to the
@@ -232,7 +236,15 @@ def plan_makespan_bounds(run: Path, rounds: list[int]) -> dict[int, tuple[float,
 ROUTER_RTT_MS = 2.0
 
 
-def makespan_window_metrics(run: Path, requests: list[dict], slo: dict, token_slo: dict) -> list[dict]:
+def quantile(values: list[float], q: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    return round(ordered[int(q * (len(ordered) - 1))], 3)
+
+
+def makespan_window_metrics(run: Path, requests: list[dict], slo: dict, token_slo: dict,
+                            pooled: dict | None = None) -> list[dict]:
     """Per round x workload x window (makespan, steady): every offered request
     is exactly one of on time, late (completed over the router-adjusted SLO),
     failed by outage (404) or failed by overload (sender pending bound).
@@ -245,7 +257,15 @@ def makespan_window_metrics(run: Path, requests: list[dict], slo: dict, token_sl
     completion rate in the window and the compute time its median.  LLM
     replicas run one request at a time: TTFT threshold = TTFT SLO + round
     trip, TPOT threshold = TPOT SLO.  over_slo_profile_basis counts completed
-    requests whose compute time alone exceeds the SLO (the planner's check)."""
+    requests whose compute time alone exceeds the SLO (the planner's check).
+    late_unadjusted counts completed requests over the catalog SLO itself
+    (vision: client end-to-end latency > SLO; LLM: client TTFT > TTFT SLO or
+    TPOT > TPOT SLO).  slo_added_ms_* is the request-weighted distribution of
+    threshold - SLO over completed requests (vision: fill + compute + round
+    trip; LLM: the round trip added to the TTFT SLO, TPOT gets nothing);
+    slo_added_fill_ms_p50 / slo_added_compute_ms_p50 are its vision terms.
+    If pooled is given, it collects per (window, workload) one tuple per
+    completed request: (added, fill, compute, late, late_unadjusted)."""
     rounds = sorted({r["live_round"] for r in requests if r.get("live_round")})
     mbounds = plan_makespan_bounds(run, rounds)
     sbounds = {}
@@ -280,6 +300,7 @@ def makespan_window_metrics(run: Path, requests: list[dict], slo: dict, token_sl
             if r.get("status") == "success":
                 replica[json.loads(r["response_json"]).get("runtimeId", "")].append(r)
         threshold: dict[str, float] = {}
+        terms: dict[str, tuple[float, float]] = {}
         for rid, done in replica.items():
             responses = [json.loads(r["response_json"]) for r in done]
             batch = int(max(x.get("maxBatchSize") or 1 for x in responses))
@@ -287,7 +308,9 @@ def makespan_window_metrics(run: Path, requests: list[dict], slo: dict, token_sl
             lam = len(done) / span_s if span_s > 0 else 0.0
             fill = (batch - 1) / lam * 1000.0 if batch > 1 and lam > 0 else 0.0
             threshold[rid] = slo[workload] + fill + compute + ROUTER_RTT_MS
-        on_time = late = outage = overload = other = profile_over = 0
+            terms[rid] = (fill, compute)
+        on_time = late = outage = overload = other = profile_over = late_unadjusted = 0
+        added, added_fill, added_compute = [], [], []
         outage_sent = []
         for r, sent in items:
             error = r.get("error") or ""
@@ -295,12 +318,26 @@ def makespan_window_metrics(run: Path, requests: list[dict], slo: dict, token_sl
                 x = json.loads(r["response_json"])
                 if workload in VISION:
                     e2e = (float(r["completion"]) - float(r["actual_send"])) * 1000.0
-                    ok = e2e <= threshold[x.get("runtimeId", "")]
+                    rid = x.get("runtimeId", "")
+                    ok = e2e <= threshold[rid]
+                    late_unadjusted += e2e > slo[workload]
+                    added.append(threshold[rid] - slo[workload])
+                    added_fill.append(terms[rid][0])
+                    added_compute.append(terms[rid][1])
+                    if pooled is not None:
+                        pooled.setdefault((window, workload), []).append(
+                            (added[-1], terms[rid][0], terms[rid][1], not ok, e2e > slo[workload]))
                     profile_over += float(x.get("runtimeLatencyMs") or 0.0) > slo[workload]
                 else:
                     tokens = llm_token_latency_ms(r)
                     ttft_slo, tpot_slo = token_slo[workload]
                     ok = tokens is not None and tokens[0] <= ttft_slo + ROUTER_RTT_MS and tokens[1] <= tpot_slo
+                    late_unadjusted += tokens is None or tokens[0] > ttft_slo or tokens[1] > tpot_slo
+                    added.append(ROUTER_RTT_MS)
+                    if pooled is not None:
+                        pooled.setdefault((window, workload), []).append(
+                            (ROUTER_RTT_MS, 0.0, 0.0, not ok,
+                             tokens is None or tokens[0] > ttft_slo or tokens[1] > tpot_slo))
                     profile_over += float(x.get("ttftMs") or 0.0) > ttft_slo or float(x.get("tpotMs") or 0.0) > tpot_slo
                 on_time += ok
                 late += not ok
@@ -323,6 +360,11 @@ def makespan_window_metrics(run: Path, requests: list[dict], slo: dict, token_sl
             "over_slo_profile_basis_of_completed": round(profile_over / completed, 4) if completed else None,
             "outage_span_s": round(max(outage_sent) - min(outage_sent), 3) if outage_sent else None,
             "no_op": False,
+            "late_unadjusted": late_unadjusted,
+            "late_fraction_unadjusted_of_completed": round(late_unadjusted / completed, 4) if completed else None,
+            "slo_added_ms_p10": quantile(added, 0.1), "slo_added_ms_p50": quantile(added, 0.5),
+            "slo_added_ms_p90": quantile(added, 0.9),
+            "slo_added_fill_ms_p50": quantile(added_fill, 0.5), "slo_added_compute_ms_p50": quantile(added_compute, 0.5),
         })
     # A round whose demand the current layout already covers has no actions:
     # no makespan window, so nothing is offered during a transition and
@@ -341,6 +383,9 @@ def makespan_window_metrics(run: Path, requests: list[dict], slo: dict, token_sl
                 "failed_outage_404": 0, "failed_overload": 0, "failed_other": 0,
                 "bad_fraction": 0.0, "goodput": None, "late_fraction_of_completed": 0.0,
                 "over_slo_profile_basis_of_completed": 0.0, "outage_span_s": None, "no_op": True,
+                "late_unadjusted": 0, "late_fraction_unadjusted_of_completed": 0.0,
+                "slo_added_ms_p10": None, "slo_added_ms_p50": None, "slo_added_ms_p90": None,
+                "slo_added_fill_ms_p50": None, "slo_added_compute_ms_p50": None,
             })
     rows.sort(key=lambda row: (row["live_round"], row["workload"], row["window"]))
     return rows
@@ -486,9 +531,30 @@ def analyze(run: Path) -> dict:
             "min_ratio": round(worst[0], 4) if worst else None, "at_round": worst[1] if worst else None,
         })
     write_csv(out / "min_ratio.csv", min_rows, list(min_rows[0].keys()))
-    ms_rows = makespan_window_metrics(run, requests, slo, token_slo)
+    pooled: dict = {}
+    ms_rows = makespan_window_metrics(run, requests, slo, token_slo, pooled)
     if ms_rows:
         write_csv(out / "makespan_window_metrics.csv", ms_rows, list(ms_rows[0].keys()))
+    # per window x workload over all rounds: the catalog SLO, what the
+    # router-adjusted criterion adds to it, and late fractions both ways
+    margin_rows = []
+    for (window, workload), items in sorted(pooled.items()):
+        if workload in VISION:
+            base = {"slo_ms": slo[workload], "ttft_slo_ms": None, "tpot_slo_ms": None}
+        else:
+            base = {"slo_ms": None, "ttft_slo_ms": token_slo[workload][0], "tpot_slo_ms": token_slo[workload][1]}
+        margin_rows.append({
+            "window": window, "workload": workload, **base, "completed": len(items),
+            "added_ms_p10": quantile([x[0] for x in items], 0.1), "added_ms_p50": quantile([x[0] for x in items], 0.5),
+            "added_ms_p90": quantile([x[0] for x in items], 0.9),
+            "fill_ms_p50": quantile([x[1] for x in items], 0.5), "compute_ms_p50": quantile([x[2] for x in items], 0.5),
+            "round_trip_ms": ROUTER_RTT_MS,
+            "late_adjusted": sum(x[3] for x in items), "late_unadjusted": sum(x[4] for x in items),
+            "late_fraction_adjusted": round(sum(x[3] for x in items) / len(items), 4),
+            "late_fraction_unadjusted": round(sum(x[4] for x in items) / len(items), 4),
+        })
+    if margin_rows:
+        write_csv(out / "slo_margin_summary.csv", margin_rows, list(margin_rows[0].keys()))
     return {"run": str(run), "rounds": len(bounds), "requests": len(requests), "min_ratio": min_rows}
 
 
